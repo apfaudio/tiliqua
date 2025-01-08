@@ -59,8 +59,6 @@ class SID(wiring.Component):
                      "sid_pot.sv",
                      "sid_envelope.sv",
                      "sid_waveform.sv",
-                     "sid_waveform_PST.svh",
-                     "sid_waveform__ST.svh",
                      "sid_waveform_PS__6581.hex",
                      "sid_waveform_PS__8580.hex",
                      "sid_waveform_P_T_6581.hex",
@@ -69,7 +67,7 @@ class SID(wiring.Component):
                      "dac_6581_cutoff.hex",
                      "sid_control.sv",
                      "dac_6581_waveform.hex"]:
-            platform.add_file(file, open(os.path.join(vroot, file)))
+            platform.add_file(file, open(os.path.join(vroot, file)).read())
 
         # Exclude ICE40 muladd.sv, replace with a generic one that works on ECP5 --
 
