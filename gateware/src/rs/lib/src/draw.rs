@@ -377,6 +377,133 @@ where
     Ok(())
 }
 
+pub fn draw_sid<D>(d: &mut D, x: u32, y: u32, hue: u8,
+                   wfm:    Option<u8>,
+                   gates:  [bool; 3],
+                   filter: bool,
+                   switches: [bool; 3],
+                   filter_types: [bool; 3],
+                   ) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = Gray8>,
+{
+     let stroke_grey = PrimitiveStyleBuilder::new()
+            .stroke_color(Gray8::new(0xB0 + hue))
+            .stroke_width(1)
+            .build();
+
+     let stroke_white = PrimitiveStyleBuilder::new()
+            .stroke_color(Gray8::WHITE)
+            .stroke_width(1)
+            .build();
+
+    let mut line = |disp: &mut D, x1: u32, y1: u32, x2: u32, y2: u32, hl: bool| {
+        Line::new(Point::new((x+x1) as i32, (y+y1) as i32),
+                  Point::new((x+x2) as i32, (y+y2) as i32))
+                  .into_styled(if hl { stroke_white } else { stroke_grey } )
+                  .draw(disp).ok()
+    };
+
+    let mut rect = |disp: &mut D, x1: u32, y1: u32, sx: u32, sy: u32, hl: bool| {
+        Rectangle::new(Point::new((x+x1) as i32, (y+y1) as i32),
+                       Size::new(sx, sy))
+                       .into_styled(if hl { stroke_white } else { stroke_grey } )
+                       .draw(disp).ok()
+    };
+
+    let mut circle = |disp: &mut D, x1: u32, y1: u32, radius: u32| {
+        Circle::new(Point::new((x+x1-radius) as i32, (y+y1-radius) as i32), radius*2+1)
+                    .into_styled(stroke_grey)
+                    .draw(disp).ok()
+    };
+
+    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xB0 + hue));
+    Text::new(
+        "MOS 6581",
+        Point::new((x+20) as i32, (y-10) as i32),
+        font_small_white,
+    )
+    .draw(d)?;
+
+    let spacing = 32;
+    for n in 0..3 {
+        let ys = n * spacing;
+
+        // wiring
+        circle(d, 51, 10+ys, 8);
+        line(d,   33, 10+ys, 42, 10+ys, false);
+        line(d,   32, 26+ys, 50, 26+ys, false);
+        line(d,   51, 19+ys, 51, 26+ys, false);
+        line(d,   46, 5+ys,  56, 15+ys, false);
+        line(d,   46, 15+ys, 56, 5+ys,  false);
+        line(d,   60, 10+ys, 69, 10+ys, false);
+
+        // wfm
+        let hl_wfm = wfm == Some(n as u8);
+        rect(d,  3,  3+ys, 30,    15, hl_wfm);
+        line(d,  9, 14+ys, 16,  7+ys, hl_wfm);
+        line(d, 17,  7+ys, 17, 14+ys, hl_wfm);
+        line(d, 17, 14+ys, 24,  7+ys, hl_wfm);
+        line(d, 25,  7+ys, 25, 14+ys, hl_wfm);
+
+        // adsr / gate
+        let hl_adsr = gates[n as usize];
+        rect(d, 3,  19+ys, 30,    15, hl_adsr);
+        line(d, 7,  31+ys, 12, 21+ys, hl_adsr);
+        line(d, 13, 22+ys, 15, 27+ys, hl_adsr);
+        line(d, 16, 27+ys, 24, 27+ys, hl_adsr);
+        line(d, 25, 27+ys, 29, 31+ys, hl_adsr);
+
+        // switch
+        let switch_pos = if switches[n as usize] { 8 } else { 0 };
+        line(d, 70, 10+ys, 79, 6+ys+switch_pos, filter);
+    }
+
+    // right wiring
+    line(d, 80,  6,  85,  6,  false);
+    line(d, 80,  14, 83,  14, false);
+    line(d, 83,  13, 87,  13, false);
+    line(d, 87,  14, 90,  14, false);
+    line(d, 80,  38, 85,  38, false);
+    line(d, 85,  6,  85,  90, false);
+    line(d, 80,  70, 85,  70, false);
+    line(d, 80,  46, 83,  46, false);
+    line(d, 80,  78, 83,  78, false);
+    line(d, 83,  45, 87,  45, false);
+    line(d, 83,  77, 87,  77, false);
+    line(d, 87,  46, 90,  46, false);
+    line(d, 87,  78, 90,  78, false);
+    line(d, 90,  78, 90,  14, false);
+    line(d, 90,  46, 95,  46, false);
+    line(d, 108, 86, 108, 94, false);
+    line(d, 104, 90, 112, 90, false);
+    line(d, 86,  90, 100, 90, false);
+    line(d, 108, 61, 108, 81, false);
+    line(d, 117, 90, 123, 90, false);
+    line(d, 123, 90, 120, 87, false);
+    line(d, 123, 90, 120, 93, false);
+
+    // lpf
+    line(d,   98,  31, 104, 31, filter_types[0]);
+    line(d,   104, 31, 109, 36, filter_types[0]);
+    line(d,   110, 36, 116, 36, filter_types[0]);
+    // bpf
+    line(d,   98,  46, 103, 46, filter_types[1]);
+    line(d,   106, 41, 104, 46, filter_types[1]);
+    line(d,   106, 41, 108, 45, filter_types[1]);
+    line(d,   108, 46, 116, 46, filter_types[1]);
+    // hpf
+    line(d,   98,  59, 104, 59, filter_types[2]);
+    line(d,   110, 54, 105, 59, filter_types[2]);
+    line(d,   110, 54, 116, 54, filter_types[2]);
+
+    rect(d,   96,  29, 23,  33, filter);
+
+    circle(d, 108, 90, 8);
+
+    Ok(())
+}
+
 
 #[cfg(test)]
 mod test_data {
