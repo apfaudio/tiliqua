@@ -1,7 +1,6 @@
 use tiliqua_lib::opt::*;
 use tiliqua_lib::impl_option_view;
 use tiliqua_lib::impl_option_page;
-use tiliqua_lib::palette::ColorPalette;
 
 use heapless::String;
 
@@ -168,6 +167,7 @@ impl_option_view!(ModulateOptions,
 #[derive(Clone)]
 pub struct Options {
     pub modify: bool,
+    pub draw: bool,
     pub screen: EnumOption<Screen>,
     pub modulate: ModulateOptions,
     pub voice1: VoiceOptions,
@@ -272,6 +272,7 @@ impl Options {
     pub fn new() -> Options {
         Options {
             modify: false,
+            draw: true,
             screen: EnumOption {
                 name: String::from_str("screen").unwrap(),
                 value: Screen::Voice1,

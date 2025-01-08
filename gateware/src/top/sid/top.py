@@ -4,20 +4,21 @@
 
 import logging
 import os
+import sys
 
-from amaranth                            import *
-from amaranth.lib                        import wiring, data
-from amaranth.lib.fifo                   import SyncFIFO
-from amaranth.lib.wiring                 import In, Out
+from amaranth              import *
+from amaranth.lib.fifo     import SyncFIFO
+from amaranth.lib          import wiring, data, stream
+from amaranth.lib.wiring   import In, Out, flipped, connect
 
-from tiliqua                             import eurorack_pmod
-from tiliqua.tiliqua_soc                 import TiliquaSoc
-from tiliqua.tiliqua_platform            import set_environment_variables
+from amaranth_soc          import csr
 
-from luna_soc                            import top_level_cli
-from luna_soc.gateware.csr.base          import Peripheral
+from amaranth_future       import fixed
 
-from xbeam.top                           import ScopeTracePeripheral
+from tiliqua               import eurorack_pmod, dsp, scope
+from tiliqua.tiliqua_soc   import TiliquaSoc
+from tiliqua.cli           import top_level_cli
+from tiliqua.scope         import ScopeTracePeripheral
 
 class SID(wiring.Component):
 
@@ -43,7 +44,7 @@ class SID(wiring.Component):
 
     def add_verilog_sources(self, platform):
         vroot = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                             "../../deps/reDIP-SID/gateware")
+                                             "../../../deps/sid/gateware")
 
         # Use MOS8580 sim, it has no DC offset.
         platform.add_file("sid_defines.sv", "`define SID2")
@@ -120,17 +121,16 @@ class SID(wiring.Component):
 
         return m
 
-class SIDPeripheral(Peripheral, Elaboratable):
+class SIDPeripheral(wiring.Component):
+    class TransactionData(csr.Register, access="w"):
+        transaction_data: csr.Field(csr.action.W, unsigned(16))
+
     def __init__(self, *, transaction_depth=16):
-        super().__init__()
-
-        self.transaction_width = 16
-        self._transactions = SyncFIFO(width=self.transaction_width,
-                                      depth=transaction_depth)
-
-        # CSRs
-        bank                   = self.csr_bank()
-        self._transaction_data = bank.csr(self.transaction_width, "w")
+        self._transactions = SyncFIFO(width=16, depth=transaction_depth)
+        # Use new CSR builder style
+        regs = csr.Builder(addr_width=5, data_width=8)
+        self._transaction_data = regs.add("transaction_data", self.TransactionData(), offset=0x0)
+        self._bridge = csr.Bridge(regs.as_memory_map())
 
         self.sid = None
 
@@ -138,9 +138,11 @@ class SIDPeripheral(Peripheral, Elaboratable):
         self.last_audio_left  = Signal(signed(24))
         self.last_audio_right = Signal(signed(24))
 
-        # Peripheral bus
-        self._bridge    = self.bridge(data_width=32, granularity=8, alignment=2)
-        self.bus        = self._bridge.bus
+        super().__init__({
+            "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+        })
+        self.bus.memory_map = self._bridge.bus.memory_map
+
 
     def elaborate(self, platform):
         m = Module()
@@ -201,20 +203,28 @@ class SIDPeripheral(Peripheral, Elaboratable):
         return m
 
 class SIDSoc(TiliquaSoc):
-    def __init__(self, *, firmware_path, dvi_timings):
-        super().__init__(firmware_path=firmware_path, dvi_timings=dvi_timings, audio_192=False,
-                         audio_out_peripheral=False)
+    def __init__(self, **kwargs):
+        # Don't finalize CSR bridge yet
+        super().__init__(audio_192=False,
+                         audio_out_peripheral=False,
+                         finalize_csr_bridge=False,
+                         **kwargs)
 
+        # Add SID peripheral
         self.sid_periph = SIDPeripheral()
-        self.soc.add_peripheral(self.sid_periph, addr=0xf0007000)
+        self.csr_decoder.add(self.sid_periph.bus, addr=0x1000, name="sid_periph")
 
+        # Add scope peripheral 
         fb_size = (self.video.fb_hsize, self.video.fb_vsize)
-        self.scope_periph = ScopeTracePeripheral(
+        self.scope_periph = scope.ScopeTracePeripheral(
             fb_base=self.video.fb_base,
             fb_size=fb_size,
-            bus=self.soc.psram,
-            default_en=True)
-        self.soc.add_peripheral(self.scope_periph, addr=0xf0008000)
+            bus_dma=self.psram_periph,
+            video_rotate_90=self.video_rotate_90)
+        self.csr_decoder.add(self.scope_periph.bus, addr=0x1100, name="scope_periph")
+
+        # Now finalize the CSR bridge
+        self.finalize_csr_bridge()
 
     def elaborate(self, platform):
 
@@ -232,10 +242,10 @@ class SIDSoc(TiliquaSoc):
 
         m.d.comb += [
             astream.ostream.valid.eq(1),
-            astream.ostream.payload[0].sas_value().eq(sid.voice0_dca),
-            astream.ostream.payload[1].sas_value().eq(sid.voice1_dca),
-            astream.ostream.payload[2].sas_value().eq(sid.voice2_dca),
-            astream.ostream.payload[3].sas_value().eq(self.sid_periph.last_audio_left>>8),
+            astream.ostream.payload[0].raw().eq(sid.voice0_dca),
+            astream.ostream.payload[1].raw().eq(sid.voice1_dca),
+            astream.ostream.payload[2].raw().eq(sid.voice2_dca),
+            astream.ostream.payload[3].raw().eq(self.sid_periph.last_audio_left>>8),
         ]
 
         m.d.comb += [
@@ -255,4 +265,4 @@ class SIDSoc(TiliquaSoc):
 
 if __name__ == "__main__":
     this_path = os.path.dirname(os.path.realpath(__file__))
-    top_level_cli(SidSoc, path=this_path)
+    top_level_cli(SIDSoc, path=this_path)

@@ -1,6 +1,6 @@
 use embedded_graphics::{
     pixelcolor::{Gray8, GrayColor},
-    primitives::{PrimitiveStyleBuilder, Line, Ellipse},
+    primitives::{PrimitiveStyleBuilder, Line, Ellipse, Rectangle, Circle},
     mono_font::{ascii::FONT_9X15, ascii::FONT_9X15_BOLD, MonoTextStyle},
     text::{Alignment, Text},
     prelude::*,
