@@ -213,11 +213,11 @@ impl VoiceOptions {
             },
             wave: EnumOption{
                 name: String::from_str("wave").unwrap(),
-                value: Wave::Noise,
+                value: Wave::Triangle,
             },
             gate: NumOption{
                 name: String::from_str("gate").unwrap(),
-                value: 0,
+                value: 1,
                 step: 1,
                 min: 0,
                 max: 1,

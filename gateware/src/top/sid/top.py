@@ -59,6 +59,8 @@ class SID(wiring.Component):
                      "sid_pot.sv",
                      "sid_envelope.sv",
                      "sid_waveform.sv",
+                     "sid_waveform_PST.svh",
+                     "sid_waveform__ST.svh",
                      "sid_waveform_PS__6581.hex",
                      "sid_waveform_PS__8580.hex",
                      "sid_waveform_P_T_6581.hex",
@@ -146,12 +148,13 @@ class SIDPeripheral(wiring.Component):
         m = Module()
 
         m.submodules.bridge  = self._bridge
+        connect(m, flipped(self.bus), self._bridge.bus)
         m.submodules.transactions = self._transactions
 
         # CSRs -> Transactions FIFO
         m.d.comb += [
-            self._transactions.w_en      .eq(self._transaction_data.w_stb),
-            self._transactions.w_data    .eq(self._transaction_data.w_data),
+            self._transactions.w_en      .eq(self._transaction_data.f.transaction_data.w_stb),
+            self._transactions.w_data    .eq(self._transaction_data.f.transaction_data.w_data),
         ]
 
         DIVIDE_BY = 60 # sync clk / 60 should be ~1MHz. TODO generate this constant
@@ -201,11 +204,15 @@ class SIDPeripheral(wiring.Component):
         return m
 
 class SIDSoc(TiliquaSoc):
+
+    brief = "MOS 6581 (SID) emulation."
+
     def __init__(self, **kwargs):
         # Don't finalize CSR bridge yet
         super().__init__(audio_192=False,
                          audio_out_peripheral=False,
                          finalize_csr_bridge=False,
+                         mainram_size=0x4000, # big opts struct eats stack
                          **kwargs)
 
         # Add SID peripheral
@@ -228,13 +235,14 @@ class SIDSoc(TiliquaSoc):
 
         m = Module()
 
+        m.submodules.sid = sid = SID()
+        m.submodules += self.sid_periph
+        m.submodules += self.scope_periph
         m.submodules += super().elaborate(platform)
 
         pmod0 = self.pmod0_periph.pmod
 
         m.submodules.astream = astream = eurorack_pmod.AudioStream(pmod0)
-
-        m.submodules.sid = sid = SID()
 
         self.sid_periph.sid = sid
 

@@ -60,6 +60,7 @@ fn volts_to_freq(volts: f32) -> f32 {
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
+
     use tiliqua_fw::opts::{VoiceOptions, ModulationTarget, VoiceModulationType};
 
     let peripherals = unsafe { pac::Peripherals::steal() };
@@ -69,106 +70,112 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             |w| unsafe { w.transaction_data().bits(((data as u16) << 5) | (addr as u16)) } );
     };
 
-    critical_section::with(|cs| {
+    let (opts, x) = critical_section::with(|cs| {
         let mut app = app.borrow_ref_mut(cs);
         app.ui.update();
+        (app.ui.opts.clone(), app.ui.pmod.sample_i())
+    });
 
-        let opts = &app.ui.opts;
-        let voices: [&VoiceOptions; 3] = [
-            &opts.voice1,
-            &opts.voice2,
-            &opts.voice3,
-        ];
+    let voices: [&VoiceOptions; 3] = [
+        &opts.voice1,
+        &opts.voice2,
+        &opts.voice3,
+    ];
 
-        let mods: [ModulationTarget; 4] = [
-            opts.modulate.in0.value,
-            opts.modulate.in1.value,
-            opts.modulate.in2.value,
-            opts.modulate.in3.value,
-        ];
+    let mods: [ModulationTarget; 4] = [
+        opts.modulate.in0.value,
+        opts.modulate.in1.value,
+        opts.modulate.in2.value,
+        opts.modulate.in3.value,
+    ];
 
-        let x = app.ui.pmod.sample_i();
+    for n_voice in 0usize..3usize {
+        let base = (7*n_voice) as u8;
 
-        for n_voice in 0usize..3usize {
-            let base = (7*n_voice) as u8;
+        // MODULATION
+        let mut freq: u16 = voices[n_voice].freq.value;
+        let mut gate = voices[n_voice].gate.value;
 
-            // MODULATION
-            let mut freq: u16 = voices[n_voice].freq.value;
-            let mut gate = voices[n_voice].gate.value;
-            
-            for (ch, m) in mods.iter().enumerate() {
-                if let Some(VoiceModulationType::Frequency) = m.modulates_voice(n_voice) {
-                    let volts: f32 = (x[ch] as f32) / 4096.0f32;
-                    let freq_hz = volts_to_freq(volts);
-                    freq = 16u16 * (0.05960464f32 * freq_hz) as u16; // assumes 1Mhz SID clk
-                                                                     // http://www.sidmusic.org/sid/sidtech2.html
+        for (ch, m) in mods.iter().enumerate() {
+            if let Some(VoiceModulationType::Frequency) = m.modulates_voice(n_voice) {
+                let volts: f32 = (x[ch] as f32) / 4096.0f32;
+                let freq_hz = volts_to_freq(volts);
+                freq = 16u16 * (0.05960464f32 * freq_hz) as u16; // assumes 1Mhz SID clk
+                                                                 // http://www.sidmusic.org/sid/sidtech2.html
+            }
+            if let Some(VoiceModulationType::Gate) = m.modulates_voice(n_voice) {
+                if x[ch] > 2000 {
+                    gate = 1;
                 }
-                if let Some(VoiceModulationType::Gate) = m.modulates_voice(n_voice) {
-                    if x[ch] > 2000 {
-                        gate = 1;
-                    }
-                    if x[ch] < 1000 {
-                        gate = 0;
-                    }
+                if x[ch] < 1000 {
+                    gate = 0;
                 }
             }
-
-            // Propagate modulation back to menu system
-
-            /*
-            voices[n_voice].freq.value = freq;
-            voices[n_voice].gate.value = gate;
-            */
-
-            freq = (freq as f32 * (voices[n_voice].freq_os.value as f32 / 1000.0f32)) as u16;
-
-            sid_poke(&sid, base+0, freq as u8);
-            sid_poke(&sid, base+1, (freq>>8) as u8);
-
-            sid_poke(&sid, base+2, voices[n_voice].pw.value as u8);
-            sid_poke(&sid, base+3, (voices[n_voice].pw.value>>8) as u8);
-
-
-            let mut reg04 = 0u8;
-            use crate::opts::Wave;
-            match voices[n_voice].wave.value {
-                Wave::Triangle => { reg04 |= 0x10; }
-                Wave::Saw      => { reg04 |= 0x20; }
-                Wave::Pulse    => { reg04 |= 0x40; }
-                Wave::Noise    => { reg04 |= 0x80; }
-            }
-
-            reg04 |= gate;
-            reg04 |= voices[n_voice].sync.value << 1;
-            reg04 |= voices[n_voice].ring.value << 2;
-
-            sid_poke(&sid, base+4, reg04);
-
-            sid_poke(&sid, base+5,
-                voices[n_voice].decay.value |
-                (voices[n_voice].attack.value << 4));
-
-            sid_poke(&sid, base+6,
-                voices[n_voice].release.value |
-                (voices[n_voice].sustain.value << 4));
         }
 
-        sid_poke(&sid, 0x15, (opts.filter.cutoff.value & 0x7) as u8);
-        sid_poke(&sid, 0x16, (opts.filter.cutoff.value >> 3) as u8);
-        sid_poke(&sid, 0x17,
-            (opts.filter.filt1.value |
-            (opts.filter.filt2.value << 1) |
-            (opts.filter.filt3.value << 2) |
-            (opts.filter.reso.value  << 4)) as u8
-            );
-        sid_poke(&sid, 0x18,
-            ((opts.filter.lp.value     << 4) |
-             (opts.filter.bp.value     << 5) |
-             (opts.filter.hp.value     << 6) |
-             (opts.filter.v3off.value  << 7) |
-             (opts.filter.volume.value << 0)) as u8
-            );
-    });
+        // Propagate modulation back to menu system
+
+        /*
+        voices[n_voice].freq.value = freq;
+        voices[n_voice].gate.value = gate;
+        */
+
+        freq = (freq as f32 * (voices[n_voice].freq_os.value as f32 / 1000.0f32)) as u16;
+
+        sid_poke(&sid, base+0, freq as u8);
+        sid_poke(&sid, base+1, (freq>>8) as u8);
+
+        sid_poke(&sid, base+2, voices[n_voice].pw.value as u8);
+        sid_poke(&sid, base+3, (voices[n_voice].pw.value>>8) as u8);
+
+        let mut reg04 = 0u8;
+        use crate::opts::Wave;
+        match voices[n_voice].wave.value {
+            Wave::Triangle => { reg04 |= 0x10; }
+            Wave::Saw      => { reg04 |= 0x20; }
+            Wave::Pulse    => { reg04 |= 0x40; }
+            Wave::Noise    => { reg04 |= 0x80; }
+        }
+
+        reg04 |= gate;
+        reg04 |= voices[n_voice].sync.value << 1;
+        reg04 |= voices[n_voice].ring.value << 2;
+
+        sid_poke(&sid, base+4, reg04);
+
+        sid_poke(&sid, base+5,
+            voices[n_voice].decay.value |
+            (voices[n_voice].attack.value << 4));
+
+        sid_poke(&sid, base+6,
+            voices[n_voice].release.value |
+            (voices[n_voice].sustain.value << 4));
+    }
+
+    sid_poke(&sid, 0x15, (opts.filter.cutoff.value & 0x7) as u8);
+    sid_poke(&sid, 0x16, (opts.filter.cutoff.value >> 3) as u8);
+    sid_poke(&sid, 0x17,
+        (opts.filter.filt1.value |
+        (opts.filter.filt2.value << 1) |
+        (opts.filter.filt3.value << 2) |
+        (opts.filter.reso.value  << 4)) as u8
+        );
+    sid_poke(&sid, 0x18,
+        ((opts.filter.lp.value     << 4) |
+         (opts.filter.bp.value     << 5) |
+         (opts.filter.hp.value     << 6) |
+         (opts.filter.v3off.value  << 7) |
+         (opts.filter.volume.value << 0)) as u8
+        );
+}
+
+pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
+    for i in 0..PX_INTENSITY_MAX {
+        for h in 0..PX_HUE_MAX {
+            let rgb = palette::compute_color(i, h, p);
+            video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
+        }
+    }
 }
 
 #[entry]
@@ -178,6 +185,8 @@ fn main() -> ! {
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
+    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
+
     let mut display = DMADisplay {
         framebuffer_base: PSRAM_FB_BASE as *mut u32,
     };
@@ -188,12 +197,11 @@ fn main() -> ! {
 
     let opts = opts::Options::new();
     let app = Mutex::new(RefCell::new(App::new(opts)));
+    let hue = 5u8;
+
+    write_palette(&mut video, palette::ColorPalette::Linear);
 
     handler!(timer0 = || timer0_handler(&app));
-
-    let hue = 10u8;
-
-    let scope = peripherals.SCOPE_PERIPH;
 
     irq::scope(|s| {
 
@@ -202,13 +210,15 @@ fn main() -> ! {
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS, 
                             pac::Interrupt::TIMER0);
 
+        let scope = peripherals.SCOPE_PERIPH;
+
         loop {
             let opts = critical_section::with(|cs| {
                 app.borrow_ref(cs).ui.opts.clone()
             });
 
             // Draw UI elements
-            draw::draw_options(&mut display, &opts, H_ACTIVE-200, V_ACTIVE/2, hue).ok();
+            draw::draw_options(&mut display, &opts, 100, V_ACTIVE/2, hue).ok();
             draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, hue, UI_NAME, UI_SHA).ok();
 
             // Draw SID visualization
@@ -286,10 +296,13 @@ fn main() -> ! {
             scope.yscale().write(|w| unsafe { w.yscale().bits(opts.scope.yscale.value) });
             scope.timebase().write(|w| unsafe { w.timebase().bits(opts.scope.timebase.value) });
 
+            scope.hue().write(|w| unsafe { w.hue().bits(hue) } );
             scope.ypos0().write(|w| unsafe { w.ypos().bits(opts.scope.ypos0.value as u16) });
             scope.ypos1().write(|w| unsafe { w.ypos().bits(opts.scope.ypos1.value as u16) });
             scope.ypos2().write(|w| unsafe { w.ypos().bits(opts.scope.ypos2.value as u16) });
             scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope.ypos3.value as u16) });
+
+            scope.xpos().write(|w| unsafe { w.xpos().bits(opts.scope.xpos.value as u16) } );
 
             scope.trigger_always().write(
                 |w| w.trigger_always().bit(opts.scope.trigger_mode.value == opts::TriggerMode::Always));

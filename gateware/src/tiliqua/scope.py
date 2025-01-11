@@ -105,6 +105,9 @@ class ScopeTracePeripheral(wiring.Component):
     class TriggerLevel(csr.Register, access="w"):
         trigger_level: csr.Field(csr.action.W, unsigned(16))
 
+    class XPosition(csr.Register, access="w"):
+        xpos: csr.Field(csr.action.W, unsigned(16))
+
     class YPosition(csr.Register, access="w"):
         ypos: csr.Field(csr.action.W, unsigned(16))
 
@@ -134,7 +137,8 @@ class ScopeTracePeripheral(wiring.Component):
         self._yscale         = regs.add("yscale",         self.YScale(),        offset=0x14)
         self._trigger_always = regs.add("trigger_always", self.TriggerAlways(), offset=0x18)
         self._trigger_lvl    = regs.add("trigger_lvl",    self.TriggerLevel(),  offset=0x1C)
-        self._ypos           = [regs.add(f"ypos{i}",      self.YPosition(),     offset=(0x20+i*4)) for i in range(4)]
+        self._xpos           = regs.add("xpos",           self.XPosition(),     offset=0x20)
+        self._ypos           = [regs.add(f"ypos{i}",      self.YPosition(),     offset=(0x24+i*4)) for i in range(4)]
 
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
@@ -214,6 +218,10 @@ class ScopeTracePeripheral(wiring.Component):
 
         with m.If(self._trigger_lvl.f.trigger_level.w_stb):
             m.d.sync += self.trigger_lvl.raw().eq(self._trigger_lvl.f.trigger_level.w_data)
+
+        with m.If(self._xpos.f.xpos.w_stb):
+            for s in self.strokes:
+                m.d.sync += s.x_offset.eq(self._xpos.f.xpos.w_data)
 
         for i, ypos_reg in enumerate(self._ypos):
             with m.If(ypos_reg.f.ypos.w_stb):

@@ -77,7 +77,8 @@ class VerilatorPlatform():
         self.psram_registers = hw_platform.psram_registers
 
     def add_file(self, file_name, contents):
-        self.files[file_name] = contents
+        if not file_name.endswith('.svh'):
+            self.files[file_name] = contents
 
 def is_hw(platform):
     # assumption: anything that inherits from Platform is a
