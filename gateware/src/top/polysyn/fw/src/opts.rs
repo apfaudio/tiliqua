@@ -21,8 +21,15 @@ pub enum Screen {
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TouchControl {
-    On,
     Off,
+    On,
+}
+
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
+pub enum UsbHost {
+    Off,
+    On,
 }
 
 #[derive(Clone)]
@@ -37,14 +44,16 @@ impl_option_view!(HelpOptions,
 #[derive(Clone)]
 pub struct PolyOptions {
     pub selected: Option<usize>,
-    pub interface: EnumOption<TouchControl>,
-    pub drive:     NumOption<u16>,
-    pub reso:      NumOption<u16>,
-    pub diffuse:   NumOption<u16>,
+    pub touch_control: EnumOption<TouchControl>,
+    pub usb_host: EnumOption<UsbHost>,
+    pub drive: NumOption<u16>,
+    pub reso: NumOption<u16>,
+    pub diffuse: NumOption<u16>,
 }
 
 impl_option_view!(PolyOptions,
-                  interface,
+                  touch_control,
+                  usb_host,
                   drive,
                   reso,
                   diffuse);
@@ -111,9 +120,13 @@ impl Options {
             },
             poly: PolyOptions {
                 selected: None,
-                interface: EnumOption{
+                touch_control: EnumOption{
                     name: String::from_str("touch").unwrap(),
                     value: TouchControl::On,
+                },
+                usb_host: EnumOption{
+                    name: String::from_str("usb-host").unwrap(),
+                    value: UsbHost::Off,
                 },
                 drive: NumOption{
                     name: String::from_str("overdrive").unwrap(),

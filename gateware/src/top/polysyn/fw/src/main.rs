@@ -23,6 +23,7 @@ use tiliqua_lib::midi::MidiTouchController;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_fw::*;
 use tiliqua_fw::opts::TouchControl;
+use tiliqua_fw::opts::UsbHost;
 use tiliqua_fw::opts::Screen;
 
 use embedded_graphics::{
@@ -87,7 +88,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
 
         // Touch controller logic (sends MIDI to internal polysynth)
-        if opts.poly.interface.value == TouchControl::On {
+        if opts.poly.touch_control.value == TouchControl::On {
             app.ui.touch_led_mask(0b00111111);
             let touch = app.ui.pmod.touch();
             let jack = app.ui.pmod.jack();
@@ -106,6 +107,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             }
         }
 
+        app.synth.usb_midi_host(opts.poly.usb_host.value == UsbHost::On);
     });
 }
 
