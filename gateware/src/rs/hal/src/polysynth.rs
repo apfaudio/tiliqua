@@ -72,6 +72,10 @@ macro_rules! impl_polysynth {
                 pub fn midi_read(&mut self) -> u32  {
                     self.registers.midi_read().read().bits()
                 }
+
+                pub fn usb_midi_host(&mut self, enable: bool)  {
+                    self.registers.usb_midi_host().write(|w| unsafe { w.host().bit(enable) } );
+                }
             }
         )+
     };

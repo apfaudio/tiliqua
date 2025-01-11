@@ -44,6 +44,7 @@ from tiliqua.delay_line        import DelayLine
 from tiliqua.eurorack_pmod     import ASQ
 from tiliqua.tiliqua_soc       import TiliquaSoc
 from tiliqua.cli               import top_level_cli
+from tiliqua.usb_host          import SimpleUSBMIDIHost
 
 class Diffuser(wiring.Component):
 
@@ -258,6 +259,10 @@ class SynthPeripheral(wiring.Component):
     class MidiRead(csr.Register, access="r"):
         msg: csr.Field(csr.action.R, unsigned(32))
 
+    class UsbMidiHost(csr.Register, access="w"):
+        """1 enables USB MIDI host."""
+        host: csr.Field(csr.action.W, unsigned(1))
+
     def __init__(self, synth=None):
         self.synth = synth
         regs = csr.Builder(addr_width=7, data_width=8)
@@ -270,10 +275,12 @@ class SynthPeripheral(wiring.Component):
         self._matrix_busy   = regs.add("matrix_busy",   self.MatrixBusy(),   offset=voices_csr_end + 0x4)
         self._midi_write    = regs.add("midi_write",    self.MidiWrite(),    offset=voices_csr_end + 0x8)
         self._midi_read     = regs.add("midi_read",     self.MidiRead(),     offset=voices_csr_end + 0xC)
+        self._midi_host     = regs.add("usb_midi_host", self.UsbMidiHost(),  offset=voices_csr_end + 0x10)
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            "i_midi": In(stream.Signature(midi.MidiMessage))
+            "i_midi": In(stream.Signature(midi.MidiMessage)),
+            "usb_midi_host": Out(1),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -287,6 +294,10 @@ class SynthPeripheral(wiring.Component):
             m.d.sync += self.synth.drive.eq(self._drive.f.value.w_data)
         with m.If(self._reso.f.value.w_stb):
             m.d.sync += self.synth.reso.eq(self._reso.f.value.w_data)
+
+        # enable USB MIDI host
+        with m.If(self._midi_host.f.host.w_stb):
+            m.d.sync += self.usb_midi_host.eq(self._midi_host.f.host.w_data)
 
         # voice tracking
         for i, voice in enumerate(self._voices):
@@ -312,7 +323,6 @@ class SynthPeripheral(wiring.Component):
                 matrix_busy.eq(0),
                 self.synth.diffuser.matrix.c.valid.eq(0),
             ]
-
 
         # MIDI injection and arbiter between SoC MIDI and HW MIDI -> synth MIDI.
         m.submodules.soc_midi_fifo = soc_midi_fifo = SyncFIFOBuffered(
@@ -396,13 +406,33 @@ class PolySoc(TiliquaSoc):
         m.submodules.astream = astream = eurorack_pmod.AudioStream(pmod0)
 
         if sim.is_hw(platform):
-            # polysynth midi
+            # Polysynth hardware MIDI sources
+
+            # TRS MIDI (serial)
             midi_pins = platform.request("midi")
             m.submodules.serialrx = serialrx = midi.SerialRx(
                     system_clk_hz=60e6, pins=midi_pins)
-            m.submodules.midi_decode = midi_decode = midi.MidiDecode()
-            wiring.connect(m, serialrx.o, midi_decode.i)
-            wiring.connect(m, midi_decode.o, self.synth_periph.i_midi)
+            m.submodules.midi_decode_trs = midi_decode_trs = midi.MidiDecode()
+            wiring.connect(m, serialrx.o, midi_decode_trs.i)
+
+            # USB MIDI host (experimental)
+            ulpi = platform.request(platform.default_usb_connection)
+            m.submodules.usb = usb = SimpleUSBMIDIHost(
+                    bus=ulpi,
+                    hardcoded_configuration_id=1,
+                    hardcoded_midi_endpoint=2,
+            )
+            m.submodules.midi_decode_usb = midi_decode_usb = midi.MidiDecode(usb=True)
+            wiring.connect(m, usb.o_midi_bytes, midi_decode_usb.i)
+
+            # Only enable VBUS if MIDI HOST is enabled.
+            vbus_o = platform.request("usb_vbus_en").o
+            with m.If(self.synth_periph.usb_midi_host):
+                wiring.connect(m, midi_decode_usb.o, self.synth_periph.i_midi)
+                m.d.comb += vbus_o.eq(1)
+            with m.Else():
+                wiring.connect(m, midi_decode_trs.o, self.synth_periph.i_midi)
+                m.d.comb += vbus_o.eq(0)
 
         # polysynth audio
         wiring.connect(m, astream.istream, polysynth.i)
