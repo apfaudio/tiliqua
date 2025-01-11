@@ -107,7 +107,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             }
         }
 
-        app.synth.usb_midi_host(opts.poly.usb_host.value == UsbHost::On);
+        app.synth.usb_midi_host(opts.usb.host.value == UsbHost::Enable,
+                                opts.usb.cfg_id.value,
+                                opts.usb.endpt_id.value);
     });
 }
 
