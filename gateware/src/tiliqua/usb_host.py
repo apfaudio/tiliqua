@@ -309,8 +309,8 @@ class SimpleUSBMIDIHost(Elaboratable):
                  hardcoded_configuration_id=0x0001,
                  hardcoded_midi_endpoint=1):
         # FIXME: for now, the configuration and endpoint ID for the MIDI interface is hardcoded.
-        self.configuration_id = hardcoded_configuration_id
-        self.midi_endpoint_id = hardcoded_midi_endpoint
+        self.configuration_id = Signal(unsigned(4), init=hardcoded_configuration_id)
+        self.midi_endpoint_id = Signal(unsigned(4), init=hardcoded_midi_endpoint)
         self.sim = sim
         if self.sim:
             self.utmi = UTMIInterface()
@@ -445,7 +445,15 @@ class SimpleUSBMIDIHost(Elaboratable):
                 """
                 with m.State(state_id):
                     data_length = data_shape.as_shape().size // 8
-                    payload = Const(data_payload, shape=data_shape)
+                    payload = Signal(shape=data_shape)
+                    def assign_payload_values(target, source):
+                        # Helper function to recursively assign payload values
+                        if not isinstance(source, dict):
+                            m.d.comb += target.eq(source)
+                        else:
+                            for key, value in source.items():
+                                assign_payload_values(getattr(target, key), value)
+                    assign_payload_values(payload, data_payload)
                     data_view = Signal(data.ArrayLayout(unsigned(8), data_length))
                     ix = Signal(range(data_length))
                     m.d.comb += [

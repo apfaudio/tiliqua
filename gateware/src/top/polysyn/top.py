@@ -260,8 +260,13 @@ class SynthPeripheral(wiring.Component):
         msg: csr.Field(csr.action.R, unsigned(32))
 
     class UsbMidiHost(csr.Register, access="w"):
-        """1 enables USB MIDI host."""
-        host: csr.Field(csr.action.W, unsigned(1))
+        """USB MIDI host settings."""
+        # 0 = off. 1 = enable VBUS and forward USB MIDI.
+        host:     csr.Field(csr.action.W, unsigned(1))
+
+    class UsbMidiCfg(csr.Register, access="w"):
+        # Hardcoded MIDI streaming endpoint location (device specific)
+        value: csr.Field(csr.action.W, unsigned(4))
 
     def __init__(self, synth=None):
         self.synth = synth
@@ -276,11 +281,15 @@ class SynthPeripheral(wiring.Component):
         self._midi_write    = regs.add("midi_write",    self.MidiWrite(),    offset=voices_csr_end + 0x8)
         self._midi_read     = regs.add("midi_read",     self.MidiRead(),     offset=voices_csr_end + 0xC)
         self._midi_host     = regs.add("usb_midi_host", self.UsbMidiHost(),  offset=voices_csr_end + 0x10)
+        self._midi_cfg      = regs.add("usb_midi_cfg",  self.UsbMidiCfg(),   offset=voices_csr_end + 0x14)
+        self._midi_endp     = regs.add("usb_midi_endp", self.UsbMidiCfg(),   offset=voices_csr_end + 0x18)
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
             "i_midi": In(stream.Signature(midi.MidiMessage)),
             "usb_midi_host": Out(1),
+            "usb_midi_cfg_id": Out(4),
+            "usb_midi_endpt_id": Out(4),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -295,9 +304,13 @@ class SynthPeripheral(wiring.Component):
         with m.If(self._reso.f.value.w_stb):
             m.d.sync += self.synth.reso.eq(self._reso.f.value.w_data)
 
-        # enable USB MIDI host
+        # USB MIDI flags
         with m.If(self._midi_host.f.host.w_stb):
             m.d.sync += self.usb_midi_host.eq(self._midi_host.f.host.w_data)
+        with m.If(self._midi_cfg.f.value.w_stb):
+            m.d.sync += self.usb_midi_cfg_id.eq(self._midi_cfg.f.value.w_data)
+        with m.If(self._midi_endp.f.value.w_stb):
+            m.d.sync += self.usb_midi_endpt_id.eq(self._midi_endp.f.value.w_data)
 
         # voice tracking
         for i, voice in enumerate(self._voices):
@@ -420,10 +433,14 @@ class PolySoc(TiliquaSoc):
             m.submodules.usb = usb = SimpleUSBMIDIHost(
                     bus=ulpi,
                     hardcoded_configuration_id=1,
-                    hardcoded_midi_endpoint=2,
+                    hardcoded_midi_endpoint=1,
             )
             m.submodules.midi_decode_usb = midi_decode_usb = midi.MidiDecode(usb=True)
             wiring.connect(m, usb.o_midi_bytes, midi_decode_usb.i)
+            m.d.comb += [
+                usb.configuration_id.eq(self.synth_periph.usb_midi_cfg_id),
+                usb.midi_endpoint_id.eq(self.synth_periph.usb_midi_endpt_id),
+            ]
 
             # Only enable VBUS if MIDI HOST is enabled.
             vbus_o = platform.request("usb_vbus_en").o
