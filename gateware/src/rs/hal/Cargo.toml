@@ -13,7 +13,7 @@ targets = [
 ]
 
 [lib]
-test = false
+test = true
 bench = false
 
 [dependencies]
@@ -23,3 +23,5 @@ log = { version = "=0.4.17", optional = true }
 nb = "=1.1.0"
 riscv = { version = "=0.11.1", features = ["critical-section-single-hart"] }
 embedded-graphics = "0.8.1"
+bitflags = "2.6.0"
+micromath = "2.1.0"
