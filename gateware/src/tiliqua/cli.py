@@ -128,6 +128,8 @@ def top_level_cli(
                         help="platform override: Tiliqua R2 with a SoldierCrab R3")
     parser.add_argument('--hw3', action='store_true',
                         help="platform override: Tiliqua R3 with a SoldierCrab R3")
+    parser.add_argument('--hw4', action='store_true',
+                        help="platform override: Tiliqua R4 with a SoldierCrab R3")
     parser.add_argument('--bootaddr', type=str, default="0x0",
                         help="'bootaddr' argument of ecppack (default: 0x0).")
     parser.add_argument('--verbose', action='store_true',
@@ -196,7 +198,10 @@ def top_level_cli(
         else:
             args.brief = ""
 
-    if args.hw3:
+    if args.hw4:
+        # Tiliqua R4 with SoldierCrab R3
+        hw_platform = TiliquaR4SC3Platform()
+    elif args.hw3:
         # Tiliqua R3 with SoldierCrab R3
         hw_platform = TiliquaR3SC3Platform()
     else:
@@ -234,8 +239,7 @@ def top_level_cli(
         return manifest
 
     def create_bitstream_archive():
-        hwrev = "r3" if args.hw3 else "r2"
-        archive_name = f"{args.name.lower()}-{repo.head.object.hexsha[:6]}-{hwrev}.tar.gz"
+        archive_name = f"{args.name.lower()}-{repo.head.object.hexsha[:6]}-{hw_platform.brief}.tar.gz"
         archive_path = os.path.join(build_path, archive_name)
         bitstream_path = "build/top.bit"
         
