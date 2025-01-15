@@ -290,8 +290,8 @@ class _TiliquaR3Mobo:
 class _TiliquaR4Mobo:
     resources   = [
         # External PLL (SI5351A) clock inputs.
-        Resource("expll_clk0", 0, Pins("44", dir="i"), Attrs(IO_TYPE="LVCMOS33")),
-        Resource("expll_clk1", 0, Pins("40", dir="i"), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("expll_clk0", 0, Pins("44", dir="i", conn=("m2", 0)), Clock(12.288e6), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("expll_clk1", 0, Pins("40", dir="i", conn=("m2", 0)), Attrs(IO_TYPE="LVCMOS33")),
 
         # Quadrature rotary encoder and switch. These are already debounced by an RC filter.
         Resource("encoder", 0,
@@ -422,7 +422,7 @@ class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
     name                   = ("Tiliqua R4 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
     brief                  = "r4"
-    clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
+    clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLsEx
     default_usb_connection = "ulpi"
 
     resources = [
