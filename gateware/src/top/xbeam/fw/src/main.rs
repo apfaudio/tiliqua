@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+use tiliqua_hal::si5351::*;
 use critical_section::Mutex;
 use core::convert::TryInto;
 use log::info;
@@ -77,6 +78,14 @@ fn main() -> ! {
     let mut display = DMADisplay {
         framebuffer_base: PSRAM_FB_BASE as *mut u32,
     };
+
+    let mut i2cdev = I2c0::new(peripherals.I2C0);
+    let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev);
+    let init = si5351drv.init_adafruit_module();
+    info!("si5351 init: {:?}", init);
+    info!("si5351 device status: {:?}", si5351drv.read_device_status());
+    let set = si5351drv.set_frequency(PLL::A, ClockOutput::Clk0, 12_288_000, Some(0.015));
+    let set = si5351drv.set_frequency(PLL::B, ClockOutput::Clk1, 74_250_000, None);
 
     tiliqua_fw::handlers::logger_init(serial);
 

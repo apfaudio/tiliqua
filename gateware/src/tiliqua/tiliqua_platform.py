@@ -291,7 +291,7 @@ class _TiliquaR4Mobo:
     resources   = [
         # External PLL (SI5351A) clock inputs.
         Resource("expll_clk0", 0, Pins("44", dir="i", conn=("m2", 0)), Clock(12.288e6), Attrs(IO_TYPE="LVCMOS33")),
-        Resource("expll_clk1", 0, Pins("40", dir="i", conn=("m2", 0)), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("expll_clk1", 0, Pins("40", dir="i", conn=("m2", 0)), Clock(74.250e6), Attrs(IO_TYPE="LVCMOS33")),
 
         # Quadrature rotary encoder and switch. These are already debounced by an RC filter.
         Resource("encoder", 0,
