@@ -8,18 +8,17 @@ from amaranth                    import *
 from tiliqua                     import video
 from amaranth.lib.cdc            import FFSynchronizer
 
-def create_dvi_pll(pll_settings: video.DVIPLL, clk48, reset, feedback, locked):
+def create_dvi_pll(pll_settings: video.DVIPLL, clk48, reset, locked):
     """
     Create a PLL to generate DVI clocks (depends on resolution selected).
     1x pixel clock and 5x (half DVI TDMS clock, output is DDR).
     """
     return Instance("EHXPLLL",
             # Clock in.
-            i_CLKI=clk48,
+            i_CLKI=ClockSignal("expll_clk1"),
             # Generated clock outputs.
-            o_CLKOP=feedback,
-            o_CLKOS=ClockSignal("dvi5x"),
-            o_CLKOS2=ClockSignal("dvi"),
+            o_CLKOP=ClockSignal("dvi5x"),
+            o_CLKOS=ClockSignal("dvi"),
             # Status.
             o_LOCK=locked,
             # PLL parameters...
@@ -31,23 +30,19 @@ def create_dvi_pll(pll_settings: video.DVIPLL, clk48, reset, feedback, locked):
             p_OUTDIVIDER_MUXB = "DIVB",
             p_OUTDIVIDER_MUXC = "DIVC",
             p_OUTDIVIDER_MUXD = "DIVD",
-            p_CLKI_DIV        = pll_settings.clki_div,
+            p_CLKI_DIV        = 1,
             p_CLKOP_ENABLE    = "ENABLED",
-            p_CLKOP_DIV       = pll_settings.clkop_div,
-            p_CLKOP_CPHASE    = pll_settings.clkop_cphase,
+            p_CLKOP_DIV       = 2,
+            p_CLKOP_CPHASE    = 0,
             p_CLKOP_FPHASE    = 0,
             p_CLKOS_ENABLE    = "ENABLED",
-            p_CLKOS_DIV       = pll_settings.clkos_div,
-            p_CLKOS_CPHASE    = pll_settings.clkos_cphase,
+            p_CLKOS_DIV       = 10,
+            p_CLKOS_CPHASE    = 0,
             p_CLKOS_FPHASE    = 0,
-            p_CLKOS2_ENABLE   = "ENABLED",
-            p_CLKOS2_DIV      = pll_settings.clkos2_div,
-            p_CLKOS2_CPHASE   = pll_settings.clkos2_cphase,
-            p_CLKOS2_FPHASE   = 0,
             p_FEEDBK_PATH     = "CLKOP",
-            p_CLKFB_DIV       = pll_settings.clkfb_div,
+            p_CLKFB_DIV       = 5,
             # Internal feedback.
-            i_CLKFB=feedback,
+            i_CLKFB=ClockSignal("dvi5x"),
             # Control signals.
             i_RST=reset,
             i_PHASESEL0=0,
@@ -64,7 +59,9 @@ def create_dvi_pll(pll_settings: video.DVIPLL, clk48, reset, feedback, locked):
             i_ENCLKOS3=0,
             # Synthesis attributes.
             a_ICP_CURRENT="12",
-            a_LPF_RESISTOR="8"
+            a_LPF_RESISTOR="8",
+            a_MFG_ENABLE_FILTEROPAMP="1",
+            a_MFG_GMCREF_SEL="2",
     )
 
 class TiliquaDomainGenerator2PLLs(Elaboratable):
@@ -187,7 +184,6 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
 
-            feedback_dvi = Signal()
             locked_dvi   = Signal()
             m.submodules.pll_dvi = create_dvi_pll(self.pixclk_pll, clk48, reset, feedback_dvi, locked_dvi)
 
@@ -206,7 +202,6 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
             ResetSignal("usb")   .eq(~locked60),
             ResetSignal("audio") .eq(~locked60),
         ]
-
 
         return m
 
@@ -250,6 +245,7 @@ class TiliquaDomainGenerator2PLLsEx(Elaboratable):
         m.domains.audio      = ClockDomain()
         m.domains.raw48      = ClockDomain()
         m.domains.expll_clk0 = ClockDomain()
+        m.domains.expll_clk1 = ClockDomain()
 
         clk48 = platform.request(platform.default_clk, dir='i').i
         reset  = Signal(init=0)
@@ -262,6 +258,8 @@ class TiliquaDomainGenerator2PLLsEx(Elaboratable):
             # external PLL clock domain with no synchronous reset.
             ClockSignal("expll_clk0").eq(platform.request("expll_clk0").i),
             ResetSignal("expll_clk0").eq(0),
+            ClockSignal("expll_clk1").eq(platform.request("expll_clk1").i),
+            ResetSignal("expll_clk1").eq(0),
         ]
 
         # External PLL: synchronous reset generation
@@ -352,7 +350,7 @@ class TiliquaDomainGenerator2PLLsEx(Elaboratable):
 
                 # Synthesis attributes.
                 a_ICP_CURRENT="12",
-                a_LPF_RESISTOR="8"
+                a_LPF_RESISTOR="8",
         )
 
         # Video PLL and derived signals
@@ -361,9 +359,8 @@ class TiliquaDomainGenerator2PLLsEx(Elaboratable):
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
 
-            feedback_dvi = Signal()
             locked_dvi   = Signal()
-            m.submodules.pll_dvi = create_dvi_pll(self.pixclk_pll, clk48, reset, feedback_dvi, locked_dvi)
+            m.submodules.pll_dvi = create_dvi_pll(self.pixclk_pll, clk48, reset, locked_dvi)
 
             m.d.comb += [
                 ResetSignal("dvi")  .eq(~locked_dvi),
@@ -378,6 +375,11 @@ class TiliquaDomainGenerator2PLLsEx(Elaboratable):
             ResetSignal("sync")  .eq(~locked60),
             ResetSignal("fast")  .eq(~locked60),
             ResetSignal("usb")   .eq(~locked60),
+        ]
+
+        m.d.comb += [
+            platform.request("led_a").o.eq(locked60),
+            platform.request("led_b").o.eq(locked_dvi),
         ]
 
 

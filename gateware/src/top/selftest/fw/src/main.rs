@@ -332,8 +332,8 @@ fn main() -> ! {
     let init = si5351drv.init_adafruit_module();
     info!("si5351 init: {:?}", init);
     info!("si5351 device status: {:?}", si5351drv.read_device_status());
-    let set = si5351drv.set_frequency(PLL::A, ClockOutput::Clk0, 12_288_000, Some(0.015));
-    //let set = si5351drv.set_frequency(PLL::B, ClockOutput::Clk1, 74_250_000, None);
+    let set = si5351drv.set_frequency(PLL::A, ClockOutput::Clk0, 4*12_288_000, Some(0.015));
+    let set = si5351drv.set_frequency(PLL::B, ClockOutput::Clk1, 74_250_000, None);
     info!("si5351 set: {:?}", set);
 
     let mut pca9635 = Pca9635Driver::new(i2cdev2);
@@ -364,11 +364,17 @@ fn main() -> ! {
 
     let mut rng = fastrand::Rng::with_seed(0);
 
+    let mut l_encoder_rotation: i16 = encoder_rotation;
+
     loop {
 
         encoder.update();
 
         encoder_rotation += encoder.poke_ticks() as i16;
+        if l_encoder_rotation != encoder_rotation {
+            let set = si5351drv.set_frequency(PLL::B, ClockOutput::Clk1, 74_250_000 + (encoder_rotation as u32)*250_000, None);
+        }
+        l_encoder_rotation = encoder_rotation;
         if encoder.poke_btn() {
             encoder_toggle = !encoder_toggle;
         }
