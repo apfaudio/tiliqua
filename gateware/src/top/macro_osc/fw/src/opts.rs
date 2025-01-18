@@ -189,7 +189,7 @@ impl Options {
                 selected: None,
                 persist: NumOption{
                     name: String::from_str("persist").unwrap(),
-                    value: 2048,
+                    value: 1024,
                     step: 256,
                     min: 512,
                     max: 32768,
@@ -217,7 +217,7 @@ impl Options {
                 },
                 palette: EnumOption {
                     name: String::from_str("palette").unwrap(),
-                    value: ColorPalette::Exp,
+                    value: ColorPalette::Linear,
                 },
             },
             scope: ScopeOptions {

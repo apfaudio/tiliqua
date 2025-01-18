@@ -3,7 +3,7 @@
 
 use critical_section::Mutex;
 use core::convert::TryInto;
-use log::{info, error};
+use log::info;
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -176,7 +176,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                                 }
                             }
                             info!("Verify {} KiB copied correctly ...", (size_words*4) / 1024);
-                            let mut crc_bzip2 = crc::Crc::<u32>::new(&crc::CRC_32_BZIP2);
+                            let crc_bzip2 = crc::Crc::<u32>::new(&crc::CRC_32_BZIP2);
                             let mut digest = crc_bzip2.digest();
                             for i in 0..size_words {
                                 unsafe {
