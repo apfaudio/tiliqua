@@ -28,6 +28,8 @@ jobs:
             cmd: polysyn build
           - name: macro-osc
             cmd: macro_osc build
+          - name: sid
+            cmd: sid build
           - name: usb-audio
             cmd: usb_audio build
           - name: usb-host
