@@ -397,21 +397,21 @@ where
             .stroke_width(1)
             .build();
 
-    let mut line = |disp: &mut D, x1: u32, y1: u32, x2: u32, y2: u32, hl: bool| {
+    let line = |disp: &mut D, x1: u32, y1: u32, x2: u32, y2: u32, hl: bool| {
         Line::new(Point::new((x+x1) as i32, (y+y1) as i32),
                   Point::new((x+x2) as i32, (y+y2) as i32))
                   .into_styled(if hl { stroke_white } else { stroke_grey } )
                   .draw(disp).ok()
     };
 
-    let mut rect = |disp: &mut D, x1: u32, y1: u32, sx: u32, sy: u32, hl: bool| {
+    let rect = |disp: &mut D, x1: u32, y1: u32, sx: u32, sy: u32, hl: bool| {
         Rectangle::new(Point::new((x+x1) as i32, (y+y1) as i32),
                        Size::new(sx, sy))
                        .into_styled(if hl { stroke_white } else { stroke_grey } )
                        .draw(disp).ok()
     };
 
-    let mut circle = |disp: &mut D, x1: u32, y1: u32, radius: u32| {
+    let circle = |disp: &mut D, x1: u32, y1: u32, radius: u32| {
         Circle::new(Point::new((x+x1-radius) as i32, (y+y1-radius) as i32), radius*2+1)
                     .into_styled(stroke_grey)
                     .draw(disp).ok()
