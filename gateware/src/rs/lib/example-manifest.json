@@ -1,4 +1,0 @@
-{"name": "SELFTEST", "version": 0, "sha": "4ef3ad", "brief": "", "video": "1280x720p60", "regions": [
-    {"filename": "firmware.bin", "spiflash_src": 786432, "psram_dst": null, "size": 35896, "crc": 3588071843},
-    {"filename": "logo.bmp", "spiflash_src": 786432, "psram_dst": 786432, "size": 35896, "crc": 3588071843}
-]}
