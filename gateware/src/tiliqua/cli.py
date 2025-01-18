@@ -172,7 +172,7 @@ def top_level_cli(
         if args.fw_offset is None:
             match args.fw_location:
                 case FirmwareLocation.SPIFlash:
-                    kwargs["fw_offset"] = 0xc0000
+                    kwargs["fw_offset"] = 0xb0000
                     print("WARN: firmware loads from SPI flash, but no `--fw-offset` specified. "
                           f"using default: {hex(kwargs['fw_offset'])}")
                 case FirmwareLocation.PSRAM:

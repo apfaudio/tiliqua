@@ -18,7 +18,7 @@ BOOTLOADER_BITSTREAM_ADDR = 0x000000
 SLOT_BITSTREAM_BASE      = 0x100000  # First user slot starts here
 SLOT_SIZE                = 0x100000
 MANIFEST_SIZE            = 1024
-FIRMWARE_BASE_SLOT0      = 0x1C0000
+FIRMWARE_BASE_SLOT0      = 0x1B0000
 MAX_SLOTS                = 8
 FLASH_PAGE_SIZE          = 1024 # 1KB
 

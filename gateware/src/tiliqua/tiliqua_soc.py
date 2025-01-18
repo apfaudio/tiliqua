@@ -186,11 +186,11 @@ class TiliquaSoc(Component):
                 # on the Vex it is memory mapped from self.spiflash_base onward.
                 self.fw_base     = self.spiflash_base + fw_offset
                 self.reset_addr  = self.fw_base
-                self.fw_max_size = 0x80000 # 512KiB
+                self.fw_max_size = 0x50000 # 320KiB
             case FirmwareLocation.PSRAM:
                 self.fw_base     = self.psram_base + fw_offset
                 self.reset_addr  = self.fw_base
-                self.fw_max_size = 0x80000 # 512KiB
+                self.fw_max_size = 0x50000 # 320KiB
 
         # cpu
         self.cpu = VexRiscv(

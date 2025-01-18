@@ -1,5 +1,3 @@
-use crate::generated_constants::*;
-
 use heapless::{String, Vec};
 use serde::{Deserialize};
 use log::info;
