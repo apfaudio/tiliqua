@@ -41,19 +41,17 @@ def maybe_flash_firmware(args, kwargs, force_flash=False):
                 "sudo", "openFPGALoader", "-c", "dirtyJtag", "-f", "-o", f"{hex(kwargs['fw_offset'])}",
                 "--file-type", "raw", kwargs["firmware_bin_path"]
             ]
-            print("SoC is configured for XIP, firmware may be flashed directly to SPI flash using:")
-            print("\t$", ' '.join(args_flash_firmware))
+            print("SoC is configured for XIP, firmware may be flashed directly to SPI flash by passing "
+                  "the bitstream archive to `pdm flash`, or passing `--flash` to build command.")
             if args.flash or force_flash:
                 subprocess.check_call(args_flash_firmware, env=os.environ)
         case FirmwareLocation.PSRAM:
-            args_flash_firmware = [
-                "sudo", "openFPGALoader", "-c", "dirtyJtag", "-f", "-o", "{{spiflash_src}}",
-                "--file-type", "raw", kwargs["firmware_bin_path"]
-            ]
-            firmware_size = os.path.getsize(kwargs["firmware_bin_path"])
-            print("This bitstream expects firmware already copied from SPI flash to PSRAM "
-                  "by a bootloader.\nThe bootloader must use the manifest from the bitstream archive "
-                  "to accomplish this.")
+            print("Note: This bitstream expects firmware already copied from SPI flash to PSRAM "
+                  "by a bootloader.\nPass the bitstream archive to `pdm flash` to flash it.")
+            if args.flash:
+                print("ERROR: direct --flash is only supported for --fw-location=spiflash (XIP). "
+                      "Pass the bitstream archive to `pdm flash` instead.")
+                sys.exit(-1)
 
 
 # TODO: these arguments would likely be cleaner encapsulated in a dataclass that
@@ -235,7 +233,7 @@ def top_level_cli(
             
         return manifest
 
-    def create_archive():
+    def create_bitstream_archive():
         hwrev = "r3" if args.hw3 else "r2"
         archive_name = f"{args.name.lower()}-{repo.head.object.hexsha[:6]}-{hwrev}.tar.gz"
         archive_path = os.path.join(build_path, archive_name)
@@ -305,7 +303,7 @@ def top_level_cli(
 
         # Create firmware-only archive if --fw-only specified
         if args.fw_only:
-            create_archive()
+            create_bitstream_archive()
             maybe_flash_firmware(args, kwargs)
             sys.exit(0)
 
@@ -348,20 +346,15 @@ def top_level_cli(
 
         hw_platform.build(fragment, **build_flags)
 
-        # Create archive with everything
-        create_archive()
-
-        bitstream_path = "build/top.bit"
-        args_flash_bitstream = ["sudo", "openFPGALoader", "-c", "dirtyJtag",
-                                "-f", bitstream_path]
-        print()
-        print("Flash bitstream with command like:")
-        print("\t$", ' '.join(args_flash_bitstream))
+        create_bitstream_archive()
 
         if isinstance(fragment, TiliquaSoc):
             maybe_flash_firmware(args, kwargs, force_flash=hw_platform.ila)
 
         if args.flash or hw_platform.ila:
+            bitstream_path = "build/top.bit"
+            args_flash_bitstream = ["sudo", "openFPGALoader", "-c", "dirtyJtag",
+                                    "-f", bitstream_path]
             # ILA situation always requires flashing, as we want to make sure
             # we aren't getting data from an old bitstream before starting the
             # ILA frontend.
