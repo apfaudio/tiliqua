@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import usb
 
 # Flash memory map constants
 BOOTLOADER_BITSTREAM_ADDR = 0x000000
@@ -286,8 +287,26 @@ def parse_json_from_flash(data):
     except json.JSONDecodeError:
         return None
 
+def get_tiliqua_hw_version():
+    dev = usb.core.find(idVendor=0x1209, idProduct=0xc0ca)
+    if dev is None:
+        raise ValueError('Tiliqua debug adapter not found!')
+    mfg     = usb.util.get_string(dev, dev.iManufacturer)
+    product = usb.util.get_string(dev, dev.iProduct)
+    dev.reset()
+    print("Manufacturer:", mfg)
+    print("Product:", product)
+    revisions = ["R2", "R3", "R4"]
+    if not any(rev in product for rev in revisions):
+        raise ValueError('Tiliqua HW revision not found in USB product descriptor, please see docs on updating RP2040 firmware!')
+    for rev in revisions:
+        if rev in product:
+            print(f"Tiliqua HW version is: {rev}")
+            return int(rev[-1])
+
 def flash_status():
     """Display the status of flashed bitstreams in each manifest slot."""
+
 
     segments = []
     for n in range(0, MAX_SLOTS):
@@ -301,6 +320,8 @@ def flash_status():
             segment["data"] = read_flash_segment(segment['offset'], segment['size'], reset=(n==MAX_SLOTS-1))
         except subprocess.CalledProcessError as e:
             print(f"  Error reading flash: {e}")
+
+    get_tiliqua_hw_version()
 
     print("Manifests:")
     print("-" * 40)

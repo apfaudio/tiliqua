@@ -5,7 +5,7 @@
 groups = ["default", "docs", "test"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:c1b51d2d9f6d9119ae839e4a3c8bba8ed00072b4d2fad8e00ba0de67fd6ec62d"
+content_hash = "sha256:38bbaa8391eba03f93296bb2b593ec7fc3f0944044f1f7bcab4e3aa4fce1fcd2"
 
 [[metadata.targets]]
 requires_python = ">=3.10"
@@ -1085,13 +1085,13 @@ files = [
 
 [[package]]
 name = "pyusb"
-version = "1.2.1"
-requires_python = ">=3.6.0"
-summary = "Python USB access module"
+version = "1.3.1"
+requires_python = ">=3.9.0"
+summary = "Easy USB access for Python"
 groups = ["default"]
 files = [
-    {file = "pyusb-1.2.1-py3-none-any.whl", hash = "sha256:2b4c7cb86dbadf044dfb9d3a4ff69fd217013dbe78a792177a3feb172449ea36"},
-    {file = "pyusb-1.2.1.tar.gz", hash = "sha256:a4cc7404a203144754164b8b40994e2849fde1cfff06b08492f12fff9d9de7b9"},
+    {file = "pyusb-1.3.1-py3-none-any.whl", hash = "sha256:bf9b754557af4717fe80c2b07cc2b923a9151f5c08d17bdb5345dac09d6a0430"},
+    {file = "pyusb-1.3.1.tar.gz", hash = "sha256:3af070b607467c1c164f49d5b0caabe8ac78dbed9298d703a8dbf9df4052d17e"},
 ]
 
 [[package]]
