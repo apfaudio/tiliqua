@@ -200,6 +200,7 @@ fn main() -> ! {
     let hue = 5u8;
 
     write_palette(&mut video, palette::ColorPalette::Linear);
+    video.set_persist(512);
 
     handler!(timer0 = || timer0_handler(&app));
 
