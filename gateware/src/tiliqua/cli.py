@@ -266,6 +266,34 @@ def top_level_cli(
         print(f"\nManifest contents:\n{json.dumps(manifest, indent=2)}")
             
 
+    def validate_existing_bitstream(args, manifest_path="build/manifest.json"):
+        """
+        Validate that an existing bitstream matches the current project when using --fw-only.
+        Returns True if validation passes, False if it fails.
+        """
+        if not os.path.exists("build/top.bit"):
+            print("\nERROR: No existing bitstream found at build/top.bit")
+            print("You must build the full project at least once before using --fw-only")
+            return False
+        
+        if not os.path.exists(manifest_path):
+            print("\nERROR: No manifest found at build/manifest.json")
+            print("You must build the full project at least once before using --fw-only") 
+            return False
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+                if manifest.get("name") != args.name:
+                    print(f"\nERROR: Existing bitstream is for '{manifest.get('name')}', "
+                          f"but current project is '{args.name}'")
+                    print("You must build the full project at least once before using --fw-only")
+                    return False
+        except (json.JSONDecodeError, KeyError) as e:
+            print("\nERROR: Failed to validate existing manifest:")
+            print(f"  {str(e)}")
+            return False
+        return True
+
     if isinstance(fragment, TiliquaSoc):
         # Generate SVD
         svd_path = os.path.join(rust_fw_root, "soc.svd")
@@ -299,13 +327,17 @@ def top_level_cli(
                 regions[-1].spiflash_src = kwargs["fw_offset"]
             case FirmwareLocation.PSRAM:
                 regions[-1].psram_dst = kwargs["fw_offset"]
-        write_manifest(regions)
 
         # Create firmware-only archive if --fw-only specified
         if args.fw_only:
+            if not validate_existing_bitstream(args):
+                sys.exit(1)
+            write_manifest(regions)
             create_bitstream_archive()
             maybe_flash_firmware(args, kwargs)
             sys.exit(0)
+        else:
+            write_manifest(regions)
 
         # Simulation configuration
         # By default, SoC examples share the same simulation harness.
