@@ -15,7 +15,7 @@ Tiliqua Manual
    technical
    install
    gettingstarted
-   soc
    bootloader
-   top
    dsp
+   soc
+   top

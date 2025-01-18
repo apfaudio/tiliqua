@@ -1,5 +1,5 @@
-Top-level projects
-##################
+Example projects
+################
 
 Top-level projects are located in `gateware/src/top`.
 

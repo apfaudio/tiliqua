@@ -37,14 +37,17 @@ A few examples of building top-level bitstreams:
 
 Generally, bitstreams are also built in CI - check ``.github/workflows`` if you need more gruesome details on how systems are built.
 
-For SoC projects that have firmware, for quicker iteration, ``--fw-only`` is useful to only build the firmware for that bitstream.
+For SoC projects that have firmware, for quicker iteration, ``--fw-only`` is useful to only re-build the firmware for that bitstream and repackage the archive, without re-synthesizing the bitstream (which often takes quite a while).
 
 Flashing example projects
 -------------------------
 
-Assuming the RP2040 and bootloader is correctly configured as per :ref:`bootloader`, you can flash bitstreams to one of 8 slots, using the built-in flash tool.
+.. warning::
 
-When you build projects from the command line, it will create a .tar.gz archive containing the bitstream, firmware (if applicable), and a manifest describing the contents.
+
+    If you have R2/R3 (prototype) hardware, you may need to reflash the RP2040 and bootloader bitstream  per :doc:`bootloader`, before the following instructions will work.
+
+When you build projects from the command line, it will create a .tar.gz archive containing the bitstream, firmware (if applicable), and a manifest describing the contents. You can flash bitstreams to one of 8 slots, using the built-in flash tool.
 Such archives may be flashed as follows:
 
 .. code-block:: bash

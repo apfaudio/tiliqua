@@ -1,26 +1,14 @@
 Bootloader
 ##########
 
-.. note::
-
-    'Bootloader' is a bit of a misnomer, as what is currently implemented is more like a 'bitstream selector' (although a true USB bootloader is something in the works).
-
 Interface
 ---------
 
-The bitstream selector allows you to arbitrarily select from one of 8 bitstreams after the Tiliqua powers on, without needing to connect a computer.
-
-Put simply:
+The bootloader allows you to arbitrarily select from one of 8 bitstreams after the Tiliqua powers on, without needing to connect a computer. In short:
 
 - When Tiliqua boots, you can select a bitstream with the encoder (either using the display output, or by reading the currently lit LED if no display is connected).
 - When you select a bitstream (press encoder), the FPGA reconfigures itself and enters the selected bitstream.
 - From any bitstream, you can always go back to the bootloader by holding the encoder for 3sec (this is built into the logic of every bitstream).
-
-.. warning::
-
-    The bitstream selector will not reboot correctly if you have
-    the :py:`dbg` USB port connected. The assumption is you're flashing
-    development bitstreams to SRAM in that scenario anyway.
 
 Setup and implementation
 ------------------------
@@ -33,18 +21,25 @@ The bitstream selector consists of 2 key components that work together:
 First-time setup
 ^^^^^^^^^^^^^^^^
 
-1. Build and flash the `apfelbug <https://github.com/apfaudio/apfbug>`_ project to the RP2040 (hold RP2040 BOOTSEL during power on, copy the :code:`build/*.uf2` to the usb storage device and reset)
+1. Flash the `apfbug <https://github.com/apfaudio/apfbug>`_ project to the RP2040. Pre-built binaries `can be found here <https://github.com/apfaudio/apfbug/releases>`_. To flash them, hold RP2040 BOOTSEL during power on, copy the :code:`build/*.uf2` to the usb storage device and power cycle Tiliqua.
 
 2. Build and flash the bootloader bitstream archive using the built-in flash tool:
 
 .. code-block:: bash
 
-    # Flash bootloader to slot 0 (0x0), force XIP firmware (execute directly from SPI flash)
-    pdm bootloader build --fw-location=spiflash
+    # Flash bootloader to start of flash, build assuming XIP (execute directly from SPI flash, not PSRAM)
+    pdm bootloader build --fw-location=spiflash --resolution 1280x720p60
     pdm flash build/bootloader-*.tar.gz
 
-3. DISCONNECT USB DBG port, reboot Tiliqua
-    - Currently :code:`apfelbug` only works correctly with the DBG connector DISCONNECTED or with the UART port open on Linux and CONNECTED. Do not have the USB DBG connected without the UART0 open with :code:`picocom` or so.
+3. DISCONNECT USB DBG port, reboot Tiliqua.
+
+.. warning::
+
+    The bootloader will NOT reboot correctly (just show a blank screen) if you have
+    the :py:`dbg` USB port connected WITHOUT a tty open. Currently you MUST have the
+    ``/dev/ttyACM0`` open OR have the ``dbg`` USB port disconnected for it to work correctly.
+    `Tracking issue (linked) <https://github.com/apfaudio/apfbug/issues/2>`_.
+
 
 4. Now when Tiliqua boots you will enter the bootloader. Use the encoder to select an image. Hold the encoder for >3sec in any image to go back to the bootloader.
 
@@ -79,7 +74,7 @@ The ECP5 :code:`bootloader` bitstream copies firmware from SPI flash to PSRAM be
 Implementation details: RP2040
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-:code:`apfelbug` firmware includes the same features as :code:`pico-dirtyjtag` (USB-JTAG and USB-UART bridge), with some additions:
+:code:`apfbug` firmware includes the same features as :code:`pico-dirtyjtag` (USB-JTAG and USB-UART bridge), with some additions:
 
 - UART traffic is inspected to look for keywords.
 - If a keyword is encountered e.g. :code:`BITSTREAM1`, a pre-recorded JTAG stream stored on the RP2040's SPI flash is decompressed and replayed. The JTAG streams are instances of the `bootstub <https://github.com/apfaudio/tiliqua/blob/main/gateware/src/top/bootstub/top.py>`_ top-level bitstream. These are tiny bitstreams that are programmed directly into SRAM with the target :code:`bootaddr` and PROGRAMN assertion.
@@ -89,4 +84,4 @@ Implementation details: RP2040
 Recording new JTAG streams for RP2040
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-TODO documentation, not necessary to change this for any ordinary usecase. Update this if needed for SoldierCrab R3.
+TODO documentation on recording new JTAG bitstreams for storage on RP2040 flash - not necessary to change this for ordinary Tiliqua usecases. Note: SoldierCrab R3 and R2 use different ECP5 variants, so they need different RP2040 images.
