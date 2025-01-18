@@ -29,7 +29,7 @@ First-time setup
 
     # Flash bootloader to start of flash, build assuming XIP (execute directly from SPI flash, not PSRAM)
     pdm bootloader build --fw-location=spiflash --resolution 1280x720p60
-    pdm flash build/bootloader-*.tar.gz
+    pdm flash archive build/bootloader-*.tar.gz
 
 3. DISCONNECT USB DBG port, reboot Tiliqua.
 

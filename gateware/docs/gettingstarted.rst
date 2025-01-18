@@ -55,9 +55,10 @@ Such archives may be flashed as follows:
 
 .. code-block:: bash
 
-   # Flash user bitstreams to slots 1-7
-   pdm flash build/selftest-*.tar.gz --slot 1
-   pdm flash build/xbeam-*.tar.gz --slot 2
+   # Flash user bitstreams to the desired slot (0-7)
+   pdm flash archive build/selftest-*.tar.gz --slot 1
+   pdm flash archive build/xbeam-*.tar.gz --slot 2
+   pdm flash status # check what is on the Tiliqua
 
 If you are running an SoC, you can monitor serial output like so:
 

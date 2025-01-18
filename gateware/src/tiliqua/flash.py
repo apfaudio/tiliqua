@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 import tarfile
+import tempfile
 
 # Flash memory map constants
 BOOTLOADER_BITSTREAM_ADDR = 0x000000
@@ -31,7 +32,6 @@ def flash_file(file_path, offset, file_type="auto", dry_run=True):
     if file_type != "auto":
         cmd.extend(["--file-type", file_type])
     cmd.append(file_path)
-    
     if dry_run:
         return cmd
     else:
@@ -108,7 +108,6 @@ def flash_archive(archive_path, slot=None, noconfirm=False):
                 sys.exit(1)
 
         # Create temp directory for extracted files
-        import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
             tar.extractall(tmpdir)
 
@@ -251,23 +250,103 @@ def flash_archive(archive_path, slot=None, noconfirm=False):
 
             print("\nFlashing completed successfully")
 
+def read_flash_segment(offset, size, reset=False):
+    """Read a segment of flash memory to a temporary file and return its contents."""
+    with tempfile.NamedTemporaryFile(suffix='.bin', delete=True) as tmp_file:
+        temp_file_name = tmp_file.name
+    cmd = [
+        "sudo", "openFPGALoader", "-c", "dirtyJtag",
+        "--dump-flash", "-o", f"{hex(offset)}",
+        "--file-size", str(size),
+    ]
+    if not reset:
+        cmd.append("--skip-reset")
+    cmd.append(temp_file_name)
+    print(" ".join(cmd))
+    subprocess.check_call(cmd)
+    with open(temp_file_name, 'rb') as f:
+        data = f.read()
+    return data
+
+def is_empty_flash(data):
+    """Check if a flash segment is empty (all 0xFF)."""
+    return all(b == 0xFF for b in data)
+
+def parse_json_from_flash(data):
+    """Try to parse JSON data from a flash segment."""
+    try:
+        # Find the end of the JSON data (null terminator or 0xFF)
+        end_idx = data.find(b'\x00')
+        if end_idx == -1:
+            end_idx = data.find(b'\xff')
+        if end_idx == -1:
+            end_idx = len(data)
+        json_bytes = data[:end_idx]
+        return json.loads(json_bytes)
+    except json.JSONDecodeError:
+        return None
+
+def flash_status():
+    """Display the status of flashed bitstreams in each manifest slot."""
+
+    segments = []
+    for n in range(0, MAX_SLOTS):
+        segments.append(
+            {"offset": SLOT_BITSTREAM_BASE+(n+1)*SLOT_SIZE-MANIFEST_SIZE, "size": 512,
+             "name": f"Slot {n} manifest", "data": None})
+
+    for (n, segment) in enumerate(segments):
+        print(f"\nReading {segment['name']} at {hex(segment['offset'])}:")
+        try:
+            segment["data"] = read_flash_segment(segment['offset'], segment['size'], reset=(n==MAX_SLOTS-1))
+        except subprocess.CalledProcessError as e:
+            print(f"  Error reading flash: {e}")
+
+    print("Manifests:")
+    print("-" * 40)
+    for segment in segments:
+        print(f"\nReading {segment['name']} at {hex(segment['offset'])}:")
+        try:
+            data = segment["data"]
+            if is_empty_flash(data):
+                print(f"  status: empty (all 0xFF)")
+                continue
+            json_data = parse_json_from_flash(data)
+            if json_data:
+                print("  status: valid manifest")
+                print("  contents:")
+                for key, value in json_data.items():
+                    print(f"    {key}: {value}")
+            else:
+                print("  status: data is there, but does not look like a manifest")
+                print(f"  first 32 bytes: {data[:32].hex()}")
+        except Exception as e:
+            print(f"  Error processing data: {e}")
+    print("\nNote: empty segments are shown as 'empty (all 0xFF)'")
+
 def main():
     parser = argparse.ArgumentParser(description="Flash Tiliqua bitstream archives")
-    parser.add_argument("archive", help="Path to bitstream archive (.tar.gz)")
-    parser.add_argument("--slot", type=int, help="Slot number (0-7) for bootloader-managed bitstreams")
-    parser.add_argument("--noconfirm", action="store_true", help="Do not ask for confirmation before flashing")
+    subparsers = parser.add_subparsers(dest='command', required=True)
+
+    archive_parser = subparsers.add_parser('archive', help='Flash a bitstream archive')
+    archive_parser.add_argument("archive_path", help="Path to bitstream archive (.tar.gz)")
+    archive_parser.add_argument("--slot", type=int, help="Slot number (0-7) for bootloader-managed bitstreams")
+    archive_parser.add_argument("--noconfirm", action="store_true", help="Do not ask for confirmation before flashing")
+
+    status_parser = subparsers.add_parser('status', help='Display current bitstream status')
 
     args = parser.parse_args()
 
-    if not os.path.exists(args.archive):
-        print(f"Error: Archive not found: {args.archive}")
-        sys.exit(1)
-
-    if args.slot is not None and not 0 <= args.slot < MAX_SLOTS:
-        print(f"Error: Slot must be between 0 and {MAX_SLOTS-1}")
-        sys.exit(1)
-
-    flash_archive(args.archive, args.slot, args.noconfirm)
+    if args.command == 'archive':
+        if not os.path.exists(args.archive_path):
+            print(f"Error: Archive not found: {args.archive_path}")
+            sys.exit(1)
+        if args.slot is not None and not 0 <= args.slot < MAX_SLOTS:
+            print(f"Error: Slot must be between 0 and {MAX_SLOTS-1}")
+            sys.exit(1)
+        flash_archive(args.archive_path, args.slot, args.noconfirm)
+    elif args.command == 'status':
+        flash_status()
 
 if __name__ == "__main__":
-    main() 
+    main()
