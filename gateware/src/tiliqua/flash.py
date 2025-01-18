@@ -2,6 +2,8 @@
 
 """
 Flash tool for Tiliqua bitstream archives.
+See docs/gettingstarted.rst for usage.
+See docs/bootloader.rst for implementation details and flash memory layout.
 """
 
 import argparse
