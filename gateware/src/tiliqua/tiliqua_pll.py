@@ -4,6 +4,7 @@
 
 """ Tiliqua and SoldierCrab PLL configurations. """
 
+from amaranth.build             import *
 from amaranth                    import *
 from tiliqua                     import video
 from amaranth.lib.cdc            import FFSynchronizer
@@ -377,9 +378,29 @@ class TiliquaDomainGenerator2PLLsEx(Elaboratable):
             ResetSignal("usb")   .eq(~locked60),
         ]
 
+        ex = [
+            Resource(f"ex", 0,
+                Subsignal("debug1",  Pins("1",  conn=("pmod", 0), dir='o')),
+                Subsignal("debug2",  Pins("2",  conn=("pmod", 0), dir='o')),
+                Subsignal("debug3",  Pins("3",  conn=("pmod", 0), dir='o')),
+                Subsignal("debug4",  Pins("4",  conn=("pmod", 0), dir='o')),
+                Subsignal("debug10", Pins("10", conn=("pmod", 0), dir='o')),
+                Subsignal("debug9",  Pins("9",  conn=("pmod", 0), dir='o')),
+                Subsignal("debug8",  Pins("8",  conn=("pmod", 0), dir='o')),
+                Subsignal("debug7",  Pins("7",  conn=("pmod", 0), dir='o')),
+                Attrs(IO_TYPE="LVCMOS33"),
+            )
+        ]
+        platform.add_resources(ex)
+        ex0 = platform.request("ex")
+
         m.d.comb += [
             platform.request("led_a").o.eq(locked60),
             platform.request("led_b").o.eq(locked_dvi),
+            ex0.debug1.o.eq(ClockSignal("expll_clk0")),
+            ex0.debug2.o.eq(ClockSignal("expll_clk1")),
+            ex0.debug3.o.eq(ClockSignal("dvi")),
+            ex0.debug4.o.eq(locked_dvi),
         ]
 
 
