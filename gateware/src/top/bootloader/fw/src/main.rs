@@ -11,8 +11,10 @@ use heapless::String;
 
 use core::str::FromStr;
 
+
 use tiliqua_pac as pac;
 use tiliqua_hal as hal;
+use tiliqua_hal::si5351::*;
 use tiliqua_lib::*;
 use tiliqua_lib::opt::*;
 use tiliqua_lib::generated_constants::*;
@@ -248,6 +250,22 @@ fn main() -> ! {
 
     let opts = opts::Options::new(&manifests);
     let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone())));
+
+    let i2cdev3 = I2c0::new(unsafe { pac::I2C0::steal() } );
+    let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev3);
+    let init = si5351drv.init_adafruit_module();
+    si5351drv.set_frequencies(
+            PLL::A,
+            &[
+                ClockOutput::Clk0,
+                ClockOutput::Clk1,
+            ],
+            &[
+                12_288_000,
+                37_400_000,
+            ],
+            Some(0.01)).unwrap();
+
 
     handler!(timer0 = || timer0_handler(&app));
 

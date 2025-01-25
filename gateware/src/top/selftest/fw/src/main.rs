@@ -14,8 +14,6 @@ use riscv_rt::entry;
 
 use tiliqua_hal::pca9635::*;
 
-use tiliqua_hal::si5351::*;
-
 use core::convert::TryInto;
 
 use embedded_graphics::{
@@ -320,27 +318,12 @@ fn main() -> ! {
     let mut i2cdev = I2c0::new(peripherals.I2C0);
     // FIXME: use proper atomic bus sharing!!
     let i2cdev2 = I2c0::new(unsafe { pac::I2C0::steal() } );
-    let i2cdev3 = I2c0::new(unsafe { pac::I2C0::steal() } );
 
     psram_memtest(&mut timer);
 
     spiflash_memtest(&mut timer);
 
     tusb322i_id_test(&mut i2cdev);
-
-    let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev3);
-    let init = si5351drv.init_adafruit_module();
-    si5351drv.set_frequencies(
-            PLL::A,
-            &[
-                ClockOutput::Clk0,
-                ClockOutput::Clk1,
-            ],
-            &[
-                12_288_000,
-                37_400_000,
-            ],
-            Some(0.01)).unwrap();
 
     let mut pca9635 = Pca9635Driver::new(i2cdev2);
 
@@ -370,8 +353,6 @@ fn main() -> ! {
 
     let mut rng = fastrand::Rng::with_seed(0);
 
-    let mut l_encoder_rotation: i16 = encoder_rotation;
-
     let vid = peripherals.VIDEO_PERIPH;
 
     loop {
@@ -379,10 +360,6 @@ fn main() -> ! {
         encoder.update();
 
         encoder_rotation += encoder.poke_ticks() as i16;
-        if l_encoder_rotation != encoder_rotation {
-            let set = si5351drv.set_frequency(PLL::B, ClockOutput::Clk1, 37_400_000 + (encoder_rotation as u32)*250_000, None);
-        }
-        l_encoder_rotation = encoder_rotation;
         if encoder.poke_btn() {
             encoder_toggle = !encoder_toggle;
         }
