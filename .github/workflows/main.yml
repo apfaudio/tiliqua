@@ -30,27 +30,11 @@ jobs:
             cmd: macro_osc build
           - name: sid
             cmd: sid build
-          - name: usb-audio
-            cmd: usb_audio build
-          - name: usb-host
-            cmd: usb_host build --midi-device arturia-keylab49-mkii
-          - name: dsp-nco
-            cmd: dsp build --dsp-core nco
-          - name: dsp-diffuser
-            cmd: dsp build --dsp-core psram_diffuser
-          - name: dsp-midicv
-            cmd: dsp build --dsp-core midicv
-          - name: vectorscope
-            cmd: vectorscope_no_soc build
-          - name: bootstub
-            cmd: bootstub build --bootaddr 0x100000
-        hw_rev: ["", "--hw3"]
+        hw_rev: ["--hw4 --resolution 720x720p60 --rotate-90"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
       - run: git submodule update --init --recursive
-      
-      # Setup Rust
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -59,18 +43,15 @@ jobs:
       - run: |
           cargo install cargo-binutils form
           cargo install svd2rust --locked
-          
       - name: Install PDM dependencies
         run: pdm install
         working-directory: gateware
-          
       - name: Build ${{ matrix.config.cmd }} ${{ matrix.hw_rev }}
         run: pdm ${{ matrix.config.cmd }} ${{ matrix.hw_rev }}
         working-directory: gateware
-        
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.config.name }}-${{ matrix.hw_rev == '--hw3' && 'r3' || 'r2' }}.zip
+          name: ${{ matrix.config.name }}-r4.zip
           path: gateware/build/*-*-*.tar.gz
           retention-days: 1
 
