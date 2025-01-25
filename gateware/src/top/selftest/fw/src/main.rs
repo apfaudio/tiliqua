@@ -440,5 +440,6 @@ fn main() -> ! {
             Alignment::Left,
         )
         .draw(&mut display).ok();
+        info!("{}", s);
     }
 }

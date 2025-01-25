@@ -368,6 +368,11 @@ class TiliquaDomainGenerator2PLLsEx(Elaboratable):
                 ResetSignal("dvi5x").eq(~locked_dvi),
             ]
 
+            m.d.comb += [
+                platform.request("led_a").o.eq(locked60),
+                platform.request("led_b").o.eq(locked_dvi),
+            ]
+
         # Derived clocks and resets
         m.d.comb += [
             ClockSignal("sync")  .eq(feedback60),
