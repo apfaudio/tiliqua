@@ -334,13 +334,13 @@ fn main() -> ! {
             PLL::A,
             &[
                 ClockOutput::Clk0,
-                ClockOutput::Clk1
+                ClockOutput::Clk1,
             ],
             &[
                 12_288_000,
                 37_400_000,
             ],
-            Some(0.005)).unwrap();
+            Some(0.01)).unwrap();
 
     let mut pca9635 = Pca9635Driver::new(i2cdev2);
 
@@ -430,12 +430,12 @@ fn main() -> ! {
         let pixclk1 = vid.pixclk().read().bits();
 
         let mut s = String::<64>::new();
-        write!(s, "pixclk       - {}",
+        write!(s, "pixclk         - {}",
                100 * (pixclk1 - pixclk0));
         let style = MonoTextStyle::new(&FONT_6X10, Gray8::WHITE);
         Text::with_alignment(
             &s,
-            display.bounding_box().center() + Point::new(-140, 100),
+            display.bounding_box().center() + Point::new(-140, 48),
             style,
             Alignment::Left,
         )
