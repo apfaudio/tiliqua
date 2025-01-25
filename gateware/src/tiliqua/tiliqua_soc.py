@@ -40,6 +40,7 @@ from amaranth.build                              import Attrs, Pins, PinsN, Plat
 from amaranth.hdl.rec                            import Record
 from amaranth.lib                                import wiring, data
 from amaranth.lib.wiring                         import Component, In, Out, flipped, connect
+from amaranth.lib.cdc                            import FFSynchronizer
 
 from amaranth_soc                                import csr, gpio, wishbone
 from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
@@ -76,6 +77,9 @@ class VideoPeripheral(wiring.Component):
     class PaletteBusyReg(csr.Register, access="r"):
         busy: csr.Field(csr.action.R, unsigned(1))
 
+    class PixclkReg(csr.Register, access="r"):
+        data: csr.Field(csr.action.R, unsigned(32))
+
     def __init__(self, fb_base, fb_size, bus_dma, video):
         self.en = Signal()
         self.video = video
@@ -89,6 +93,7 @@ class VideoPeripheral(wiring.Component):
         self._decay        = regs.add("decay",        self.DecayReg(),       offset=0x4)
         self._palette      = regs.add("palette",      self.PaletteReg(),     offset=0x8)
         self._palette_busy = regs.add("palette_busy", self.PaletteBusyReg(), offset=0xC)
+        self._pixclk       = regs.add("pixclk",       self.PixclkReg(),     offset=0x10)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
@@ -105,6 +110,11 @@ class VideoPeripheral(wiring.Component):
         connect(m, flipped(self.bus), self._bridge.bus)
 
         m.d.comb += self.persist.enable.eq(self.en)
+
+        pcnt_dvi = Signal(32)
+        m.d.dvi += pcnt_dvi.eq(pcnt_dvi+1)
+        m.submodules.ffpclk = FFSynchronizer(
+                pcnt_dvi, self._pixclk.f.data.r_data)
 
         with m.If(self._persist.f.persist.w_stb):
             m.d.sync += self.persist.holdoff.eq(self._persist.f.persist.w_data)

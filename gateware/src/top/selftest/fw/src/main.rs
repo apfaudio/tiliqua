@@ -332,6 +332,7 @@ fn main() -> ! {
     let init = si5351drv.init_adafruit_module();
     info!("si5351 init: {:?}", init);
     info!("si5351 device status: {:?}", si5351drv.read_device_status());
+    /*
     let set = si5351drv.set_frequencies(
             PLL::A,
             &[
@@ -343,6 +344,9 @@ fn main() -> ! {
                 37_400_000,
             ],
             Some(0.005));
+    */
+    let set = si5351drv.set_frequency(PLL::A, ClockOutput::Clk0, 12_288_000, Some(0.005));
+    let set = si5351drv.set_frequency(PLL::A, ClockOutput::Clk1, 37_400_000, None);
     info!("si5351 set: {:?}", set);
 
     let mut pca9635 = Pca9635Driver::new(i2cdev2);
@@ -375,17 +379,19 @@ fn main() -> ! {
 
     let mut l_encoder_rotation: i16 = encoder_rotation;
 
+    let vid = peripherals.VIDEO_PERIPH;
+
     loop {
 
+
+        /*
         encoder.update();
 
         encoder_rotation += encoder.poke_ticks() as i16;
-        /*
         if l_encoder_rotation != encoder_rotation {
             let set = si5351drv.set_frequency(PLL::B, ClockOutput::Clk1, 37_400_000 + (encoder_rotation as u32)*250_000, None);
         }
         l_encoder_rotation = encoder_rotation;
-        */
         if encoder.poke_btn() {
             encoder_toggle = !encoder_toggle;
         }
@@ -427,6 +433,9 @@ fn main() -> ! {
             pca9635.leds[n] = (f32::sin((uptime_ms as f32)/200.0f32 + (n as f32)) * 255.0f32) as u8;
         }
         pca9635.push().ok();
+        */
 
+        info!("pixclk: {}", vid.pixclk().read().bits());
+        pause_flush(&mut timer, &mut uptime_ms, period_ms);
     }
 }
