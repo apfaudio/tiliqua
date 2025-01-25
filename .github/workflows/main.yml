@@ -30,7 +30,7 @@ jobs:
             cmd: macro_osc build
           - name: sid
             cmd: sid build
-        hw_rev: ["--hw4 --resolution 720x720p60 --rotate-90"]
+        hw_rev: ["--hw4"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
