@@ -112,7 +112,7 @@ class VideoPeripheral(wiring.Component):
         m.d.comb += self.persist.enable.eq(self.en)
 
         pcnt_dvi = Signal(32)
-        m.d.dvi += pcnt_dvi.eq(pcnt_dvi+1)
+        m.d.expll_clk1 += pcnt_dvi.eq(pcnt_dvi+1)
         m.submodules.ffpclk = FFSynchronizer(
                 pcnt_dvi, self._pixclk.f.data.r_data)
 

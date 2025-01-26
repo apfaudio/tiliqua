@@ -5,6 +5,7 @@ use tiliqua_pac as pac;
 use tiliqua_hal as hal;
 
 use hal::hal::delay::DelayNs;
+use tiliqua_hal::si5351::*;
 
 use tiliqua_fw::*;
 
@@ -355,6 +356,23 @@ fn main() -> ! {
 
     let vid = peripherals.VIDEO_PERIPH;
 
+    let i2cdev3 = I2c0::new(unsafe { pac::I2C0::steal() } );
+    let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev3);
+    let init = si5351drv.init_adafruit_module();
+    info!("{:?}", init);
+    pause_flush(&mut timer, &mut uptime_ms, 500);
+    si5351drv.set_frequencies(
+            PLL::A,
+            &[
+                ClockOutput::Clk0,
+                ClockOutput::Clk1,
+            ],
+            &[
+                12_288_000,
+                37_400_000,
+            ],
+            Some(0.01)).unwrap();
+
     loop {
 
         encoder.update();
@@ -418,5 +436,14 @@ fn main() -> ! {
         )
         .draw(&mut display).ok();
         info!("{}", s);
+
+        info!("{:?}", si5351drv.read_device_status());
+
+        /*
+        if cnt == 3 {
+            panic!("oops");
+        }
+        cnt = cnt + 1;
+        */
     }
 }
