@@ -775,7 +775,7 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
             ClockControlBits::MS_SRC
         };
 
-        let base = ClockControlBits::CLK_SRC_MS | ClockControlBits::CLK_DRV_8;
+        let base = ClockControlBits::CLK_SRC_MS | ClockControlBits::CLK_DRV_2;
 
         self.write_register(
             clk.register(),
