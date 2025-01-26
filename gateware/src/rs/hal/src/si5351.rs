@@ -358,6 +358,7 @@ pub trait Si5351 {
     fn set_frequencies(&mut self, pll: PLL, clks: &[ClockOutput], freqs: &[u32], spread: Option<f32>) -> Result<(), Error>;
     fn set_clock_enabled(&mut self, clk: ClockOutput, enabled: bool);
     fn setup_spread_spectrum(&mut self, pll: PLL, params: &SpreadParams) -> Result<(), Error>;
+    fn clear_spread_spectrum(&mut self) -> Result<(), Error>;
 
     fn flush_output_enabled(&mut self) -> Result<(), Error>;
     fn flush_clock_control(&mut self, clk: ClockOutput) -> Result<(), Error>;
@@ -551,21 +552,6 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
             }
         }
 
-        self.flush_output_enabled()?;
-        const CLK_REGS: [Register; 8] = [
-            Register::Clk0,
-            Register::Clk1,
-            Register::Clk2,
-            Register::Clk3,
-            Register::Clk4,
-            Register::Clk5,
-            Register::Clk6,
-            Register::Clk7,
-        ];
-        for &reg in CLK_REGS.iter() {
-            self.write_register(reg, ClockControlBits::CLK_PDN.bits())?;
-        }
-
         self.write_register(
             Register::CrystalLoad,
             (CrystalLoadBits::RESERVED
@@ -576,6 +562,8 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
                 })
             .bits(),
         )?;
+
+        self.clear_spread_spectrum()?;
 
         Ok(())
     }
@@ -642,6 +630,26 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
                 (ssup_p3 & 0xff) as u8,
                 (ssup_p1 & 0xff) as u8,
                 (ss_nclk | ((ssup_p1 >> 8) & 0x0f)) as u8,
+            ]
+        )
+    }
+
+    fn clear_spread_spectrum(&mut self) -> Result<(), Error> {
+        self.write_ssc_registers(
+            [
+                0u8,
+                0u8,
+                0u8,
+                0u8,
+                0u8,
+                0u8,
+                0u8,
+                0u8,
+                0u8,
+                0u8,
+                0u8,
+                0u8,
+                0u8,
             ]
         )
     }
