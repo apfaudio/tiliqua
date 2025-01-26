@@ -183,10 +183,11 @@ impl Register {
 bitflags! {
     #[derive(Debug)]
     pub struct DeviceStatusBits: u8 {
-        const SYS_INIT = 0b1000_0000;
-        const LOL_B = 0b0100_0000;
-        const LOL_A = 0b0010_0000;
-        const LOS = 0b0001_0000;
+        const SYS_INIT  = 0b1000_0000;
+        const LOL_B     = 0b0100_0000;
+        const LOL_A     = 0b0010_0000;
+        const LOS_CLKIN = 0b0001_0000;
+        const LOS_XTAL  = 0b0000_1000;
     }
 }
 
@@ -357,7 +358,7 @@ pub trait Si5351 {
     fn set_frequency(&mut self, pll: PLL, clk: ClockOutput, freq: u32, spread: Option<f32>) -> Result<(), Error>;
     fn set_frequencies(&mut self, pll: PLL, clks: &[ClockOutput], freqs: &[u32], spread: Option<f32>) -> Result<(), Error>;
     fn set_clock_enabled(&mut self, clk: ClockOutput, enabled: bool);
-    fn setup_spread_spectrum(&mut self, pll: PLL, params: &SpreadParams) -> Result<(), Error>;
+    fn setup_spread_spectrum(&mut self, pll: PLL, params: &SpreadParams) -> Result<u8, Error>;
     fn clear_spread_spectrum(&mut self) -> Result<(), Error>;
 
     fn flush_output_enabled(&mut self) -> Result<(), Error>;
@@ -564,6 +565,12 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
         )?;
 
         self.clear_spread_spectrum()?;
+        self.set_clock_enabled(ClockOutput::Clk0, false);
+        self.flush_clock_control(ClockOutput::Clk0)?;
+        self.set_clock_enabled(ClockOutput::Clk1, false);
+        self.flush_clock_control(ClockOutput::Clk1)?;
+        self.flush_output_enabled()?;
+        self.reset_pll(PLL::A)?;
 
         Ok(())
     }
@@ -609,15 +616,16 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
         Ok((mult, f))
     }
 
-    fn setup_spread_spectrum(&mut self, _pll: PLL, params: &SpreadParams) -> Result<(), Error> {
-        let ssc_en = 0x80;
+    fn setup_spread_spectrum(&mut self, _pll: PLL, params: &SpreadParams) -> Result<u8, Error> {
+        let ssc_en = 0x00;
         let ssc_mode = 0x80;
         let ss_nclk = 0x0;
         let ssudp = params.calc_ssudp();
         let (ssup_p1, ssup_p2, ssup_p3, ssdn_p1, ssdn_p2, ssdn_p3) = params.calc_center_spread();
+        let reg0 = (ssc_en | (ssdn_p2 >> 8)) as u8;
         self.write_ssc_registers(
             [
-                (ssc_en | (ssdn_p2 >> 8)) as u8,
+                reg0,
                 (ssdn_p2 & 0xff) as u8,
                 (ssc_mode | (ssdn_p3 >> 8)) as u8,
                 (ssdn_p3 & 0xff) as u8,
@@ -631,7 +639,8 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
                 (ssup_p1 & 0xff) as u8,
                 (ss_nclk | ((ssup_p1 >> 8) & 0x0f)) as u8,
             ]
-        )
+        )?;
+        Ok(reg0)
     }
 
     fn clear_spread_spectrum(&mut self) -> Result<(), Error> {
@@ -700,6 +709,7 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
         let total_div = ms_divider as u32 * r_div.denominator_u8() as u32;
         let (mult0, num0) = self.find_pll_coeffs_for_dividers(total_div, denom0, freqs[0])?;
 
+        let mut reg0 = 0u8;
         if let Some(spread_percent) = spread {
             let params = SpreadParams {
                 f_pfd: self.xtal_freq as f32,
@@ -708,7 +718,7 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
                 c: denom0 as f32,
                 ssc_amp: spread_percent,
             };
-            self.setup_spread_spectrum(pll, &params)?;
+            reg0 = self.setup_spread_spectrum(pll, &params)?;
         }
 
         for (i, clk) in clks.iter().enumerate() {
@@ -742,8 +752,18 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
             self.flush_clock_control(*clk)?;
         }
 
-
         self.reset_pll(pll)?;
+
+        self.i2c
+            .write(
+                self.address,
+                &[
+                    0x95,
+                    reg0 | 0x80
+                ],
+            )
+            .map_err(i2c_error);
+
         self.flush_output_enabled()?;
 
         Ok(())
