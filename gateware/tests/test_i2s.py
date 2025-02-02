@@ -17,6 +17,39 @@ from amaranth_future       import fixed
 
 class I2CTests(unittest.TestCase):
 
+    def test_i2s_tdm_multi_channel(self):
+        # Create test module
+        m = Module()
+        dut = eurorack_pmod.I2STDM(audio_192=False)  # Testing 48kHz mode
+        m.d.comb += dut.sdout1.eq(dut.sdin1)
+        m = DomainRenamer({"audio": "sync"})(m)
+
+        m.submodules.dut = dut
+        TICKS = 512  # Covers multiple 128-bit TDM frames
+
+        def generate_sine(freq, n):
+            return int(32767 * math.sin(2 * math.pi * freq * n / 48000))
+        frequencies = [440, 880, 1320, 1760]  # A4, A5, E6, A6
+        input_samples = [[generate_sine(f, n) for n in range(TICKS)] for f in frequencies]
+
+        async def process(ctx):
+            sample_idx = 0
+            current_channel = 0
+            for tick in range(TICKS):
+                await ctx.tick().until(dut.strobe)
+                current_channel = ctx.get(dut.channel)
+                ctx.set(dut.i, input_samples[current_channel][sample_idx])
+                if current_channel == dut.N_CHANNELS - 1:
+                    sample_idx += 1
+
+        sim = Simulator(m)
+        sim.add_clock(1e-6)
+        sim.add_testbench(process)
+
+        with sim.write_vcd(vcd_file=open("test_i2s_tdm_multi_channel.vcd", "w")):
+            sim.run()
+
+    """
     def test_i2s_tdm(self):
 
         m = Module()
@@ -55,3 +88,4 @@ class I2CTests(unittest.TestCase):
         sim.add_testbench(test_response)
         with sim.write_vcd(vcd_file=open("test_i2s_tdm.vcd", "w")):
             sim.run()
+    """

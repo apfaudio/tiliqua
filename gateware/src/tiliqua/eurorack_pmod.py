@@ -14,6 +14,7 @@ from amaranth.lib.wiring        import In, Out
 from amaranth.lib.fifo          import AsyncFIFOBuffered
 from amaranth.lib.cdc           import FFSynchronizer
 from amaranth.lib.memory        import Memory
+from amaranth.utils             import exact_log2
 
 from tiliqua                    import i2c
 from vendor                     import i2c as vendor_i2c
@@ -31,78 +32,75 @@ class I2STDM(wiring.Component):
     This core talks I2S TDM to an AK4619 configured in the
     interface mode configured by I2CMaster below.
 
-    The following registers specify the interface format:
-     - FS == 0b000, which means:
+    The interface formats assumed by this core as taken from
+    Table 1 in AK4619VN datasheet):
+     - For 48kHz, FS == 0b000, which requires:
          - MCLK = 256*Fs,
          - BICK = 128*Fs,
          - Fs must fall within 8kHz <= Fs <= 48Khz.
-    - TDM == 0b1 and DCF == 0b010, which means:
+     - For 192kHz, FS == 0b100, which requires:
+         - MCLK = 128*Fs,
+         - BICK = 128*Fs,
+         - Fs is 192Khz.
+    - In both cases, TDM == 0b1 and DCF == 0b010, implies:
          - TDM128 mode I2S compatible.
-
-    WARN: :py:`i`, :py:`o` do NOT adhere to normal stream
-    rules. :py:`i.ready` and :py:`o.valid` are simply strobed
-    for 1 cycle in the :py:`audio` domain at the end of every sample
-    slot. Channel 0 is scheduled first on both in and out streams,
-    samples emitted and consumed for channels 0, 1, 2, 3, 0, 1 ...
     """
 
     N_CHANNELS = 4
     S_WIDTH    = 16
     SLOT_WIDTH = 32
 
-    # CODEC pins
-
-    mclk:   Out(1)
-    bick:   Out(1)
-    lrck:   Out(1)
-    sdin1:  Out(1)
-    sdout1: In(1)
-
-    # DAC/ADC sample streams (see note in docstring!)
-
-    en_dac: In(1)
-
-    i: In(stream.Signature(signed(16)))
-    o: Out(stream.Signature(signed(16)))
+    def __init__(self, audio_192=False):
+        self.audio_192 = audio_192
+        super().__init__({
+            # CODEC pins (I2S)
+            "mclk":   Out(1),
+            "bick":   Out(1),
+            "lrck":   Out(1),
+            "sdin1":  Out(1),
+            "sdout1": In(1),
+            # Gateware interface
+            "channel": Out(exact_log2(self.N_CHANNELS)),
+            "strobe": Out(1),
+            "i": In(signed(self.S_WIDTH)),
+            "o": Out(signed(self.S_WIDTH)),
+        })
 
     def elaborate(self, platform):
         m = Module()
         clkdiv       = Signal(8)
         bit_counter  = Signal(5)
         bitsel       = Signal(range(self.S_WIDTH))
-        sample_i     = Signal(signed(self.S_WIDTH))
-        channel      = Signal(2)
-        en_dac_latch = Signal()
+
+        if self.audio_192:
+            self.mclk  .eq(clkdiv[0]),
+        else:
+            self.mclk  .eq(ClockSignal("audio")),
+
         m.d.comb += [
-            self.mclk  .eq(ClockSignal("audio")), # TODO 192KHz
             self.bick  .eq(clkdiv[0]),
             self.lrck  .eq(clkdiv[7]),
             bit_counter.eq(clkdiv[1:6]),
             bitsel.eq(self.S_WIDTH-bit_counter-1),
-            channel    .eq(clkdiv[6:8])
+            self.channel.eq(clkdiv[6:8])
         ]
         m.d.audio += clkdiv.eq(clkdiv+1)
         with m.If(bit_counter == (self.SLOT_WIDTH-2)): # TODO s/-2/-1 if S_WIDTH > 24 needed
             with m.If(self.bick):
-                m.d.audio += self.o.payload.eq(0)
+                m.d.audio += self.o.eq(0)
             with m.Else():
-                m.d.comb += self.o.valid.eq(1)
-                with m.If(en_dac_latch):
-                    m.d.comb += self.i.ready.eq(1)
-                with m.If(self.en_dac & (channel == 0)):
-                    m.d.comb += self.i.ready.eq(1)
-                    m.d.sync += en_dac_latch.eq(1)
+                m.d.comb += self.strobe.eq(1)
         with m.If(self.bick):
             # BICK transition HI -> LO: Clock in W bits
             # On HI -> LO both SDIN and SDOUT do not transition.
             # (determined by AK4619 transition polarity register BCKP)
             with m.If(bit_counter < self.S_WIDTH):
-                m.d.audio += self.o.payload.eq((self.o.payload << 1) | self.sdout1)
+                m.d.audio += self.o.eq((self.o << 1) | self.sdout1)
         with m.Else():
             # BICK transition LO -> HI: Clock out W bits
             # On LO -> HI both SDIN and SDOUT transition.
             with m.If(bit_counter < (self.S_WIDTH-1)):
-                m.d.audio += self.sdin1.eq(self.i.payload.bit_select(bitsel, 1))
+                m.d.audio += self.sdin1.eq(self.i.bit_select(bitsel, 1))
             with m.Else():
                 m.d.audio += self.sdin1.eq(0)
         return m
@@ -195,6 +193,8 @@ class I2SCalibrator(wiring.Component):
 
         with m.If(dac_fifo.r_level > (self.fifo_depth // 2)):
             m.d.sync += self.en_dac.eq(1)
+        with m.If(dac_fifo.r_level < 5):
+            m.d.sync += self.en_dac.eq(0)
 
         # ADC path calibration
 
