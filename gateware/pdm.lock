@@ -5,7 +5,7 @@
 groups = ["default", "docs", "test"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:c1b51d2d9f6d9119ae839e4a3c8bba8ed00072b4d2fad8e00ba0de67fd6ec62d"
+content_hash = "sha256:5f171919406382725836dd88693cb72809229f16f764d8a280175d5814a84d2f"
 
 [[metadata.targets]]
 requires_python = ">=3.10"
@@ -689,7 +689,7 @@ name = "luna-usb"
 version = "0.1.0"
 requires_python = ">=3.8"
 git = "https://github.com/schnommus/luna"
-ref = "seb/iso-amaranth5"
+ref = "seb/iso-amaranth5-2"
 revision = "2a25d9e9042628dee4dcbadefc7a60faf11945f2"
 summary = "Amaranth HDL framework for FPGA-based USB solutions"
 groups = ["default"]
