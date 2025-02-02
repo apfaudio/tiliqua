@@ -12,80 +12,39 @@ from amaranth.lib          import wiring, data
 from amaranth.lib.memory   import Memory
 from amaranth.lib.fifo     import SyncFIFO
 from tiliqua               import eurorack_pmod
+from tiliqua.eurorack_pmod import ASQ
 
 from amaranth_future       import fixed
 
-class I2CTests(unittest.TestCase):
+class I2STests(unittest.TestCase):
 
-    def test_i2s_tdm_multi_channel(self):
-        # Create test module
+    def test_i2s(self):
         m = Module()
-        dut = eurorack_pmod.I2STDM(audio_192=False)  # Testing 48kHz mode
-        m.d.comb += dut.sdout1.eq(dut.sdin1)
+        i2s = eurorack_pmod.I2STDM(audio_192=False) # 48kHz logic
+        dut = eurorack_pmod.I2SCalibrator()
+        m.d.comb += i2s.sdout1.eq(i2s.sdin1) # I2S hardware loopback
+        m.d.comb += [
+            # I2S <-> calibrator
+            dut.channel.eq(i2s.channel),
+            dut.strobe.eq(i2s.strobe),
+            dut.i_uncal.eq(i2s.o),
+            i2s.i.eq(dut.o_uncal),
+        ]
+        m.submodules += [i2s, dut]
         m = DomainRenamer({"audio": "sync"})(m)
 
-        m.submodules.dut = dut
-        TICKS = 512  # Covers multiple 128-bit TDM frames
-
-        def generate_sine(freq, n):
-            return int(32767 * math.sin(2 * math.pi * freq * n / 48000))
-        frequencies = [440, 880, 1320, 1760]  # A4, A5, E6, A6
-        input_samples = [[generate_sine(f, n) for n in range(TICKS)] for f in frequencies]
-
         async def process(ctx):
-            sample_idx = 0
-            current_channel = 0
-            for tick in range(TICKS):
-                await ctx.tick().until(dut.strobe)
-                current_channel = ctx.get(dut.channel)
-                ctx.set(dut.i, input_samples[current_channel][sample_idx])
-                if current_channel == dut.N_CHANNELS - 1:
-                    sample_idx += 1
+            for n in range(0, 100):
+                await ctx.tick().until(dut.i_cal.ready)
+                x = fixed.Const(math.sin(n*0.10), shape=ASQ)
+                ctx.set(dut.i_cal.payload, [x, 0, 0, 0])
+                ctx.set(dut.i_cal.valid, 1)
+                await ctx.tick()
+                ctx.set(dut.i_cal.valid, 0)
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
         sim.add_testbench(process)
 
-        with sim.write_vcd(vcd_file=open("test_i2s_tdm_multi_channel.vcd", "w")):
+        with sim.write_vcd(vcd_file=open("test_i2s.vcd", "w")):
             sim.run()
-
-    """
-    def test_i2s_tdm(self):
-
-        m = Module()
-        dut = eurorack_pmod.I2STDM()
-        cal = eurorack_pmod.I2SCalibrator()
-        wiring.connect(m, dut.o, cal.i_uncal)
-        wiring.connect(m, cal.o_uncal, dut.i)
-        m.d.comb += dut.en_dac.eq(cal.en_dac)
-        m.submodules += [dut, cal]
-        m = DomainRenamer({"audio": "sync"})(m)
-
-        TICKS = 10000
-
-        async def test_response(ctx):
-
-            for n in range(16):
-                def fn(n):
-                    return 0.4*(math.sin(n*0.2) + math.sin(n))
-                v = fixed.Const(fn(n), shape=eurorack_pmod.ASQ)
-                ctx.set(cal.i_cal.valid, 1)
-                #ctx.set(dac_fifo.w_stream.payload[0:16],  v.as_value())
-                ctx.set(cal.i_cal.payload, [0, v, 0, 0])
-                #ctx.set(dac_fifo.w_stream.payload[32:48], v.as_value())
-                #ctx.set(dac_fifo.w_stream.payload[48:64], v.as_value())
-                await ctx.tick()
-                ctx.set(cal.i_cal.valid, 0)
-                for n in range(8):
-                    await ctx.tick()
-
-            for n in range(TICKS):
-                ctx.set(dut.sdout1, n % 5 == 0)
-                await ctx.tick()
-
-        sim = Simulator(m)
-        sim.add_clock(1e-6)
-        sim.add_testbench(test_response)
-        with sim.write_vcd(vcd_file=open("test_i2s_tdm.vcd", "w")):
-            sim.run()
-    """

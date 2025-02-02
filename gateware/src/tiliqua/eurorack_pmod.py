@@ -11,7 +11,7 @@ from amaranth                   import *
 from amaranth.build             import *
 from amaranth.lib               import wiring, data, stream
 from amaranth.lib.wiring        import In, Out
-from amaranth.lib.fifo          import AsyncFIFOBuffered
+from amaranth.lib.fifo          import AsyncFIFO
 from amaranth.lib.cdc           import FFSynchronizer
 from amaranth.lib.memory        import Memory
 from amaranth.utils             import exact_log2
@@ -138,25 +138,23 @@ class I2SCalibrator(wiring.Component):
         m = Module()
 
         cal_mem = Memory(shape=data.ArrayLayout(ASQ, 2),
-                         depth=I2STDM.N_CHANNELS,
+                         depth=I2STDM.N_CHANNELS*2,
                          init=[
-                            [fixed.Const(1.0, shape=ASQ),
-                             fixed.Const(0.0, shape=ASQ)] for _ in range(4) + # input defaults
-                            [fixed.Const(1.0, shape=ASQ),
-                             fixed.Const(0.0, shape=ASQ)] for _ in range(4) # output defaults
+                            [fixed.Const(0.98, shape=ASQ), fixed.Const(0.0, shape=ASQ)]
+                            for _ in range(I2STDM.N_CHANNELS*2)
                          ])
-        m.submodules.cal_read = cal_read = cal_mem.read_port(domain="comb")
+        cal_read = cal_mem.read_port(domain="comb")
 
         # FIFOs for crossing clock domains
-        m.submodules.adc_fifo = adc_fifo = stream.AsyncFIFO(
-            layout=data.ArrayLayout(ASQ, 4),
+        m.submodules.adc_fifo = adc_fifo = AsyncFIFO(
+            width=I2STDM.S_WIDTH*4,
             depth=self.fifo_depth,
             w_domain="audio",
             r_domain=self.stream_domain
         )
 
-        m.submodules.dac_fifo = dac_fifo = stream.AsyncFIFO(
-            layout=data.ArrayLayout(ASQ, 4),
+        m.submodules.dac_fifo = dac_fifo = AsyncFIFO(
+            width=I2STDM.S_WIDTH*4,
             depth=self.fifo_depth,
             w_domain=self.stream_domain,
             r_domain="audio"
@@ -169,8 +167,9 @@ class I2SCalibrator(wiring.Component):
         in_sample = Signal(ASQ)
         out_sample = Signal(ASQ)
 
-        # calibration logic
-        m.d.comb += out_sample.eq((in_sample * cal_read.data[0]) + cal_read.data[1])
+        # calibration logic (single MAC)
+        # m.d.comb += out_sample.eq((in_sample * cal_read.data[0]) + cal_read.data[1])
+        m.d.comb += out_sample.eq(in_sample) # FIXME
 
         # Combined calibration state machine
         with m.FSM(domain="audio") as cal_fsm:
@@ -180,20 +179,23 @@ class I2SCalibrator(wiring.Component):
                         cal_read.addr.eq(self.channel),
                         in_sample.raw().eq(self.i_uncal)
                     ]
-                    with m.If(dac_fifo.r_valid):
-                        m.d.audio += dac_samples.eq(dac_fifo.r_data)
-                        m.d.comb += dac_fifo.r_ready.eq(1)
+                    with m.If(dac_fifo.r_rdy):
+                        with m.If(self.channel == (I2STDM.N_CHANNELS - 1)):
+                            m.d.audio += dac_samples.eq(dac_fifo.r_data)
+                            m.d.comb += dac_fifo.r_en.eq(1)
                     m.next = "PROCESS_ADC"
             with m.State("PROCESS_ADC"):
-                m.d.audio += adc_samples[self.channel].eq(out_sample)
+                channel_store = Signal.like(self.channel)
+                m.d.comb += channel_store.eq(self.channel-1)
+                m.d.audio += adc_samples[channel_store].eq(out_sample)
                 with m.If(self.channel == (I2STDM.N_CHANNELS - 1)):
                     m.d.comb += [
                         adc_fifo.w_data.eq(adc_samples),
-                        adc_fifo.w_valid.eq(1),
+                        adc_fifo.w_en.eq(1),
                     ]
                 m.d.audio += [
                     # Setup signals for DAC processing
-                    cal_addr.eq(self.channel + I2STDM.N_CHANNELS),
+                    cal_read.addr.eq(self.channel + I2STDM.N_CHANNELS),
                     in_sample.eq(dac_samples[self.channel])
                 ]
                 m.next = "PROCESS_DAC"
@@ -204,13 +206,13 @@ class I2SCalibrator(wiring.Component):
         # Hook up stream interfaces
         m.d.comb += [
             # ADC
-            self.o_cal.valid.eq(adc_fifo.r_valid),
+            self.o_cal.valid.eq(adc_fifo.r_rdy),
             self.o_cal.payload.eq(adc_fifo.r_data),
-            adc_fifo.r_ready.eq(self.o_cal.ready),
+            adc_fifo.r_en.eq(self.o_cal.ready),
             # DAC
-            dac_fifo.w_valid.eq(self.i_cal.valid),
+            dac_fifo.w_en.eq(self.i_cal.valid),
             dac_fifo.w_data.eq(self.i_cal.payload),
-            self.i_cal.ready.eq(dac_fifo.w_ready),
+            self.i_cal.ready.eq(dac_fifo.w_rdy),
         ]
 
         return m
