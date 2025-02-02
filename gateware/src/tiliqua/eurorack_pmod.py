@@ -163,6 +163,9 @@ class I2SCalibrator(wiring.Component):
             r_domain="audio"
         )
 
+        wiring.connect(m, wiring.flipped(self.i_cal), dac_fifo.w_stream)
+        wiring.connect(m, adc_fifo.r_stream, wiring.flipped(self.o_cal))
+
         adc_samples = Signal(data.ArrayLayout(ASQ, 4))
         dac_samples = Signal(data.ArrayLayout(ASQ, 4))
 
@@ -207,18 +210,6 @@ class I2SCalibrator(wiring.Component):
             with m.State("PROCESS_DAC"):
                 m.d.audio += self.o_uncal.eq(out_sample.raw())
                 m.next = "IDLE"
-
-        # Hook up stream interfaces
-        m.d.comb += [
-            # ADC
-            self.o_cal.valid.eq(adc_fifo.r_rdy),
-            self.o_cal.payload.eq(adc_fifo.r_data),
-            adc_fifo.r_en.eq(self.o_cal.ready),
-            # DAC
-            dac_fifo.w_en.eq(self.i_cal.valid),
-            dac_fifo.w_data.eq(self.i_cal.payload),
-            self.i_cal.ready.eq(dac_fifo.w_rdy),
-        ]
 
         return m
 
