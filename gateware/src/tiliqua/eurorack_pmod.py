@@ -137,12 +137,15 @@ class I2SCalibrator(wiring.Component):
 
         m = Module()
 
-        cal_mem = Memory(shape=data.ArrayLayout(ASQ, 2),
+        self.ctype = fixed.SQ(2, ASQ.f_width)
+        cal_mem = Memory(shape=data.ArrayLayout(self.ctype, 2),
                          depth=I2STDM.N_CHANNELS*2,
                          init=[
-                            [fixed.Const(0.98, shape=ASQ), fixed.Const(0.0, shape=ASQ)]
+                            [fixed.Const(1.0, shape=self.ctype),
+                             fixed.Const(0.0, shape=self.ctype)]
                             for _ in range(I2STDM.N_CHANNELS*2)
                          ])
+        m.submodules.cal_mem = cal_mem
         cal_read = cal_mem.read_port(domain="comb")
 
         # FIFOs for crossing clock domains
@@ -168,8 +171,8 @@ class I2SCalibrator(wiring.Component):
         out_sample = Signal(ASQ)
 
         # calibration logic (single MAC)
-        # m.d.comb += out_sample.eq((in_sample * cal_read.data[0]) + cal_read.data[1])
-        m.d.comb += out_sample.eq(in_sample) # FIXME
+        m.d.comb += out_sample.eq((in_sample * cal_read.data[0]) +
+                                  cal_read.data[1])
 
         # Combined calibration state machine
         with m.FSM(domain="audio") as cal_fsm:
@@ -185,16 +188,18 @@ class I2SCalibrator(wiring.Component):
                             m.d.comb += dac_fifo.r_en.eq(1)
                     m.next = "PROCESS_ADC"
             with m.State("PROCESS_ADC"):
-                channel_store = Signal.like(self.channel)
-                m.d.comb += channel_store.eq(self.channel-1)
-                m.d.audio += adc_samples[channel_store].eq(out_sample)
+                # Store ADC readings one channel back
+                channel_adc = Signal.like(self.channel)
+                m.d.comb += channel_adc.eq(self.channel-1)
+                m.d.audio += adc_samples[channel_adc].eq(out_sample)
+                # Complete set of ADC readings, next FIFO entry
                 with m.If(self.channel == (I2STDM.N_CHANNELS - 1)):
                     m.d.comb += [
                         adc_fifo.w_data.eq(adc_samples),
                         adc_fifo.w_en.eq(1),
                     ]
+                # Setup signals for DAC processing
                 m.d.audio += [
-                    # Setup signals for DAC processing
                     cal_read.addr.eq(self.channel + I2STDM.N_CHANNELS),
                     in_sample.eq(dac_samples[self.channel])
                 ]
