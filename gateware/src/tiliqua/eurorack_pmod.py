@@ -242,10 +242,7 @@ class I2SCalibrator(wiring.Component):
                             m.d.comb += dac_fifo.r_en.eq(1)
                     m.next = "PROCESS_ADC"
             with m.State("PROCESS_ADC"):
-                # Store ADC readings one channel back
-                channel_adc = Signal.like(self.channel)
-                m.d.comb += channel_adc.eq(self.channel-1)
-                m.d.audio += adc_samples[channel_adc].eq(out_sample)
+                m.d.audio += adc_samples[self.channel].eq(out_sample)
                 # Complete set of ADC readings, next FIFO entry
                 with m.If(self.channel == (I2STDM.N_CHANNELS - 1)):
                     m.d.comb += [
@@ -253,9 +250,12 @@ class I2SCalibrator(wiring.Component):
                         adc_fifo.w_en.eq(1),
                     ]
                 # Setup signals for DAC processing
+                # Fetch DAC readings one channel back
+                channel_dac = Signal.like(self.channel)
+                m.d.comb += channel_dac.eq(self.channel+1)
                 m.d.audio += [
                     cal_read.addr.eq(self.channel + I2STDM.N_CHANNELS),
-                    in_sample.eq(dac_samples[self.channel])
+                    in_sample.eq(dac_samples[channel_dac])
                 ]
                 m.next = "PROCESS_DAC"
             with m.State("PROCESS_DAC"):
@@ -673,6 +673,8 @@ class EurorackPmod(wiring.Component):
                 if n <= 3:
                     with m.If(self.o_cal.valid & self.jack[n]):
                         m.d.sync += i2c_master.led[n].eq(self.o_cal.payload[n].raw()>>8),
+                    with m.If(~self.jack[n]):
+                        m.d.sync += i2c_master.led[n].eq(0),
                 else:
                     with m.If(self.i_cal.valid):
                         m.d.sync += i2c_master.led[n].eq(self.i_cal.payload[n-4].raw()>>8),
