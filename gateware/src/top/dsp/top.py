@@ -820,7 +820,10 @@ class CoreTop(Elaboratable):
             m.d.comb += pmod0.codec_mute.eq(reboot.mute)
         else:
             m.submodules.car = sim.FakeTiliquaDomainGenerator()
-            m.submodules.pmod0 = pmod0 = sim.FakeEurorackPmod()
+            m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
+                    hardware_r33=True,
+                    touch_enabled=self.touch)
+            """
             m.d.comb += [
                 pmod0.sample_inject[0]._target.eq(self.inject0),
                 pmod0.sample_inject[1]._target.eq(self.inject1),
@@ -828,6 +831,7 @@ class CoreTop(Elaboratable):
                 pmod0.sample_inject[3]._target.eq(self.inject3),
                 pmod0.fs_strobe.eq(self.fs_strobe),
             ]
+            """
 
         m.submodules.core = self.core
         wiring.connect(m, pmod0.o_cal, self.core.i)

@@ -124,9 +124,9 @@ class I2STDM(wiring.Component):
         bitsel       = Signal(range(self.S_WIDTH))
 
         if self.audio_192:
-            self.i2s.mclk  .eq(clkdiv[0]),
+            m.d.comb += self.i2s.mclk.eq(clkdiv[0]),
         else:
-            self.i2s.mclk  .eq(ClockSignal("audio")),
+            m.d.comb += self.i2s.mclk.eq(ClockSignal("audio")),
 
         m.d.comb += [
             self.i2s.bick  .eq(clkdiv[0]),
