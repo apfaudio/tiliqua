@@ -416,8 +416,6 @@ class PolySoc(TiliquaSoc):
 
         pmod0 = self.pmod0_periph.pmod
 
-        m.submodules.astream = astream = eurorack_pmod.AudioStream(pmod0)
-
         if sim.is_hw(platform):
             # Polysynth hardware MIDI sources
 
@@ -452,8 +450,8 @@ class PolySoc(TiliquaSoc):
                 m.d.comb += vbus_o.eq(0)
 
         # polysynth audio
-        wiring.connect(m, astream.istream, polysynth.i)
-        wiring.connect(m, polysynth.o, astream.ostream)
+        wiring.connect(m, pmod0.o_cal, polysynth.i)
+        wiring.connect(m, polysynth.o, pmod0.i_cal)
 
         with m.If(self.vector_periph.soc_en):
             # polysynth out -> vectorscope TODO use true split

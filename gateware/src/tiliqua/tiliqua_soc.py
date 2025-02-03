@@ -378,11 +378,12 @@ class TiliquaSoc(Component):
             # pmod0
             # add a eurorack pmod instance without an audio stream for basic self-testing
             # connect it to our test peripheral before instantiating SoC.
+            m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
             m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                    pmod_pins=platform.request("audio_ffc"),
                     hardware_r33=True,
                     touch_enabled=self.touch,
                     audio_192=self.audio_192)
+            wiring.connect(m, pmod0.pins, pmod0_provider.pins)
             self.pmod0_periph.pmod = pmod0
             m.submodules.pmod0_periph = self.pmod0_periph
 
