@@ -128,7 +128,7 @@ class I2SCalibrator(wiring.Component):
     # Calibrated samples -> to DAC (sync domain)
     i_cal:    In(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    def __init__(self, stream_domain="sync", fifo_depth=32):
+    def __init__(self, stream_domain="sync", fifo_depth=4):
         self.stream_domain = stream_domain
         self.fifo_depth = fifo_depth
         super().__init__()
@@ -652,7 +652,7 @@ class EurorackPmod(wiring.Component):
             with m.If(3000 < pdn_cnt):
                 m.d.comb += pmod_pins.pdn_clk.o.eq(1)
 
-        m.submodules.i2stdm = i2stdm = I2STDM()
+        m.submodules.i2stdm = i2stdm = I2STDM(audio_192=self.audio_192)
         m.d.comb += [
             pmod_pins.mclk.o.eq(i2stdm.mclk),
             pmod_pins.bick.o.eq(i2stdm.bick),
@@ -661,13 +661,15 @@ class EurorackPmod(wiring.Component):
             i2stdm.sdout1.eq(pmod_pins.sdout1.i),
         ]
         m.submodules.calibrator = calibrator = I2SCalibrator()
-        wiring.connect(m, i2stdm.o, calibrator.i_uncal)
-        wiring.connect(m, calibrator.o_uncal, i2stdm.i)
+        # I2S <-> calibrator
+        m.d.comb += [
+            calibrator.channel.eq(i2stdm.channel),
+            calibrator.strobe.eq(i2stdm.strobe),
+            calibrator.i_uncal.eq(i2stdm.o),
+            i2stdm.i.eq(calibrator.o_uncal),
+        ]
         wiring.connect(m, calibrator.o_cal, wiring.flipped(self.o_cal))
         wiring.connect(m, wiring.flipped(self.i_cal), calibrator.i_cal)
-
-        # DAC startup timing
-        m.d.comb += i2stdm.en_dac.eq(calibrator.en_dac)
 
         return m
 

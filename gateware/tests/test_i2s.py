@@ -39,8 +39,10 @@ class I2STests(unittest.TestCase):
                 x = fixed.Const(math.sin(n*0.10), shape=ASQ)
                 ctx.set(dut.i_cal.payload, [x, 0, 0, 0])
                 ctx.set(dut.i_cal.valid, 1)
+                ctx.set(dut.o_cal.ready, 1)
                 await ctx.tick()
                 ctx.set(dut.i_cal.valid, 0)
+                ctx.set(dut.o_cal.ready, 0)
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
