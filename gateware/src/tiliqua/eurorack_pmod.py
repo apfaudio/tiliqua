@@ -22,12 +22,11 @@ from vendor                     import i2c as vendor_i2c
 
 from amaranth_future            import fixed
 
-WIDTH = 16
-
-# Native 'Audio sample SQ', shape of audio samples from CODEC.
-ASQ = fixed.SQ(0, WIDTH-1)
-
 class I2SSignature(wiring.Signature):
+    """
+    Standard I2S inter-chip audio bus.
+    We use TDM for multiple audio channels.
+    """
     def __init__(self):
         super().__init__({
             "sdin1":   Out(1),
@@ -38,6 +37,9 @@ class I2SSignature(wiring.Signature):
         })
 
 class EurorackPmodPinSignature(wiring.Signature):
+    """
+    Interface between tiliqua-mobo and audio interface board.
+    """
     def __init__(self):
         super().__init__({
             "i2s":     Out(I2SSignature()),
@@ -47,12 +49,9 @@ class EurorackPmodPinSignature(wiring.Signature):
         })
 
 class FFCProvider(wiring.Component):
-
     """
-    Pin provider for audio interface connected through FFC
-    connector and onboard PDN flip-flop on Tiliqua R3+
+    Provider for audio interface board connected through FFC on tiliqua-mobo.
     """
-
     def __init__(self):
         super().__init__({
             "pins": In(EurorackPmodPinSignature())
@@ -68,8 +67,8 @@ class FFCProvider(wiring.Component):
             ffc.lrck.o.eq(self.pins.i2s.lrck),
             ffc.bick.o.eq(self.pins.i2s.bick),
             ffc.mclk.o.eq(self.pins.i2s.mclk),
-            # Power clocking
-            ffc.pdn_clk.o.eq(self.pins.pdn_clk),
+            # Power clocking (Note: only R3+ has a flip-flop on PDN with pdn_clk).
+            ffc.pdn_clk.o.eq(self.pins.pdn_clk) if hasattr(ffc, "pdn_clk") else [],
             ffc.pdn_d.o.eq(self.pins.pdn_d),
             # I2C bus
             ffc.i2c_sda.o.eq(self.pins.i2c.sda.o),
@@ -156,15 +155,24 @@ class I2STDM(wiring.Component):
                 m.d.audio += self.i2s.sdin1.eq(0)
         return m
 
+# Native 'Audio sample SQ', shape of audio samples from CODEC.
+ASQ = fixed.SQ(0, I2STDM.S_WIDTH-1)
+
 class I2SCalibrator(wiring.Component):
 
     """
-    Convert uncalibrated I2S samples (1 sample per payload)
-    into calibrated sample streams (4 samples per payload, each channel
+    Convert uncalibrated I2S samples from the audio CODEC into
+    calibrated sample streams (4 samples per payload, each channel
     has its own slot).
 
     The goal is to remove the CODEC DC offset and scale raw counts to
-    consistent fixed-point types.
+    calibrated fixed-point types. The calibration memory contains 2
+    values per channel, where ``out = in * A + B``. A and B may be arbitrarily
+    set to any fixed-point constant that fits within ``self.ctype`` declared
+    below.
+
+    Most cores assume 4 counts/mV scaling, that is, a value of 1.0 (float) is
+    32768 (underlying data) which represents 8.192V (physically).
     """
 
     # Raw samples (I2S interface, audio domain from I2STDM)
@@ -191,12 +199,12 @@ class I2SCalibrator(wiring.Component):
         self.ctype = fixed.SQ(2, ASQ.f_width)
         cal_mem = Memory(shape=data.ArrayLayout(self.ctype, 2),
                          depth=I2STDM.N_CHANNELS*2,
-                         init=[
+                         init=[ # default calibration constants
                             [fixed.Const(1.0, shape=self.ctype),
                              fixed.Const(0.0, shape=self.ctype)]
                             for _ in range(I2STDM.N_CHANNELS*2)
                          ])
-        m.submodules.cal_mem = cal_mem
+        m.submodules.cal_mem = cal_mem # WARN: accessed in 'audio' domain
         cal_read = cal_mem.read_port(domain="comb")
 
         # FIFOs for crossing clock domains
@@ -228,7 +236,7 @@ class I2SCalibrator(wiring.Component):
         m.d.comb += out_sample.eq((in_sample * cal_read.data[0]) +
                                   cal_read.data[1])
 
-        # Combined calibration state machine
+        # Calibrating samples happens in the 'audio' domain.
         with m.FSM(domain="audio") as cal_fsm:
             with m.State("IDLE"):
                 with m.If(self.strobe):
@@ -627,15 +635,15 @@ class EurorackPmod(wiring.Component):
     # Audio interface pins
     pins:  Out(EurorackPmodPinSignature())
 
-    # Sample streaming
+    # Calibrated sample streaming
     i_cal:  In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o_cal: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
     # Touch sensing and jacksense outputs.
     touch: Out(8).array(8)
     jack: Out(8)
-    touch_err: Out(8)
-    codec_mute: In(1)
+    touch_err: Out(8) # Roughly proportional to touch IC NACKs (0 is good)
+    codec_mute: In(1) # Hold at 1 to soft mute CODEC
 
     # 1s for automatic audio -> LED control. 0s for manual.
     led_mode: In(8, init=0xff)
@@ -651,9 +659,32 @@ class EurorackPmod(wiring.Component):
 
         m = Module()
 
+        #
+        # AUDIO/CODEC CONTROL
+        #
+
+        m.submodules.i2stdm = i2stdm = I2STDM(audio_192=self.audio_192)
+        m.submodules.calibrator = calibrator = I2SCalibrator()
+        # I2STDM <-> I2S pins
+        wiring.connect(m, i2stdm.i2s, wiring.flipped(self.pins.i2s))
+        # I2STDM <-> calibrator
+        m.d.comb += [
+            calibrator.channel.eq(i2stdm.channel),
+            calibrator.strobe.eq(i2stdm.strobe),
+            calibrator.i_uncal.eq(i2stdm.o),
+            i2stdm.i.eq(calibrator.o_uncal),
+        ]
+        # User core <-> calibrator
+        wiring.connect(m, calibrator.o_cal, wiring.flipped(self.o_cal))
+        wiring.connect(m, wiring.flipped(self.i_cal), calibrator.i_cal)
+
+        #
+        # I2C MASTER CONTROL
+        #
+
         m.submodules.i2c_master = i2c_master = I2CMaster(audio_192=self.audio_192)
 
-        # Hook up I2C master (TODO: use provider)
+        # Hook up I2C master pins
         wiring.connect(m, i2c_master.pins, wiring.flipped(self.pins.i2c))
         m.d.comb += [
             # Hook up I2C master registers
@@ -662,6 +693,10 @@ class EurorackPmod(wiring.Component):
             # Hook up coded mute control
             i2c_master.codec_mute.eq(self.codec_mute),
         ]
+
+        #
+        # LED/TOUCH HANDLING
+        #
 
         for n in range(8):
 
@@ -681,51 +716,20 @@ class EurorackPmod(wiring.Component):
             with m.Else():
                 m.d.sync += i2c_master.led[n].eq(self.led[n]),
 
+        #
+        # POWER / SOFT MUTE HANDLING
+        #
+
         # PDN (and clocking for mobo R3+ for pop-free bitstream switching)
         m.d.comb += self.pins.pdn_d.eq(1),
-        #
         # Drive external flip-flop, ensuring PDN remains high across
-        # FPGA reconfiguration (only works on mobo R3+).
-        #
+        # FPGA reconfiguration (pdn_clk only exists on mobo R3+).
         # Codec RSTN must be asserted (held in reset) across the
         # FPGA reconfiguration. This is performed by `self.codec_mute`.
-        #
         pdn_cnt = Signal(unsigned(16))
         with m.If(pdn_cnt != 60000): # 1ms
             m.d.sync += pdn_cnt.eq(pdn_cnt+1)
         with m.If(3000 < pdn_cnt):
             m.d.comb += self.pins.pdn_clk.eq(1)
 
-        m.submodules.i2stdm = i2stdm = I2STDM(audio_192=self.audio_192)
-        wiring.connect(m, i2stdm.i2s, wiring.flipped(self.pins.i2s))
-        m.submodules.calibrator = calibrator = I2SCalibrator()
-        # I2S <-> calibrator
-        m.d.comb += [
-            calibrator.channel.eq(i2stdm.channel),
-            calibrator.strobe.eq(i2stdm.strobe),
-            calibrator.i_uncal.eq(i2stdm.o),
-            i2stdm.i.eq(calibrator.o_uncal),
-        ]
-        wiring.connect(m, calibrator.o_cal, wiring.flipped(self.o_cal))
-        wiring.connect(m, wiring.flipped(self.i_cal), calibrator.i_cal)
-
         return m
-
-def pins_from_pmod_connector_with_ribbon(platform, pmod_index):
-    """Create a eurorack-pmod resource on a given PMOD connector. Assumes ribbon cable flip."""
-    eurorack_pmod = [
-        Resource(f"eurorack_pmod{pmod_index}", pmod_index,
-            Subsignal("sdin1",   Pins("1",  conn=("pmod", pmod_index), dir='o')),
-            Subsignal("sdout1",  Pins("2",  conn=("pmod", pmod_index), dir='i')),
-            Subsignal("lrck",    Pins("3",  conn=("pmod", pmod_index), dir='o')),
-            Subsignal("bick",    Pins("4",  conn=("pmod", pmod_index), dir='o')),
-            Subsignal("mclk",    Pins("10", conn=("pmod", pmod_index), dir='o')),
-            Subsignal("pdn",     Pins("9",  conn=("pmod", pmod_index), dir='o')),
-            Subsignal("i2c_sda", Pins("8",  conn=("pmod", pmod_index), dir='io')),
-            Subsignal("i2c_scl", Pins("7",  conn=("pmod", pmod_index), dir='io')),
-            Attrs(IO_TYPE="LVCMOS33"),
-        )
-    ]
-    platform.add_resources(eurorack_pmod)
-    return platform.request(f"eurorack_pmod{pmod_index}")
-
