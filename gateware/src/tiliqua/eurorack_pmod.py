@@ -15,6 +15,7 @@ from amaranth.lib.fifo          import AsyncFIFO
 from amaranth.lib.cdc           import FFSynchronizer
 from amaranth.lib.memory        import Memory
 from amaranth.utils             import exact_log2
+from amaranth_soc               import gpio
 
 from tiliqua                    import i2c
 from vendor                     import i2c as vendor_i2c
@@ -25,6 +26,60 @@ WIDTH = 16
 
 # Native 'Audio sample SQ', shape of audio samples from CODEC.
 ASQ = fixed.SQ(0, WIDTH-1)
+
+class I2SSignature(wiring.Signature):
+    def __init__(self):
+        super().__init__({
+            "sdin1":   Out(1),
+            "sdout1":   In(1),
+            "lrck":    Out(1),
+            "bick":    Out(1),
+            "mclk":    Out(1),
+        })
+
+class EurorackPmodPinSignature(wiring.Signature):
+    def __init__(self):
+        super().__init__({
+            "i2s":     Out(I2SSignature()),
+            "i2c":     Out(vendor_i2c.I2CPinSignature()),
+            "pdn_clk": Out(1),
+            "pdn_d":   Out(1),
+        })
+
+class FFCProvider(wiring.Component):
+
+    """
+    Pin provider for audio interface connected through FFC
+    connector and onboard PDN flip-flop on Tiliqua R3+
+    """
+
+    def __init__(self):
+        super().__init__({
+            "pins": In(EurorackPmodPinSignature())
+        })
+
+    def elaborate(self, platform):
+        m = Module()
+        ffc = platform.request("audio_ffc")
+        m.d.comb += [
+            # I2S bus
+            ffc.sdin1.o.eq(self.pins.i2s.sdin1),
+            self.pins.i2s.sdout1.eq(ffc.sdout1.i),
+            ffc.lrck.o.eq(self.pins.i2s.lrck),
+            ffc.bick.o.eq(self.pins.i2s.bick),
+            ffc.mclk.o.eq(self.pins.i2s.mclk),
+            # Power clocking
+            ffc.pdn_clk.o.eq(self.pins.pdn_clk),
+            ffc.pdn_d.o.eq(self.pins.pdn_d),
+            # I2C bus
+            ffc.i2c_sda.o.eq(self.pins.i2c.sda.o),
+            ffc.i2c_sda.oe.eq(self.pins.i2c.sda.oe),
+            self.pins.i2c.sda.i.eq(ffc.i2c_sda.i),
+            ffc.i2c_scl.o.eq(self.pins.i2c.scl.o),
+            ffc.i2c_scl.oe.eq(self.pins.i2c.scl.oe),
+            self.pins.i2c.scl.i.eq(ffc.i2c_scl.i),
+        ]
+        return m
 
 class I2STDM(wiring.Component):
 
@@ -54,16 +109,12 @@ class I2STDM(wiring.Component):
         self.audio_192 = audio_192
         super().__init__({
             # CODEC pins (I2S)
-            "mclk":   Out(1),
-            "bick":   Out(1),
-            "lrck":   Out(1),
-            "sdin1":  Out(1),
-            "sdout1": In(1),
+            "i2s":     Out(I2SSignature()),
             # Gateware interface
             "channel": Out(exact_log2(self.N_CHANNELS)),
-            "strobe": Out(1),
-            "i": In(signed(self.S_WIDTH)),
-            "o": Out(signed(self.S_WIDTH)),
+            "strobe":  Out(1),
+            "i":       In(signed(self.S_WIDTH)),
+            "o":       Out(signed(self.S_WIDTH)),
         })
 
     def elaborate(self, platform):
@@ -73,36 +124,36 @@ class I2STDM(wiring.Component):
         bitsel       = Signal(range(self.S_WIDTH))
 
         if self.audio_192:
-            self.mclk  .eq(clkdiv[0]),
+            self.i2s.mclk  .eq(clkdiv[0]),
         else:
-            self.mclk  .eq(ClockSignal("audio")),
+            self.i2s.mclk  .eq(ClockSignal("audio")),
 
         m.d.comb += [
-            self.bick  .eq(clkdiv[0]),
-            self.lrck  .eq(clkdiv[7]),
+            self.i2s.bick  .eq(clkdiv[0]),
+            self.i2s.lrck  .eq(clkdiv[7]),
             bit_counter.eq(clkdiv[1:6]),
             bitsel.eq(self.S_WIDTH-bit_counter-1),
             self.channel.eq(clkdiv[6:8])
         ]
         m.d.audio += clkdiv.eq(clkdiv+1)
         with m.If(bit_counter == (self.SLOT_WIDTH-2)): # TODO s/-2/-1 if S_WIDTH > 24 needed
-            with m.If(self.bick):
+            with m.If(self.i2s.bick):
                 m.d.audio += self.o.eq(0)
             with m.Else():
                 m.d.comb += self.strobe.eq(1)
-        with m.If(self.bick):
+        with m.If(self.i2s.bick):
             # BICK transition HI -> LO: Clock in W bits
             # On HI -> LO both SDIN and SDOUT do not transition.
             # (determined by AK4619 transition polarity register BCKP)
             with m.If(bit_counter < self.S_WIDTH):
-                m.d.audio += self.o.eq((self.o << 1) | self.sdout1)
+                m.d.audio += self.o.eq((self.o << 1) | self.i2s.sdout1)
         with m.Else():
             # BICK transition LO -> HI: Clock out W bits
             # On LO -> HI both SDIN and SDOUT transition.
             with m.If(bit_counter < (self.S_WIDTH-1)):
-                m.d.audio += self.sdin1.eq(self.i.bit_select(bitsel, 1))
+                m.d.audio += self.i2s.sdin1.eq(self.i.bit_select(bitsel, 1))
             with m.Else():
-                m.d.audio += self.sdin1.eq(0)
+                m.d.audio += self.i2s.sdin1.eq(0)
         return m
 
 class I2SCalibrator(wiring.Component):
@@ -563,7 +614,8 @@ class I2CMaster(wiring.Component):
 
 class EurorackPmod(wiring.Component):
     """
-    Amaranth wrapper for Verilog files from `eurorack-pmod` project.
+    Driver for `eurorack-pmod` audio interface PCBA (CODEC, LEDs,
+    EEPROM, jack detect, touch sensing and so on).
 
     Requires an "audio" clock domain running at 12.288MHz (256*Fs).
 
@@ -572,6 +624,10 @@ class EurorackPmod(wiring.Component):
     rates (as needed for 4x4 TDM the AK4619 requires).
     """
 
+    # Audio interface pins
+    pins:  Out(EurorackPmodPinSignature())
+
+    # Sample streaming
     i_cal:  In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o_cal: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
@@ -586,11 +642,8 @@ class EurorackPmod(wiring.Component):
     # If an LED is in manual, this is signed i8 from -green to +red.
     led: In(8).array(8)
 
-    def __init__(self, pmod_pins, hardware_r33=True, touch_enabled=True, audio_192=False):
-
-        self.pmod_pins = pmod_pins
+    def __init__(self, hardware_r33=True, touch_enabled=True, audio_192=False):
         self.audio_192 = audio_192
-
         super().__init__()
 
 
@@ -600,22 +653,12 @@ class EurorackPmod(wiring.Component):
 
         m.submodules.i2c_master = i2c_master = I2CMaster(audio_192=self.audio_192)
 
-        pmod_pins = self.pmod_pins
-
         # Hook up I2C master (TODO: use provider)
+        wiring.connect(m, i2c_master.pins, wiring.flipped(self.pins.i2c))
         m.d.comb += [
-            # When i2c oe is asserted, we always want to pull down.
-            pmod_pins.i2c_scl.o.eq(0),
-            pmod_pins.i2c_sda.o.eq(0),
-            pmod_pins.i2c_sda.oe.eq(i2c_master.pins.sda.oe),
-            pmod_pins.i2c_scl.oe.eq(i2c_master.pins.scl.oe),
-            i2c_master.pins.sda.i.eq(pmod_pins.i2c_sda.i),
-            i2c_master.pins.scl.i.eq(pmod_pins.i2c_scl.i),
-
             # Hook up I2C master registers
             self.jack.eq(i2c_master.jack),
             self.touch_err.eq(i2c_master.touch_err),
-
             # Hook up coded mute control
             i2c_master.codec_mute.eq(self.codec_mute),
         ]
@@ -637,29 +680,22 @@ class EurorackPmod(wiring.Component):
                 m.d.sync += i2c_master.led[n].eq(self.led[n]),
 
         # PDN (and clocking for mobo R3+ for pop-free bitstream switching)
-        m.d.comb += pmod_pins.pdn_d.o.eq(1),
-        if hasattr(pmod_pins, "pdn_clk"):
-            #
-            # Drive external flip-flop, ensuring PDN remains high across
-            # FPGA reconfiguration (only works on mobo R3+).
-            #
-            # Codec RSTN must be asserted (held in reset) across the
-            # FPGA reconfiguration. This is performed by `self.codec_mute`.
-            #
-            pdn_cnt = Signal(unsigned(16))
-            with m.If(pdn_cnt != 60000): # 1ms
-                m.d.sync += pdn_cnt.eq(pdn_cnt+1)
-            with m.If(3000 < pdn_cnt):
-                m.d.comb += pmod_pins.pdn_clk.o.eq(1)
+        m.d.comb += self.pins.pdn_d.eq(1),
+        #
+        # Drive external flip-flop, ensuring PDN remains high across
+        # FPGA reconfiguration (only works on mobo R3+).
+        #
+        # Codec RSTN must be asserted (held in reset) across the
+        # FPGA reconfiguration. This is performed by `self.codec_mute`.
+        #
+        pdn_cnt = Signal(unsigned(16))
+        with m.If(pdn_cnt != 60000): # 1ms
+            m.d.sync += pdn_cnt.eq(pdn_cnt+1)
+        with m.If(3000 < pdn_cnt):
+            m.d.comb += self.pins.pdn_clk.eq(1)
 
         m.submodules.i2stdm = i2stdm = I2STDM(audio_192=self.audio_192)
-        m.d.comb += [
-            pmod_pins.mclk.o.eq(i2stdm.mclk),
-            pmod_pins.bick.o.eq(i2stdm.bick),
-            pmod_pins.lrck.o.eq(i2stdm.lrck),
-            pmod_pins.sdin1.o.eq(i2stdm.sdin1),
-            i2stdm.sdout1.eq(pmod_pins.sdout1.i),
-        ]
+        wiring.connect(m, i2stdm.i2s, wiring.flipped(self.pins.i2s))
         m.submodules.calibrator = calibrator = I2SCalibrator()
         # I2S <-> calibrator
         m.d.comb += [

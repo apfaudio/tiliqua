@@ -20,17 +20,17 @@ class I2STests(unittest.TestCase):
 
     def test_i2s(self):
         m = Module()
-        i2s = eurorack_pmod.I2STDM(audio_192=False) # 48kHz logic
+        i2stdm = eurorack_pmod.I2STDM(audio_192=False) # 48kHz logic
         dut = eurorack_pmod.I2SCalibrator()
-        m.d.comb += i2s.sdout1.eq(i2s.sdin1) # I2S hardware loopback
+        m.d.comb += i2stdm.i2s.sdout1.eq(i2stdm.i2s.sdin1) # I2S hardware loopback
         m.d.comb += [
             # I2S <-> calibrator
-            dut.channel.eq(i2s.channel),
-            dut.strobe.eq(i2s.strobe),
-            dut.i_uncal.eq(i2s.o),
-            i2s.i.eq(dut.o_uncal),
+            dut.channel.eq(i2stdm.channel),
+            dut.strobe.eq(i2stdm.strobe),
+            dut.i_uncal.eq(i2stdm.o),
+            i2stdm.i.eq(dut.o_uncal),
         ]
-        m.submodules += [i2s, dut]
+        m.submodules += [i2stdm, dut]
         m = DomainRenamer({"audio": "sync"})(m)
 
         async def process(ctx):

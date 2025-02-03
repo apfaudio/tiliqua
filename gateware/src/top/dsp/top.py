@@ -809,10 +809,11 @@ class CoreTop(Elaboratable):
 
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator()
+            m.submodules.provider = provider = eurorack_pmod.FFCProvider()
             m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                    pmod_pins=platform.request("audio_ffc"),
                     hardware_r33=True,
                     touch_enabled=self.touch)
+            wiring.connect(m, pmod0.pins, provider.pins)
             m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
             m.submodules.btn = FFSynchronizer(
                     platform.request("encoder").s.i, reboot.button)
