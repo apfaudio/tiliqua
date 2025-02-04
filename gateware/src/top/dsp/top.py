@@ -791,13 +791,6 @@ class CoreTop(Elaboratable):
         self.core = dsp_core()
         self.touch = enable_touch
 
-        # Only used for simulation
-        self.fs_strobe = Signal()
-        self.inject0 = Signal(signed(16))
-        self.inject1 = Signal(signed(16))
-        self.inject2 = Signal(signed(16))
-        self.inject3 = Signal(signed(16))
-
         # Only if this core uses PSRAM
         if hasattr(self.core, "bus"):
             self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
@@ -807,12 +800,12 @@ class CoreTop(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
+        m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
+                hardware_r33=True,
+                touch_enabled=self.touch)
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator()
             m.submodules.provider = provider = eurorack_pmod.FFCProvider()
-            m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                    hardware_r33=True,
-                    touch_enabled=self.touch)
             wiring.connect(m, pmod0.pins, provider.pins)
             m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
             m.submodules.btn = FFSynchronizer(
@@ -820,18 +813,6 @@ class CoreTop(Elaboratable):
             m.d.comb += pmod0.codec_mute.eq(reboot.mute)
         else:
             m.submodules.car = sim.FakeTiliquaDomainGenerator()
-            m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                    hardware_r33=True,
-                    touch_enabled=self.touch)
-            """
-            m.d.comb += [
-                pmod0.sample_inject[0]._target.eq(self.inject0),
-                pmod0.sample_inject[1]._target.eq(self.inject1),
-                pmod0.sample_inject[2]._target.eq(self.inject2),
-                pmod0.sample_inject[3]._target.eq(self.inject3),
-                pmod0.fs_strobe.eq(self.fs_strobe),
-            ]
-            """
 
         m.submodules.core = self.core
         wiring.connect(m, pmod0.o_cal, self.core.i)
@@ -882,11 +863,6 @@ def simulation_ports(fragment):
         "rst_sync":       (ResetSignal("sync"),                        None),
         "clk_fast":       (ClockSignal("fast"),                        None),
         "rst_fast":       (ResetSignal("fast"),                        None),
-        "fs_strobe":      (fragment.fs_strobe,                         None),
-        "fs_inject0":     (fragment.inject0,                           None),
-        "fs_inject1":     (fragment.inject1,                           None),
-        "fs_inject2":     (fragment.inject2,                           None),
-        "fs_inject3":     (fragment.inject3,                           None),
     }
     # Maybe hook up PSRAM simulation interface
     if hasattr(fragment.core, "bus"):

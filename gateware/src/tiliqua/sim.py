@@ -18,28 +18,6 @@ from amaranth.lib.wiring   import In, Out
 from tiliqua.eurorack_pmod import ASQ
 from tiliqua.types         import FirmwareLocation
 
-class FakeEurorackPmod(wiring.Component):
-    """ Fake EurorackPmod. """
-
-    fs_strobe: Out(1)
-    sample_i:  Out(data.ArrayLayout(ASQ, 4))
-    sample_o:   In(data.ArrayLayout(ASQ, 4))
-    touch:     Out(8).array(8)
-    jack:      Out(8)
-
-    # simulation interface
-    sample_inject:   In(ASQ).array(4)
-    sample_extract: Out(ASQ).array(4)
-
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        for n in range(4):
-            m.d.comb += self.sample_i[n].eq(self.sample_inject[n])
-            m.d.comb += self.sample_extract[n].eq(self.sample_o[n])
-
-        return m
-
 class FakeTiliquaDomainGenerator(Elaboratable):
     """ Fake Clock generator for Tiliqua platform. """
 

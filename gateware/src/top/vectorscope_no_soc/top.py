@@ -41,7 +41,7 @@ from tiliqua                  import eurorack_pmod, dsp, sim, cache
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
-from tiliqua.sim              import FakeEurorackPmod, FakeTiliquaDomainGenerator
+from tiliqua.sim              import FakeTiliquaDomainGenerator
 from tiliqua.video            import DVI_TIMINGS, FramebufferPHY
 from tiliqua.raster           import Persistance, Stroke
 
@@ -83,46 +83,26 @@ class VectorScopeTop(Elaboratable):
             self.psram_periph.add_master(self.cache.slave)
         else:
             self.psram_periph.add_master(self.stroke.bus)
-
-        # Only used for simulation
-        self.fs_strobe = Signal()
-        self.inject0 = Signal(signed(16))
-        self.inject1 = Signal(signed(16))
-        self.inject2 = Signal(signed(16))
-        self.inject3 = Signal(signed(16))
-
         super().__init__()
 
     def elaborate(self, platform):
         m = Module()
 
-        if not sim.is_hw(platform):
-            self.pmod0 = FakeEurorackPmod()
-            m.submodules.car = FakeTiliquaDomainGenerator()
-            m.d.comb += [
-                self.pmod0.sample_inject[0]._target.eq(self.inject0),
-                self.pmod0.sample_inject[1]._target.eq(self.inject1),
-                self.pmod0.sample_inject[2]._target.eq(self.inject2),
-                self.pmod0.sample_inject[3]._target.eq(self.inject3),
-                self.pmod0.fs_strobe.eq(self.fs_strobe),
-            ]
-        else:
+        m.submodules.pmod0 = pmod0 = self.pmod0 = eurorack_pmod.EurorackPmod(
+                hardware_r33=True,
+                touch_enabled=False,
+                audio_192=True)
+        if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator(audio_192=True, pixclk_pll=self.dvi_timings.pll)
             m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
             m.submodules.btn = FFSynchronizer(
                     platform.request("encoder").s.i, reboot.button)
-
-        if sim.is_hw(platform):
             m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
-            self.pmod0 = eurorack_pmod.EurorackPmod(
-                    hardware_r33=True,
-                    touch_enabled=False,
-                    audio_192=True)
             wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
             m.d.comb += self.pmod0.codec_mute.eq(reboot.mute)
+        else:
+            m.submodules.car = FakeTiliquaDomainGenerator()
 
-        pmod0 = self.pmod0
-        m.submodules.pmod0 = pmod0
         self.stroke.pmod0 = pmod0
 
         m.submodules.video = self.video
@@ -227,11 +207,6 @@ def simulation_ports(fragment):
         "dvi_r":          (fragment.video.phy_r,                       None),
         "dvi_g":          (fragment.video.phy_g,                       None),
         "dvi_b":          (fragment.video.phy_b,                       None),
-        "fs_strobe":      (fragment.fs_strobe,                         None),
-        "fs_inject0":     (fragment.inject0,                           None),
-        "fs_inject1":     (fragment.inject1,                           None),
-        "fs_inject2":     (fragment.inject2,                           None),
-        "fs_inject3":     (fragment.inject3,                           None),
     }
 
 def argparse_callback(parser):
