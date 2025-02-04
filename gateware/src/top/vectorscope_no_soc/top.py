@@ -113,18 +113,18 @@ class VectorScopeTop(Elaboratable):
                     platform.request("encoder").s.i, reboot.button)
 
         if sim.is_hw(platform):
+            m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
             self.pmod0 = eurorack_pmod.EurorackPmod(
-                pmod_pins=platform.request("audio_ffc"),
-                hardware_r33=True,
-                touch_enabled=False,
-                audio_192=True)
+                    hardware_r33=True,
+                    touch_enabled=False,
+                    audio_192=True)
+            wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
             m.d.comb += self.pmod0.codec_mute.eq(reboot.mute)
 
         pmod0 = self.pmod0
         m.submodules.pmod0 = pmod0
         self.stroke.pmod0 = pmod0
 
-        m.submodules.astream = astream = eurorack_pmod.AudioStream(self.pmod0)
         m.submodules.video = self.video
         m.submodules.persist = self.persist
         m.submodules.stroke = self.stroke
@@ -133,7 +133,7 @@ class VectorScopeTop(Elaboratable):
             m.submodules.cache = self.cache
             wiring.connect(m, self.stroke.bus, self.cache.master)
 
-        wiring.connect(m, astream.istream, self.stroke.i)
+        wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
