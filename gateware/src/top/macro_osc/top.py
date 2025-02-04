@@ -154,7 +154,7 @@ class MacroOscSoc(TiliquaSoc):
     def __init__(self, **kwargs):
 
         # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
-        super().__init__(audio_192=False, audio_out_peripheral=False,
+        super().__init__(audio_192=False,
                          finalize_csr_bridge=False, mainram_size=0x10000,
                          cpu_variant="tiliqua_rv32imafc", **kwargs)
 

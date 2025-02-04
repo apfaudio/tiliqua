@@ -210,7 +210,6 @@ class SIDSoc(TiliquaSoc):
     def __init__(self, **kwargs):
         # Don't finalize CSR bridge yet
         super().__init__(audio_192=False,
-                         audio_out_peripheral=False,
                          finalize_csr_bridge=False,
                          mainram_size=0x4000, # big opts struct eats stack
                          **kwargs)
