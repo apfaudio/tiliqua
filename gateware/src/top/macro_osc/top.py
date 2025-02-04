@@ -209,11 +209,9 @@ class MacroOscSoc(TiliquaSoc):
 
         pmod0 = self.pmod0_periph.pmod
 
-        m.submodules.astream = astream = eurorack_pmod.AudioStream(pmod0, fifo_depth=8)
+        self.scope_periph.source = pmod0.i_cal
 
-        self.scope_periph.source = astream.istream
-
-        wiring.connect(m, self.audio_fifo.stream, astream.ostream)
+        wiring.connect(m, self.audio_fifo.stream, pmod0.i_cal)
 
         # Extra FIFO between audio out stream and plotting components
         # This FIFO does not block the audio stream.
@@ -223,7 +221,7 @@ class MacroOscSoc(TiliquaSoc):
 
         # Route audio outputs 2/3 to plotting stream (scope / vector)
         m.d.comb += [
-            plot_fifo.w_stream.valid.eq(self.audio_fifo.stream.valid & astream.ostream.ready),
+            plot_fifo.w_stream.valid.eq(self.audio_fifo.stream.valid & pmod0.i_cal.ready),
             plot_fifo.w_stream.payload[0:16] .eq(self.audio_fifo.stream.payload[2]),
             plot_fifo.w_stream.payload[16:32].eq(self.audio_fifo.stream.payload[3]),
         ]
