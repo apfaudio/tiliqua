@@ -385,7 +385,6 @@ fn main() -> ! {
 
         draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
 
-        /*
         // Write something to the CODEC outputs / LEDs
         pmod.sample_o0().write(|w| unsafe { w.sample().bits(
             ((f32::sin((uptime_ms as f32)/200.0f32 + 0.0) * 16000.0f32) as i16) as u16) } );
@@ -395,7 +394,6 @@ fn main() -> ! {
             ((f32::sin((uptime_ms as f32)/200.0f32 + 2.0) * 16000.0f32) as i16) as u16) } );
         pmod.sample_o3().write(|w| unsafe { w.sample().bits(
             ((f32::sin((uptime_ms as f32)/200.0f32 + 3.0) * 16000.0f32) as i16) as u16) } );
-        */
 
         for n in 0..16 {
             pca9635.leds[n] = (f32::sin((uptime_ms as f32)/200.0f32 + (n as f32)) * 255.0f32) as u8;

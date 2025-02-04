@@ -137,7 +137,7 @@ class VideoPeripheral(wiring.Component):
 
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, dvi_timings, ui_name, ui_sha, audio_192=False,
-                 touch=False, finalize_csr_bridge=True, video_rotate_90=False,
+                 touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
                  mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im"):
 
         super().__init__({})
@@ -264,7 +264,8 @@ class TiliquaSoc(Component):
         self.csr_decoder.add(self.encoder0.bus, addr=self.encoder0_base, name="encoder0")
 
         # pmod periph
-        self.pmod0_periph = eurorack_pmod_peripheral.Peripheral(pmod=None)
+        self.pmod0_periph = eurorack_pmod_peripheral.Peripheral(
+                pmod=None, poke_outputs=poke_outputs)
         self.csr_decoder.add(self.pmod0_periph.bus, addr=self.pmod0_periph_base, name="pmod0_periph")
 
         # die temperature

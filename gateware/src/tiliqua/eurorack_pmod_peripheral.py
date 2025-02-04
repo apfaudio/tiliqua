@@ -40,13 +40,17 @@ class Peripheral(wiring.Component):
     class FlagsReg(csr.Register, access="w"):
         mute: csr.Field(csr.action.W, unsigned(1))
 
-    def __init__(self, *, pmod, **kwargs):
+    def __init__(self, *, pmod, poke_outputs=False, **kwargs):
         self.pmod = pmod
+        self.poke_outputs = poke_outputs
 
         regs = csr.Builder(addr_width=6, data_width=8)
 
         # ADC and input samples
         self._sample_i = [regs.add(f"sample_i{i}", self.ISampleReg()) for i in range(4)]
+
+        if self.poke_outputs:
+            self._sample_o = [regs.add(f"sample_o{ch}", self.OSampleReg()) for ch in range(4)]
 
         # Touch sensing
         self._touch = [regs.add(f"touch{i}", self.TouchReg()) for i in range(8)]
@@ -95,5 +99,12 @@ class Peripheral(wiring.Component):
 
         for i in range(4):
             m.d.comb += self._sample_i[i].f.sample.r_data.eq(self.pmod.calibrator.o_cal_peek[i])
+
+        if self.poke_outputs:
+            m.d.comb += self.pmod.i_cal.valid.eq(1)
+            for i in range(4):
+                with m.If(self._sample_o[i].f.sample.w_stb):
+                    m.d.sync += self.pmod.i_cal.payload[i].eq(
+                            self._sample_o[i].f.sample.w_data)
 
         return m
