@@ -203,9 +203,9 @@ class I2SCalibrator(wiring.Component):
         cal_mem = Memory(shape=data.ArrayLayout(self.ctype, 2),
                          depth=I2STDM.N_CHANNELS*2,
                          init=[ # default calibration constants
-                            [fixed.Const(1.0, shape=self.ctype),
+                            [fixed.Const(1.0 if n >= 4 else -1.0, shape=self.ctype),
                              fixed.Const(0.0, shape=self.ctype)]
-                            for _ in range(I2STDM.N_CHANNELS*2)
+                            for n in range(I2STDM.N_CHANNELS*2)
                          ])
         m.submodules.cal_mem = cal_mem # WARN: accessed in 'audio' domain
         cal_read = cal_mem.read_port(domain="comb")
@@ -713,9 +713,9 @@ class EurorackPmod(wiring.Component):
             # LED auto/manual settings per jack
             with m.If(self.led_mode[n]):
                 if n <= 3:
-                    with m.If(self.o_cal.valid & self.jack[n]):
-                        m.d.sync += i2c_master.led[n].eq(self.o_cal.payload[n].raw()>>8),
-                    with m.If(~self.jack[n]):
+                    with m.If(self.jack[n]):
+                        m.d.sync += i2c_master.led[n].eq(self.calibrator.o_cal_peek[n].raw()>>8),
+                    with m.Else():
                         m.d.sync += i2c_master.led[n].eq(0),
                 else:
                     with m.If(self.i_cal.valid):
