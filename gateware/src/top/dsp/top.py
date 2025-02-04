@@ -791,6 +791,10 @@ class CoreTop(Elaboratable):
         self.core = dsp_core()
         self.touch = enable_touch
 
+        self.pmod0 = eurorack_pmod.EurorackPmod(
+            hardware_r33=True,
+            touch_enabled=self.touch)
+
         # Only if this core uses PSRAM
         if hasattr(self.core, "bus"):
             self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
@@ -800,9 +804,7 @@ class CoreTop(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                hardware_r33=True,
-                touch_enabled=self.touch)
+        m.submodules.pmod0 = pmod0 = self.pmod0
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator()
             m.submodules.provider = provider = eurorack_pmod.FFCProvider()
@@ -863,6 +865,10 @@ def simulation_ports(fragment):
         "rst_sync":       (ResetSignal("sync"),                        None),
         "clk_fast":       (ClockSignal("fast"),                        None),
         "rst_fast":       (ResetSignal("fast"),                        None),
+        "i2s_sdin1":      (fragment.pmod0.i2stdm.i2s.sdin1,            None),
+        "i2s_sdout1":     (fragment.pmod0.i2stdm.i2s.sdout1,           None),
+        "i2s_lrck":       (fragment.pmod0.i2stdm.i2s.lrck,             None),
+        "i2s_bick":       (fragment.pmod0.i2stdm.i2s.bick,             None),
     }
     # Maybe hook up PSRAM simulation interface
     if hasattr(fragment.core, "bus"):

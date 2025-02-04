@@ -658,6 +658,7 @@ class EurorackPmod(wiring.Component):
 
     def __init__(self, hardware_r33=True, touch_enabled=True, audio_192=False):
         self.audio_192 = audio_192
+        self.i2stdm = I2STDM(audio_192=self.audio_192)
         self.calibrator = I2SCalibrator()
         super().__init__()
 
@@ -670,7 +671,7 @@ class EurorackPmod(wiring.Component):
         # AUDIO/CODEC CONTROL
         #
 
-        m.submodules.i2stdm = i2stdm = I2STDM(audio_192=self.audio_192)
+        m.submodules.i2stdm = i2stdm = self.i2stdm
         m.submodules.calibrator = calibrator = self.calibrator
         # I2STDM <-> I2S pins
         wiring.connect(m, i2stdm.i2s, wiring.flipped(self.pins.i2s))
