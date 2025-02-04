@@ -372,7 +372,7 @@ def top_level_cli(
 
         # workaround for https://github.com/YosysHQ/yosys/issues/4451
         build_flags |= {
-            "script_after_read": "splitnets"
+            "script_after_read": "proc ; splitnets"
         }
         if args.noflatten:
             # workaround for https://github.com/YosysHQ/yosys/issues/4349
