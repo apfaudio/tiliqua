@@ -40,18 +40,13 @@ class Peripheral(wiring.Component):
     class FlagsReg(csr.Register, access="w"):
         mute: csr.Field(csr.action.W, unsigned(1))
 
-    def __init__(self, *, pmod, enable_out=False, **kwargs):
+    def __init__(self, *, pmod, **kwargs):
         self.pmod = pmod
-        self.enable_out = enable_out
 
         regs = csr.Builder(addr_width=6, data_width=8)
 
         # ADC and input samples
         self._sample_i = [regs.add(f"sample_i{i}", self.ISampleReg()) for i in range(4)]
-
-        # Output samples
-        if self.enable_out:
-            self._sample_o = [regs.add(f"sample_o{i}", self.OSampleReg()) for i in range(4)]
 
         # Touch sensing
         self._touch = [regs.add(f"touch{i}", self.TouchReg()) for i in range(8)]
@@ -98,14 +93,7 @@ class Peripheral(wiring.Component):
             with m.If(self._led[i].f.led.w_stb):
                 m.d.sync += self.pmod.led[i].eq(self._led[i].f.led.w_data)
 
-        # Audio domain signals need synchronizers
         for i in range(4):
-            """
-            m.submodules += FFSynchronizer(self.pmod.sample_i[i], self._sample_i[i].f.sample.r_data, reset=0)
-            if self.enable_out:
-                with m.If(self._sample_o[i].f.sample.w_stb):
-                    m.d.sync += self.pmod.sample_o[i].eq(self._sample_o[i].f.sample.w_data)
-                    """
-
+            m.d.comb += self._sample_i[i].f.sample.r_data.eq(self.pmod.calibrator.o_cal_peek[i])
 
         return m

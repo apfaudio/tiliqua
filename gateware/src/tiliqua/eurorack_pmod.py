@@ -187,6 +187,9 @@ class I2SCalibrator(wiring.Component):
     # Calibrated samples -> to DAC (sync domain)
     i_cal:    In(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    # Low latency ADC sample peeking (sync domain, can be used by softcore at same time as streams)
+    o_cal_peek: Out(data.ArrayLayout(ASQ, 4))
+
     def __init__(self, stream_domain="sync", fifo_depth=4):
         self.stream_domain = stream_domain
         self.fifo_depth = fifo_depth
@@ -227,6 +230,9 @@ class I2SCalibrator(wiring.Component):
 
         adc_samples = Signal(data.ArrayLayout(ASQ, 4))
         dac_samples = Signal(data.ArrayLayout(ASQ, 4))
+
+        # Low latency ADC sample peeking in sync domain
+        m.submodules += FFSynchronizer(adc_samples, self.o_cal_peek, o_domain="sync", init=[0, 0, 0, 0])
 
         # into / out of the scale/cal process
         in_sample = Signal(ASQ)
@@ -652,6 +658,7 @@ class EurorackPmod(wiring.Component):
 
     def __init__(self, hardware_r33=True, touch_enabled=True, audio_192=False):
         self.audio_192 = audio_192
+        self.calibrator = I2SCalibrator()
         super().__init__()
 
 
@@ -664,7 +671,7 @@ class EurorackPmod(wiring.Component):
         #
 
         m.submodules.i2stdm = i2stdm = I2STDM(audio_192=self.audio_192)
-        m.submodules.calibrator = calibrator = I2SCalibrator()
+        m.submodules.calibrator = calibrator = self.calibrator
         # I2STDM <-> I2S pins
         wiring.connect(m, i2stdm.i2s, wiring.flipped(self.pins.i2s))
         # I2STDM <-> calibrator
