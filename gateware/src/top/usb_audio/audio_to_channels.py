@@ -94,32 +94,21 @@ class AudioToChannels(Elaboratable):
         # HOST -> USB Channel stream -> eurorack-pmod calibrated OUTPUT samples.
         #
 
+        m.submodules.dac_fifo = dac_fifo = AsyncFIFO(width=SW*4, depth=64, w_domain="usb", r_domain="sync")
+        wiring.connect(m, dac_fifo.r_stream, eurorack_pmod.i_cal);
+
+        m.d.usb += dac_fifo.w_en.eq(0)
         for n in range(4):
+            with m.If((self.from_usb.channel_nr == n) & self.from_usb.valid):
+                m.d.usb += dac_fifo.w_data[n*SW:(n+1)*SW].eq(self.from_usb.payload[N_ZFILL:])
+                # Write all channels on every incoming zero'th channel
+                # This should work even if < 4 channels are used.
+                if n == 0:
+                    m.d.usb += dac_fifo.w_en.eq(1)
 
-            # FIXME: we shouldn't need one FIFO per channel
-            fifo = AsyncFIFO(width=SW, depth=64, w_domain="usb", r_domain="sync")
-            setattr(m.submodules, f'dac_fifo{n}', fifo)
-
-            # (usb domain) if the channel_nr matches, demux it into the correct channel FIFO
-            m.d.comb += [
-                fifo.w_data.eq(self.from_usb.payload[N_ZFILL:]),
-                fifo.w_en.eq((self.from_usb.channel_nr == n) &
-                             self.from_usb.valid),
-                # Send to DAC
-                eurorack_pmod.i_cal.payload[n].eq(fifo.r_data),
-                fifo.r_en.eq(eurorack_pmod.i_cal.ready & eurorack_pmod.i_cal.valid),
-            ]
-
-        # TODO: inactive channels?
-        eurorack_pmod.i_cal.valid.eq(
-            m.submodules.dac_fifo0.r_rdy & m.submodules.dac_fifo1.r_rdy &
-            m.submodules.dac_fifo2.r_rdy & m.submodules.dac_fifo3.r_rdy)
-
-        m.d.comb += self.dac_fifo_level.eq(m.submodules.dac_fifo0.r_level)
-
-        # FIXME: make this less lenient
-        m.d.comb += self.from_usb.ready.eq(
-            m.submodules.dac_fifo0.w_rdy & m.submodules.dac_fifo1.w_rdy &
-            m.submodules.dac_fifo2.w_rdy & m.submodules.dac_fifo3.w_rdy)
+        m.d.comb += [
+            self.dac_fifo_level.eq(m.submodules.dac_fifo.r_level),
+            self.from_usb.ready.eq(dac_fifo.w_rdy),
+        ]
 
         return m
