@@ -49,7 +49,7 @@ public:
         const bool current_bick = dut->i2s_bick;
 
         // Detect LRCK transition (frame start)
-        if (current_lrck != last_lrck) {
+        if (current_lrck != last_lrck && current_lrck) {
             current_channel = 0;
             bit_counter = 0;
             start_channel_transmission(current_channel);
@@ -61,7 +61,7 @@ public:
             // Progress through TDM slots
             if (bit_counter >= SLOT_BITS) {
                 bit_counter = 0;
-                current_channel = (current_channel + 1) % N_CHANNELS;
+                current_channel = (current_channel == 0) ? (N_CHANNELS-1) : (current_channel-1);
                 start_channel_transmission(current_channel);
             }
         }
@@ -123,7 +123,7 @@ private:
         ChannelState& cs = channels[current_channel];
         if (bit_counter < SAMPLE_BITS && cs.tx_active) {
             // Transmit MSB first
-            dut->i2s_sdout1 = (cs.current_tx_sample >> (SAMPLE_BITS - 1 - bit_counter)) & 1;
+            dut->i2s_sdout1 = (cs.current_tx_sample >> (SAMPLE_BITS - bit_counter)) & 1;
         } else {
             // Zero padding for rest of slot
             dut->i2s_sdout1 = 0;

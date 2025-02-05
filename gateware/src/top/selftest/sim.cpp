@@ -146,25 +146,6 @@ int main(int argc, char** argv) {
         // Audio clock domain (Audio stimulation)
         if (timestamp_ns % (ns_in_audio_cycle/2) == 0) {
             top->clk_audio = !top->clk_audio;
-            if (top->clk_audio) {
-                // 256x I2S clock divider
-                if (mod_pmod % 256 == 0) {
-                    ++pmod_clocks;
-                    top->fs_strobe = 1;
-                    /*
-                    // audio signals
-                    top->fs_inject0 = (int16_t)20000.0*sin((float)pmod_clocks / 6000.0);
-                    top->fs_inject1 = (int16_t)20000.0*cos((float)pmod_clocks /  300.0);
-                    // color
-                    top->fs_inject3 = (int16_t)20000.0*cos((float)pmod_clocks /  600.0);
-                    */
-                } else {
-                    if (top->fs_strobe) {
-                        top->fs_strobe = 0;
-                    }
-                }
-                mod_pmod += 1;
-            }
         }
 
         contextp->timeInc(1000);

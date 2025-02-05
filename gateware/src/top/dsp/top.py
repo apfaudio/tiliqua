@@ -865,10 +865,10 @@ def simulation_ports(fragment):
         "rst_sync":       (ResetSignal("sync"),                        None),
         "clk_fast":       (ClockSignal("fast"),                        None),
         "rst_fast":       (ResetSignal("fast"),                        None),
-        "i2s_sdin1":      (fragment.pmod0.i2stdm.i2s.sdin1,            None),
-        "i2s_sdout1":     (fragment.pmod0.i2stdm.i2s.sdout1,           None),
-        "i2s_lrck":       (fragment.pmod0.i2stdm.i2s.lrck,             None),
-        "i2s_bick":       (fragment.pmod0.i2stdm.i2s.bick,             None),
+        "i2s_sdin1":      (fragment.pmod0.pins.i2s.sdin1,            None),
+        "i2s_sdout1":     (fragment.pmod0.pins.i2s.sdout1,           None),
+        "i2s_lrck":       (fragment.pmod0.pins.i2s.lrck,             None),
+        "i2s_bick":       (fragment.pmod0.pins.i2s.bick,             None),
     }
     # Maybe hook up PSRAM simulation interface
     if hasattr(fragment.core, "bus"):

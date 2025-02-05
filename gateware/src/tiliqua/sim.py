@@ -86,7 +86,6 @@ def soc_simulation_ports(fragment):
         "dvi_r":          (fragment.video.phy_r,                         None),
         "dvi_g":          (fragment.video.phy_g,                         None),
         "dvi_b":          (fragment.video.phy_b,                         None),
-        "fs_strobe":      (fragment.sim_fs_strobe,                       None),
     }
 
 def simulate(fragment, ports, harness, hw_platform, tracing=False):
