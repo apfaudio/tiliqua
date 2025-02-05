@@ -190,6 +190,20 @@ class I2SCalibrator(wiring.Component):
     # Low latency ADC sample peeking (sync domain, can be used by softcore at same time as streams)
     o_cal_peek: Out(data.ArrayLayout(ASQ, 4))
 
+    # default calibration constants based on averaging some R3.3 units
+    # These should be accurate to +/- 100mV or so on a fresh unit without
+    # requiring any initial calibration.
+    DEFAULT_CALIBRATION_R33 = [
+        [-1.158, 0.008], # in (mul, add)
+        [-1.158, 0.008],
+        [-1.158, 0.008],
+        [-1.158, 0.008],
+        [ 0.97,  0.03 ], # out (mul, add)
+        [ 0.97,  0.03 ],
+        [ 0.97,  0.03 ],
+        [ 0.97,  0.03 ],
+    ]
+
     def __init__(self, stream_domain="sync", fifo_depth=4):
         self.stream_domain = stream_domain
         self.fifo_depth = fifo_depth
@@ -202,10 +216,9 @@ class I2SCalibrator(wiring.Component):
         self.ctype = fixed.SQ(2, ASQ.f_width)
         cal_mem = Memory(shape=data.ArrayLayout(self.ctype, 2),
                          depth=I2STDM.N_CHANNELS*2,
-                         init=[ # default calibration constants
-                            [fixed.Const(1.0 if n >= 4 else -1.0, shape=self.ctype),
-                             fixed.Const(0.0, shape=self.ctype)]
-                            for n in range(I2STDM.N_CHANNELS*2)
+                         init=[
+                            [fixed.Const(mul, shape=self.ctype), fixed.Const(add, shape=self.ctype)]
+                            for mul, add in self.DEFAULT_CALIBRATION_R33
                          ])
         m.submodules.cal_mem = cal_mem # WARN: accessed in 'audio' domain
         cal_read = cal_mem.read_port(domain="comb")
@@ -238,9 +251,15 @@ class I2SCalibrator(wiring.Component):
         in_sample = Signal(ASQ)
         out_sample = Signal(ASQ)
 
-        # calibration logic (single MAC)
-        m.d.comb += out_sample.eq((in_sample * cal_read.data[0]) +
-                                  cal_read.data[1])
+        # calibration logic (single MAC then clamp)
+        scaled = Signal(self.ctype)
+        m.d.comb += scaled.eq((in_sample * cal_read.data[0]) + cal_read.data[1])
+        with m.If(scaled >= ASQ.max()):
+            m.d.comb += out_sample.eq(ASQ.max())
+        with m.Elif(scaled <= ASQ.min()):
+            m.d.comb += out_sample.eq(ASQ.min())
+        with m.Else():
+            m.d.comb += out_sample.eq(scaled)
 
         # Calibrating samples happens in the 'audio' domain.
         with m.FSM(domain="audio") as cal_fsm:
