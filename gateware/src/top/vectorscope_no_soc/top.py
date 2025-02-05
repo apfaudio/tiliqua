@@ -64,6 +64,11 @@ class VectorScopeTop(Elaboratable):
         fb_base = 0x0
         fb_size = (dvi_timings.h_active, dvi_timings.v_active)
 
+        self.pmod0 = eurorack_pmod.EurorackPmod(
+                hardware_r33=True,
+                touch_enabled=False,
+                audio_192=True)
+
         # All of our DMA masters
         self.video = FramebufferPHY(
                 fb_base=fb_base, dvi_timings=dvi_timings, fb_size=fb_size,
@@ -88,10 +93,8 @@ class VectorScopeTop(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.pmod0 = pmod0 = self.pmod0 = eurorack_pmod.EurorackPmod(
-                hardware_r33=True,
-                touch_enabled=False,
-                audio_192=True)
+        m.submodules.pmod0 = pmod0 = self.pmod0
+
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator(audio_192=True, pixclk_pll=self.dvi_timings.pll)
             m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
@@ -196,6 +199,10 @@ def simulation_ports(fragment):
         "rst_dvi":        (ResetSignal("dvi"),                         None),
         "clk_audio":      (ClockSignal("audio"),                       None),
         "rst_audio":      (ResetSignal("audio"),                       None),
+        "i2s_sdin1":      (fragment.pmod0.pins.i2s.sdin1,              None),
+        "i2s_sdout1":     (fragment.pmod0.pins.i2s.sdout1,             None),
+        "i2s_lrck":       (fragment.pmod0.pins.i2s.lrck,               None),
+        "i2s_bick":       (fragment.pmod0.pins.i2s.bick,               None),
         "idle":           (fragment.psram_periph.simif.idle,           None),
         "address_ptr":    (fragment.psram_periph.simif.address_ptr,    None),
         "read_data_view": (fragment.psram_periph.simif.read_data_view, None),
