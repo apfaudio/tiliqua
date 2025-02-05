@@ -37,27 +37,20 @@ class Peripheral(wiring.Component):
     class JackReg(csr.Register, access="r"):
         jack: csr.Field(csr.action.R, unsigned(8))
 
-    class EEPROMReg(csr.Register, access="r"):
-        mfg: csr.Field(csr.action.R, unsigned(8))
-        dev: csr.Field(csr.action.R, unsigned(8))
-        serial: csr.Field(csr.action.R, unsigned(32))
-
     class FlagsReg(csr.Register, access="w"):
         mute: csr.Field(csr.action.W, unsigned(1))
 
-    def __init__(self, *, pmod, enable_out=False, **kwargs):
+    def __init__(self, *, pmod, poke_outputs=False, **kwargs):
         self.pmod = pmod
-        self.enable_out = enable_out
+        self.poke_outputs = poke_outputs
 
         regs = csr.Builder(addr_width=6, data_width=8)
 
         # ADC and input samples
-        self._sample_adc = [regs.add(f"sample_adc{i}", self.ISampleReg()) for i in range(4)]
         self._sample_i = [regs.add(f"sample_i{i}", self.ISampleReg()) for i in range(4)]
 
-        # Output samples
-        if self.enable_out:
-            self._sample_o = [regs.add(f"sample_o{i}", self.OSampleReg()) for i in range(4)]
+        if self.poke_outputs:
+            self._sample_o = [regs.add(f"sample_o{ch}", self.OSampleReg()) for ch in range(4)]
 
         # Touch sensing
         self._touch = [regs.add(f"touch{i}", self.TouchReg()) for i in range(8)]
@@ -69,7 +62,6 @@ class Peripheral(wiring.Component):
 
         # I2C peripheral data
         self._jack = regs.add("jack", self.JackReg())
-        self._eeprom = regs.add("eeprom", self.EEPROMReg())
 
         self._flags = regs.add("flags", self.FlagsReg())
 
@@ -90,9 +82,6 @@ class Peripheral(wiring.Component):
         m.d.comb += [
             self._touch_err.f.value.r_data.eq(self.pmod.touch_err),
             self._jack.f.jack.r_data.eq(self.pmod.jack),
-            self._eeprom.f.mfg.r_data.eq(self.pmod.eeprom_mfg),
-            self._eeprom.f.dev.r_data.eq(self.pmod.eeprom_dev),
-            self._eeprom.f.serial.r_data.eq(self.pmod.eeprom_serial),
         ]
 
         mute_reg = Signal(init=0)
@@ -108,13 +97,14 @@ class Peripheral(wiring.Component):
             with m.If(self._led[i].f.led.w_stb):
                 m.d.sync += self.pmod.led[i].eq(self._led[i].f.led.w_data)
 
-        # Audio domain signals need synchronizers
         for i in range(4):
-            m.submodules += FFSynchronizer(self.pmod.sample_adc[i], self._sample_adc[i].f.sample.r_data, reset=0)
-            m.submodules += FFSynchronizer(self.pmod.sample_i[i], self._sample_i[i].f.sample.r_data, reset=0)
-            if self.enable_out:
-                with m.If(self._sample_o[i].f.sample.w_stb):
-                    m.d.sync += self.pmod.sample_o[i].eq(self._sample_o[i].f.sample.w_data)
+            m.d.comb += self._sample_i[i].f.sample.r_data.eq(self.pmod.calibrator.o_cal_peek[i])
 
+        if self.poke_outputs:
+            m.d.comb += self.pmod.i_cal.valid.eq(1)
+            for i in range(4):
+                with m.If(self._sample_o[i].f.sample.w_stb):
+                    m.d.sync += self.pmod.i_cal.payload[i].eq(
+                            self._sample_o[i].f.sample.w_data)
 
         return m

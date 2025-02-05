@@ -5,6 +5,7 @@
 
 """Utilities for simulating Tiliqua designs."""
 
+import glob
 import os
 import shutil
 import subprocess
@@ -17,28 +18,6 @@ from amaranth.lib.wiring   import In, Out
 
 from tiliqua.eurorack_pmod import ASQ
 from tiliqua.types         import FirmwareLocation
-
-class FakeEurorackPmod(wiring.Component):
-    """ Fake EurorackPmod. """
-
-    fs_strobe: Out(1)
-    sample_i:  Out(data.ArrayLayout(ASQ, 4))
-    sample_o:   In(data.ArrayLayout(ASQ, 4))
-    touch:     Out(8).array(8)
-    jack:      Out(8)
-
-    # simulation interface
-    sample_inject:   In(ASQ).array(4)
-    sample_extract: Out(ASQ).array(4)
-
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        for n in range(4):
-            m.d.comb += self.sample_i[n].eq(self.sample_inject[n])
-            m.d.comb += self.sample_extract[n].eq(self.sample_o[n])
-
-        return m
 
 class FakeTiliquaDomainGenerator(Elaboratable):
     """ Fake Clock generator for Tiliqua platform. """
@@ -94,6 +73,10 @@ def soc_simulation_ports(fragment):
         "rst_dvi":        (ResetSignal("dvi"),                           None),
         "clk_audio":      (ClockSignal("audio"),                         None),
         "rst_audio":      (ResetSignal("audio"),                         None),
+        "i2s_sdin1":      (fragment.pmod0.pins.i2s.sdin1,                None),
+        "i2s_sdout1":     (fragment.pmod0.pins.i2s.sdout1,               None),
+        "i2s_lrck":       (fragment.pmod0.pins.i2s.lrck,                 None),
+        "i2s_bick":       (fragment.pmod0.pins.i2s.bick,                 None),
         "uart0_w_data":   (fragment.uart0._tx_data.f.data.w_data,        None),
         "uart0_w_stb":    (fragment.uart0._tx_data.f.data.w_stb,         None),
         "address_ptr":    (fragment.psram_periph.simif.address_ptr,      None),
@@ -101,6 +84,7 @@ def soc_simulation_ports(fragment):
         "write_data":     (fragment.psram_periph.simif.write_data,       None),
         "read_ready":     (fragment.psram_periph.simif.read_ready,       None),
         "write_ready":    (fragment.psram_periph.simif.write_ready,      None),
+        "idle":           (fragment.psram_periph.simif.idle,             None),
         "spiflash_addr":  (fragment.spiflash_periph.spi_mmap.simif_addr, None),
         "spiflash_data":  (fragment.spiflash_periph.spi_mmap.simif_data, None),
         "dvi_x":          (fragment.video.dvi_tgen.x,                    None),
@@ -108,7 +92,6 @@ def soc_simulation_ports(fragment):
         "dvi_r":          (fragment.video.phy_r,                         None),
         "dvi_g":          (fragment.video.phy_g,                         None),
         "dvi_b":          (fragment.video.phy_b,                         None),
-        "fs_strobe":      (fragment.sim_fs_strobe,                       None),
     }
 
 def simulate(fragment, ports, harness, hw_platform, tracing=False):
@@ -171,11 +154,19 @@ def simulate(fragment, ports, harness, hw_platform, tracing=False):
                 ]
 
     clock_sync_hz = 60000000
-    audio_clk_hz = 48000000
+    audio_clk_hz = 12288000
     fast_clk_hz = 120000000
 
     verilator_dst = "build/obj_dir"
     shutil.rmtree(verilator_dst, ignore_errors=True)
+
+    # Copy shared testbench headers somewhere Verilator's build
+    # process can see them.
+    os.makedirs(verilator_dst)
+    testbench_utils = glob.glob("./src/tb_cpp/*.h")
+    for header in testbench_utils:
+        shutil.copy(header, verilator_dst)
+
     print(f"verilate '{dst}' into C++ binary...")
     subprocess.check_call(["verilator",
                            "-Wno-COMBDLY",
@@ -190,9 +181,9 @@ def simulate(fragment, ports, harness, hw_platform, tracing=False):
                            "-cc"] + tracing_flags + [
                            "--exe",
                            "--Mdir", f"{verilator_dst}",
+                           "-Ibuild",
                            "--build",
                            "-j", "0",
-                           "-Ibuild",
                            "-CFLAGS", f"-DSYNC_CLK_HZ={clock_sync_hz}",
                            "-CFLAGS", f"-DAUDIO_CLK_HZ={audio_clk_hz}",
                            "-CFLAGS", f"-DFAST_CLK_HZ={fast_clk_hz}",

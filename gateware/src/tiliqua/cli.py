@@ -347,7 +347,7 @@ def top_level_cli(
         # By default, SoC examples share the same simulation harness.
         if sim_ports is None:
             sim_ports = sim.soc_simulation_ports
-            sim_harness = os.path.join(path, "../selftest/sim.cpp")
+            sim_harness = "src/tb_cpp/sim_soc.cpp"
     else:
         write_manifest(regions=[])
 
@@ -370,6 +370,10 @@ def top_level_cli(
             "ecppack_opts": f"--freq 38.8 --compress --bootaddr {args.bootaddr}"
         }
 
+        # workaround for https://github.com/YosysHQ/yosys/issues/4451
+        build_flags |= {
+            "script_after_read": "proc ; splitnets"
+        }
         if args.noflatten:
             # workaround for https://github.com/YosysHQ/yosys/issues/4349
             build_flags |= {

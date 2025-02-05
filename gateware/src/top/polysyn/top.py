@@ -373,7 +373,7 @@ class PolySoc(TiliquaSoc):
     def __init__(self, **kwargs):
 
         # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
-        super().__init__(audio_192=False, audio_out_peripheral=False,
+        super().__init__(audio_192=False,
                          touch=True, finalize_csr_bridge=False, **kwargs)
 
         fb_size = (self.video.fb_hsize, self.video.fb_vsize)
@@ -416,8 +416,6 @@ class PolySoc(TiliquaSoc):
 
         pmod0 = self.pmod0_periph.pmod
 
-        m.submodules.astream = astream = eurorack_pmod.AudioStream(pmod0)
-
         if sim.is_hw(platform):
             # Polysynth hardware MIDI sources
 
@@ -452,8 +450,8 @@ class PolySoc(TiliquaSoc):
                 m.d.comb += vbus_o.eq(0)
 
         # polysynth audio
-        wiring.connect(m, astream.istream, polysynth.i)
-        wiring.connect(m, polysynth.o, astream.ostream)
+        wiring.connect(m, pmod0.o_cal, polysynth.i)
+        wiring.connect(m, polysynth.o, pmod0.i_cal)
 
         with m.If(self.vector_periph.soc_en):
             # polysynth out -> vectorscope TODO use true split

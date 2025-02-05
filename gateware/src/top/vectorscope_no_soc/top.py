@@ -41,7 +41,7 @@ from tiliqua                  import eurorack_pmod, dsp, sim, cache
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
-from tiliqua.sim              import FakeEurorackPmod, FakeTiliquaDomainGenerator
+from tiliqua.sim              import FakeTiliquaDomainGenerator
 from tiliqua.video            import DVI_TIMINGS, FramebufferPHY
 from tiliqua.raster           import Persistance, Stroke
 
@@ -64,6 +64,11 @@ class VectorScopeTop(Elaboratable):
         fb_base = 0x0
         fb_size = (dvi_timings.h_active, dvi_timings.v_active)
 
+        self.pmod0 = eurorack_pmod.EurorackPmod(
+                hardware_r33=True,
+                touch_enabled=False,
+                audio_192=True)
+
         # All of our DMA masters
         self.video = FramebufferPHY(
                 fb_base=fb_base, dvi_timings=dvi_timings, fb_size=fb_size,
@@ -83,48 +88,26 @@ class VectorScopeTop(Elaboratable):
             self.psram_periph.add_master(self.cache.slave)
         else:
             self.psram_periph.add_master(self.stroke.bus)
-
-        # Only used for simulation
-        self.fs_strobe = Signal()
-        self.inject0 = Signal(signed(16))
-        self.inject1 = Signal(signed(16))
-        self.inject2 = Signal(signed(16))
-        self.inject3 = Signal(signed(16))
-
         super().__init__()
 
     def elaborate(self, platform):
         m = Module()
 
-        if not sim.is_hw(platform):
-            self.pmod0 = FakeEurorackPmod()
-            m.submodules.car = FakeTiliquaDomainGenerator()
-            m.d.comb += [
-                self.pmod0.sample_inject[0]._target.eq(self.inject0),
-                self.pmod0.sample_inject[1]._target.eq(self.inject1),
-                self.pmod0.sample_inject[2]._target.eq(self.inject2),
-                self.pmod0.sample_inject[3]._target.eq(self.inject3),
-                self.pmod0.fs_strobe.eq(self.fs_strobe),
-            ]
-        else:
+        m.submodules.pmod0 = pmod0 = self.pmod0
+
+        if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator(audio_192=True, pixclk_pll=self.dvi_timings.pll)
             m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
             m.submodules.btn = FFSynchronizer(
                     platform.request("encoder").s.i, reboot.button)
-
-        if sim.is_hw(platform):
-            self.pmod0 = eurorack_pmod.EurorackPmod(
-                pmod_pins=platform.request("audio_ffc"),
-                hardware_r33=True,
-                touch_enabled=False,
-                audio_192=True)
+            m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
+            wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
             m.d.comb += self.pmod0.codec_mute.eq(reboot.mute)
+        else:
+            m.submodules.car = FakeTiliquaDomainGenerator()
 
-        pmod0 = self.pmod0
-        m.submodules.pmod0 = pmod0
         self.stroke.pmod0 = pmod0
 
-        m.submodules.astream = astream = eurorack_pmod.AudioStream(self.pmod0)
         m.submodules.video = self.video
         m.submodules.persist = self.persist
         m.submodules.stroke = self.stroke
@@ -133,7 +116,7 @@ class VectorScopeTop(Elaboratable):
             m.submodules.cache = self.cache
             wiring.connect(m, self.stroke.bus, self.cache.master)
 
-        wiring.connect(m, astream.istream, self.stroke.i)
+        wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
@@ -216,6 +199,10 @@ def simulation_ports(fragment):
         "rst_dvi":        (ResetSignal("dvi"),                         None),
         "clk_audio":      (ClockSignal("audio"),                       None),
         "rst_audio":      (ResetSignal("audio"),                       None),
+        "i2s_sdin1":      (fragment.pmod0.pins.i2s.sdin1,              None),
+        "i2s_sdout1":     (fragment.pmod0.pins.i2s.sdout1,             None),
+        "i2s_lrck":       (fragment.pmod0.pins.i2s.lrck,               None),
+        "i2s_bick":       (fragment.pmod0.pins.i2s.bick,               None),
         "idle":           (fragment.psram_periph.simif.idle,           None),
         "address_ptr":    (fragment.psram_periph.simif.address_ptr,    None),
         "read_data_view": (fragment.psram_periph.simif.read_data_view, None),
@@ -227,11 +214,6 @@ def simulation_ports(fragment):
         "dvi_r":          (fragment.video.phy_r,                       None),
         "dvi_g":          (fragment.video.phy_g,                       None),
         "dvi_b":          (fragment.video.phy_b,                       None),
-        "fs_strobe":      (fragment.fs_strobe,                         None),
-        "fs_inject0":     (fragment.inject0,                           None),
-        "fs_inject1":     (fragment.inject1,                           None),
-        "fs_inject2":     (fragment.inject2,                           None),
-        "fs_inject3":     (fragment.inject3,                           None),
     }
 
 def argparse_callback(parser):

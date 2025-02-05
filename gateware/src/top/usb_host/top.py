@@ -74,17 +74,17 @@ class USB2HostTest(Elaboratable):
         m.submodules.midi_decode = midi_decode = midi.MidiDecode(usb=True)
         wiring.connect(m, usb.o_midi_bytes, midi_decode.i)
 
+        m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
         m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                pmod_pins=platform.request("audio_ffc"),
                 hardware_r33=True,
                 touch_enabled=False)
+        wiring.connect(m, pmod0.pins, pmod0_provider.pins)
         m.d.comb += pmod0.codec_mute.eq(reboot.mute)
 
 
-        m.submodules.audio_stream = audio_stream = eurorack_pmod.AudioStream(pmod0)
         m.submodules.midi_cv = self.midi_cv = midi.MonoMidiCV()
-        wiring.connect(m, audio_stream.istream, self.midi_cv.i)
-        wiring.connect(m, self.midi_cv.o, audio_stream.ostream)
+        wiring.connect(m, pmod0.o_cal, self.midi_cv.i)
+        wiring.connect(m, self.midi_cv.o, pmod0.i_cal)
         wiring.connect(m, midi_decode.o, self.midi_cv.i_midi)
 
         # XXX: this demo enables VBUS output

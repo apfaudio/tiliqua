@@ -163,11 +163,11 @@ where
     D: DrawTarget<Color = Gray8>,
 {
     let mut s = String::<64>::new();
-    write!(s, "codec_raw_adc  - ch0={:06} ch1={:06} ch2={:06} ch3={:06}",
-          pmod.sample_adc0().read().bits() as i16,
-          pmod.sample_adc1().read().bits() as i16,
-          pmod.sample_adc2().read().bits() as i16,
-          pmod.sample_adc3().read().bits() as i16).ok();
+    write!(s, "codec_in       - ch0={:06} ch1={:06} ch2={:06} ch3={:06}",
+          pmod.sample_i0().read().bits() as i16,
+          pmod.sample_i1().read().bits() as i16,
+          pmod.sample_i2().read().bits() as i16,
+          pmod.sample_i3().read().bits() as i16).ok();
     info!("{}", s);
     let style = MonoTextStyle::new(&FONT_6X10, Gray8::WHITE);
     Text::with_alignment(

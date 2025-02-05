@@ -17,6 +17,7 @@ import os
 
 from amaranth              import *
 from amaranth.build        import *
+from amaranth.lib          import wiring, data, stream
 from amaranth.lib.cdc      import FFSynchronizer
 from amaranth.lib.fifo     import SyncFIFO, AsyncFIFO, SyncFIFOBuffered
 
@@ -42,7 +43,7 @@ from luna.gateware.stream                     import StreamInterface
 from luna.gateware.architecture.car           import PHYResetController
 
 from tiliqua.cli                              import top_level_cli
-from tiliqua.eurorack_pmod                    import EurorackPmod
+from tiliqua                                  import eurorack_pmod
 from tiliqua.tiliqua_platform                 import RebootProvider
 from vendor.ila                               import AsyncSerialILA
 
@@ -486,15 +487,17 @@ class USB2AudioInterface(Elaboratable):
             usb_to_channel_stream.no_channels_in.eq(self.NR_CHANNELS),
         ]
 
-        m.submodules.pmod0 = pmod0 = EurorackPmod(
-                pmod_pins=platform.request("audio_ffc"),
+        m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
+        m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
                 hardware_r33=True)
+        wiring.connect(m, pmod0.pins, pmod0_provider.pins)
         m.d.comb += pmod0.codec_mute.eq(reboot.mute)
 
-        m.submodules.audio_to_channels = AudioToChannels(
-                pmod0,
+        m.submodules.audio_to_channels = audio_to_channels = AudioToChannels(
                 to_usb_stream=channels_to_usb_stream.channel_stream_in,
                 from_usb_stream=usb_to_channel_stream.channel_stream_out)
+        wiring.connect(m, pmod0.o_cal, audio_to_channels.i)
+        wiring.connect(m, audio_to_channels.o, pmod0.i_cal)
 
         jack_period = Signal(32)
         jack_usb = Signal(8)

@@ -210,7 +210,6 @@ class SIDSoc(TiliquaSoc):
     def __init__(self, **kwargs):
         # Don't finalize CSR bridge yet
         super().__init__(audio_192=False,
-                         audio_out_peripheral=False,
                          finalize_csr_bridge=False,
                          mainram_size=0x4000, # big opts struct eats stack
                          **kwargs)
@@ -242,24 +241,22 @@ class SIDSoc(TiliquaSoc):
 
         pmod0 = self.pmod0_periph.pmod
 
-        m.submodules.astream = astream = eurorack_pmod.AudioStream(pmod0)
-
         self.sid_periph.sid = sid
 
         m.d.comb += [
-            astream.ostream.valid.eq(1),
-            astream.ostream.payload[0].raw().eq(sid.voice0_dca),
-            astream.ostream.payload[1].raw().eq(sid.voice1_dca),
-            astream.ostream.payload[2].raw().eq(sid.voice2_dca),
-            astream.ostream.payload[3].raw().eq(self.sid_periph.last_audio_left>>8),
+            pmod0.i_cal.valid.eq(1),
+            pmod0.i_cal.payload[0].raw().eq(sid.voice0_dca),
+            pmod0.i_cal.payload[1].raw().eq(sid.voice1_dca),
+            pmod0.i_cal.payload[2].raw().eq(sid.voice2_dca),
+            pmod0.i_cal.payload[3].raw().eq(self.sid_periph.last_audio_left>>8),
         ]
 
         m.d.comb += [
-            self.scope_periph.i.valid.eq(astream.ostream.valid),
-            self.scope_periph.i.payload[0].eq(astream.ostream.payload[3]),
-            self.scope_periph.i.payload[1].eq(astream.ostream.payload[0]),
-            self.scope_periph.i.payload[2].eq(astream.ostream.payload[1]),
-            self.scope_periph.i.payload[3].eq(astream.ostream.payload[2]),
+            self.scope_periph.i.valid.eq(pmod0.i_cal.valid),
+            self.scope_periph.i.payload[0].eq(pmod0.i_cal.payload[3]),
+            self.scope_periph.i.payload[1].eq(pmod0.i_cal.payload[0]),
+            self.scope_periph.i.payload[2].eq(pmod0.i_cal.payload[1]),
+            self.scope_periph.i.payload[3].eq(pmod0.i_cal.payload[2]),
         ]
 
         # Memory controller hangs if we start making requests to it straight away.

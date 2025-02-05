@@ -137,9 +137,8 @@ class VideoPeripheral(wiring.Component):
 
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, dvi_timings, ui_name, ui_sha, audio_192=False,
-                 audio_out_peripheral=True, touch=False, finalize_csr_bridge=True,
-                 video_rotate_90=False, mainram_size=0x2000, fw_location=None,
-                 fw_offset=None, cpu_variant="tiliqua_rv32im"):
+                 touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
+                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im"):
 
         super().__init__({})
 
@@ -264,9 +263,13 @@ class TiliquaSoc(Component):
         self.encoder0 = encoder.Peripheral()
         self.csr_decoder.add(self.encoder0.bus, addr=self.encoder0_base, name="encoder0")
 
-        # pmod periph
+        # pmod periph / audio interface (can be simulated)
+        self.pmod0 = eurorack_pmod.EurorackPmod(
+                hardware_r33=True,
+                touch_enabled=self.touch,
+                audio_192=self.audio_192)
         self.pmod0_periph = eurorack_pmod_peripheral.Peripheral(
-                pmod=None, enable_out=audio_out_peripheral)
+                pmod=self.pmod0, poke_outputs=poke_outputs)
         self.csr_decoder.add(self.pmod0_periph.bus, addr=self.pmod0_periph_base, name="pmod0_periph")
 
         # die temperature
@@ -374,17 +377,14 @@ class TiliquaSoc(Component):
         # video periph / persist
         m.submodules.video_periph = self.video_periph
 
+        # audio interface
+        m.submodules.pmod0 = self.pmod0
+        m.submodules.pmod0_periph = self.pmod0_periph
+
         if sim.is_hw(platform):
-            # pmod0
-            # add a eurorack pmod instance without an audio stream for basic self-testing
-            # connect it to our test peripheral before instantiating SoC.
-            m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                    pmod_pins=platform.request("audio_ffc"),
-                    hardware_r33=True,
-                    touch_enabled=self.touch,
-                    audio_192=self.audio_192)
-            self.pmod0_periph.pmod = pmod0
-            m.submodules.pmod0_periph = self.pmod0_periph
+            # hook up audio interface pins
+            m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
+            wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
 
             # die temperature
             m.submodules.dtr0 = self.dtr0
@@ -402,8 +402,6 @@ class TiliquaSoc(Component):
             m.d.comb += self.pmod0_periph.mute.eq(reboot.mute)
         else:
             m.submodules.car = sim.FakeTiliquaDomainGenerator()
-            self.pmod0_periph.pmod = sim.FakeEurorackPmod()
-            m.d.comb += self.pmod0_periph.pmod.fs_strobe.eq(self.sim_fs_strobe)
 
         # wishbone csr bridge
         m.submodules.wb_to_csr = self.wb_to_csr

@@ -791,12 +791,9 @@ class CoreTop(Elaboratable):
         self.core = dsp_core()
         self.touch = enable_touch
 
-        # Only used for simulation
-        self.fs_strobe = Signal()
-        self.inject0 = Signal(signed(16))
-        self.inject1 = Signal(signed(16))
-        self.inject2 = Signal(signed(16))
-        self.inject3 = Signal(signed(16))
+        self.pmod0 = eurorack_pmod.EurorackPmod(
+            hardware_r33=True,
+            touch_enabled=self.touch)
 
         # Only if this core uses PSRAM
         if hasattr(self.core, "bus"):
@@ -807,31 +804,21 @@ class CoreTop(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
+        m.submodules.pmod0 = pmod0 = self.pmod0
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator()
-            m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                    pmod_pins=platform.request("audio_ffc"),
-                    hardware_r33=True,
-                    touch_enabled=self.touch)
+            m.submodules.provider = provider = eurorack_pmod.FFCProvider()
+            wiring.connect(m, pmod0.pins, provider.pins)
             m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
             m.submodules.btn = FFSynchronizer(
                     platform.request("encoder").s.i, reboot.button)
             m.d.comb += pmod0.codec_mute.eq(reboot.mute)
         else:
             m.submodules.car = sim.FakeTiliquaDomainGenerator()
-            m.submodules.pmod0 = pmod0 = sim.FakeEurorackPmod()
-            m.d.comb += [
-                pmod0.sample_inject[0]._target.eq(self.inject0),
-                pmod0.sample_inject[1]._target.eq(self.inject1),
-                pmod0.sample_inject[2]._target.eq(self.inject2),
-                pmod0.sample_inject[3]._target.eq(self.inject3),
-                pmod0.fs_strobe.eq(self.fs_strobe),
-            ]
 
-        m.submodules.audio_stream = audio_stream = eurorack_pmod.AudioStream(pmod0)
         m.submodules.core = self.core
-        wiring.connect(m, audio_stream.istream, self.core.i)
-        wiring.connect(m, self.core.o, audio_stream.ostream)
+        wiring.connect(m, pmod0.o_cal, self.core.i)
+        wiring.connect(m, self.core.o, pmod0.i_cal)
 
         if hasattr(self.core, "i_midi") and sim.is_hw(platform):
             # For now, if a core requests midi input, we connect it up
@@ -878,11 +865,10 @@ def simulation_ports(fragment):
         "rst_sync":       (ResetSignal("sync"),                        None),
         "clk_fast":       (ClockSignal("fast"),                        None),
         "rst_fast":       (ResetSignal("fast"),                        None),
-        "fs_strobe":      (fragment.fs_strobe,                         None),
-        "fs_inject0":     (fragment.inject0,                           None),
-        "fs_inject1":     (fragment.inject1,                           None),
-        "fs_inject2":     (fragment.inject2,                           None),
-        "fs_inject3":     (fragment.inject3,                           None),
+        "i2s_sdin1":      (fragment.pmod0.pins.i2s.sdin1,            None),
+        "i2s_sdout1":     (fragment.pmod0.pins.i2s.sdout1,           None),
+        "i2s_lrck":       (fragment.pmod0.pins.i2s.lrck,             None),
+        "i2s_bick":       (fragment.pmod0.pins.i2s.bick,             None),
     }
     # Maybe hook up PSRAM simulation interface
     if hasattr(fragment.core, "bus"):

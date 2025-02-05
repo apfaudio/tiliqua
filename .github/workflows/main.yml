@@ -13,7 +13,7 @@ jobs:
           pdm test
         working-directory: gateware
 
-  build-bitstream:
+  build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -38,18 +38,22 @@ jobs:
             cmd: dsp build --dsp-core nco
           - name: dsp-diffuser
             cmd: dsp build --dsp-core psram_diffuser
+          - name: dsp-diffuser-sim
+            cmd: dsp sim --dsp-core psram_diffuser
           - name: dsp-midicv
             cmd: dsp build --dsp-core midicv
           - name: vectorscope
             cmd: vectorscope_no_soc build
+          - name: vectorscope-sim
+            cmd: vectorscope_no_soc sim
           - name: bootstub
             cmd: bootstub build --bootaddr 0x100000
         hw_rev: ["", "--hw3"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
+      - uses: YosysHQ/setup-oss-cad-suite@v3
       - run: git submodule update --init --recursive
-      
       # Setup Rust
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -59,15 +63,12 @@ jobs:
       - run: |
           cargo install cargo-binutils form
           cargo install svd2rust --locked
-          
       - name: Install PDM dependencies
         run: pdm install
         working-directory: gateware
-          
       - name: Build ${{ matrix.config.cmd }} ${{ matrix.hw_rev }}
         run: pdm ${{ matrix.config.cmd }} ${{ matrix.hw_rev }}
         working-directory: gateware
-        
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.config.name }}-${{ matrix.hw_rev == '--hw3' && 'r3' || 'r2' }}.zip
@@ -75,7 +76,7 @@ jobs:
           retention-days: 1
 
   package-artifacts:
-    needs: build-bitstream
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
