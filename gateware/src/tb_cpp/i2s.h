@@ -1,17 +1,13 @@
 #pragma once
 
-#ifndef VERILATOR_DUT_TYPE
-#error "Please define VERILATOR_DUT_TYPE"
-#endif
-
 #include <vector>
 #include <queue>
 #include <cstdint>
 
-class I2SDriver {
+template <typename DutT> class I2SDriver {
 private:
     // DUT reference
-    VERILATOR_DUT_TYPE* dut;
+    DutT* dut;
 
     // Channel state
     struct ChannelState {
@@ -33,7 +29,7 @@ private:
     bool last_bick = false;
 
 public:
-    explicit I2SDriver(VERILATOR_DUT_TYPE* dut) : dut(dut) {}
+    explicit I2SDriver(DutT* dut) : dut(dut) {}
 
     void post_edge() {
         const bool current_lrck = dut->i2s_lrck;

@@ -13,8 +13,8 @@
 #include "verilated.h"
 
 #include "plot.h"
-#define VERILATOR_DUT_TYPE Vtiliqua_soc
 #include "i2s.h"
+#include "psram.h"
 
 #include <cmath>
 
@@ -62,12 +62,7 @@ int main(int argc, char** argv) {
     printf("fast clock is: %i KHz (%i ns/cycle)\n", FAST_CLK_HZ/1000, ns_in_fast_cycle);
 
 #ifdef PSRAM_SIM
-    uint32_t psram_size_bytes = 1024*1024*16;
-    uint8_t *psram_data = (uint8_t*)malloc(psram_size_bytes);
-    memset(psram_data, 0, psram_size_bytes);
-
-    uint64_t idle_lo = 0;
-    uint64_t idle_hi = 0;
+    PSRAMDriver psram_driver(top);
 #endif
 
     I2SDriver i2s_driver(top);
@@ -87,31 +82,7 @@ int main(int argc, char** argv) {
         if (timestamp_ns % (ns_in_sync_cycle/2) == 0) {
             top->clk_sync = !top->clk_sync;
 #ifdef PSRAM_SIM
-            if (top->clk_sync) {
-                if (top->read_ready) {
-                    top->read_data_view =
-                        (psram_data[top->address_ptr+3] << 24)  |
-                        (psram_data[top->address_ptr+2] << 16)  |
-                        (psram_data[top->address_ptr+1] << 8)   |
-                        (psram_data[top->address_ptr+0] << 0);
-                    /*
-                    if (top->read_data_view != 0) {
-                        printf("read %x@%x\n", top->read_data_view, top->address_ptr);
-                    }
-                    */
-                    top->eval();
-                }
-
-                if (top->write_ready) {
-                    psram_data[top->address_ptr+0] = (uint8_t)(top->write_data >> 0);
-                    psram_data[top->address_ptr+1] = (uint8_t)(top->write_data >> 8);
-                    psram_data[top->address_ptr+2] = (uint8_t)(top->write_data >> 16);
-                    psram_data[top->address_ptr+3] = (uint8_t)(top->write_data >> 24);
-                    //printf("write %x@%x\n", top->write_data, top->address_ptr);
-                    top->eval();
-                }
-
-            }
+            psram_driver.post_edge();
 #endif
         }
 
@@ -127,15 +98,6 @@ int main(int argc, char** argv) {
             top->clk_fast = !top->clk_fast;
         }
 
-#ifdef PSRAM_SIM
-        // Track PSRAM usage to see how close we are to saturation
-        if (top->idle == 1) {
-            idle_hi += 1;
-        } else {
-            idle_lo += 1;
-        }
-#endif
-
         contextp->timeInc(1000);
         top->eval();
 #if defined VM_TRACE_FST && VM_TRACE_FST == 1
@@ -144,8 +106,7 @@ int main(int argc, char** argv) {
     }
 
 #ifdef PSRAM_SIM
-    printf("RAM bandwidth: idle: %i, !idle: %i, percent_used: %f\n", idle_hi, idle_lo,
-            100.0f * (float)idle_lo / (float)(idle_hi + idle_lo));
+    psram_driver.post_sim();
 #endif
 
 #if defined VM_TRACE_FST && VM_TRACE_FST == 1
