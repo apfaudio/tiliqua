@@ -347,7 +347,7 @@ def top_level_cli(
         # By default, SoC examples share the same simulation harness.
         if sim_ports is None:
             sim_ports = sim.soc_simulation_ports
-            sim_harness = os.path.join(path, "../selftest/sim.cpp")
+            sim_harness = "src/tb_cpp/sim_soc.cpp"
     else:
         write_manifest(regions=[])
 
