@@ -8,11 +8,9 @@
 
 #include "i2s.h"
 #include "psram.h"
+#include "dvi.h"
 
 #include <cmath>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
 
 int gcd(int a, int b)
 {
@@ -76,17 +74,12 @@ int main(int argc, char** argv) {
 
     PSRAMDriver psram_driver(top);
     I2SDriver i2s_driver(top);
+    DVIDriver dvi_driver(top);
 
     for (int i = 0; i != 50000; ++i) {
         i2s_driver.inject_sample(0, (int16_t)10000.0*cos((float)i /  300.0));
         i2s_driver.inject_sample(1, (int16_t)10000.0*sin((float)i /  150.0));
     }
-
-    uint32_t im_stride = 3;
-    uint8_t *image_data = (uint8_t*)malloc(DVI_H_ACTIVE*DVI_V_ACTIVE*im_stride);
-    memset(image_data, 0, DVI_H_ACTIVE*DVI_V_ACTIVE*im_stride);
-
-    uint32_t frames = 0;
 
     while (contextp->time() < sim_time && !contextp->gotFinish()) {
 
@@ -95,22 +88,7 @@ int main(int argc, char** argv) {
         // DVI clock domain (PHY output simulation to bitmap image)
         if (timestamp_ns % (ns_in_dvi_cycle/2) == 0) {
             top->clk_dvi = !top->clk_dvi;
-            if (top->clk_dvi) {
-                uint32_t x = top->dvi_x;
-                uint32_t y = top->dvi_y;
-                if (x < DVI_H_ACTIVE && y < DVI_V_ACTIVE) {
-                    image_data[y*DVI_H_ACTIVE*3 + x*3 + 0] = top->dvi_r;
-                    image_data[y*DVI_H_ACTIVE*3 + x*3 + 1] = top->dvi_g;
-                    image_data[y*DVI_H_ACTIVE*3 + x*3 + 2] = top->dvi_b;
-                }
-                if (x == DVI_H_ACTIVE-1 && y == DVI_V_ACTIVE-1) {
-                    char name[64];
-                    sprintf(name, "frame%02d.bmp", frames);
-                    printf("out %s\n", name);
-                    stbi_write_bmp(name, DVI_H_ACTIVE, DVI_V_ACTIVE, 3, image_data);
-                    ++frames;
-                }
-            }
+            dvi_driver.post_edge();
         }
 
         // Sync clock domain (PSRAM read/write simulation)
