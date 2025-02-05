@@ -493,10 +493,11 @@ class USB2AudioInterface(Elaboratable):
         wiring.connect(m, pmod0.pins, pmod0_provider.pins)
         m.d.comb += pmod0.codec_mute.eq(reboot.mute)
 
-        m.submodules.audio_to_channels = AudioToChannels(
-                pmod0,
+        m.submodules.audio_to_channels = audio_to_channels = AudioToChannels(
                 to_usb_stream=channels_to_usb_stream.channel_stream_in,
                 from_usb_stream=usb_to_channel_stream.channel_stream_out)
+        wiring.connect(m, pmod0.o_cal, audio_to_channels.i)
+        wiring.connect(m, audio_to_channels.o, pmod0.i_cal)
 
         jack_period = Signal(32)
         jack_usb = Signal(8)

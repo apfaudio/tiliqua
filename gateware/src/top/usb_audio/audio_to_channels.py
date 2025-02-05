@@ -5,27 +5,31 @@
 from amaranth              import *
 from amaranth.lib.fifo     import AsyncFIFO
 from amaranth.lib          import wiring, data, stream
-from tiliqua.eurorack_pmod import I2STDM
+from amaranth.lib.wiring   import In, Out
+from tiliqua.eurorack_pmod import I2STDM, ASQ
 
-class AudioToChannels(Elaboratable):
+class AudioToChannels(wiring.Component):
 
     """
     Domain crossing logic to move samples from `eurorack-pmod` logic in the audio domain
     to `channels_to_usb_stream` and `usb_stream_to_channels` logic in the USB domain.
     """
 
-    def __init__(self, eurorack_pmod, to_usb_stream, from_usb_stream):
+    # streams for hooking up to audio source / sink, sent / recieved over USB.
+    i:    In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o:   Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    # TODO: legacy: internal USB streams should be exposed as an ordinary wiring.Component.
+
+    def __init__(self, to_usb_stream, from_usb_stream):
         self.to_usb = to_usb_stream
         self.from_usb = from_usb_stream
-        self.eurorack_pmod = eurorack_pmod
         self.dac_fifo_level = Signal(16)
+        super().__init__()
 
     def elaborate(self, platform) -> Module:
 
         m = Module()
-
-        eurorack_pmod = self.eurorack_pmod
 
         # Sample widths
         SW      = I2STDM.S_WIDTH            # Sample width used in underlying I2S driver.
@@ -43,7 +47,7 @@ class AudioToChannels(Elaboratable):
 
         # (sync domain) on every sample strobe, latch and write all channels concatenated into one entry
         # of adc_fifo.
-        wiring.connect(m, eurorack_pmod.o_cal, adc_fifo.w_stream);
+        wiring.connect(m, wiring.flipped(self.i), adc_fifo.w_stream);
 
         # (usb domain) unpack samples from the adc_fifo (one big concatenated
         # entry with samples for all channels once per sample strobe) and feed them
@@ -95,7 +99,7 @@ class AudioToChannels(Elaboratable):
         #
 
         m.submodules.dac_fifo = dac_fifo = AsyncFIFO(width=SW*4, depth=64, w_domain="usb", r_domain="sync")
-        wiring.connect(m, dac_fifo.r_stream, eurorack_pmod.i_cal);
+        wiring.connect(m, dac_fifo.r_stream, wiring.flipped(self.o));
 
         m.d.usb += dac_fifo.w_en.eq(0)
         for n in range(4):
