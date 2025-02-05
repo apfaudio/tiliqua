@@ -5,6 +5,7 @@
 
 """Utilities for simulating Tiliqua designs."""
 
+import glob
 import os
 import shutil
 import subprocess
@@ -148,11 +149,19 @@ def simulate(fragment, ports, harness, hw_platform, tracing=False):
                 ]
 
     clock_sync_hz = 60000000
-    audio_clk_hz = 48000000
+    audio_clk_hz = 12288000
     fast_clk_hz = 120000000
 
     verilator_dst = "build/obj_dir"
     shutil.rmtree(verilator_dst, ignore_errors=True)
+
+    # Copy shared testbench headers somewhere Verilator's build
+    # process can see them.
+    os.makedirs(verilator_dst)
+    testbench_utils = glob.glob("./src/tb_cpp/*.h")
+    for header in testbench_utils:
+        shutil.copy(header, verilator_dst)
+
     print(f"verilate '{dst}' into C++ binary...")
     subprocess.check_call(["verilator",
                            "-Wno-COMBDLY",
@@ -169,7 +178,6 @@ def simulate(fragment, ports, harness, hw_platform, tracing=False):
                            "--Mdir", f"{verilator_dst}",
                            "--build",
                            "-j", "0",
-                           "-Ibuild",
                            "-CFLAGS", f"-DSYNC_CLK_HZ={clock_sync_hz}",
                            "-CFLAGS", f"-DAUDIO_CLK_HZ={audio_clk_hz}",
                            "-CFLAGS", f"-DFAST_CLK_HZ={fast_clk_hz}",
