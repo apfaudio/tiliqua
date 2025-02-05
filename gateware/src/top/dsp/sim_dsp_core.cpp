@@ -12,6 +12,8 @@
 #include "Vtiliqua_soc.h"
 #include "verilated.h"
 
+#include "plot.h"
+
 #include <cmath>
 #include <vector>
 #include <queue>
@@ -110,10 +112,12 @@ private:
             cs.current_rx_sample = (cs.current_rx_sample << 1) | (dut->i2s_sdin1 & 1);
             if (bit_counter == SAMPLE_BITS - 1) {
                 // Sign-extend and store captured sample
-                const int16_t sample = static_cast<int16_t>(
+                int16_t sample = static_cast<int32_t>(
                     (cs.current_rx_sample << (32 - SAMPLE_BITS)) >> (32 - SAMPLE_BITS)
                 );
-                cs.captured.push_back(sample);
+                // FIXME: migrate this conversion to bit timings!
+                sample = (sample > 16384) ? (sample - 32769) : sample;
+                cs.captured.push_back(sample<<1);
                 cs.current_rx_sample = 0;
             }
         }
@@ -143,7 +147,7 @@ int main(int argc, char** argv) {
     top->trace(tfp, 99);  // Trace 99 levels of hierarchy (or see below)
     tfp->open("simx.fst");
 #endif
-    uint64_t sim_time =  100000000000;
+    uint64_t sim_time =  10000000000;
 
     contextp->timeInc(1);
     top->rst_sync = 1;
@@ -264,5 +268,19 @@ int main(int argc, char** argv) {
 #if defined VM_TRACE_FST && VM_TRACE_FST == 1
     tfp->close();
 #endif
+
+    signalsmith::plot::Plot2D plot(1200, 400);
+    for (int ax = 0; ax != 4; ++ax) {
+        auto &axes = plot.newY(1.0 - 0.25*ax, 1.0 - 0.25*(ax+1));
+        axes.linear(-32768, 32768);
+        auto &line = plot.line(plot.x, axes).fillToY(ax);
+        int x = 0;
+        for (auto &y : i2s_driver.get_captured_samples(ax)) {
+            line.add(x, y);
+            ++x;
+        }
+    }
+    plot.write("sim-i2s-outputs.svg");
+
     return 0;
 }
