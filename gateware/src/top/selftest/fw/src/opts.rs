@@ -11,79 +11,159 @@ use strum_macros::{EnumIter, IntoStaticStr};
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Screen {
-    Xbeam,
+    Report,
+    Stimulus,
+    CalDac,
+    CalAdc,
 }
 
 #[derive(Clone)]
-pub struct XbeamOptions {
+pub struct StimulusOptions {
     pub selected: Option<usize>,
-    pub persist: NumOption<u16>,
-    pub hue: NumOption<u8>,
-    pub intensity: NumOption<u8>,
-    pub decay: NumOption<u8>,
-    pub scale: NumOption<u8>,
+    pub volts: NumOption<i8>,
 }
 
-impl_option_view!(XbeamOptions,
-                  persist, hue, intensity, decay, scale);
+impl_option_view!(StimulusOptions, volts);
+
+#[derive(Clone)]
+pub struct ReportOptions {
+    pub selected: Option<usize>,
+    pub page: NumOption<u8>,
+}
+
+impl_option_view!(ReportOptions, page);
+
+#[derive(Clone)]
+pub struct CalOptions {
+    pub selected: Option<usize>,
+    pub zero0: NumOption<i8>,
+    pub zero1: NumOption<i8>,
+    pub zero2: NumOption<i8>,
+    pub zero3: NumOption<i8>,
+    pub scale0: NumOption<i8>,
+    pub scale1: NumOption<i8>,
+    pub scale2: NumOption<i8>,
+    pub scale3: NumOption<i8>,
+}
+
+impl CalOptions {
+    pub fn default() -> Self {
+        Self {
+            selected: Some(0),
+            zero0: NumOption {
+                name: String::from_str("zero0").unwrap(),
+                value: 0,
+                step: 1,
+                min: -128,
+                max: 127,
+            },
+            zero1: NumOption {
+                name: String::from_str("zero1").unwrap(),
+                value: 0,
+                step: 1,
+                min: -128,
+                max: 127,
+            },
+            zero2: NumOption {
+                name: String::from_str("zero2").unwrap(),
+                value: 0,
+                step: 1,
+                min: -128,
+                max: 127,
+            },
+            zero3: NumOption {
+                name: String::from_str("zero3").unwrap(),
+                value: 0,
+                step: 1,
+                min: -128,
+                max: 127,
+            },
+            scale0: NumOption {
+                name: String::from_str("scale0").unwrap(),
+                value: 0,
+                step: 1,
+                min: -128,
+                max: 127,
+            },
+            scale1: NumOption {
+                name: String::from_str("scale1").unwrap(),
+                value: 0,
+                step: 1,
+                min: -128,
+                max: 127,
+            },
+            scale2: NumOption {
+                name: String::from_str("scale2").unwrap(),
+                value: 0,
+                step: 1,
+                min: -128,
+                max: 127,
+            },
+            scale3: NumOption {
+                name: String::from_str("scale3").unwrap(),
+                value: 0,
+                step: 1,
+                min: -128,
+                max: 127,
+            },
+        }
+    }
+}
+
+impl_option_view!(CalOptions,
+                   zero0,  zero1,  zero2,  zero3,
+                  scale0, scale1, scale2, scale3);
 
 #[derive(Clone)]
 pub struct Options {
     pub modify: bool,
+    pub draw: bool,
     pub screen: EnumOption<Screen>,
 
-    pub xbeam: XbeamOptions,
+    pub report: ReportOptions,
+    pub stimulus: StimulusOptions,
+    pub caldac: CalOptions,
+    pub caladc: CalOptions,
 }
 
 impl_option_page!(Options,
-                  (Screen::Xbeam, xbeam));
+                  (Screen::Report, report),
+                  (Screen::Stimulus, stimulus),
+                  (Screen::CalDac, caldac),
+                  (Screen::CalAdc, caladc)
+                  );
 
 impl Options {
     pub fn new() -> Options {
         Options {
             modify: false,
+            draw: true,
             screen: EnumOption {
                 name: String::from_str("screen").unwrap(),
-                value: Screen::Xbeam,
+                value: Screen::Report,
             },
-            xbeam: XbeamOptions {
+            report: ReportOptions {
                 selected: Some(0),
-                persist: NumOption{
-                    name: String::from_str("persist").unwrap(),
-                    value: 1024,
-                    step: 256,
-                    min: 512,
-                    max: 32768,
-                },
-                hue: NumOption{
-                    name: String::from_str("hue").unwrap(),
-                    value: 10,
+                page: NumOption{
+                    name: String::from_str("page").unwrap(),
+                    value: 0,
                     step: 1,
                     min: 0,
-                    max: 15,
-                },
-                intensity: NumOption{
-                    name: String::from_str("intensity").unwrap(),
-                    value: 8,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-                decay: NumOption{
-                    name: String::from_str("decay").unwrap(),
-                    value: 1,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-                scale: NumOption{
-                    name: String::from_str("scale").unwrap(),
-                    value: 6,
-                    step: 1,
-                    min: 0,
-                    max: 15,
+                    max: 0,
                 },
             },
+            stimulus: StimulusOptions {
+                selected: Some(0),
+                volts: NumOption{
+                    name: String::from_str("volts").unwrap(),
+                    value: 0,
+                    step: 1,
+                    min: -10,
+                    max: 10,
+                },
+            },
+            caldac: CalOptions::default(),
+            caladc: CalOptions::default(),
         }
     }
 }

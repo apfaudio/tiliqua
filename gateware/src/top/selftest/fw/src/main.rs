@@ -1,42 +1,63 @@
 #![no_std]
 #![no_main]
 
-use tiliqua_pac as pac;
-use tiliqua_hal as hal;
-
-use hal::hal::delay::DelayNs;
-
-use tiliqua_fw::*;
-
+use riscv_rt::entry;
+use irq::handler;
 use log::{info, error};
 
-use riscv_rt::entry;
-
-use tiliqua_hal::pca9635::*;
-
+use critical_section::Mutex;
+use core::cell::RefCell;
 use core::convert::TryInto;
+use core::fmt::Write;
 
+use embedded_hal::i2c::Operation;
+use embedded_hal::i2c::I2c;
 use embedded_graphics::{
-    mono_font::{ascii::FONT_6X10, ascii::FONT_9X15_BOLD, MonoTextStyle},
+    mono_font::{ascii::FONT_6X10, MonoTextStyle},
     pixelcolor::{Gray8, GrayColor},
     prelude::*,
     text::{Alignment, Text},
 };
 
-use embedded_hal::i2c::Operation;
-use embedded_hal::i2c::I2c;
-
 use heapless::String;
-use core::fmt::Write;
 
-use micromath::F32Ext;
-
+use tiliqua_pac as pac;
+use tiliqua_hal as hal;
+use tiliqua_fw::*;
+use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_lib::draw;
 
 const TUSB322I_ADDR:  u8 = 0x47;
 
+use opts::Options;
+use hal::pca9635::Pca9635Driver;
+
+impl_ui!(UI,
+         Options,
+         Encoder0,
+         Pca9635Driver<I2c0>,
+         EurorackPmod0);
+
+
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
+
+pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
+
+fn timer0_handler(app: &Mutex<RefCell<App>>) {
+
+    critical_section::with(|cs| {
+
+        let mut app = app.borrow_ref_mut(cs);
+
+        //
+        // Update UI and options
+        //
+
+        app.ui.update();
+
+    });
+}
 
 fn psram_memtest(timer: &mut Timer0) {
 
@@ -137,25 +158,6 @@ fn tusb322i_id_test(i2cdev: &mut I2c0) {
     } else {
         info!("PASS: TUSB322I Device ID.");
     }
-}
-
-fn print_encoder_state<D>(d: &mut D, rotation: i16, button: bool)
-where
-    D: DrawTarget<Color = Gray8>,
-{
-    let mut s = String::<64>::new();
-    write!(s, "encoder        - btn={} rot={}",
-          button,
-          rotation).ok();
-    info!("{}", s);
-    let style = MonoTextStyle::new(&FONT_6X10, Gray8::WHITE);
-    Text::with_alignment(
-        &s,
-        d.bounding_box().center() + Point::new(-140, -24),
-        style,
-        Alignment::Left,
-    )
-    .draw(d).ok();
 }
 
 fn print_codec_state<D>(d: &mut D, pmod: &pac::PMOD0_PERIPH)
@@ -287,19 +289,31 @@ where
     .draw(d).ok();
 }
 
+struct App {
+    ui: UI,
+}
 
-fn print_tiliqua<D>(d: &mut D, rng: &mut fastrand::Rng)
-where
-    D: DrawTarget<Color = Gray8>,
-{
-    let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
-    Text::with_alignment(
-        "TILIQUA SELF TEST",
-        Point::new(rng.i32(0..H_ACTIVE as i32), rng.i32(0..V_ACTIVE as i32)),
-        style,
-        Alignment::Center,
-    )
-    .draw(d).ok();
+impl App {
+    pub fn new(opts: Options) -> Self {
+        let peripherals = unsafe { pac::Peripherals::steal() };
+        let encoder = Encoder0::new(peripherals.ENCODER0);
+        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+        let i2cdev = I2c0::new(peripherals.I2C0);
+        let pca9635 = Pca9635Driver::new(i2cdev);
+        Self {
+            ui: UI::new(opts, TIMER0_ISR_PERIOD_MS,
+                        encoder, pca9635, pmod),
+        }
+    }
+}
+
+pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
+    for i in 0..PX_INTENSITY_MAX {
+        for h in 0..PX_HUE_MAX {
+            let rgb = palette::compute_color(i, h, p);
+            video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
+        }
+    }
 }
 
 #[entry]
@@ -312,107 +326,54 @@ fn main() -> ! {
 
     let sysclk = pac::clock::sysclk();
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
+    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
 
     info!("Hello from Tiliqua selftest!");
 
     let mut i2cdev = I2c0::new(peripherals.I2C0);
-    // FIXME: use proper atomic bus sharing!!
-    let i2cdev2 = I2c0::new(unsafe { pac::I2C0::steal() } );
+    let pmod = peripherals.PMOD0_PERIPH;
+    let dtr = peripherals.DTR0;
 
     psram_memtest(&mut timer);
-
     spiflash_memtest(&mut timer);
-
     tusb322i_id_test(&mut i2cdev);
-
-    let mut pca9635 = Pca9635Driver::new(i2cdev2);
-
-    let mut encoder = Encoder0::new(peripherals.ENCODER0);
-
-    let pmod = peripherals.PMOD0_PERIPH;
-
-    /*
-    // TODO: for testing only
-    for ch in 0..8 {
-        pmod.cal_a().write(|w| unsafe { w.value().bits(32768) });
-        pmod.cal_b().write(|w| unsafe { w.value().bits(0) });
-        pmod.cal_reg().write(|w| unsafe {
-            w.write().bit(true);
-            w.channel().bits(ch as u8)
-        });
-        while !pmod.cal_reg().read().done().bit() {}
-    }
-    */
-
-    let dtr = peripherals.DTR0;
 
     let mut display = DMADisplay {
         framebuffer_base: PSRAM_FB_BASE as *mut u32,
     };
 
-    // Must flush the dcache for framebuffer writes to go through
-    // TODO: put the framebuffer in the DMA section of Vex address space?
-    let pause_flush = |timer: &mut Timer0, uptime_ms: &mut u32, period_ms: u32| {
-        timer.delay_ms(period_ms);
-        *uptime_ms += period_ms;
-        pac::cpu::vexriscv::flush_dcache();
-    };
+    write_palette(&mut video, palette::ColorPalette::Linear);
+    video.set_persist(512);
 
-    let mut uptime_ms = 0u32;
-    let period_ms = 10u32;
+    let opts = opts::Options::new();
+    let app = Mutex::new(RefCell::new(App::new(opts)));
+    let hue = 10;
 
-    let mut encoder_rotation: i16 = 0;
-    let mut encoder_toggle: bool = false;
+    handler!(timer0 = || timer0_handler(&app));
 
-    let mut rng = fastrand::Rng::with_seed(0);
+    irq::scope(|s| {
 
-    loop {
+        s.register(handlers::Interrupt::TIMER0, timer0);
 
-        encoder.update();
+        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
+                              pac::Interrupt::TIMER0);
 
-        encoder_rotation += encoder.poke_ticks() as i16;
-        if encoder.poke_btn() {
-            encoder_toggle = !encoder_toggle;
+        loop {
+            let opts = critical_section::with(|cs| {
+                let app = app.borrow_ref(cs);
+                app.ui.opts.clone()
+            });
+            draw::draw_options(&mut display, &opts, H_ACTIVE/2-30, 70,
+                               hue).ok();
+            draw::draw_name(&mut display, H_ACTIVE/2, 30, hue, UI_NAME, UI_SHA).ok();
+
+            if opts.screen.value == opts::Screen::Report {
+                print_codec_state(&mut display, &pmod);
+                print_touch_state(&mut display, &pmod);
+                print_jack_state(&mut display, &pmod);
+                print_usb_state(&mut display, &mut i2cdev);
+                print_die_temperature(&mut display, &dtr);
+            }
         }
-
-        print_tiliqua(&mut display, &mut rng);
-        pause_flush(&mut timer, &mut uptime_ms, period_ms);
-
-        print_encoder_state(&mut display, encoder_rotation, encoder_toggle);
-        pause_flush(&mut timer, &mut uptime_ms, period_ms);
-
-        print_codec_state(&mut display, &pmod);
-        pause_flush(&mut timer, &mut uptime_ms, period_ms);
-
-        print_touch_state(&mut display, &pmod);
-        pause_flush(&mut timer, &mut uptime_ms, period_ms);
-
-        print_jack_state(&mut display, &pmod);
-        pause_flush(&mut timer, &mut uptime_ms, period_ms);
-
-        print_usb_state(&mut display, &mut i2cdev);
-        pause_flush(&mut timer, &mut uptime_ms, period_ms);
-
-        print_die_temperature(&mut display, &dtr);
-        pause_flush(&mut timer, &mut uptime_ms, period_ms);
-
-        draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
-
-        // Write something to the CODEC outputs / LEDs
-        pmod.sample_o0().write(|w| unsafe { w.sample().bits(
-            ((f32::sin((uptime_ms as f32)/200.0f32 + 0.0) * 16000.0f32) as i16) as u16) } );
-        pmod.sample_o1().write(|w| unsafe { w.sample().bits(
-            ((f32::sin((uptime_ms as f32)/200.0f32 + 1.0) * 16000.0f32) as i16) as u16) } );
-        pmod.sample_o2().write(|w| unsafe { w.sample().bits(
-            ((f32::sin((uptime_ms as f32)/200.0f32 + 2.0) * 16000.0f32) as i16) as u16) } );
-        pmod.sample_o3().write(|w| unsafe { w.sample().bits(
-            ((f32::sin((uptime_ms as f32)/200.0f32 + 3.0) * 16000.0f32) as i16) as u16) } );
-
-
-        for n in 0..16 {
-            pca9635.leds[n] = (f32::sin((uptime_ms as f32)/200.0f32 + (n as f32)) * 255.0f32) as u8;
-        }
-        pca9635.push().ok();
-
-    }
+    })
 }

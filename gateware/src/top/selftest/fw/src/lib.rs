@@ -20,5 +20,13 @@ tiliqua_hal::impl_encoder! {
     Encoder0: pac::ENCODER0,
 }
 
+tiliqua_hal::impl_eurorack_pmod! {
+    EurorackPmod0: pac::PMOD0_PERIPH,
+}
+
+tiliqua_hal::impl_video! {
+    Video0: pac::VIDEO_PERIPH,
+}
+
 pub mod handlers;
 pub mod opts;
