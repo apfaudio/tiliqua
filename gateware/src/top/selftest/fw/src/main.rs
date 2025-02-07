@@ -160,16 +160,17 @@ fn tusb322i_id_test(i2cdev: &mut I2c0) {
     }
 }
 
-fn print_codec_state<D>(d: &mut D, pmod: &pac::PMOD0_PERIPH)
+fn print_codec_state<D>(d: &mut D, pmod: &EurorackPmod0)
 where
     D: DrawTarget<Color = Gray8>,
 {
     let mut s = String::<64>::new();
+    let sample_i = pmod.sample_i();
     write!(s, "codec_in       - ch0={:06} ch1={:06} ch2={:06} ch3={:06}",
-          pmod.sample_i0().read().bits() as i16,
-          pmod.sample_i1().read().bits() as i16,
-          pmod.sample_i2().read().bits() as i16,
-          pmod.sample_i3().read().bits() as i16).ok();
+           sample_i[0],
+           sample_i[1],
+           sample_i[2],
+           sample_i[3]).ok();
     info!("{}", s);
     let style = MonoTextStyle::new(&FONT_6X10, Gray8::WHITE);
     Text::with_alignment(
@@ -181,21 +182,22 @@ where
     .draw(d).ok();
 }
 
-fn print_touch_state<D>(d: &mut D, pmod: &pac::PMOD0_PERIPH)
+fn print_touch_state<D>(d: &mut D, pmod: &EurorackPmod0)
 where
     D: DrawTarget<Color = Gray8>,
 {
     let mut s = String::<128>::new();
+    let touch = pmod.touch();
     write!(s, "touch          - err={:03} ch0={:03} ch1={:03} ch2={:03} ch3={:03} ch4={:03} ch5={:03} ch6={:03} ch7={:03}",
-          pmod.touch_err().read().bits() as u8,
-          pmod.touch0().read().bits() as u8,
-          pmod.touch1().read().bits() as u8,
-          pmod.touch2().read().bits() as u8,
-          pmod.touch3().read().bits() as u8,
-          pmod.touch4().read().bits() as u8,
-          pmod.touch5().read().bits() as u8,
-          pmod.touch6().read().bits() as u8,
-          pmod.touch7().read().bits() as u8).ok();
+          pmod.touch_err(),
+          touch[0],
+          touch[1],
+          touch[2],
+          touch[3],
+          touch[4],
+          touch[5],
+          touch[6],
+          touch[7]).ok();
     info!("{}", s);
     let style = MonoTextStyle::new(&FONT_6X10, Gray8::WHITE);
     Text::with_alignment(
@@ -207,13 +209,13 @@ where
     .draw(d).ok();
 }
 
-fn print_jack_state<D>(d: &mut D, pmod: &pac::PMOD0_PERIPH)
+fn print_jack_state<D>(d: &mut D, pmod: &EurorackPmod0)
 where
     D: DrawTarget<Color = Gray8>,
 {
     let mut s = String::<64>::new();
     write!(s, "jack           - 0x{:x}",
-          pmod.jack().read().bits() as u8).ok();
+          pmod.jack()).ok();
     info!("{}", s);
     let style = MonoTextStyle::new(&FONT_6X10, Gray8::WHITE);
     Text::with_alignment(
@@ -331,7 +333,7 @@ fn main() -> ! {
     info!("Hello from Tiliqua selftest!");
 
     let mut i2cdev = I2c0::new(peripherals.I2C0);
-    let pmod = peripherals.PMOD0_PERIPH;
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
 
     psram_memtest(&mut timer);
@@ -373,6 +375,60 @@ fn main() -> ! {
                 print_jack_state(&mut display, &pmod);
                 print_usb_state(&mut display, &mut i2cdev);
                 print_die_temperature(&mut display, &dtr);
+            }
+
+            if opts.screen.value == opts::Screen::Stimulus {
+                let v = (4096 * opts.stimulus.volts.value as i16) as u16;
+                pmod.registers.sample_o0().write(|w| unsafe { w.sample().bits(v) } );
+                pmod.registers.sample_o1().write(|w| unsafe { w.sample().bits(v) } );
+                pmod.registers.sample_o2().write(|w| unsafe { w.sample().bits(v) } );
+                pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(v) } );
+            }
+
+            if opts.screen.value == opts::Screen::CalDac {
+                let zero = [
+                    opts.caldac.zero0.value,
+                    opts.caldac.zero1.value,
+                    opts.caldac.zero2.value,
+                    opts.caldac.zero3.value,
+                ];
+                let scale = [
+                    opts.caldac.scale0.value,
+                    opts.caldac.scale1.value,
+                    opts.caldac.scale2.value,
+                    opts.caldac.scale3.value,
+                ];
+                for ch in 0..4usize {
+                    pmod.write_calibration_constant(
+                        4u8 + ch as u8,
+                        31785 + scale[ch] as i32, // 0.97 * 2**15
+                        983   + zero[ch] as i32   // 0.03 * 2**15
+                    )
+                }
+                print_codec_state(&mut display, &pmod);
+            }
+
+            if opts.screen.value == opts::Screen::CalAdc {
+                let zero = [
+                    opts.caladc.zero0.value,
+                    opts.caladc.zero1.value,
+                    opts.caladc.zero2.value,
+                    opts.caladc.zero3.value,
+                ];
+                let scale = [
+                    opts.caladc.scale0.value,
+                    opts.caladc.scale1.value,
+                    opts.caladc.scale2.value,
+                    opts.caladc.scale3.value,
+                ];
+                for ch in 0..4usize {
+                    pmod.write_calibration_constant(
+                        ch as u8,
+                        -37945 + scale[ch] as i32, // -1.158 * 2**15
+                        262    + zero[ch] as i32   //  0.008 * 2**15
+                    )
+                }
+                print_codec_state(&mut display, &pmod);
             }
         }
     })

@@ -6,7 +6,7 @@ macro_rules! impl_eurorack_pmod {
         $(
             #[derive(Debug)]
             pub struct $PMODX {
-                registers: $PACPMODX,
+                pub registers: $PACPMODX,
                 led_mode: u8,
             }
 
@@ -20,6 +20,10 @@ macro_rules! impl_eurorack_pmod {
 
                 pub fn jack(&self) -> u8 {
                     self.registers.jack().read().bits() as u8
+                }
+
+                pub fn touch_err(&self) -> u8 {
+                    self.registers.touch_err().read().bits() as u8
                 }
 
                 pub fn touch(&self) -> [u8; 8] {
