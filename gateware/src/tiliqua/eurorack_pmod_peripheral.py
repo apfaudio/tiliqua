@@ -40,11 +40,24 @@ class Peripheral(wiring.Component):
     class FlagsReg(csr.Register, access="w"):
         mute: csr.Field(csr.action.W, unsigned(1))
 
+    class CalibrationConstant(csr.Register, access="w"):
+        value: csr.Field(csr.action.W, signed(32))
+
+    class CalibrationReg(csr.Register, access="rw"):
+        channel: csr.Field(csr.action.W, unsigned(3))
+        write:   csr.Field(csr.action.W, unsigned(1))
+        done:    csr.Field(csr.action.R, unsigned(1))
+
     def __init__(self, *, pmod, poke_outputs=False, **kwargs):
         self.pmod = pmod
         self.poke_outputs = poke_outputs
 
         regs = csr.Builder(addr_width=6, data_width=8)
+
+        # Calibration constant writing
+        self._cal_a = regs.add("cal_a", self.CalibrationConstant())
+        self._cal_b = regs.add("cal_b", self.CalibrationConstant())
+        self._cal_reg = regs.add("cal_reg", self.CalibrationReg())
 
         # ADC and input samples
         self._sample_i = [regs.add(f"sample_i{i}", self.ISampleReg()) for i in range(4)]
@@ -106,5 +119,27 @@ class Peripheral(wiring.Component):
                 with m.If(self._sample_o[i].f.sample.w_stb):
                     m.d.sync += self.pmod.i_cal.payload[i].eq(
                             self._sample_o[i].f.sample.w_data)
+
+        #
+        # Writing calibration constants.
+        # Write calibration constants, then write a '1' to the 'write' flag.
+        # When 'done' is 1, the constant has been committed and another one
+        # may be written.
+        #
+
+        with m.If(self._cal_a.f.value.w_stb):
+            m.d.sync += self.pmod.calibrator.cal_mem_write.payload.a.eq(self._cal_a.f.value.w_data)
+        with m.If(self._cal_b.f.value.w_stb):
+            m.d.sync += self.pmod.calibrator.cal_mem_write.payload.b.eq(self._cal_b.f.value.w_data)
+        with m.If(self._cal_reg.f.channel.w_stb):
+            m.d.sync += self.pmod.calibrator.cal_mem_write.payload.channel.eq(self._cal_reg.f.channel.w_data)
+
+        with m.If(self._cal_reg.f.write.w_stb & self._cal_reg.f.write.w_data):
+            m.d.sync += self.pmod.calibrator.cal_mem_write.valid.eq(1)
+            m.d.sync += self._cal_reg.f.done.r_data.eq(0)
+
+        with m.If(self.pmod.calibrator.cal_mem_write.valid & self.pmod.calibrator.cal_mem_write.ready):
+            m.d.sync += self.pmod.calibrator.cal_mem_write.valid.eq(0)
+            m.d.sync += self._cal_reg.f.done.r_data.eq(1)
 
         return m

@@ -331,6 +331,19 @@ fn main() -> ! {
 
     let pmod = peripherals.PMOD0_PERIPH;
 
+    /*
+    // TODO: for testing only
+    for ch in 0..8 {
+        pmod.cal_a().write(|w| unsafe { w.value().bits(32768) });
+        pmod.cal_b().write(|w| unsafe { w.value().bits(0) });
+        pmod.cal_reg().write(|w| unsafe {
+            w.write().bit(true);
+            w.channel().bits(ch as u8)
+        });
+        while !pmod.cal_reg().read().done().bit() {}
+    }
+    */
+
     let dtr = peripherals.DTR0;
 
     let mut display = DMADisplay {
@@ -394,6 +407,7 @@ fn main() -> ! {
             ((f32::sin((uptime_ms as f32)/200.0f32 + 2.0) * 16000.0f32) as i16) as u16) } );
         pmod.sample_o3().write(|w| unsafe { w.sample().bits(
             ((f32::sin((uptime_ms as f32)/200.0f32 + 3.0) * 16000.0f32) as i16) as u16) } );
+
 
         for n in 0..16 {
             pca9635.leds[n] = (f32::sin((uptime_ms as f32)/200.0f32 + (n as f32)) * 255.0f32) as u8;

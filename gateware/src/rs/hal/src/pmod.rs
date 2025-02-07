@@ -81,6 +81,16 @@ macro_rules! impl_eurorack_pmod {
                     self.led_mode = 0xff;
                     self.registers.led_mode().write(|w| unsafe { w.led().bits(self.led_mode) } );
                 }
+
+                pub fn write_calibration_constant(&mut self, ch: u8, a: i32, b: i32) {
+                    self.registers.cal_a().write(|w| unsafe { w.value().bits(a as u32) });
+                    self.registers.cal_b().write(|w| unsafe { w.value().bits(b as u32) });
+                    self.registers.cal_reg().write(|w| unsafe {
+                        w.write().bit(true);
+                        w.channel().bits(ch)
+                    });
+                    while !self.registers.cal_reg().read().done().bit() {}
+                }
             }
         )+
     };
