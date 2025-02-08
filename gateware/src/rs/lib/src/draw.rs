@@ -257,7 +257,7 @@ where
         }
 
         let mut adc_text: String<8> = String::new();
-        write!(adc_text, "{}", adc[ch as usize]/4);
+        write!(adc_text, "{}", adc[ch as usize]/4).ok();
         Text::with_alignment(
             &adc_text,
             Point::new((x-10) as i32, (y+(ch+1)*spacing-3) as i32),
@@ -266,7 +266,7 @@ where
         ).draw(d)?;
 
         let mut dac_text: String<8> = String::new();
-        write!(dac_text, "{}", dac[ch as usize]/4);
+        write!(dac_text, "{}", dac[ch as usize]/4).ok();
         Text::with_alignment(
             &dac_text,
             Point::new((x+width+10) as i32, (y+(ch+1)*spacing-3) as i32),
@@ -302,11 +302,9 @@ pub fn draw_cal_constants<D>(
 where
     D: DrawTarget<Color = Gray8>,
 {
-    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
     let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
 
     let spacing = 30;
-    let s_y     = spacing;
     let width   = 256;
 
     for ch in 0..4 {
@@ -315,7 +313,7 @@ where
               ch,
               dac_scale[ch as usize] as f32 / 32768f32,
               ch,
-              dac_zero[ch as usize] as f32 / 32768f32);
+              dac_zero[ch as usize] as f32 / 32768f32).ok();
         Text::with_alignment(
             &s,
             Point::new((x+width/2+20) as i32, (y+(ch+1)*spacing-3) as i32),
@@ -330,7 +328,7 @@ where
               ch,
               adc_scale[ch as usize] as f32 / 32768f32,
               ch,
-              adc_zero[ch as usize] as f32 / 32768f32);
+              adc_zero[ch as usize] as f32 / 32768f32).ok();
         Text::with_alignment(
             &s,
             Point::new((x+width/2-20) as i32, (y+(ch+1)*spacing-3) as i32),

@@ -14,10 +14,8 @@ use embedded_hal::i2c::Operation;
 use embedded_hal::i2c::I2c;
 use embedded_hal::delay::DelayNs;
 use embedded_graphics::{
-    mono_font::{ascii::FONT_6X10, MonoTextStyle},
     pixelcolor::{Gray8, GrayColor},
     prelude::*,
-    text::{Alignment, Text},
 };
 
 use heapless::String;
@@ -100,7 +98,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     app.ui.opts.caldac.scale2.value += deltas[2];
                     app.ui.opts.caldac.scale3.value += deltas[3];
                 }
-                _ => {}
             }
         }
 
@@ -109,7 +106,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
 fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
-    write!(s, "PSRAM memtest\r\n");
+    write!(s, "PSRAM memtest\r\n").ok();
 
     // WARN: assume framebuffer is at the start of PSRAM - don't try memtesting that section.
 
@@ -148,19 +145,19 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let read_ticks = endwrite-endread;
 
     let sysclk = pac::clock::sysclk();
-    write!(s, "  write {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / write_ticks as u64);
-    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / (read_ticks as u64));
+    write!(s, "  write {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / write_ticks as u64).ok();
+    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / (read_ticks as u64)).ok();
 
     if psram_fl {
-        write!(s, "  FAIL\r\n");
+        write!(s, "  FAIL\r\n").ok();
     } else {
-        write!(s, "  PASS\r\n");
+        write!(s, "  PASS\r\n").ok();
     }
 }
 
 fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
-    write!(s, "SPIFLASH memtest\r\n");
+    write!(s, "SPIFLASH memtest\r\n").ok();
 
     let spiflash_ptr = SPIFLASH_BASE as *mut u32;
     let spiflash_sz_test = 1024;
@@ -184,7 +181,7 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let read_ticks = start-timer.counter();
 
     let sysclk = pac::clock::sysclk();
-    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (spiflash_sz_test/1024) as u64) / (read_ticks as u64));
+    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (spiflash_sz_test/1024) as u64) / (read_ticks as u64)).ok();
 
     // TODO: verify there is actually a bitstream header in first N words?
     let mut spiflash_fl = true;
@@ -196,9 +193,9 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     }
 
     if spiflash_fl {
-        write!(s, "  FAIL\r\n");
+        write!(s, "  FAIL\r\n").ok();
     } else {
-        write!(s, "  PASS\r\n");
+        write!(s, "  PASS\r\n").ok();
     }
 }
 
@@ -213,19 +210,18 @@ fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
             info!("tusb322i_id{}: 0x{:x}", ix, byte);
             ix += 1;
         }
-        write!(s, "FAIL: TUSB322I ID\r\n");
+        write!(s, "FAIL: TUSB322I ID\r\n").ok();
     } else {
-        write!(s, "PASS: TUSB322I ID\r\n");
+        write!(s, "PASS: TUSB322I ID\r\n").ok();
     }
 }
 
 fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
 {
-    let touch = pmod.touch();
     if pmod.touch_err() != 0 {
-        write!(s, "FAIL: TOUCH IC NAK\r\n");
+        write!(s, "FAIL: TOUCH IC NAK\r\n").ok();
     } else {
-        write!(s, "PASS: TOUCH IC\r\n");
+        write!(s, "PASS: TOUCH IC\r\n").ok();
     }
 }
 
@@ -352,7 +348,7 @@ fn main() -> ! {
                 app.ui.opts.clone()
             });
 
-            let mut stimulus_raw = 4000 * opts.reference.volts.value as i16;
+            let stimulus_raw = 4000 * opts.reference.volts.value as i16;
 
             draw::draw_options(&mut display, &opts, H_ACTIVE/2-30, 70,
                                hue).ok();
@@ -459,25 +455,25 @@ fn main() -> ! {
             if opts.screen.value != opts::Screen::StartupReport {
                 draw::draw_cal(&mut display, H_ACTIVE/2-128, V_ACTIVE/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
-                               &pmod.sample_i());
+                               &pmod.sample_i()).ok();
                 draw::draw_cal_constants(
                     &mut display, H_ACTIVE/2-128, V_ACTIVE/2+64, hue,
-                    &adc_scale, &adc_zero, &dac_scale, &dac_zero);
+                    &adc_scale, &adc_zero, &dac_scale, &dac_zero).ok();
 
                 if opts.reference.print.value == EnSerialPrint::SerialOn {
                     let mut s: String<256> = String::new();
-                    write!(s, "cal_constants = [\n\r");
+                    write!(s, "cal_constants = [\n\r").ok();
                     for ch in 0..4 {
                         write!(s, "  [{:.4}, {:.4}],\n\r",
                               adc_scale[ch as usize] as f32 / 32768f32,
-                              adc_zero[ch as usize] as f32 / 32768f32);
+                              adc_zero[ch as usize] as f32 / 32768f32).ok();
                     }
                     for ch in 0..4 {
                         write!(s, "  [{:.4}, {:.4}],\n\r",
                               dac_scale[ch as usize] as f32 / 32768f32,
-                              dac_zero[ch as usize] as f32 / 32768f32);
+                              dac_zero[ch as usize] as f32 / 32768f32).ok();
                     }
-                    write!(s, "]\n\r");
+                    write!(s, "]\n\r").ok();
                     log::info!("{}", s);
                 }
             }
