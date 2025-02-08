@@ -11,10 +11,10 @@ use strum_macros::{EnumIter, IntoStaticStr};
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Screen {
-    Report,
+    StartupReport,
     Autocal,
-    CalAdc,
-    CalDac,
+    TweakAdc,
+    TweakDac,
 }
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
@@ -44,12 +44,12 @@ pub struct AutocalOptions {
 impl_option_view!(AutocalOptions, volts, autozero, run);
 
 #[derive(Clone)]
-pub struct ReportOptions {
+pub struct StartupReportOptions {
     pub selected: Option<usize>,
     pub page: NumOption<u8>,
 }
 
-impl_option_view!(ReportOptions, page);
+impl_option_view!(StartupReportOptions, page);
 
 #[derive(Clone)]
 pub struct CalOptions {
@@ -138,29 +138,29 @@ pub struct Options {
     pub draw: bool,
     pub screen: EnumOption<Screen>,
 
-    pub report: ReportOptions,
+    pub report: StartupReportOptions,
     pub reference: AutocalOptions,
     pub caldac: CalOptions,
     pub caladc: CalOptions,
 }
 
 impl_option_page!(Options,
-                  (Screen::Report, report),
+                  (Screen::StartupReport, report),
                   (Screen::Autocal, reference),
-                  (Screen::CalAdc, caladc),
-                  (Screen::CalDac, caldac)
+                  (Screen::TweakAdc, caladc),
+                  (Screen::TweakDac, caldac)
                   );
 
 impl Options {
     pub fn new() -> Options {
         Options {
-            modify: false,
+            modify: true,
             draw: true,
             screen: EnumOption {
                 name: String::from_str("screen").unwrap(),
-                value: Screen::Report,
+                value: Screen::StartupReport,
             },
-            report: ReportOptions {
+            report: StartupReportOptions {
                 selected: None,
                 page: NumOption{
                     name: String::from_str("page").unwrap(),
