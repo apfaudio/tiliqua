@@ -382,11 +382,6 @@ fn main() -> ! {
                     "[startup report]",
                     &report
                 ).ok();
-            } else {
-                draw::draw_cal(&mut display, H_ACTIVE/2-128, V_ACTIVE/2-128, hue,
-                               &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
-                               &pmod.sample_i());
-
             }
 
             if opts.screen.value == opts::Screen::Autocal {
@@ -412,11 +407,15 @@ fn main() -> ! {
                 opts.caldac.scale2.value,
                 opts.caldac.scale3.value,
             ];
+            let mut dac_scale = [0i32; 4];
+            let mut dac_zero  = [0i32; 4];
             for ch in 0..4usize {
+                dac_scale[ch] = 32725 + 4*scale[ch] as i32;
+                dac_zero[ch]  = 983 + 2*zero[ch] as i32; // FIXME 2x/4x
                 pmod.write_calibration_constant(
                     4u8 + ch as u8,
-                    32725 + 4*scale[ch] as i32,
-                    983   + 2*zero[ch] as i32 // FIXME 2x/4x
+                    dac_scale[ch],
+                    dac_zero[ch],
                 )
             }
 
@@ -443,17 +442,29 @@ fn main() -> ! {
             let adc_default_offset =  0.008f32;
             let adc_gamma_default  = 1.0f32/adc_default_scale - 0.00025*75f32;
             let adc_delta_default  = -adc_default_offset/adc_default_scale;
+            let mut adc_scale = [0i32; 4];
+            let mut adc_zero  = [0i32; 4];
             for ch in 0..4usize {
-                let adc_gamma = adc_gamma_default + 0.00010*(scale[ch] as f32);
-                let adc_delta = adc_delta_default + 0.00005*(zero[ch] as f32);
-                let adc_scale = 32768f32 * (1.0f32/adc_gamma);
-                let adc_delta = 32768f32 * (-adc_delta/adc_gamma);
+                let adc_gamma     = adc_gamma_default + 0.00010*(scale[ch] as f32);
+                let adc_delta     = adc_delta_default + 0.00005*(zero[ch] as f32);
+                adc_scale[ch] = (32768f32 * (1.0f32/adc_gamma)) as i32;
+                adc_zero[ch]  = (32768f32 * (-adc_delta/adc_gamma)) as i32;
                 pmod.write_calibration_constant(
                     ch as u8,
-                    adc_scale as i32,
-                    adc_delta as i32,
+                    adc_scale[ch],
+                    adc_zero[ch],
                 )
             }
+
+            if opts.screen.value != opts::Screen::StartupReport {
+                draw::draw_cal(&mut display, H_ACTIVE/2-128, V_ACTIVE/2-128, hue,
+                               &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
+                               &pmod.sample_i());
+                draw::draw_cal_constants(
+                    &mut display, H_ACTIVE/2-128, V_ACTIVE/2+64, hue,
+                    &adc_scale, &adc_zero, &dac_scale, &dac_zero);
+            }
+
         }
     })
 }

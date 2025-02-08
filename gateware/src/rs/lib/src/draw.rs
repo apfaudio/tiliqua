@@ -292,6 +292,56 @@ where
     Ok(())
 }
 
+pub fn draw_cal_constants<D>(
+    d: &mut D, x: u32, y: u32, hue: u8,
+    adc_scale: &[i32; 4],
+    adc_zero:  &[i32; 4],
+    dac_scale: &[i32; 4],
+    dac_zero:  &[i32; 4]
+    ) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = Gray8>,
+{
+    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
+    let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
+
+    let spacing = 30;
+    let s_y     = spacing;
+    let width   = 256;
+
+    for ch in 0..4 {
+        let mut s: String<32> = String::new();
+        write!(s, "O{} = {:.4} * o{} + {:.4}",
+              ch,
+              dac_scale[ch as usize] as f32 / 32768f32,
+              ch,
+              dac_zero[ch as usize] as f32 / 32768f32);
+        Text::with_alignment(
+            &s,
+            Point::new((x+width/2+20) as i32, (y+(ch+1)*spacing-3) as i32),
+            font_small_grey,
+            Alignment::Left
+        ).draw(d)?;
+    }
+
+    for ch in 0..4 {
+        let mut s: String<32> = String::new();
+        write!(s, "i{} = {:.4} * I{} + {:.4}",
+              ch,
+              adc_scale[ch as usize] as f32 / 32768f32,
+              ch,
+              adc_zero[ch as usize] as f32 / 32768f32);
+        Text::with_alignment(
+            &s,
+            Point::new((x+width/2-20) as i32, (y+(ch+1)*spacing-3) as i32),
+            font_small_grey,
+            Alignment::Right
+        ).draw(d)?;
+    }
+
+    Ok(())
+}
+
 pub fn draw_tiliqua<D>(d: &mut D, x: u32, y: u32, hue: u8,
                        str_l: [&str; 8], str_r: [&str; 6], text_title: &str, text_desc: &str) -> Result<(), D::Error>
 where
@@ -768,6 +818,13 @@ mod tests {
         draw_cal(&mut disp, H_ACTIVE/2-128, V_ACTIVE/2-128, 0,
                  &[4096, 4096, 4096, 4096],
                  &[4000, 4120, 4090, 4000]);
+
+        draw_cal_constants(&mut disp, H_ACTIVE/2-128, V_ACTIVE/2+64, 0,
+                 &[4096, 4096, 4096, 4096],
+                 &[4000, 4120, 4090, 4000],
+                 &[4096, 4096, 4096, 4096],
+                 &[4000, 4120, 4090, 4000]
+                 );
 
         draw_name(&mut disp, H_ACTIVE/2, 30, 0, "MACRO-OSC", "b2d3aa").ok();
 
