@@ -412,8 +412,8 @@ fn main() -> ! {
                 for ch in 0..4usize {
                     pmod.write_calibration_constant(
                         4u8 + ch as u8,
-                        31785 + 4*scale[ch] as i32, // 0.97 * 2**15
-                        983   + 4*zero[ch] as i32   // 0.03 * 2**15
+                        32725 + 4*scale[ch] as i32,
+                        983   + 4*zero[ch] as i32
                     )
                 }
             }
@@ -436,7 +436,7 @@ fn main() -> ! {
                 // easier to adjust the zero offset first.
                 let adc_default_scale  = -1.158f32;
                 let adc_default_offset =  0.008f32;
-                let adc_gamma_default  = 1.0f32/adc_default_scale;
+                let adc_gamma_default  = 1.0f32/adc_default_scale - 0.00025*75f32;
                 let adc_delta_default  = -adc_default_offset/adc_default_scale;
                 for ch in 0..4usize {
                     let adc_gamma = adc_gamma_default + 0.00025*(scale[ch] as f32);

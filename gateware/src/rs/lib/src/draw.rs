@@ -260,7 +260,7 @@ where
         write!(adc_text, "{}", adc[ch as usize]/4);
         Text::with_alignment(
             &adc_text,
-            Point::new((x-10) as i32, (y+(ch+1)*spacing) as i32),
+            Point::new((x-10) as i32, (y+(ch+1)*spacing-3) as i32),
             font_small_grey,
             Alignment::Right
         ).draw(d)?;
@@ -269,19 +269,25 @@ where
         write!(dac_text, "{}", dac[ch as usize]/4);
         Text::with_alignment(
             &dac_text,
-            Point::new((x+width+10) as i32, (y+(ch+1)*spacing) as i32),
+            Point::new((x+width+10) as i32, (y+(ch+1)*spacing-3) as i32),
             font_small_grey,
             Alignment::Left
         ).draw(d)?;
     }
 
     Text::with_alignment(
-        "in (ADC, mV)             delta           ref (DAC mV)",
+        "in (ADC mV)             delta           ref (DAC mV)",
         Point::new((x+width/2) as i32, y as i32),
         font_small_white,
         Alignment::Center
     ).draw(d)?;
 
+    Text::with_alignment(
+        "-128mV                     128mV",
+        Point::new((x+width/2) as i32, (y+spacing*5-10) as i32),
+        font_small_grey,
+        Alignment::Center
+    ).draw(d)?;
 
     Ok(())
 }
