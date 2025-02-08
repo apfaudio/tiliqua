@@ -109,7 +109,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
 fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
-    writeln!(s, "PSRAM memtest");
+    write!(s, "PSRAM memtest\r\n");
 
     // WARN: assume framebuffer is at the start of PSRAM - don't try memtesting that section.
 
@@ -148,19 +148,19 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let read_ticks = endwrite-endread;
 
     let sysclk = pac::clock::sysclk();
-    writeln!(s, "  write {} KByte/sec", ((sysclk as u64) * (psram_sz_test/1024) as u64) / write_ticks as u64);
-    writeln!(s, "  read {} KByte/sec", ((sysclk as u64) * (psram_sz_test/1024) as u64) / (read_ticks as u64));
+    write!(s, "  write {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / write_ticks as u64);
+    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / (read_ticks as u64));
 
     if psram_fl {
-        writeln!(s, "  FAIL");
+        write!(s, "  FAIL\r\n");
     } else {
-        writeln!(s, "  PASS");
+        write!(s, "  PASS\r\n");
     }
 }
 
 fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
-    writeln!(s, "SPIFLASH memtest");
+    write!(s, "SPIFLASH memtest\r\n");
 
     let spiflash_ptr = SPIFLASH_BASE as *mut u32;
     let spiflash_sz_test = 1024;
@@ -184,7 +184,7 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let read_ticks = start-timer.counter();
 
     let sysclk = pac::clock::sysclk();
-    writeln!(s, "  read {} KByte/sec", ((sysclk as u64) * (spiflash_sz_test/1024) as u64) / (read_ticks as u64));
+    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (spiflash_sz_test/1024) as u64) / (read_ticks as u64));
 
     // TODO: verify there is actually a bitstream header in first N words?
     let mut spiflash_fl = true;
@@ -196,9 +196,9 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     }
 
     if spiflash_fl {
-        writeln!(s, "  FAIL");
+        write!(s, "  FAIL\r\n");
     } else {
-        writeln!(s, "  PASS");
+        write!(s, "  PASS\r\n");
     }
 }
 
@@ -213,9 +213,9 @@ fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
             info!("tusb322i_id{}: 0x{:x}", ix, byte);
             ix += 1;
         }
-        writeln!(s, "FAIL: TUSB322I ID");
+        write!(s, "FAIL: TUSB322I ID\r\n");
     } else {
-        writeln!(s, "PASS: TUSB322I ID");
+        write!(s, "PASS: TUSB322I ID\r\n");
     }
 }
 
@@ -223,9 +223,9 @@ fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
 {
     let touch = pmod.touch();
     if pmod.touch_err() != 0 {
-        writeln!(s, "FAIL: TOUCH IC NAK");
+        write!(s, "FAIL: TOUCH IC NAK\r\n");
     } else {
-        writeln!(s, "PASS: TOUCH IC");
+        write!(s, "PASS: TOUCH IC\r\n");
     }
 }
 
@@ -238,7 +238,7 @@ fn print_usb_state(s: &mut ReportString, i2cdev: &mut I2c0)
     let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x09u8]),
                                                     Operation::Read(&mut tusb322_conn_status)]);
 
-    writeln!(s, "PASS: TUSB322I state 0x{:x} (DUA={} DDC={} VF={} IS={} CD={} AS={})",
+    write!(s, "PASS: TUSB322I state 0x{:x} (DUA={} DDC={} VF={} IS={} CD={} AS={})\r\n",
           tusb322_conn_status[0],
           tusb322_conn_status[0]        & 0x1,
           (tusb322_conn_status[0] >> 1) & 0x3,
@@ -264,7 +264,7 @@ fn print_die_temperature(s: &mut ReportString, dtr: &pac::DTR0)
         106, 107, 108, 116, 120, 124, 128, 132
     ];
     let code = dtr.temperature().read().bits();
-    writeln!(s, "PASS: die_temp [code={} celsius={}]",
+    write!(s, "PASS: die_temp [code={} celsius={}]\r\n",
            code,
            code_to_celsius[code as usize]).ok();
 }
@@ -463,6 +463,23 @@ fn main() -> ! {
                 draw::draw_cal_constants(
                     &mut display, H_ACTIVE/2-128, V_ACTIVE/2+64, hue,
                     &adc_scale, &adc_zero, &dac_scale, &dac_zero);
+
+                if opts.reference.print.value == EnSerialPrint::SerialOn {
+                    let mut s: String<256> = String::new();
+                    write!(s, "cal_constants = [\n\r");
+                    for ch in 0..4 {
+                        write!(s, "  [{:.4}, {:.4}],\n\r",
+                              adc_scale[ch as usize] as f32 / 32768f32,
+                              adc_zero[ch as usize] as f32 / 32768f32);
+                    }
+                    for ch in 0..4 {
+                        write!(s, "  [{:.4}, {:.4}],\n\r",
+                              dac_scale[ch as usize] as f32 / 32768f32,
+                              dac_zero[ch as usize] as f32 / 32768f32);
+                    }
+                    write!(s, "]\n\r");
+                    log::info!("{}", s);
+                }
             }
 
         }
