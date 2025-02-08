@@ -330,10 +330,15 @@ class I2SCalibrator(wiring.Component):
         # Execute write to calibration memory (in audio domain)
         with m.If(cal_write_en_audio):
             m.d.audio += [
-                cal_write.addr.eq(cal_write_payload_audio.channel),
                 cal_write.data.eq(Cat(cal_write_payload_audio.a, cal_write_payload_audio.b)),
                 cal_write.en.eq(1),
             ]
+            # TODO: CLEANUP DAC cal channel off-by-one should be unnecessary!
+            with m.If(cal_write_payload_audio.channel < 4):
+                m.d.audio += cal_write.addr.eq(cal_write_payload_audio.channel)
+            with m.Else():
+                m.d.audio += cal_write.addr.eq(
+                        Mux(cal_write_payload_audio.channel == 4, 7, cal_write_payload_audio.channel-1))
 
         # `valid` (hence en_audio) should be held high until we strobe `ready` in sync domain
         # detect a rising edge on en_audio and send a single `ready` strobe (1 cycle) after

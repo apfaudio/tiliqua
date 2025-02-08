@@ -42,7 +42,7 @@ impl_ui!(UI,
 
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
+pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
@@ -336,16 +336,18 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
 
+    /*
     psram_memtest(&mut timer);
     spiflash_memtest(&mut timer);
     tusb322i_id_test(&mut i2cdev);
+    */
 
     let mut display = DMADisplay {
         framebuffer_base: PSRAM_FB_BASE as *mut u32,
     };
 
     write_palette(&mut video, palette::ColorPalette::Linear);
-    video.set_persist(512);
+    video.set_persist(256);
 
     let opts = opts::Options::new();
     let app = Mutex::new(RefCell::new(App::new(opts)));
@@ -369,8 +371,9 @@ fn main() -> ! {
                                hue).ok();
             draw::draw_name(&mut display, H_ACTIVE/2, 30, hue, UI_NAME, UI_SHA).ok();
 
+            print_codec_state(&mut display, &pmod);
+
             if opts.screen.value == opts::Screen::Report {
-                print_codec_state(&mut display, &pmod);
                 print_touch_state(&mut display, &pmod);
                 print_jack_state(&mut display, &pmod);
                 print_usb_state(&mut display, &mut i2cdev);
@@ -401,11 +404,10 @@ fn main() -> ! {
                 for ch in 0..4usize {
                     pmod.write_calibration_constant(
                         4u8 + ch as u8,
-                        31785 + scale[ch] as i32, // 0.97 * 2**15
-                        983   + zero[ch] as i32   // 0.03 * 2**15
+                        31785 + 4*scale[ch] as i32, // 0.97 * 2**15
+                        983   + 4*zero[ch] as i32   // 0.03 * 2**15
                     )
                 }
-                print_codec_state(&mut display, &pmod);
             }
 
             if opts.screen.value == opts::Screen::CalAdc {
@@ -421,14 +423,24 @@ fn main() -> ! {
                     opts.caladc.scale2.value,
                     opts.caladc.scale3.value,
                 ];
+                // Linear conversion such that we can adjust our adc_readings = `A * voltage + B`
+                // as if it is `adc_readings = (voltage + delta) * gamma`, which makes it much
+                // easier to adjust the zero offset first.
+                let adc_default_scale  = -1.158f32;
+                let adc_default_offset =  0.008f32;
+                let adc_gamma_default  = 1.0f32/adc_default_scale;
+                let adc_delta_default  = -adc_default_offset/adc_default_scale;
                 for ch in 0..4usize {
+                    let adc_gamma = adc_gamma_default + 0.004*(scale[ch] as f32);
+                    let adc_delta = adc_delta_default + 0.00025*(zero[ch] as f32);
+                    let adc_scale = 32768f32 * (1.0f32/adc_gamma);
+                    let adc_delta = 32768f32 * (-adc_delta/adc_gamma);
                     pmod.write_calibration_constant(
                         ch as u8,
-                        -37945 + scale[ch] as i32, // -1.158 * 2**15
-                        262    + zero[ch] as i32   //  0.008 * 2**15
+                        adc_scale as i32,
+                        adc_delta as i32,
                     )
                 }
-                print_codec_state(&mut display, &pmod);
             }
         }
     })

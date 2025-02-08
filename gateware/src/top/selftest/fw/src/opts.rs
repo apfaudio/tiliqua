@@ -13,8 +13,8 @@ use strum_macros::{EnumIter, IntoStaticStr};
 pub enum Screen {
     Report,
     Stimulus,
-    CalDac,
     CalAdc,
+    CalDac,
 }
 
 #[derive(Clone)]
@@ -49,62 +49,62 @@ pub struct CalOptions {
 impl CalOptions {
     pub fn default() -> Self {
         Self {
-            selected: Some(0),
+            selected: None,
             zero0: NumOption {
                 name: String::from_str("zero0").unwrap(),
                 value: 0,
                 step: 1,
-                min: -1024,
-                max: 1023,
+                min: -256,
+                max: 256,
             },
             zero1: NumOption {
                 name: String::from_str("zero1").unwrap(),
                 value: 0,
                 step: 1,
-                min: -1024,
-                max: 1023,
+                min: -256,
+                max: 256,
             },
             zero2: NumOption {
                 name: String::from_str("zero2").unwrap(),
                 value: 0,
                 step: 1,
-                min: -1024,
-                max: 1023,
+                min: -256,
+                max: 256,
             },
             zero3: NumOption {
                 name: String::from_str("zero3").unwrap(),
                 value: 0,
                 step: 1,
-                min: -1024,
-                max: 1023,
+                min: -256,
+                max: 256,
             },
             scale0: NumOption {
                 name: String::from_str("scale0").unwrap(),
                 value: 0,
                 step: 1,
-                min: -1024,
-                max: 1023,
+                min: -256,
+                max: 256,
             },
             scale1: NumOption {
                 name: String::from_str("scale1").unwrap(),
                 value: 0,
                 step: 1,
-                min: -1024,
-                max: 1023,
+                min: -256,
+                max: 256,
             },
             scale2: NumOption {
                 name: String::from_str("scale2").unwrap(),
                 value: 0,
                 step: 1,
-                min: -1024,
-                max: 1023,
+                min: -256,
+                max: 256,
             },
             scale3: NumOption {
                 name: String::from_str("scale3").unwrap(),
                 value: 0,
                 step: 1,
-                min: -1024,
-                max: 1023,
+                min: -256,
+                max: 256,
             },
         }
     }
@@ -129,8 +129,8 @@ pub struct Options {
 impl_option_page!(Options,
                   (Screen::Report, report),
                   (Screen::Stimulus, stimulus),
-                  (Screen::CalDac, caldac),
-                  (Screen::CalAdc, caladc)
+                  (Screen::CalAdc, caladc),
+                  (Screen::CalDac, caldac)
                   );
 
 impl Options {
@@ -143,7 +143,7 @@ impl Options {
                 value: Screen::Report,
             },
             report: ReportOptions {
-                selected: Some(0),
+                selected: None,
                 page: NumOption{
                     name: String::from_str("page").unwrap(),
                     value: 0,
@@ -153,13 +153,13 @@ impl Options {
                 },
             },
             stimulus: StimulusOptions {
-                selected: Some(0),
+                selected: None,
                 volts: NumOption{
                     name: String::from_str("volts").unwrap(),
                     value: 0,
                     step: 1,
-                    min: -10,
-                    max: 10,
+                    min: -8,
+                    max: 8,
                 },
             },
             caldac: CalOptions::default(),
