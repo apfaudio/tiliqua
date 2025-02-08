@@ -27,6 +27,7 @@ use tiliqua_fw::*;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_lib::draw;
+use tiliqua_fw::opts::*;
 
 const TUSB322I_ADDR:  u8 = 0x47;
 
@@ -55,6 +56,51 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         //
 
         app.ui.update();
+
+        let opts_ro = app.ui.opts.clone();
+
+        if opts_ro.reference.run.value == EnAutoZero::Run {
+            let stimulus_raw = 4000 * opts_ro.reference.volts.value as i16;
+            let sample_i = app.ui.pmod.sample_i();
+            let mut deltas = [0i16; 4];
+            for ch in 0..4 {
+                let delta = (sample_i[ch] - stimulus_raw)/4;
+                if delta.abs() < 1024 {
+                    if delta > 0 {
+                        deltas[ch] = -1;
+                    } else if delta < 0 {
+                        deltas[ch] = 1;
+                    }
+                }
+            }
+            match opts_ro.reference.autozero.value {
+                AutoZero::AdcZero => {
+                    app.ui.opts.caladc.zero0.value += deltas[0];
+                    app.ui.opts.caladc.zero1.value += deltas[1];
+                    app.ui.opts.caladc.zero2.value += deltas[2];
+                    app.ui.opts.caladc.zero3.value += deltas[3];
+                }
+                AutoZero::DacZero => {
+                    app.ui.opts.caldac.zero0.value += deltas[0];
+                    app.ui.opts.caldac.zero1.value += deltas[1];
+                    app.ui.opts.caldac.zero2.value += deltas[2];
+                    app.ui.opts.caldac.zero3.value += deltas[3];
+                }
+                AutoZero::AdcScale => {
+                    app.ui.opts.caladc.scale0.value += deltas[0];
+                    app.ui.opts.caladc.scale1.value += deltas[1];
+                    app.ui.opts.caladc.scale2.value += deltas[2];
+                    app.ui.opts.caladc.scale3.value += deltas[3];
+                }
+                AutoZero::DacScale => {
+                    app.ui.opts.caldac.scale0.value += deltas[0];
+                    app.ui.opts.caldac.scale1.value += deltas[1];
+                    app.ui.opts.caldac.scale2.value += deltas[2];
+                    app.ui.opts.caldac.scale3.value += deltas[3];
+                }
+                _ => {}
+            }
+        }
 
     });
 }
@@ -389,66 +435,62 @@ fn main() -> ! {
                 print_die_temperature(&mut display, &dtr);
             }
 
-            if opts.screen.value == opts::Screen::Reference {
+            if opts.screen.value == opts::Screen::Autocal {
                 pmod.registers.sample_o0().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
                 pmod.registers.sample_o1().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
                 pmod.registers.sample_o2().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
                 pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
             }
 
-            if opts.screen.value == opts::Screen::CalDac {
-                let zero = [
-                    opts.caldac.zero0.value,
-                    opts.caldac.zero1.value,
-                    opts.caldac.zero2.value,
-                    opts.caldac.zero3.value,
-                ];
-                let scale = [
-                    opts.caldac.scale0.value,
-                    opts.caldac.scale1.value,
-                    opts.caldac.scale2.value,
-                    opts.caldac.scale3.value,
-                ];
-                for ch in 0..4usize {
-                    pmod.write_calibration_constant(
-                        4u8 + ch as u8,
-                        32725 + 4*scale[ch] as i32,
-                        983   + 4*zero[ch] as i32
-                    )
-                }
+            let zero = [
+                opts.caldac.zero0.value,
+                opts.caldac.zero1.value,
+                opts.caldac.zero2.value,
+                opts.caldac.zero3.value,
+            ];
+            let scale = [
+                opts.caldac.scale0.value,
+                opts.caldac.scale1.value,
+                opts.caldac.scale2.value,
+                opts.caldac.scale3.value,
+            ];
+            for ch in 0..4usize {
+                pmod.write_calibration_constant(
+                    4u8 + ch as u8,
+                    32725 + 4*scale[ch] as i32,
+                    983   + 2*zero[ch] as i32 // FIXME 2x/4x
+                )
             }
 
-            if opts.screen.value == opts::Screen::CalAdc {
-                let zero = [
-                    opts.caladc.zero0.value,
-                    opts.caladc.zero1.value,
-                    opts.caladc.zero2.value,
-                    opts.caladc.zero3.value,
-                ];
-                let scale = [
-                    opts.caladc.scale0.value,
-                    opts.caladc.scale1.value,
-                    opts.caladc.scale2.value,
-                    opts.caladc.scale3.value,
-                ];
-                // Linear conversion such that we can adjust our adc_readings = `A * voltage + B`
-                // as if it is `adc_readings = (voltage + delta) * gamma`, which makes it much
-                // easier to adjust the zero offset first.
-                let adc_default_scale  = -1.158f32;
-                let adc_default_offset =  0.008f32;
-                let adc_gamma_default  = 1.0f32/adc_default_scale - 0.00025*75f32;
-                let adc_delta_default  = -adc_default_offset/adc_default_scale;
-                for ch in 0..4usize {
-                    let adc_gamma = adc_gamma_default + 0.00025*(scale[ch] as f32);
-                    let adc_delta = adc_delta_default + 0.00025*(zero[ch] as f32);
-                    let adc_scale = 32768f32 * (1.0f32/adc_gamma);
-                    let adc_delta = 32768f32 * (-adc_delta/adc_gamma);
-                    pmod.write_calibration_constant(
-                        ch as u8,
-                        adc_scale as i32,
-                        adc_delta as i32,
-                    )
-                }
+            let zero = [
+                opts.caladc.zero0.value,
+                opts.caladc.zero1.value,
+                opts.caladc.zero2.value,
+                opts.caladc.zero3.value,
+            ];
+            let scale = [
+                opts.caladc.scale0.value,
+                opts.caladc.scale1.value,
+                opts.caladc.scale2.value,
+                opts.caladc.scale3.value,
+            ];
+            // Linear conversion such that we can adjust our adc_readings = `A * voltage + B`
+            // as if it is `adc_readings = (voltage + delta) * gamma`, which makes it much
+            // easier to adjust the zero offset first.
+            let adc_default_scale  = -1.158f32;
+            let adc_default_offset =  0.008f32;
+            let adc_gamma_default  = 1.0f32/adc_default_scale - 0.00025*75f32;
+            let adc_delta_default  = -adc_default_offset/adc_default_scale;
+            for ch in 0..4usize {
+                let adc_gamma = adc_gamma_default + 0.00010*(scale[ch] as f32);
+                let adc_delta = adc_delta_default + 0.00005*(zero[ch] as f32);
+                let adc_scale = 32768f32 * (1.0f32/adc_gamma);
+                let adc_delta = 32768f32 * (-adc_delta/adc_gamma);
+                pmod.write_calibration_constant(
+                    ch as u8,
+                    adc_scale as i32,
+                    adc_delta as i32,
+                )
             }
         }
     })

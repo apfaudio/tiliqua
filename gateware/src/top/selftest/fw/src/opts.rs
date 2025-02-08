@@ -12,18 +12,36 @@ use strum_macros::{EnumIter, IntoStaticStr};
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Screen {
     Report,
-    Reference,
+    Autocal,
     CalAdc,
     CalDac,
 }
 
-#[derive(Clone)]
-pub struct ReferenceOptions {
-    pub selected: Option<usize>,
-    pub volts: NumOption<i8>,
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
+pub enum AutoZero {
+    AdcZero,
+    DacZero,
+    AdcScale,
+    DacScale,
 }
 
-impl_option_view!(ReferenceOptions, volts);
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
+pub enum EnAutoZero {
+    Stop,
+    Run,
+}
+
+#[derive(Clone)]
+pub struct AutocalOptions {
+    pub selected: Option<usize>,
+    pub volts: NumOption<i8>,
+    pub autozero: EnumOption<AutoZero>,
+    pub run: EnumOption<EnAutoZero>,
+}
+
+impl_option_view!(AutocalOptions, volts, autozero, run);
 
 #[derive(Clone)]
 pub struct ReportOptions {
@@ -121,14 +139,14 @@ pub struct Options {
     pub screen: EnumOption<Screen>,
 
     pub report: ReportOptions,
-    pub reference: ReferenceOptions,
+    pub reference: AutocalOptions,
     pub caldac: CalOptions,
     pub caladc: CalOptions,
 }
 
 impl_option_page!(Options,
                   (Screen::Report, report),
-                  (Screen::Reference, reference),
+                  (Screen::Autocal, reference),
                   (Screen::CalAdc, caladc),
                   (Screen::CalDac, caldac)
                   );
@@ -152,7 +170,7 @@ impl Options {
                     max: 0,
                 },
             },
-            reference: ReferenceOptions {
+            reference: AutocalOptions {
                 selected: None,
                 volts: NumOption{
                     name: String::from_str("volts").unwrap(),
@@ -160,6 +178,14 @@ impl Options {
                     step: 1,
                     min: -8,
                     max: 8,
+                },
+                autozero: EnumOption{
+                    name: String::from_str("set").unwrap(),
+                    value: AutoZero::AdcZero,
+                },
+                run: EnumOption{
+                    name: String::from_str("autozero").unwrap(),
+                    value: EnAutoZero::Stop,
                 },
             },
             caldac: CalOptions::default(),
