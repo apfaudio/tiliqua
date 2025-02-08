@@ -219,6 +219,73 @@ where
     Ok(())
 }
 
+pub fn draw_cal<D>(d: &mut D, x: u32, y: u32, hue: u8, dac: &[i16; 4], adc: &[i16; 4]) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = Gray8>,
+{
+    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
+    let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
+    let stroke_grey = PrimitiveStyleBuilder::new()
+           .stroke_color(Gray8::new(0xA0 + hue))
+           .stroke_width(1)
+           .build();
+    let stroke_white = PrimitiveStyleBuilder::new()
+           .stroke_color(Gray8::new(0xF0 + hue))
+           .stroke_width(2)
+           .build();
+
+    let line = |disp: &mut D, x1: u32, y1: u32, x2: u32, y2: u32, hl: bool| {
+        Line::new(Point::new((x+x1) as i32, (y+y1) as i32),
+                  Point::new((x+x2) as i32, (y+y2) as i32))
+                  .into_styled(if hl { stroke_white } else { stroke_grey } )
+                  .draw(disp).ok()
+    };
+
+    let spacing = 30;
+    let s_y     = spacing;
+    let width   = 256;
+
+    for ch in 0..4 {
+        line(d, 0, s_y+ch*spacing, width, s_y+ch*spacing, false);
+        line(d, 0, ch*spacing+s_y/2, 0, s_y+ch*spacing, false);
+        line(d, width, ch*spacing+s_y/2, width, s_y+ch*spacing, false);
+        line(d, width/2, ch*spacing+s_y-spacing/2, width/2, s_y+ch*spacing, false);
+        let delta = (adc[ch as usize] - dac[ch as usize]) / 4;
+        if delta.abs() < (width/2) as i16 {
+            let pos = (delta + (width/2) as i16) as u32;
+            line(d, pos, ch*spacing+s_y-spacing/4, pos, s_y+ch*spacing, true);
+        }
+
+        let mut adc_text: String<8> = String::new();
+        write!(adc_text, "{}", adc[ch as usize]/4);
+        Text::with_alignment(
+            &adc_text,
+            Point::new((x-10) as i32, (y+(ch+1)*spacing) as i32),
+            font_small_grey,
+            Alignment::Right
+        ).draw(d)?;
+
+        let mut dac_text: String<8> = String::new();
+        write!(dac_text, "{}", dac[ch as usize]/4);
+        Text::with_alignment(
+            &dac_text,
+            Point::new((x+width+10) as i32, (y+(ch+1)*spacing) as i32),
+            font_small_grey,
+            Alignment::Left
+        ).draw(d)?;
+    }
+
+    Text::with_alignment(
+        "in (ADC, mV)             delta           ref (DAC mV)",
+        Point::new((x+width/2) as i32, y as i32),
+        font_small_white,
+        Alignment::Center
+    ).draw(d)?;
+
+
+    Ok(())
+}
+
 pub fn draw_tiliqua<D>(d: &mut D, x: u32, y: u32, hue: u8,
                        str_l: [&str; 8], str_r: [&str; 6], text_title: &str, text_desc: &str) -> Result<(), D::Error>
 where
@@ -650,6 +717,7 @@ mod tests {
                        12, 127, 0).ok();
         }
 
+        /*
         draw_tiliqua(&mut disp, H_ACTIVE/2-80, V_ACTIVE/2-200, 0,
             [
             //  "touch  jack "
@@ -689,6 +757,11 @@ mod tests {
             FM effects.\n\
             ",
             ).ok();
+        */
+
+        draw_cal(&mut disp, H_ACTIVE/2-128, V_ACTIVE/2-128, 0,
+                 &[4096, 4096, 4096, 4096],
+                 &[4000, 4120, 4090, 4000]);
 
         draw_name(&mut disp, H_ACTIVE/2, 30, 0, "MACRO-OSC", "b2d3aa").ok();
 

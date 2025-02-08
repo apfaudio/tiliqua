@@ -355,6 +355,8 @@ fn main() -> ! {
 
     handler!(timer0 = || timer0_handler(&app));
 
+
+
     irq::scope(|s| {
 
         s.register(handlers::Interrupt::TIMER0, timer0);
@@ -367,11 +369,18 @@ fn main() -> ! {
                 let app = app.borrow_ref(cs);
                 app.ui.opts.clone()
             });
+
+            let mut stimulus_raw = 4000 * opts.reference.volts.value as i16;
+
             draw::draw_options(&mut display, &opts, H_ACTIVE/2-30, 70,
                                hue).ok();
             draw::draw_name(&mut display, H_ACTIVE/2, 30, hue, UI_NAME, UI_SHA).ok();
 
-            print_codec_state(&mut display, &pmod);
+            draw::draw_cal(&mut display, H_ACTIVE/2-128, V_ACTIVE/2-128, hue,
+                           &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
+                           &pmod.sample_i());
+
+            //print_codec_state(&mut display, &pmod);
 
             if opts.screen.value == opts::Screen::Report {
                 print_touch_state(&mut display, &pmod);
@@ -380,12 +389,11 @@ fn main() -> ! {
                 print_die_temperature(&mut display, &dtr);
             }
 
-            if opts.screen.value == opts::Screen::Stimulus {
-                let v = (4096 * opts.stimulus.volts.value as i16) as u16;
-                pmod.registers.sample_o0().write(|w| unsafe { w.sample().bits(v) } );
-                pmod.registers.sample_o1().write(|w| unsafe { w.sample().bits(v) } );
-                pmod.registers.sample_o2().write(|w| unsafe { w.sample().bits(v) } );
-                pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(v) } );
+            if opts.screen.value == opts::Screen::Reference {
+                pmod.registers.sample_o0().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
+                pmod.registers.sample_o1().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
+                pmod.registers.sample_o2().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
+                pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
             }
 
             if opts.screen.value == opts::Screen::CalDac {
@@ -431,7 +439,7 @@ fn main() -> ! {
                 let adc_gamma_default  = 1.0f32/adc_default_scale;
                 let adc_delta_default  = -adc_default_offset/adc_default_scale;
                 for ch in 0..4usize {
-                    let adc_gamma = adc_gamma_default + 0.004*(scale[ch] as f32);
+                    let adc_gamma = adc_gamma_default + 0.00025*(scale[ch] as f32);
                     let adc_delta = adc_delta_default + 0.00025*(zero[ch] as f32);
                     let adc_scale = 32768f32 * (1.0f32/adc_gamma);
                     let adc_delta = 32768f32 * (-adc_delta/adc_gamma);

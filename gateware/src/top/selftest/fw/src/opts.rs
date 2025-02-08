@@ -12,18 +12,18 @@ use strum_macros::{EnumIter, IntoStaticStr};
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Screen {
     Report,
-    Stimulus,
+    Reference,
     CalAdc,
     CalDac,
 }
 
 #[derive(Clone)]
-pub struct StimulusOptions {
+pub struct ReferenceOptions {
     pub selected: Option<usize>,
     pub volts: NumOption<i8>,
 }
 
-impl_option_view!(StimulusOptions, volts);
+impl_option_view!(ReferenceOptions, volts);
 
 #[derive(Clone)]
 pub struct ReportOptions {
@@ -121,14 +121,14 @@ pub struct Options {
     pub screen: EnumOption<Screen>,
 
     pub report: ReportOptions,
-    pub stimulus: StimulusOptions,
+    pub reference: ReferenceOptions,
     pub caldac: CalOptions,
     pub caladc: CalOptions,
 }
 
 impl_option_page!(Options,
                   (Screen::Report, report),
-                  (Screen::Stimulus, stimulus),
+                  (Screen::Reference, reference),
                   (Screen::CalAdc, caladc),
                   (Screen::CalDac, caldac)
                   );
@@ -152,7 +152,7 @@ impl Options {
                     max: 0,
                 },
             },
-            stimulus: StimulusOptions {
+            reference: ReferenceOptions {
                 selected: None,
                 volts: NumOption{
                     name: String::from_str("volts").unwrap(),
