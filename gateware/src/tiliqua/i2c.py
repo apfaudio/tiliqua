@@ -316,6 +316,7 @@ class Peripheral(wiring.Component):
             self._status.f.full.r_data.eq(~self.i2c_stream.i.ready),
             self._status.f.error.r_data.eq(self.i2c_stream.status.error),
 
+            # TODO: stick after w_stb until READY
             self.i2c_stream.i.valid.eq(self._transaction_reg.element.w_stb),
             self.i2c_stream.i.payload.last.eq(self._transaction_reg.f.last.w_data),
             self.i2c_stream.i.payload.rw.eq(self._transaction_reg.f.rw.w_data),

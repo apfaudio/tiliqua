@@ -722,7 +722,8 @@ class I2CMaster(wiring.Component):
 
             with m.State("I2C-OVERRIDE-WAIT"):
                 wiring.connect(m, wiring.flipped(self.i2c_override), i2c)
-                with m.If(~i2c.status.busy):
+                # look at IN PROGRESS transactions
+                with m.If(~i2c.status.busy & ~i2c.i.valid & i2c.done):
                     m.next = s_loop_begin
 
         return m

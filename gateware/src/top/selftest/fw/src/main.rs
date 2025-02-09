@@ -216,6 +216,18 @@ fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
     }
 }
 
+fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) {
+    let mut eeprom_id: [u8; 6] = [0; 6];
+    let _ = i2cdev.transaction(0x50, &mut [Operation::Write(&[0xFAu8]),
+                                           Operation::Read(&mut eeprom_id)]);
+    let mut ix = 0;
+    for byte in eeprom_id {
+        info!("eeprom_id{}: 0x{:x}", ix, byte);
+        ix += 1;
+    }
+    write!(s, "PASS: EEPROM ID\r\n").ok();
+}
+
 fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
 {
     if pmod.touch_err() != 0 {
@@ -307,10 +319,12 @@ fn main() -> ! {
     info!("Hello from Tiliqua selftest!");
 
     let mut i2cdev = I2c0::new(peripherals.I2C0);
+    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
 
     let mut report = ReportString::new();
+    eeprom_id_test(&mut report, &mut i2cdev1);
     psram_memtest(&mut report, &mut timer);
     spiflash_memtest(&mut report, &mut timer);
     tusb322i_id_test(&mut report, &mut i2cdev);
