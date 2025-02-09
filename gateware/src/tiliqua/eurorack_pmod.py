@@ -368,6 +368,9 @@ class I2CMaster(wiring.Component):
     This kind of stateful stuff is often best suited for a softcore rather
     than pure RTL, however I wanted to make it possible to use all
     functions of the board without having to resort to using a softcore.
+
+    An SoC can optionally inject its own I2C traffic into this state machine
+    (useful for calibration and selftests) using the `i2c_override` port.
     """
 
     PCA9557_ADDR     = 0x18
@@ -451,13 +454,18 @@ class I2CMaster(wiring.Component):
             "touch_err":      Out(unsigned(8)),
             # assert for at least 100msec for complete muting sequence.
             "codec_mute":     In(1),
+            # I2C override from SoC, not used unless written to.
+            "i2c_override":  In(i2c.I2CStreamerControl()),
         })
 
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.i2c_stream = i2c = self.i2c_stream
+        m.submodules.i2c_stream = self.i2c_stream
+        i2c = self.i2c_stream.control
         wiring.connect(m, wiring.flipped(self.pins), self.i2c_stream.pins)
+        l_i2c_address = Signal.like(i2c.address)
+        m.d.comb += i2c.address.eq(l_i2c_address)
 
         def state_id(ix):
             return (f"i2c_state{ix}", f"i2c_state{ix+1}", ix+1)
@@ -466,7 +474,7 @@ class I2CMaster(wiring.Component):
             # set i2c address of transactions being enqueued
             cur, nxt, ix = state_id(ix)
             with m.State(cur):
-                m.d.sync += i2c.address.eq(addr),
+                m.d.sync += l_i2c_address.eq(addr),
                 m.next = nxt
             return cur, nxt, ix
 
@@ -696,8 +704,26 @@ class I2CMaster(wiring.Component):
                         m.d.sync += mute_count.eq(mute_count+1)
                 with m.Else():
                     m.d.sync += mute_count.eq(0)
-                # Go back to LED brightness update
-                m.next = s_loop_begin
+                with m.If(self.i2c_override.i.valid):
+                    # Pending transaction from SoC?
+                    m.next = "I2C-OVERRIDE"
+                with m.Else():
+                    # Go back to LED brightness update
+                    m.next = s_loop_begin
+
+            #
+            # I2C OVERRIDE
+            # Issue transaction from SoC, then go back to ordinary state machine.
+            #
+
+            with m.State("I2C-OVERRIDE"):
+                wiring.connect(m, wiring.flipped(self.i2c_override), i2c)
+                m.next = "I2C-OVERRIDE-WAIT"
+
+            with m.State("I2C-OVERRIDE-WAIT"):
+                wiring.connect(m, wiring.flipped(self.i2c_override), i2c)
+                with m.If(~i2c.status.busy):
+                    m.next = s_loop_begin
 
         return m
 
@@ -734,6 +760,7 @@ class EurorackPmod(wiring.Component):
     def __init__(self, hardware_r33=True, touch_enabled=True, audio_192=False):
         self.audio_192 = audio_192
         self.i2stdm = I2STDM(audio_192=self.audio_192)
+        self.i2c_master = I2CMaster(audio_192=self.audio_192)
         self.calibrator = I2SCalibrator()
         super().__init__()
 
@@ -765,7 +792,7 @@ class EurorackPmod(wiring.Component):
         # I2C MASTER CONTROL
         #
 
-        m.submodules.i2c_master = i2c_master = I2CMaster(audio_192=self.audio_192)
+        m.submodules.i2c_master = i2c_master = self.i2c_master
 
         # Hook up I2C master pins
         wiring.connect(m, i2c_master.pins, wiring.flipped(self.pins.i2c))
