@@ -35,9 +35,10 @@ pub enum EnAutoZero {
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
-pub enum EnSerialPrint {
-    Off,
-    SerialOn,
+pub enum EnWrite {
+    WriteD,
+    Turn,
+    WriteU,
 }
 
 #[derive(Clone)]
@@ -46,10 +47,10 @@ pub struct AutocalOptions {
     pub volts: NumOption<i8>,
     pub autozero: EnumOption<AutoZero>,
     pub run: EnumOption<EnAutoZero>,
-    pub print: EnumOption<EnSerialPrint>,
+    pub write: EnumOption<EnWrite>,
 }
 
-impl_option_view!(AutocalOptions, volts, autozero, run, print);
+impl_option_view!(AutocalOptions, volts, autozero, run, write);
 
 #[derive(Clone)]
 pub struct StartupReportOptions {
@@ -195,9 +196,9 @@ impl Options {
                     name: String::from_str("autozero").unwrap(),
                     value: EnAutoZero::Stop,
                 },
-                print: EnumOption{
-                    name: String::from_str("print").unwrap(),
-                    value: EnSerialPrint::Off,
+                write: EnumOption{
+                    name: String::from_str("write").unwrap(),
+                    value: EnWrite::Turn,
                 },
             },
             caldac: CalOptions::default(),

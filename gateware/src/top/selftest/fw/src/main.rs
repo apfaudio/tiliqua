@@ -218,22 +218,10 @@ fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
 }
 
 fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) {
-    /*
-    let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x00u8, 0x42])]);
-    info!("err {:?}", err);
-    info!("err {:?}", err);
-    info!("err {:?}", err);
-    info!("err {:?}", err);
-    info!("err {:?}", err);
-    info!("err {:?}", err);
-    info!("err {:?}", err);
-    info!("err {:?}", err);
-    info!("err {:?}", err);
-    */
     let mut eeprom_id: [u8; 4] = [0; 4];
     let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x00u8]),
                                              Operation::Read(&mut eeprom_id)]);
-    info!("err {:?}", err);
+    info!("eeprom_err {:?}", err);
     let mut ix = 0;
     for byte in eeprom_id {
         info!("eeprom_id{}: 0x{:x}", ix, byte);
@@ -567,17 +555,6 @@ fn main() -> ! {
         CalibrationConstants::default().push_to_opts(&mut opts);
     }
 
-    /*
-    er.write_to_eeprom(&mut i2cdev1);
-    info!("DELAY");
-    info!("DELAY");
-    info!("DELAY");
-    info!("DELAY");
-    info!("DELAY");
-    info!("READDDD {:?}", CalibrationConstants::from_eeprom(&mut i2cdev1));
-    */
-
-
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 10;
 
@@ -591,9 +568,14 @@ fn main() -> ! {
                               pac::Interrupt::TIMER0);
 
         loop {
-            let opts = critical_section::with(|cs| {
-                let app = app.borrow_ref(cs);
-                app.ui.opts.clone()
+            let (opts, commit_to_eeprom) = critical_section::with(|cs| {
+                let mut app = app.borrow_ref_mut(cs);
+                let mut commit_to_eeprom = false;
+                if app.ui.opts.reference.write.value != EnWrite::Turn {
+                    commit_to_eeprom = true;
+                    app.ui.opts.reference.write.value = EnWrite::Turn;
+                }
+                (app.ui.opts.clone(), commit_to_eeprom)
             });
 
             let stimulus_raw = 4000 * opts.reference.volts.value as i16;
@@ -649,7 +631,7 @@ fn main() -> ! {
                     &mut display, H_ACTIVE/2-128, V_ACTIVE/2+64, hue,
                     &constants.adc_scale, &constants.adc_zero, &constants.dac_scale, &constants.dac_zero).ok();
 
-                if opts.reference.print.value == EnSerialPrint::SerialOn {
+                if commit_to_eeprom {
                     let mut s: String<256> = String::new();
                     write!(s, "cal_constants = [\n\r").ok();
                     for ch in 0..4 {
