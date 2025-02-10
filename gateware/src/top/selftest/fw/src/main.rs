@@ -307,6 +307,22 @@ impl CalibrationConstants {
     }
 
     fn write_to_eeprom(&self, i2cdev: &mut I2c1) {
+        // Print the calibration constants in amaranth-friendly format.
+        let mut s: String<256> = String::new();
+        write!(s, "[\n\r").ok();
+        for ch in 0..4 {
+            write!(s, "  [{:.4}, {:.4}],\n\r",
+                   fx18tof32(self.adc_scale[ch as usize]),
+                   fx18tof32(self.adc_zero[ch as usize])).ok();
+        }
+        for ch in 0..4 {
+            write!(s, "  [{:.4}, {:.4}],\n\r",
+                   fx18tof32(self.dac_scale[ch as usize]),
+                   fx18tof32(self.dac_zero[ch as usize])).ok();
+        }
+        write!(s, "]\n\r").ok();
+        log::info!("[write to eeprom] cal_constants = {}", s);
+        // Commit to eeprom
         let mut constants = [0i32; 8*2+1];
         for ch in 0..4usize {
             constants[2*ch+0]   = self.adc_scale[ch];
@@ -320,12 +336,14 @@ impl CalibrationConstants {
             tx_bytes[0] = (4*n) as u8; // 4 bytes storage per constant
             tx_bytes[1..5].clone_from_slice(&constants[n].to_le_bytes());
             loop {
+                // TODO: add timeouts!
                 match i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&tx_bytes)]) {
                     Ok(_) => break,
                     _ => {}
                 }
             }
         }
+        log::info!("[write to eeprom] complete");
     }
 
     fn write_to_pmod(&self, pmod: &mut EurorackPmod0) {
@@ -632,21 +650,8 @@ fn main() -> ! {
                     &constants.adc_scale, &constants.adc_zero, &constants.dac_scale, &constants.dac_zero).ok();
 
                 if commit_to_eeprom {
-                    let mut s: String<256> = String::new();
-                    write!(s, "cal_constants = [\n\r").ok();
-                    for ch in 0..4 {
-                        write!(s, "  [{:.4}, {:.4}],\n\r",
-                              constants.adc_scale[ch as usize] as f32 / 32768f32,
-                              constants.adc_zero[ch as usize] as f32 / 32768f32).ok();
-                    }
-                    for ch in 0..4 {
-                        write!(s, "  [{:.4}, {:.4}],\n\r",
-                              constants.dac_scale[ch as usize] as f32 / 32768f32,
-                              constants.dac_zero[ch as usize] as f32 / 32768f32).ok();
-                    }
-                    write!(s, "]\n\r").ok();
-                    log::info!("{}", s);
                     constants.write_to_eeprom(&mut i2cdev1);
+                    draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE/2+64, hue, &"SAVED", &"").ok();
                 }
             }
 
