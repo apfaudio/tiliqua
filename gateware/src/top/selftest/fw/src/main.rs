@@ -29,6 +29,7 @@ use tiliqua_lib::draw;
 use tiliqua_fw::opts::*;
 
 const TUSB322I_ADDR:  u8 = 0x47;
+const EEPROM_ADDR:    u8 = 0x52;
 
 use opts::Options;
 use hal::pca9635::Pca9635Driver;
@@ -217,9 +218,21 @@ fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
 }
 
 fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) {
-    let mut eeprom_id: [u8; 6] = [0; 6];
-    let err = i2cdev.transaction(0x52, &mut [Operation::Write(&[0xFAu8]),
-                                           Operation::Read(&mut eeprom_id)]);
+    /*
+    let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x00u8, 0x42])]);
+    info!("err {:?}", err);
+    info!("err {:?}", err);
+    info!("err {:?}", err);
+    info!("err {:?}", err);
+    info!("err {:?}", err);
+    info!("err {:?}", err);
+    info!("err {:?}", err);
+    info!("err {:?}", err);
+    info!("err {:?}", err);
+    */
+    let mut eeprom_id: [u8; 4] = [0; 4];
+    let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x00u8]),
+                                             Operation::Read(&mut eeprom_id)]);
     info!("err {:?}", err);
     let mut ix = 0;
     for byte in eeprom_id {
@@ -228,6 +241,97 @@ fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) {
     }
     write!(s, "PASS: EEPROM ID\r\n").ok();
 }
+
+#[derive(Debug)]
+struct CalibrationConstants {
+    adc_scale: [i32; 4],
+    adc_zero:  [i32; 4],
+    dac_scale: [i32; 4],
+    dac_zero:  [i32; 4],
+    checksum:  i32,
+}
+
+impl CalibrationConstants {
+    fn default() -> Self {
+        let adc_dscale = -37139i32;
+        let adc_dzero  =    256i32;
+        let dac_dscale =  32725i32;
+        let dac_dzero  =    983i32;
+        let mut result = Self {
+            adc_scale: [adc_dscale; 4],
+            adc_zero:  [adc_dzero;  4],
+            dac_scale: [dac_dscale; 4],
+            dac_zero:  [dac_dzero;  4],
+            checksum:  0i32,
+        };
+        result.checksum = result.compute_checksum();
+        result
+    }
+
+    fn compute_checksum(&self) -> i32 {
+        let mut sum = 0i32;
+        for n in 0..4 {
+            sum += self.adc_scale[n] + self.adc_zero[n] + self.dac_scale[n] + self.dac_zero[n]
+        }
+        sum
+    }
+
+    fn from_eeprom(i2cdev: &mut I2c1) -> Option<Self> {
+        let mut constants = [0i32; 8*2+1];
+        for n in 0..constants.len() {
+            let mut rx_bytes = [0u8; 4];
+            let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[(n*4) as u8]),
+                                                            Operation::Read(&mut rx_bytes)]);
+            constants[n] = i32::from_le_bytes(rx_bytes);
+            info!("from_eeprom n={} err={:?} constant={}", n, err, constants[n]);
+        }
+
+        let mut result = Self {
+            adc_scale: [0i32; 4],
+            adc_zero:  [0i32; 4],
+            dac_scale: [0i32; 4],
+            dac_zero:  [0i32; 4],
+            checksum:  0i32,
+        };
+
+        for ch in 0..4usize {
+            result.adc_scale[ch] = constants[2*ch+0];
+            result.adc_zero[ch]  = constants[2*ch+1];
+            result.dac_scale[ch] = constants[2*ch+8+0];
+            result.dac_zero[ch]  = constants[2*ch+8+1];
+        }
+
+        result.checksum = constants[constants.len()-1];
+        if result.compute_checksum() == result.checksum {
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    fn write_to_eeprom(&self, i2cdev: &mut I2c1) {
+        let mut constants = [0i32; 8*2+1];
+        for ch in 0..4usize {
+            constants[2*ch+0]   = self.adc_scale[ch];
+            constants[2*ch+1]   = self.adc_zero[ch];
+            constants[2*ch+8+0] = self.dac_scale[ch];
+            constants[2*ch+8+1] = self.dac_zero[ch];
+        }
+        constants[constants.len()-1] = self.compute_checksum();
+        for n in 0..constants.len() {
+            let mut tx_bytes = [0u8; 5];
+            tx_bytes[0] = (4*n) as u8; // 4 bytes storage per constant
+            tx_bytes[1..5].clone_from_slice(&constants[n].to_le_bytes());
+            loop {
+                match i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&tx_bytes)]) {
+                    Ok(_) => break,
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
 
 fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
 {
@@ -323,6 +427,15 @@ fn main() -> ! {
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
+
+    let er = CalibrationConstants::default();
+    er.write_to_eeprom(&mut i2cdev1);
+    info!("DELAY");
+    info!("DELAY");
+    info!("DELAY");
+    info!("DELAY");
+    info!("DELAY");
+    info!("READDDD {:?}", CalibrationConstants::from_eeprom(&mut i2cdev1));
 
     let mut report = ReportString::new();
     eeprom_id_test(&mut report, &mut i2cdev1);
