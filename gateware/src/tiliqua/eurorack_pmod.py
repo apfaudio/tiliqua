@@ -373,10 +373,11 @@ class I2CMaster(wiring.Component):
     (useful for calibration and selftests) using the `i2c_override` port.
     """
 
-    PCA9557_ADDR     = 0x18
-    PCA9635_ADDR     = 0x5
-    AK4619VN_ADDR    = 0x10
-    CY8CMBR3108_ADDR = 0x37
+    PCA9557_ADDR        = 0x18
+    PCA9635_ADDR        = 0x5
+    AK4619VN_ADDR       = 0x10
+    CY8CMBR3108_ADDR    = 0x37
+    EEPROM_24AA025_ADDR = 0x52
 
     N_JACKS   = 8
     N_LEDS    = N_JACKS * 2
@@ -722,8 +723,8 @@ class I2CMaster(wiring.Component):
 
             with m.State("I2C-OVERRIDE-WAIT"):
                 wiring.connect(m, wiring.flipped(self.i2c_override), i2c)
-                # look at IN PROGRESS transactions
-                with m.If(~i2c.status.busy & ~i2c.i.valid & i2c.done):
+                # Single transaction has been executed.
+                with m.If(i2c.status.tx_empty & i2c.status.rx_empty & ~i2c.status.busy):
                     m.next = s_loop_begin
 
         return m

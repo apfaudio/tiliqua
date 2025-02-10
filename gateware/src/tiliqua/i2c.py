@@ -39,6 +39,8 @@ class I2CStreamerTransaction(data.Struct):
     data: unsigned(8)
 
 class I2CStreamerStatus(data.Struct):
+    tx_empty: unsigned(1)
+    rx_empty: unsigned(1)
     busy:  unsigned(1)
     error: unsigned(1)
 
@@ -99,8 +101,8 @@ class I2CStreamer(wiring.Component):
         current_transaction_rw = Signal()
 
         err  = Signal()
-        done = Signal()
-        m.d.comb += done.eq(self._transactions.level == 0)
+        m.d.comb += self.control.status.tx_empty.eq(self._transactions.level == 0)
+        m.d.comb += self.control.status.rx_empty.eq(self._rx_fifo.level == 0)
         m.d.comb += self.control.status.error.eq(err)
 
         with m.FSM() as fsm:
@@ -131,7 +133,7 @@ class I2CStreamer(wiring.Component):
                 with m.If(~i2c.busy):
                     with m.If(~i2c.ack_o):
                         m.next = "ABORT"
-                    with m.Elif(done):
+                    with m.Elif(self.control.status.tx_empty):
                         # zero-length transaction
                         m.next = "FINISH"
                     with m.Elif(current_transaction_rw != tx.rw):
@@ -157,7 +159,7 @@ class I2CStreamer(wiring.Component):
                         self._rx_fifo.w_data.eq(i2c.data_o),
                         self._rx_fifo.w_en.eq(1),
                     ]
-                    with m.If(done):
+                    with m.If(self.control.status.tx_empty):
                         m.next = "FINISH"
                     with m.Elif(tx.rw != 1):
                         m.next = "START"
@@ -177,7 +179,7 @@ class I2CStreamer(wiring.Component):
                 with m.If(~i2c.busy):
                     with m.If(~i2c.ack_o):
                         m.next = "ABORT"
-                    with m.Elif(done):
+                    with m.Elif(self.control.status.tx_empty):
                         m.next = "FINISH"
                     with m.Elif(tx.rw != 0):
                         m.next = "START"
@@ -281,7 +283,7 @@ class Peripheral(wiring.Component):
 
     class StatusReg(csr.Register, access="r"):
         busy:  csr.Field(csr.action.R, unsigned(1))
-        full:  csr.Field(csr.action.R, unsigned(1))
+        ready:  csr.Field(csr.action.R, unsigned(1))
         error: csr.Field(csr.action.R, unsigned(1))
 
     def __init__(self, **kwargs):
@@ -312,16 +314,21 @@ class Peripheral(wiring.Component):
             m.d.sync += self.i2c_stream.address.eq(self._address.f.address.w_data)
 
         m.d.comb += [
-            self._status.f.busy.r_data.eq(self.i2c_stream.status.busy),
-            self._status.f.full.r_data.eq(~self.i2c_stream.i.ready),
+            self._status.f.busy.r_data.eq(self.i2c_stream.status.busy | self.i2c_stream.i.valid),
+            self._status.f.ready.r_data.eq(self.i2c_stream.i.ready),
             self._status.f.error.r_data.eq(self.i2c_stream.status.error),
-
-            # TODO: stick after w_stb until READY
-            self.i2c_stream.i.valid.eq(self._transaction_reg.element.w_stb),
-            self.i2c_stream.i.payload.last.eq(self._transaction_reg.f.last.w_data),
-            self.i2c_stream.i.payload.rw.eq(self._transaction_reg.f.rw.w_data),
-            self.i2c_stream.i.payload.data.eq(self._transaction_reg.f.data.w_data),
         ]
+
+        with m.If(self._transaction_reg.element.w_stb):
+            m.d.sync += [
+                self.i2c_stream.i.valid.eq(1),
+                self.i2c_stream.i.payload.last.eq(self._transaction_reg.f.last.w_data),
+                self.i2c_stream.i.payload.rw.eq(self._transaction_reg.f.rw.w_data),
+                self.i2c_stream.i.payload.data.eq(self._transaction_reg.f.data.w_data),
+            ]
+
+        with m.If(self.i2c_stream.i.valid & self.i2c_stream.i.ready):
+            m.d.sync += self.i2c_stream.i.valid.eq(0)
 
         m.d.comb += [
             self._rx_data.f.data.r_data.eq(self.i2c_stream.o.payload),

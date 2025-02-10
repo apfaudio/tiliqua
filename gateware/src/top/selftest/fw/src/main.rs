@@ -218,8 +218,9 @@ fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
 
 fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) {
     let mut eeprom_id: [u8; 6] = [0; 6];
-    let _ = i2cdev.transaction(0x50, &mut [Operation::Write(&[0xFAu8]),
+    let err = i2cdev.transaction(0x52, &mut [Operation::Write(&[0xFAu8]),
                                            Operation::Read(&mut eeprom_id)]);
+    info!("err {:?}", err);
     let mut ix = 0;
     for byte in eeprom_id {
         info!("eeprom_id{}: 0x{:x}", ix, byte);
