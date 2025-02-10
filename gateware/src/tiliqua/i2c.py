@@ -112,10 +112,10 @@ class I2CStreamer(wiring.Component):
 
             with m.State('IDLE'):
                 with m.If(self.control.i.ready & self.control.i.valid & self.control.i.payload.last):
+                    m.d.sync += err.eq(0)
                     m.next = 'START'
 
             with m.State('START'):
-                m.d.sync += err.eq(0)
                 with m.If(~i2c.busy):
                     m.d.comb += i2c.start.eq(1),
                     m.next = 'SEND_DEV_ADDRESS'
@@ -316,8 +316,12 @@ class Peripheral(wiring.Component):
         m.d.comb += [
             self._status.f.busy.r_data.eq(self.i2c_stream.status.busy | self.i2c_stream.i.valid),
             self._status.f.ready.r_data.eq(self.i2c_stream.i.ready),
-            self._status.f.error.r_data.eq(self.i2c_stream.status.error),
         ]
+
+        # only if connected!
+        with m.If(self.i2c_stream.i.ready):
+            m.d.sync += self._status.f.error.r_data.eq(
+                    self.i2c_stream.status.error),
 
         with m.If(self._transaction_reg.element.w_stb):
             m.d.sync += [
