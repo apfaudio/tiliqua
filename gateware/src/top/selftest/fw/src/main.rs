@@ -251,6 +251,14 @@ struct CalibrationConstants {
     checksum:  i32,
 }
 
+fn fx18tof32(x: i32) -> f32 {
+    (x as f32) / 32768.0f32
+}
+
+fn f32tofx18(x: f32) -> i32 {
+    (x * 32768.0f32) as i32
+}
+
 impl CalibrationConstants {
     fn default() -> Self {
         let adc_dscale = -37139i32;
@@ -271,7 +279,8 @@ impl CalibrationConstants {
     fn compute_checksum(&self) -> i32 {
         let mut sum = 0i32;
         for n in 0..4 {
-            sum += self.adc_scale[n] + self.adc_zero[n] + self.dac_scale[n] + self.dac_zero[n]
+            sum += self.adc_scale[n] + self.adc_zero[n] +
+                   self.dac_scale[n] + self.dac_zero[n]
         }
         sum
     }
@@ -329,6 +338,108 @@ impl CalibrationConstants {
                 }
             }
         }
+    }
+
+    fn write_to_pmod(&self, pmod: &mut EurorackPmod0) {
+        for ch in 0..4usize {
+            pmod.write_calibration_constant(
+                ch as u8,
+                self.adc_scale[ch],
+                self.adc_zero[ch],
+            );
+            pmod.write_calibration_constant(
+                (ch+4) as u8,
+                self.dac_scale[ch],
+                self.dac_zero[ch],
+            );
+        }
+    }
+
+    fn adc_default_gamma_delta() -> (f32, f32) {
+        let defaults = Self::default();
+        let adc_gamma_default  = 1.0f32/fx18tof32(defaults.adc_scale[0]);
+        let adc_delta_default  = -fx18tof32(defaults.adc_zero[0])*adc_gamma_default;
+        (adc_gamma_default, adc_delta_default)
+    }
+
+    fn from_opts(opts: &Options) -> Self {
+        let defaults   = Self::default();
+        let mut result = Self::default();
+        // DAC
+        {
+            let zero = [
+                opts.caldac.zero0.value,
+                opts.caldac.zero1.value,
+                opts.caldac.zero2.value,
+                opts.caldac.zero3.value,
+            ];
+            let scale = [
+                opts.caldac.scale0.value,
+                opts.caldac.scale1.value,
+                opts.caldac.scale2.value,
+                opts.caldac.scale3.value,
+            ];
+            for ch in 0..4usize {
+                result.dac_scale[ch] = defaults.dac_scale[0] + 4*scale[ch] as i32;
+                result.dac_zero[ch]  = defaults.dac_zero[0]  + 2*zero[ch] as i32; // FIXME 2x/4x
+            }
+        }
+        // ADC
+        {
+            let zero = [
+                opts.caladc.zero0.value,
+                opts.caladc.zero1.value,
+                opts.caladc.zero2.value,
+                opts.caladc.zero3.value,
+            ];
+            let scale = [
+                opts.caladc.scale0.value,
+                opts.caladc.scale1.value,
+                opts.caladc.scale2.value,
+                opts.caladc.scale3.value,
+            ];
+            let (adc_gd, adc_dd) = CalibrationConstants::adc_default_gamma_delta();
+            for ch in 0..4usize {
+                let adc_gamma      = adc_gd + 0.00010*(scale[ch] as f32);
+                let adc_delta      = adc_dd + 0.00005*(zero[ch] as f32);
+                result.adc_scale[ch] = f32tofx18(1.0f32/adc_gamma);
+                result.adc_zero[ch]  = f32tofx18(-adc_delta/adc_gamma);
+            }
+        }
+        result
+    }
+
+    fn push_to_opts(&self, opts: &mut Options) {
+        let mut dac_scale = [0i16; 4];
+        let mut dac_zero  = [0i16; 4];
+        let mut adc_scale = [0i16; 4];
+        let mut adc_zero  = [0i16; 4];
+        let defaults = Self::default();
+        let (adc_gd, adc_dd) = CalibrationConstants::adc_default_gamma_delta();
+        for ch in 0..4usize {
+            let adc_gamma = 1.0f32/fx18tof32(self.adc_scale[ch]);
+            adc_scale[ch] = ((adc_gamma - adc_gd) / 0.00010) as i16;
+            let adc_delta = -fx18tof32(self.adc_zero[ch])*adc_gamma;
+            adc_zero[ch]  = ((adc_delta - adc_dd) / 0.00005) as i16;
+            dac_scale[ch] = ((self.dac_scale[ch] - defaults.dac_scale[0]) / 4) as i16;
+            dac_zero[ch]  = ((self.dac_zero[ch]  -  defaults.dac_zero[0]) / 2) as i16;
+        }
+        opts.caldac.scale0.value = dac_scale[0];
+        opts.caldac.scale1.value = dac_scale[1];
+        opts.caldac.scale2.value = dac_scale[2];
+        opts.caldac.scale3.value = dac_scale[3];
+        opts.caldac.zero0.value  = dac_zero[0];
+        opts.caldac.zero1.value  = dac_zero[1];
+        opts.caldac.zero2.value  = dac_zero[2];
+        opts.caldac.zero3.value  = dac_zero[3];
+        opts.caladc.scale0.value = adc_scale[0];
+        opts.caladc.scale1.value = adc_scale[1];
+        opts.caladc.scale2.value = adc_scale[2];
+        opts.caladc.scale3.value = adc_scale[3];
+        opts.caladc.zero0.value  = adc_zero[0];
+        opts.caladc.zero1.value  = adc_zero[1];
+        opts.caladc.zero2.value  = adc_zero[2];
+        opts.caladc.zero3.value  = adc_zero[3];
     }
 }
 
@@ -428,15 +539,6 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
 
-    let er = CalibrationConstants::default();
-    er.write_to_eeprom(&mut i2cdev1);
-    info!("DELAY");
-    info!("DELAY");
-    info!("DELAY");
-    info!("DELAY");
-    info!("DELAY");
-    info!("READDDD {:?}", CalibrationConstants::from_eeprom(&mut i2cdev1));
-
     let mut report = ReportString::new();
     eeprom_id_test(&mut report, &mut i2cdev1);
     psram_memtest(&mut report, &mut timer);
@@ -457,7 +559,25 @@ fn main() -> ! {
     write_palette(&mut video, palette::ColorPalette::Linear);
     video.set_persist(256);
 
-    let opts = opts::Options::new();
+    let mut opts = opts::Options::new();
+
+    if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
+        cal_constants.push_to_opts(&mut opts);
+    } else {
+        CalibrationConstants::default().push_to_opts(&mut opts);
+    }
+
+    /*
+    er.write_to_eeprom(&mut i2cdev1);
+    info!("DELAY");
+    info!("DELAY");
+    info!("DELAY");
+    info!("DELAY");
+    info!("DELAY");
+    info!("READDDD {:?}", CalibrationConstants::from_eeprom(&mut i2cdev1));
+    */
+
+
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 10;
 
@@ -516,69 +636,10 @@ fn main() -> ! {
             }
 
             //
-            // DAC calibration constants
+            // Push calibration constants to audio interface
             //
-
-            let zero = [
-                opts.caldac.zero0.value,
-                opts.caldac.zero1.value,
-                opts.caldac.zero2.value,
-                opts.caldac.zero3.value,
-            ];
-            let scale = [
-                opts.caldac.scale0.value,
-                opts.caldac.scale1.value,
-                opts.caldac.scale2.value,
-                opts.caldac.scale3.value,
-            ];
-            let mut dac_scale = [0i32; 4];
-            let mut dac_zero  = [0i32; 4];
-            for ch in 0..4usize {
-                dac_scale[ch] = 32725 + 4*scale[ch] as i32;
-                dac_zero[ch]  = 983 + 2*zero[ch] as i32; // FIXME 2x/4x
-                pmod.write_calibration_constant(
-                    4u8 + ch as u8,
-                    dac_scale[ch],
-                    dac_zero[ch],
-                )
-            }
-
-            //
-            // ADC calibration constants
-            //
-
-            let zero = [
-                opts.caladc.zero0.value,
-                opts.caladc.zero1.value,
-                opts.caladc.zero2.value,
-                opts.caladc.zero3.value,
-            ];
-            let scale = [
-                opts.caladc.scale0.value,
-                opts.caladc.scale1.value,
-                opts.caladc.scale2.value,
-                opts.caladc.scale3.value,
-            ];
-            // Linear conversion such that we can adjust our adc_readings = `A * voltage + B`
-            // as if it is `adc_readings = (voltage + delta) * gamma`, which makes it much
-            // easier to adjust the zero offset first.
-            let adc_default_scale  = -1.158f32;
-            let adc_default_offset =  0.008f32;
-            let adc_gamma_default  = 1.0f32/adc_default_scale - 0.00025*75f32;
-            let adc_delta_default  = -adc_default_offset/adc_default_scale;
-            let mut adc_scale = [0i32; 4];
-            let mut adc_zero  = [0i32; 4];
-            for ch in 0..4usize {
-                let adc_gamma     = adc_gamma_default + 0.00010*(scale[ch] as f32);
-                let adc_delta     = adc_delta_default + 0.00005*(zero[ch] as f32);
-                adc_scale[ch] = (32768f32 * (1.0f32/adc_gamma)) as i32;
-                adc_zero[ch]  = (32768f32 * (-adc_delta/adc_gamma)) as i32;
-                pmod.write_calibration_constant(
-                    ch as u8,
-                    adc_scale[ch],
-                    adc_zero[ch],
-                )
-            }
+            let constants = CalibrationConstants::from_opts(&opts);
+            constants.write_to_pmod(&mut pmod);
 
             if opts.screen.value != opts::Screen::StartupReport {
                 draw::draw_cal(&mut display, H_ACTIVE/2-128, V_ACTIVE/2-128, hue,
@@ -586,23 +647,24 @@ fn main() -> ! {
                                &pmod.sample_i()).ok();
                 draw::draw_cal_constants(
                     &mut display, H_ACTIVE/2-128, V_ACTIVE/2+64, hue,
-                    &adc_scale, &adc_zero, &dac_scale, &dac_zero).ok();
+                    &constants.adc_scale, &constants.adc_zero, &constants.dac_scale, &constants.dac_zero).ok();
 
                 if opts.reference.print.value == EnSerialPrint::SerialOn {
                     let mut s: String<256> = String::new();
                     write!(s, "cal_constants = [\n\r").ok();
                     for ch in 0..4 {
                         write!(s, "  [{:.4}, {:.4}],\n\r",
-                              adc_scale[ch as usize] as f32 / 32768f32,
-                              adc_zero[ch as usize] as f32 / 32768f32).ok();
+                              constants.adc_scale[ch as usize] as f32 / 32768f32,
+                              constants.adc_zero[ch as usize] as f32 / 32768f32).ok();
                     }
                     for ch in 0..4 {
                         write!(s, "  [{:.4}, {:.4}],\n\r",
-                              dac_scale[ch as usize] as f32 / 32768f32,
-                              dac_zero[ch as usize] as f32 / 32768f32).ok();
+                              constants.dac_scale[ch as usize] as f32 / 32768f32,
+                              constants.dac_zero[ch as usize] as f32 / 32768f32).ok();
                     }
                     write!(s, "]\n\r").ok();
                     log::info!("{}", s);
+                    constants.write_to_eeprom(&mut i2cdev1);
                 }
             }
 
