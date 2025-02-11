@@ -100,6 +100,7 @@ macro_rules! impl_ui {
 
                     if self.opts.modify() {
                         // Flashing if we're modifying something
+                        self.pmod.led_all_auto();
                         if self.toggle_leds {
                             if let Some(n) = self.opts.view().selected() {
                                 // red for option selection
@@ -113,8 +114,6 @@ macro_rules! impl_ui {
                                     self.pmod.led_set_manual(n, i8::MIN);
                                 }
                             }
-                        } else {
-                            self.pmod.led_all_auto();
                         }
                     } else {
                         // Not flashing with fade-out if we stopped modifying something
