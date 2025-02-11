@@ -21,26 +21,19 @@ use embedded_graphics::{
 use heapless::String;
 
 use tiliqua_pac as pac;
-use tiliqua_hal as hal;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_lib::draw;
 use tiliqua_lib::calibration::*;
 use tiliqua_fw::opts::*;
-use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::video::Video;
+use tiliqua_hal::pmod::EurorackPmod;
+use tiliqua_hal::pca9635::Pca9635Driver;
 
 const TUSB322I_ADDR:  u8 = 0x47;
 
 use opts::Options;
-use hal::pca9635::Pca9635Driver;
-
-impl_ui!(UI,
-         Options,
-         Encoder0,
-         Pca9635Driver<I2c0>,
-         EurorackPmod0);
 
 pub type ReportString = String<512>;
 
@@ -304,7 +297,7 @@ fn print_die_temperature(s: &mut ReportString, dtr: &pac::DTR0)
 }
 
 struct App {
-    ui: UI,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
 }
 
 impl App {
@@ -315,8 +308,8 @@ impl App {
         let i2cdev = I2c0::new(peripherals.I2C0);
         let pca9635 = Pca9635Driver::new(i2cdev);
         Self {
-            ui: UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                        encoder, pca9635, pmod),
+            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
+                            encoder, pca9635, pmod),
         }
     }
 }
