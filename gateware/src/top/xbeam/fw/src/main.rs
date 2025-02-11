@@ -14,7 +14,6 @@ use tiliqua_fw::*;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_lib::calibration::*;
-use tiliqua_hal::pmod::EurorackPmod;
 
 use embedded_graphics::{
     pixelcolor::{Gray8, GrayColor},

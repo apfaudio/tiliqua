@@ -3,18 +3,23 @@ use embedded_hal::i2c::Operation;
 
 const PCA9635_ADDR: u8 = 0x05;
 
+pub trait Pca9635<I2C: I2c> {
+    fn push(&mut self) -> Result<(), I2C::Error>;
+}
+
 pub struct Pca9635Driver<I2C> {
     i2c: I2C,
     pub leds: [u8; 16],
 }
 
 impl<I2C: I2c> Pca9635Driver<I2C> {
-
     pub fn new(i2c: I2C) -> Self {
         Self { i2c, leds: [0u8; 16] }
     }
+}
 
-    pub fn push(&mut self) -> Result<(), I2C::Error> {
+impl<I2C: I2c> Pca9635<I2C> for Pca9635Driver<I2C> {
+    fn push(&mut self) -> Result<(), I2C::Error> {
         let pca9635_bytes = [
            0x80u8, // Auto-increment starting from MODE1
            0x81u8, // MODE1

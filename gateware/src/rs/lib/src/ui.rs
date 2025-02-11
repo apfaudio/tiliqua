@@ -55,6 +55,9 @@ macro_rules! impl_ui {
 
                 pub fn update(&mut self) {
                     use tiliqua_lib::opt::*;
+                    use tiliqua_hal::pmod::EurorackPmod;
+                    use tiliqua_hal::encoder::Encoder;
+                    use tiliqua_hal::pca9635::Pca9635;
 
                     //
                     // Consume encoder, update options
