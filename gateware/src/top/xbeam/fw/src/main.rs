@@ -12,6 +12,7 @@ use tiliqua_fw::*;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_lib::calibration::*;
+use tiliqua_hal::video::Video;
 
 use embedded_graphics::{
     pixelcolor::{Gray8, GrayColor},
@@ -54,15 +55,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         let mut app = app.borrow_ref_mut(cs);
         app.ui.update();
     });
-}
-
-pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
-    for i in 0..PX_INTENSITY_MAX {
-        for h in 0..PX_HUE_MAX {
-            let rgb = palette::compute_color(i, h, p);
-            video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
-        }
-    }
 }
 
 #[entry]
@@ -109,7 +101,7 @@ fn main() -> ! {
             });
 
             if opts.beam.palette.value != last_palette || first {
-                write_palette(&mut video, opts.beam.palette.value);
+                opts.beam.palette.value.write_to_hardware(&mut video);
                 last_palette = opts.beam.palette.value;
             }
 

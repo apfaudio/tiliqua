@@ -29,6 +29,7 @@ use tiliqua_lib::draw;
 use tiliqua_lib::calibration::*;
 use tiliqua_fw::opts::*;
 use tiliqua_hal::pmod::EurorackPmod;
+use tiliqua_hal::video::Video;
 
 const TUSB322I_ADDR:  u8 = 0x47;
 
@@ -320,15 +321,6 @@ impl App {
     }
 }
 
-pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
-    for i in 0..PX_INTENSITY_MAX {
-        for h in 0..PX_HUE_MAX {
-            let rgb = palette::compute_color(i, h, p);
-            video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
-        }
-    }
-}
-
 fn push_to_opts(constants: &CalibrationConstants, options: &mut Options) {
     let c = constants.to_tweakable();
     options.caladc.scale0.value = c.adc_scale[0];
@@ -382,7 +374,7 @@ fn main() -> ! {
         framebuffer_base: PSRAM_FB_BASE as *mut u32,
     };
 
-    write_palette(&mut video, palette::ColorPalette::Linear);
+    palette::ColorPalette::default().write_to_hardware(&mut video);
     video.set_persist(512);
 
     let mut opts = opts::Options::new();

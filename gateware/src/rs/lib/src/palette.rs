@@ -1,4 +1,5 @@
 use crate::generated_constants::*;
+use tiliqua_hal::video::Video;
 
 use strum_macros::{EnumIter, IntoStaticStr};
 
@@ -63,29 +64,44 @@ pub fn hsl2rgb(h: f32, s: f32, l: f32) -> RGB {
     }
 }
 
-pub fn compute_color(i: i32, h: i32, p: ColorPalette) -> RGB {
-    let n_i: i32 = PX_INTENSITY_MAX;
-    let n_h: i32 = PX_HUE_MAX;
-    match p {
-        ColorPalette::Exp => {
-            let fac = 1.35f32;
-            let hue = (h as f32)/(n_h as f32);
-            let saturation = 0.9f32;
-            let intensity = fac.powi(i+1) / fac.powi(n_i);
-            hsl2rgb(hue, saturation, intensity)
-        },
-        ColorPalette::Linear => {
-            hsl2rgb((h as f32)/(n_h as f32), 0.9f32,
-                    (i as f32)/(n_h as f32))
-        },
-        ColorPalette::Gray => {
-            let gray: u8 = (i * 16) as u8;
-            RGB { r: gray, g: gray, b: gray }
-        },
-        ColorPalette::InvGray => {
-            let gray: u8 = 255u8 - (i * 16) as u8;
-            RGB { r: gray, g: gray, b: gray }
+
+impl ColorPalette {
+    pub fn default() -> Self {
+        ColorPalette::Linear
+    }
+
+    fn compute_color(&self, i: i32, h: i32) -> RGB {
+        let n_i: i32 = PX_INTENSITY_MAX;
+        let n_h: i32 = PX_HUE_MAX;
+        match self {
+            ColorPalette::Exp => {
+                let fac = 1.35f32;
+                let hue = (h as f32)/(n_h as f32);
+                let saturation = 0.9f32;
+                let intensity = fac.powi(i+1) / fac.powi(n_i);
+                hsl2rgb(hue, saturation, intensity)
+            },
+            ColorPalette::Linear => {
+                hsl2rgb((h as f32)/(n_h as f32), 0.9f32,
+                        (i as f32)/(n_h as f32))
+            },
+            ColorPalette::Gray => {
+                let gray: u8 = (i * 16) as u8;
+                RGB { r: gray, g: gray, b: gray }
+            },
+            ColorPalette::InvGray => {
+                let gray: u8 = 255u8 - (i * 16) as u8;
+                RGB { r: gray, g: gray, b: gray }
+            }
+        }
+    }
+
+    pub fn write_to_hardware(&self, video: &mut impl Video) {
+        for i in 0..PX_INTENSITY_MAX {
+            for h in 0..PX_HUE_MAX {
+                let rgb = self.compute_color(i, h);
+                video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
+            }
         }
     }
 }
-

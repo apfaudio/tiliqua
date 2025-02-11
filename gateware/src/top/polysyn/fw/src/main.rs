@@ -16,7 +16,6 @@ use tiliqua_pac as pac;
 use tiliqua_hal as hal;
 use tiliqua_lib::*;
 use tiliqua_lib::draw;
-use tiliqua_lib::palette;
 use tiliqua_lib::leds;
 use tiliqua_lib::dsp::OnePoleSmoother;
 use tiliqua_lib::midi::MidiTouchController;
@@ -26,6 +25,7 @@ use tiliqua_fw::opts::TouchControl;
 use tiliqua_fw::opts::UsbHost;
 use tiliqua_fw::opts::Screen;
 use tiliqua_hal::pmod::EurorackPmod;
+use tiliqua_hal::video::Video;
 
 use embedded_graphics::{
     pixelcolor::{Gray8, GrayColor},
@@ -114,15 +114,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     });
 }
 
-pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
-    for i in 0..PX_INTENSITY_MAX {
-        for h in 0..PX_HUE_MAX {
-            let rgb = palette::compute_color(i, h, p);
-            video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
-        }
-    }
-}
-
 struct App {
     ui: UI,
     synth: Polysynth0,
@@ -202,7 +193,7 @@ fn main() -> ! {
             let help_screen: bool = opts.screen.value == Screen::Help;
 
             if opts.beam.palette.value != last_palette || first {
-                write_palette(&mut video, opts.beam.palette.value);
+                opts.beam.palette.value.write_to_hardware(&mut video);
                 last_palette = opts.beam.palette.value;
             }
 
