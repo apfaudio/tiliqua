@@ -59,68 +59,6 @@ pub struct EnumOption<T> {
     pub value: T,
 }
 
-#[macro_export]
-macro_rules! impl_option_view {
-    ($struct_name:ident, $($field:ident),*) => {
-        impl OptionView for $struct_name {
-            fn selected(&self) -> Option<usize> {
-                self.selected
-            }
-
-            fn set_selected(&mut self, s: Option<usize>) {
-                self.selected = s;
-            }
-
-            fn options(&self) -> OptionVec {
-                OptionVec::from_slice(&[$(&self.$field),*]).unwrap()
-            }
-
-            fn options_mut(&mut self) -> OptionVecMut {
-                let mut r = OptionVecMut::new();
-                $(r.push(&mut self.$field).ok();)*
-                r
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_option_page {
-    ($struct_name:ident, $(($screen:path, $field:ident)),*) => {
-        impl OptionPage for $struct_name {
-            fn modify(&self) -> bool {
-                self.modify
-            }
-
-            fn modify_mut(&mut self, modify: bool) {
-                self.modify = modify
-            }
-
-            fn screen(&self) -> &dyn OptionTrait {
-                &self.screen
-            }
-
-            fn screen_mut(&mut self) -> &mut dyn OptionTrait {
-                &mut self.screen
-            }
-
-            #[allow(dead_code)]
-            fn view(&self) -> &dyn OptionView {
-                match self.screen.value {
-                    $($screen => &self.$field,)*
-                }
-            }
-
-            #[allow(dead_code)]
-            fn view_mut(&mut self) -> &mut dyn OptionView {
-                match self.screen.value {
-                    $($screen => &mut self.$field,)*
-                }
-            }
-        }
-    };
-}
-
 impl<T> OptionPageEncoderInterface for T
 where
     T: OptionPage,
@@ -169,6 +107,35 @@ where
             for _ in ticks..0 {
                 self.tick_down();
             }
+        }
+    }
+}
+
+impl<T: Copy +
+        core::ops::Add<Output = T> +
+        core::ops::Sub<Output = T> +
+        core::cmp::PartialOrd +
+        core::fmt::Display> NumOption<T> {
+    pub fn new(name: &str, value: T, min: T, max: T, step: T) -> Self {
+        NumOption {
+            name: String::from_str(name).unwrap(),
+            value,
+            step,
+            min,
+            max,
+        }
+    }
+}
+
+impl<T: Copy +
+        strum::IntoEnumIterator +
+        PartialEq +
+        Into<&'static str>>
+    EnumOption<T> {
+    pub fn new(name: &str, value: T) -> Self {
+        EnumOption {
+            name: String::from_str(name).unwrap(),
+            value
         }
     }
 }
@@ -234,7 +201,7 @@ impl<T: Copy + strum::IntoEnumIterator + PartialEq + Into<&'static str>>
     }
 
     fn value(&self) -> OptionString {
-        String::from_str(self.value.into()).unwrap()
+        String::from_str(self.value.into()).unwrap_or(OptionString::new())
     }
 
     fn tick_up(&mut self) {

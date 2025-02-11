@@ -1,6 +1,5 @@
 use tiliqua_lib::opt::*;
-use tiliqua_lib::impl_option_view;
-use tiliqua_lib::impl_option_page;
+use opts_macro::*;
 
 use heapless::String;
 
@@ -48,35 +47,44 @@ pub enum EnWrite {
     WriteU,
 }
 
-#[derive(Clone)]
+#[derive(OptionView, Clone)]
 pub struct AutocalOptions {
     pub selected: Option<usize>,
+    #[option]
     pub volts: NumOption<i8>,
+    #[option]
     pub autozero: EnumOption<AutoZero>,
+    #[option]
     pub run: EnumOption<EnAutoZero>,
+    #[option]
     pub write: EnumOption<EnWrite>,
 }
 
-impl_option_view!(AutocalOptions, volts, autozero, run, write);
-
-#[derive(Clone)]
+#[derive(OptionView, Clone)]
 pub struct ReportOptions {
     pub selected: Option<usize>,
+    #[option]
     pub page: EnumOption<ReportPage>,
 }
 
-impl_option_view!(ReportOptions, page);
-
-#[derive(Clone)]
+#[derive(OptionView, Clone)]
 pub struct CalOptions {
     pub selected: Option<usize>,
+    #[option]
     pub zero0: NumOption<i16>,
+    #[option]
     pub zero1: NumOption<i16>,
+    #[option]
     pub zero2: NumOption<i16>,
+    #[option]
     pub zero3: NumOption<i16>,
+    #[option]
     pub scale0: NumOption<i16>,
+    #[option]
     pub scale1: NumOption<i16>,
+    #[option]
     pub scale2: NumOption<i16>,
+    #[option]
     pub scale3: NumOption<i16>,
 }
 
@@ -84,87 +92,32 @@ impl CalOptions {
     pub fn default() -> Self {
         Self {
             selected: None,
-            zero0: NumOption {
-                name: String::from_str("zero0").unwrap(),
-                value: 0,
-                step: 1,
-                min: -256,
-                max: 256,
-            },
-            zero1: NumOption {
-                name: String::from_str("zero1").unwrap(),
-                value: 0,
-                step: 1,
-                min: -256,
-                max: 256,
-            },
-            zero2: NumOption {
-                name: String::from_str("zero2").unwrap(),
-                value: 0,
-                step: 1,
-                min: -256,
-                max: 256,
-            },
-            zero3: NumOption {
-                name: String::from_str("zero3").unwrap(),
-                value: 0,
-                step: 1,
-                min: -256,
-                max: 256,
-            },
-            scale0: NumOption {
-                name: String::from_str("scale0").unwrap(),
-                value: 0,
-                step: 1,
-                min: -256,
-                max: 256,
-            },
-            scale1: NumOption {
-                name: String::from_str("scale1").unwrap(),
-                value: 0,
-                step: 1,
-                min: -256,
-                max: 256,
-            },
-            scale2: NumOption {
-                name: String::from_str("scale2").unwrap(),
-                value: 0,
-                step: 1,
-                min: -256,
-                max: 256,
-            },
-            scale3: NumOption {
-                name: String::from_str("scale3").unwrap(),
-                value: 0,
-                step: 1,
-                min: -256,
-                max: 256,
-            },
+            zero0:  NumOption::new("zero0",  0, 1, -256, 256),
+            zero1:  NumOption::new("zero1",  0, 1, -256, 256),
+            zero2:  NumOption::new("zero2",  0, 1, -256, 256),
+            zero3:  NumOption::new("zero3",  0, 1, -256, 256),
+            scale0: NumOption::new("scale0", 0, 1, -256, 256),
+            scale1: NumOption::new("scale1", 0, 1, -256, 256),
+            scale2: NumOption::new("scale2", 0, 1, -256, 256),
+            scale3: NumOption::new("scale3", 0, 1, -256, 256),
         }
     }
 }
 
-impl_option_view!(CalOptions,
-                   zero0,  zero1,  zero2,  zero3,
-                  scale0, scale1, scale2, scale3);
-
-#[derive(Clone)]
+#[derive(OptionPage, Clone)]
 pub struct Options {
     pub modify: bool,
     pub screen: EnumOption<Screen>,
 
+    #[screen(Screen::Report)]
     pub report: ReportOptions,
+    #[screen(Screen::Autocal)]
     pub reference: AutocalOptions,
-    pub caldac: CalOptions,
+    #[screen(Screen::TweakAdc)]
     pub caladc: CalOptions,
+    #[screen(Screen::TweakDac)]
+    pub caldac: CalOptions,
 }
-
-impl_option_page!(Options,
-                  (Screen::Report, report),
-                  (Screen::Autocal, reference),
-                  (Screen::TweakAdc, caladc),
-                  (Screen::TweakDac, caldac)
-                  );
 
 impl Options {
     pub fn new() -> Options {
@@ -176,32 +129,14 @@ impl Options {
             },
             report: ReportOptions {
                 selected: None,
-                page: EnumOption {
-                    name: String::from_str("page").unwrap(),
-                    value: ReportPage::Startup,
-                },
+                page: EnumOption::new("page", ReportPage::Startup),
             },
             reference: AutocalOptions {
                 selected: None,
-                volts: NumOption{
-                    name: String::from_str("volts").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: -8,
-                    max: 8,
-                },
-                autozero: EnumOption{
-                    name: String::from_str("set").unwrap(),
-                    value: AutoZero::AdcZero,
-                },
-                run: EnumOption{
-                    name: String::from_str("autozero").unwrap(),
-                    value: EnAutoZero::Stop,
-                },
-                write: EnumOption{
-                    name: String::from_str("write").unwrap(),
-                    value: EnWrite::Turn,
-                },
+                volts:    NumOption::new("volts", 0, 1, -8, 8),
+                autozero: EnumOption::new("set", AutoZero::AdcZero),
+                run:      EnumOption::new("run", EnAutoZero::Stop),
+                write:    EnumOption::new("write", EnWrite::Turn),
             },
             caldac: CalOptions::default(),
             caladc: CalOptions::default(),
