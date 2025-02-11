@@ -373,7 +373,7 @@ fn main() -> ! {
     spiflash_memtest(&mut startup_report, &mut timer);
     tusb322i_id_test(&mut startup_report, &mut i2cdev);
     print_touch_err(&mut startup_report, &pmod);
-    let eeprom_ok = eeprom_id_test(&mut startup_report, &mut i2cdev1);
+    eeprom_id_test(&mut startup_report, &mut i2cdev1);
 
     timer.disable();
     timer.delay_ns(0);
@@ -387,15 +387,12 @@ fn main() -> ! {
 
     let mut opts = opts::Options::new();
 
-    match (eeprom_ok, CalibrationConstants::from_eeprom(&mut i2cdev1)) {
-        (true, Some(cal_constants)) => {
-            push_to_opts(&cal_constants, &mut opts);
-            write!(startup_report, "PASS: load calibration from EEPROM").ok();
-        }
-        _ => {
-            push_to_opts(&CalibrationConstants::default(), &mut opts);
-            write!(startup_report, "FAIL: load calibration from EEPROM").ok();
-        }
+    if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
+        push_to_opts(&cal_constants, &mut opts);
+        write!(startup_report, "PASS: load calibration from EEPROM").ok();
+    } else {
+        push_to_opts(&CalibrationConstants::default(), &mut opts);
+        write!(startup_report, "FAIL: load calibration from EEPROM").ok();
     }
     info!("STARTUP REPORT: {}", startup_report);
 

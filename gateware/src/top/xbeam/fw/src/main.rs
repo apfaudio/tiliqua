@@ -86,11 +86,7 @@ fn main() -> ! {
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
-        cal_constants.write_to_pmod(&mut pmod);
-    } else {
-        CalibrationConstants::default().write_to_pmod(&mut pmod);
-    }
+    CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let opts = opts::Options::new();
     let mut last_palette = opts.beam.palette.value;

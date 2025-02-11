@@ -70,9 +70,10 @@ impl CalibrationConstants {
         let mut sum = 0i32;
         for n in 0..4 {
             sum += self.adc_scale[n] + self.adc_zero[n] +
-                   self.dac_scale[n] + self.dac_zero[n]
+                   self.dac_scale[n] + self.dac_zero[n];
         }
-        sum
+        // Seed checksum, so all zeros doesn't look OK.
+        sum + 0xdeadi32
     }
 
     pub fn write_to_pmod<Pmod>(&self, pmod: &mut Pmod)
@@ -94,15 +95,15 @@ impl CalibrationConstants {
     }
 
     pub fn from_eeprom<EepromI2c>(i2cdev: &mut EepromI2c) -> Option<Self>
-        where EepromI2c: I2c
+    where
+        EepromI2c: I2c
     {
         let mut constants = [0i32; 8*2+1];
         for n in 0..constants.len() {
             let mut rx_bytes = [0u8; 4];
-            let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[(n*4) as u8]),
-                                                            Operation::Read(&mut rx_bytes)]);
+            i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[(n*4) as u8]),
+                                                  Operation::Read(&mut rx_bytes)]).ok();
             constants[n] = i32::from_le_bytes(rx_bytes);
-            info!("from_eeprom n={} err={:?} constant={}", n, err, constants[n]);
         }
 
         let mut result = Self {
@@ -128,8 +129,23 @@ impl CalibrationConstants {
         }
     }
 
+    pub fn load_or_default<EepromI2c, Pmod>(i2cdev: &mut EepromI2c, pmod: &mut Pmod)
+    where
+        EepromI2c: I2c,
+        Pmod: EurorackPmod
+    {
+        if let Some(cal_constants) = Self::from_eeprom(i2cdev) {
+            info!("calibration: looks good!");
+            cal_constants.write_to_pmod(pmod);
+        } else {
+            info!("calibration: invalid! falling back to default");
+            CalibrationConstants::default().write_to_pmod(pmod);
+        }
+    }
+
     pub fn write_to_eeprom<EepromI2c>(&self, i2cdev: &mut EepromI2c)
-        where EepromI2c: I2c
+    where
+        EepromI2c: I2c
     {
         // Print the calibration constants in amaranth-friendly format.
         let mut s: String<256> = String::new();
@@ -145,7 +161,7 @@ impl CalibrationConstants {
                    fx18tof32(self.dac_zero[ch as usize])).ok();
         }
         write!(s, "]\n\r").ok();
-        log::info!("[write to eeprom] cal_constants = {}", s);
+        info!("[write to eeprom] cal_constants = {}", s);
         // Commit to eeprom
         let mut constants = [0i32; 8*2+1];
         for ch in 0..4usize {
@@ -167,7 +183,7 @@ impl CalibrationConstants {
                 }
             }
         }
-        log::info!("[write to eeprom] complete");
+        info!("[write to eeprom] complete");
     }
 
     // See comment on 'TweakableConstants' for the purpose of this.
