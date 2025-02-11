@@ -251,7 +251,7 @@ fn print_usb_state(s: &mut ReportString, i2cdev: &mut I2c0)
     let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x09u8]),
                                                     Operation::Read(&mut tusb322_conn_status)]);
 
-    write!(s, "PASS: TUSB322I state 0x{:x} (DUA={} DDC={} VF={} IS={} CD={} AS={})\r\n",
+    write!(s, "tusb322i_state 0x{:x} (DUA={} DDC={} VF={} IS={} CD={} AS={})\r\n",
           tusb322_conn_status[0],
           tusb322_conn_status[0]        & 0x1,
           (tusb322_conn_status[0] >> 1) & 0x3,
@@ -260,6 +260,25 @@ fn print_usb_state(s: &mut ReportString, i2cdev: &mut I2c0)
           (tusb322_conn_status[0] >> 5) & 0x1,
           (tusb322_conn_status[0] >> 6) & 0x3,
           ).ok();
+}
+
+fn print_pmod_state(s: &mut ReportString, pmod: &impl EurorackPmod)
+{
+    let si = pmod.sample_i();
+    write!(s, "audio_samples [ch0={:06} ch1={:06}\r\n",
+           si[0] as i16,
+           si[1] as i16).ok();
+    write!(s, "               ch2={:06} ch3={:06}]\r\n",
+           si[2] as i16,
+           si[3] as i16).ok();
+    write!(s, "audio_if      [jack={:x} touch_err={:x}]\r\n",
+           pmod.jack(),
+           pmod.touch_err()).ok();
+    let touch = pmod.touch();
+    write!(s, "audio_touch   [t0={:x} t1={:x} t2={:x} t3={:x}\r\n",
+           touch[0], touch[1], touch[2], touch[3]).ok();
+    write!(s, "               t4={:x} t5={:x} t6={:x} t7={:x}]\r\n",
+           touch[4], touch[5], touch[6], touch[7]).ok();
 }
 
 fn print_die_temperature(s: &mut ReportString, dtr: &pac::DTR0)
@@ -277,7 +296,7 @@ fn print_die_temperature(s: &mut ReportString, dtr: &pac::DTR0)
         106, 107, 108, 116, 120, 124, 128, 132
     ];
     let code = dtr.temperature().read().bits();
-    write!(s, "PASS: die_temp [code={} celsius={}]\r\n",
+    write!(s, "die_temp [code={} celsius={}]\r\n",
            code,
            code_to_celsius[code as usize]).ok();
 }
@@ -348,15 +367,12 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
 
-    let mut report = ReportString::new();
-    eeprom_id_test(&mut report, &mut i2cdev1);
-    psram_memtest(&mut report, &mut timer);
-    spiflash_memtest(&mut report, &mut timer);
-    tusb322i_id_test(&mut report, &mut i2cdev);
-    print_touch_err(&mut report, &pmod);
-    print_usb_state(&mut report, &mut i2cdev);
-    print_die_temperature(&mut report, &dtr);
-    info!("STARTUP REPORT: {}", report);
+    let mut startup_report = ReportString::new();
+    eeprom_id_test(&mut startup_report, &mut i2cdev1);
+    psram_memtest(&mut startup_report, &mut timer);
+    spiflash_memtest(&mut startup_report, &mut timer);
+    tusb322i_id_test(&mut startup_report, &mut i2cdev);
+    print_touch_err(&mut startup_report, &pmod);
 
     timer.disable();
     timer.delay_ns(0);
@@ -366,15 +382,19 @@ fn main() -> ! {
     };
 
     write_palette(&mut video, palette::ColorPalette::Linear);
-    video.set_persist(256);
+    video.set_persist(512);
 
     let mut opts = opts::Options::new();
 
     if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
         push_to_opts(&cal_constants, &mut opts);
+        write!(startup_report, "PASS: load calibration from EEPROM").ok();
     } else {
         push_to_opts(&CalibrationConstants::default(), &mut opts);
+        write!(startup_report, "FAIL: load calibration from EEPROM").ok();
     }
+
+    info!("STARTUP REPORT: {}", startup_report);
 
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 10;
@@ -407,7 +427,18 @@ fn main() -> ! {
                                hue).ok();
             draw::draw_name(&mut display, H_ACTIVE/2, 30, hue, UI_NAME, UI_SHA).ok();
 
-            if opts.screen.value == opts::Screen::StartupReport {
+            if opts.screen.value == opts::Screen::Report {
+                let mut status_report = ReportString::new();
+                let (page_name, report_str) = match opts.report.page.value {
+                    ReportPage::Startup => ("[startup report]", &startup_report),
+                    ReportPage::Status  => {
+                        print_pmod_state(&mut status_report, &pmod);
+                        print_usb_state(&mut status_report, &mut i2cdev);
+                        print_die_temperature(&mut status_report, &dtr);
+                        info!("STATUS REPORT: {}", status_report);
+                        ("[status report]", &status_report)
+                    }
+                };
                 draw::draw_tiliqua(&mut display, H_ACTIVE/2-80, V_ACTIVE/2-200, hue,
                     [
                     //  "touch  jack "
@@ -428,8 +459,8 @@ fn main() -> ! {
                         "-",
                         "-",
                     ],
-                    "[startup report]",
-                    &report
+                    &page_name,
+                    report_str
                 ).ok();
             }
 
@@ -473,7 +504,7 @@ fn main() -> ! {
             );
             constants.write_to_pmod(&mut pmod);
 
-            if opts.screen.value != opts::Screen::StartupReport {
+            if opts.screen.value != opts::Screen::Report {
                 draw::draw_cal(&mut display, H_ACTIVE/2-128, V_ACTIVE/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
                                &pmod.sample_i()).ok();

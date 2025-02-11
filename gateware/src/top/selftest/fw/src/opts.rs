@@ -11,7 +11,7 @@ use strum_macros::{EnumIter, IntoStaticStr};
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Screen {
-    StartupReport,
+    Report,
     Autocal,
     TweakAdc,
     TweakDac,
@@ -24,6 +24,13 @@ pub enum AutoZero {
     AdcScale,
     DacZero,
     DacScale,
+}
+
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
+pub enum ReportPage {
+    Startup,
+    Status,
 }
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
@@ -53,12 +60,12 @@ pub struct AutocalOptions {
 impl_option_view!(AutocalOptions, volts, autozero, run, write);
 
 #[derive(Clone)]
-pub struct StartupReportOptions {
+pub struct ReportOptions {
     pub selected: Option<usize>,
-    pub page: NumOption<u8>,
+    pub page: EnumOption<ReportPage>,
 }
 
-impl_option_view!(StartupReportOptions, page);
+impl_option_view!(ReportOptions, page);
 
 #[derive(Clone)]
 pub struct CalOptions {
@@ -147,14 +154,14 @@ pub struct Options {
     pub draw: bool,
     pub screen: EnumOption<Screen>,
 
-    pub report: StartupReportOptions,
+    pub report: ReportOptions,
     pub reference: AutocalOptions,
     pub caldac: CalOptions,
     pub caladc: CalOptions,
 }
 
 impl_option_page!(Options,
-                  (Screen::StartupReport, report),
+                  (Screen::Report, report),
                   (Screen::Autocal, reference),
                   (Screen::TweakAdc, caladc),
                   (Screen::TweakDac, caldac)
@@ -167,16 +174,13 @@ impl Options {
             draw: true,
             screen: EnumOption {
                 name: String::from_str("screen").unwrap(),
-                value: Screen::StartupReport,
+                value: Screen::Report,
             },
-            report: StartupReportOptions {
+            report: ReportOptions {
                 selected: None,
-                page: NumOption{
+                page: EnumOption {
                     name: String::from_str("page").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: 0,
-                    max: 0,
+                    value: ReportPage::Startup,
                 },
             },
             reference: AutocalOptions {
