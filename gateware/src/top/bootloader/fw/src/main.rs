@@ -11,14 +11,13 @@ use heapless::String;
 
 use core::str::FromStr;
 
-use tiliqua_pac as pac;
-use tiliqua_hal as hal;
 use tiliqua_lib::*;
 use tiliqua_lib::opt::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_fw::*;
 use tiliqua_lib::palette::ColorPalette;
 use tiliqua_lib::manifest::*;
+use tiliqua_hal::pmod::EurorackPmod;
 
 use embedded_graphics::{
     mono_font::{ascii::FONT_9X15, ascii::FONT_9X15_BOLD, MonoTextStyle},
@@ -226,7 +225,6 @@ pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
-    let pmod = peripherals.PMOD0_PERIPH;
 
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
@@ -245,6 +243,10 @@ fn main() -> ! {
         info!("(entry {}) look for manifest from {:#x} to {:#x}", n, addr, addr+size);
         manifests[n] = manifest::BitstreamManifest::from_addr(addr, size);
     }
+
+    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let opts = opts::Options::new(&manifests);
     let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone())));
@@ -312,7 +314,7 @@ fn main() -> ! {
             }
 
             if let Some(_) = reboot_n {
-                pmod.flags().write(|w|  w.mute().bit(true) );
+                pmod.mute(true);
                 print_rebooting(&mut display, &mut rng);
             }
         }

@@ -25,6 +25,7 @@ use tiliqua_fw::*;
 use tiliqua_fw::opts::TouchControl;
 use tiliqua_fw::opts::UsbHost;
 use tiliqua_fw::opts::Screen;
+use tiliqua_hal::pmod::EurorackPmod;
 
 use embedded_graphics::{
     pixelcolor::{Gray8, GrayColor},
@@ -168,6 +169,10 @@ fn main() -> ! {
     crate::handlers::logger_init(serial);
 
     info!("Hello from Tiliqua POLYSYN!");
+
+    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let opts = opts::Options::new();
     let mut last_palette = opts.beam.palette.value.clone();
