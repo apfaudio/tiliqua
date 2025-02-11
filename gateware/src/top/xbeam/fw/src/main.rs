@@ -13,6 +13,8 @@ use tiliqua_hal as hal;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
+use tiliqua_lib::calibration::*;
+use tiliqua_hal::pmod::EurorackPmod;
 
 use embedded_graphics::{
     pixelcolor::{Gray8, GrayColor},
@@ -81,6 +83,14 @@ fn main() -> ! {
     tiliqua_fw::handlers::logger_init(serial);
 
     info!("Hello from Tiliqua XBEAM!");
+
+    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
+        cal_constants.write_to_pmod(&mut pmod);
+    } else {
+        CalibrationConstants::default().write_to_pmod(&mut pmod);
+    }
 
     let opts = opts::Options::new();
     let mut last_palette = opts.beam.palette.value;
