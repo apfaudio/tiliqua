@@ -50,58 +50,42 @@ pub enum EnWrite {
 #[derive(OptionView, Clone)]
 pub struct AutocalOptions {
     pub selected: Option<usize>,
-    #[option]
+    #[option(0, 1, -8, 8)]
     pub volts: NumOption<i8>,
-    #[option]
+    #[option(AutoZero::AdcZero)]
     pub autozero: EnumOption<AutoZero>,
-    #[option]
+    #[option(EnAutoZero::Stop)]
     pub run: EnumOption<EnAutoZero>,
-    #[option]
+    #[option(EnWrite::Turn)]
     pub write: EnumOption<EnWrite>,
 }
 
 #[derive(OptionView, Clone)]
 pub struct ReportOptions {
     pub selected: Option<usize>,
-    #[option]
+    #[option(ReportPage::Startup)]
     pub page: EnumOption<ReportPage>,
 }
 
 #[derive(OptionView, Clone)]
 pub struct CalOptions {
     pub selected: Option<usize>,
-    #[option]
+    #[option(0, 1, -256, 256)]
     pub zero0: NumOption<i16>,
-    #[option]
+    #[option(0, 1, -256, 256)]
     pub zero1: NumOption<i16>,
-    #[option]
+    #[option(0, 1, -256, 256)]
     pub zero2: NumOption<i16>,
-    #[option]
+    #[option(0, 1, -256, 256)]
     pub zero3: NumOption<i16>,
-    #[option]
+    #[option(0, 1, -256, 256)]
     pub scale0: NumOption<i16>,
-    #[option]
+    #[option(0, 1, -256, 256)]
     pub scale1: NumOption<i16>,
-    #[option]
+    #[option(0, 1, -256, 256)]
     pub scale2: NumOption<i16>,
-    #[option]
+    #[option(0, 1, -256, 256)]
     pub scale3: NumOption<i16>,
-}
-
-impl CalOptions {
-    pub fn default() -> Self {
-        Self {
-            selected: None,
-            zero0:  NumOption::new("zero0",  0, 1, -256, 256),
-            zero1:  NumOption::new("zero1",  0, 1, -256, 256),
-            zero2:  NumOption::new("zero2",  0, 1, -256, 256),
-            zero3:  NumOption::new("zero3",  0, 1, -256, 256),
-            scale0: NumOption::new("scale0", 0, 1, -256, 256),
-            scale1: NumOption::new("scale1", 0, 1, -256, 256),
-            scale2: NumOption::new("scale2", 0, 1, -256, 256),
-            scale3: NumOption::new("scale3", 0, 1, -256, 256),
-        }
-    }
 }
 
 #[derive(OptionPage, Clone)]
@@ -123,21 +107,9 @@ impl Options {
     pub fn new() -> Options {
         Options {
             modify: true,
-            screen: EnumOption {
-                name: String::from_str("screen").unwrap(),
-                value: Screen::Report,
-            },
-            report: ReportOptions {
-                selected: None,
-                page: EnumOption::new("page", ReportPage::Startup),
-            },
-            reference: AutocalOptions {
-                selected: None,
-                volts:    NumOption::new("volts", 0, 1, -8, 8),
-                autozero: EnumOption::new("set", AutoZero::AdcZero),
-                run:      EnumOption::new("run", EnAutoZero::Stop),
-                write:    EnumOption::new("write", EnWrite::Turn),
-            },
+            screen: EnumOption::new("", Screen::Report),
+            report: ReportOptions::default(),
+            reference: AutocalOptions::default(),
             caldac: CalOptions::default(),
             caladc: CalOptions::default(),
         }
