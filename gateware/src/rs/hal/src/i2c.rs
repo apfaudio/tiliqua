@@ -94,7 +94,6 @@ macro_rules! impl_i2c {
                         return Err($crate::hal::i2c::ErrorKind::Other);
                     }
 
-
                     // Copy out recieved bytes
                     for op in operations.iter_mut() {
                         match op {

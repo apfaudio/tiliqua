@@ -108,8 +108,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
 fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
-    write!(s, "PSRAM memtest\r\n").ok();
-
     // WARN: assume framebuffer is at the start of PSRAM - don't try memtesting that section.
 
     let psram_ptr = PSRAM_BASE as *mut u32;
@@ -147,19 +145,18 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let read_ticks = endwrite-endread;
 
     let sysclk = pac::clock::sysclk();
+    if psram_fl {
+        write!(s, "FAIL: PSRAM memtest\r\n").ok();
+
+    } else {
+        write!(s, "PASS: PSRAM memtest\r\n").ok();
+    }
+
     write!(s, "  write {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / write_ticks as u64).ok();
     write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / (read_ticks as u64)).ok();
-
-    if psram_fl {
-        write!(s, "  FAIL\r\n").ok();
-    } else {
-        write!(s, "  PASS\r\n").ok();
-    }
 }
 
 fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
-
-    write!(s, "SPIFLASH memtest\r\n").ok();
 
     let spiflash_ptr = SPIFLASH_BASE as *mut u32;
     let spiflash_sz_test = 1024;
@@ -183,22 +180,22 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let read_ticks = start-timer.counter();
 
     let sysclk = pac::clock::sysclk();
-    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (spiflash_sz_test/1024) as u64) / (read_ticks as u64)).ok();
 
     // TODO: verify there is actually a bitstream header in first N words?
     let mut spiflash_fl = true;
     for i in 0..first_words.len() {
-        info!("read @ {:#x} at {:#x}", first_words[i], i);
+        info!("spiflash_memtest: read @ {:#x} at {:#x}", first_words[i], i);
         if first_words[i] != 0xff && first_words[i] != 0x00 {
             spiflash_fl = false;
         }
     }
 
     if spiflash_fl {
-        write!(s, "  FAIL\r\n").ok();
+        write!(s, "FAIL: SPIFLASH memtest\r\n").ok();
     } else {
-        write!(s, "  PASS\r\n").ok();
+        write!(s, "PASS: SPIFLASH memtest\r\n").ok();
     }
+    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (spiflash_sz_test/1024) as u64) / (read_ticks as u64)).ok();
 }
 
 fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
@@ -207,38 +204,42 @@ fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
     let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x00u8]),
                                                     Operation::Read(&mut tusb322i_id)]);
     if tusb322i_id != [0x32, 0x32, 0x33, 0x42, 0x53, 0x55, 0x54, 0x0] {
-        let mut ix = 0;
-        for byte in tusb322i_id {
-            info!("tusb322i_id{}: 0x{:x}", ix, byte);
-            ix += 1;
-        }
-        write!(s, "FAIL: TUSB322I ID\r\n").ok();
+        write!(s, "FAIL: tusb322i_id ").ok();
     } else {
-        write!(s, "PASS: TUSB322I ID\r\n").ok();
+        write!(s, "PASS: tusb322i_id ").ok();
     }
+    for byte in tusb322i_id {
+        write!(s, "{:x} ", byte).ok();
+    }
+    write!(s, "\r\n").ok();
 }
 
-fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) {
-    let mut eeprom_id: [u8; 4] = [0; 4];
-    let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x00u8]),
-                                             Operation::Read(&mut eeprom_id)]);
-    info!("eeprom_err {:?}", err);
-    let mut ix = 0;
+fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
+    let mut ok = false;
+    let mut eeprom_id: [u8; 6] = [0; 6];
+    let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0xFAu8]),
+                                                    Operation::Read(&mut eeprom_id)]);
+    if !err.is_ok() {
+        write!(s, "FAIL: eeprom_id (nak?) ").ok();
+    } else if eeprom_id[0] == 0x29 {
+        ok = true;
+        write!(s, "PASS: eeprom_id ").ok();
+    } else {
+        write!(s, "FAIL: eeprom_id ").ok();
+    }
     for byte in eeprom_id {
-        info!("eeprom_id{}: 0x{:x}", ix, byte);
-        ix += 1;
+        write!(s, "{:x} ", byte).ok();
     }
-    write!(s, "PASS: EEPROM ID\r\n").ok();
+    write!(s, "\r\n").ok();
+    ok
 }
-
-
 
 fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
 {
     if pmod.touch_err() != 0 {
-        write!(s, "FAIL: TOUCH IC NAK\r\n").ok();
+        write!(s, "FAIL: cy8cmbr_nak\r\n").ok();
     } else {
-        write!(s, "PASS: TOUCH IC\r\n").ok();
+        write!(s, "PASS: cy8cmbr_nak\r\n").ok();
     }
 }
 
@@ -368,11 +369,11 @@ fn main() -> ! {
     let dtr = peripherals.DTR0;
 
     let mut startup_report = ReportString::new();
-    eeprom_id_test(&mut startup_report, &mut i2cdev1);
     psram_memtest(&mut startup_report, &mut timer);
     spiflash_memtest(&mut startup_report, &mut timer);
     tusb322i_id_test(&mut startup_report, &mut i2cdev);
     print_touch_err(&mut startup_report, &pmod);
+    let eeprom_ok = eeprom_id_test(&mut startup_report, &mut i2cdev1);
 
     timer.disable();
     timer.delay_ns(0);
@@ -386,14 +387,16 @@ fn main() -> ! {
 
     let mut opts = opts::Options::new();
 
-    if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
-        push_to_opts(&cal_constants, &mut opts);
-        write!(startup_report, "PASS: load calibration from EEPROM").ok();
-    } else {
-        push_to_opts(&CalibrationConstants::default(), &mut opts);
-        write!(startup_report, "FAIL: load calibration from EEPROM").ok();
+    match (eeprom_ok, CalibrationConstants::from_eeprom(&mut i2cdev1)) {
+        (true, Some(cal_constants)) => {
+            push_to_opts(&cal_constants, &mut opts);
+            write!(startup_report, "PASS: load calibration from EEPROM").ok();
+        }
+        _ => {
+            push_to_opts(&CalibrationConstants::default(), &mut opts);
+            write!(startup_report, "FAIL: load calibration from EEPROM").ok();
+        }
     }
-
     info!("STARTUP REPORT: {}", startup_report);
 
     let app = Mutex::new(RefCell::new(App::new(opts)));
