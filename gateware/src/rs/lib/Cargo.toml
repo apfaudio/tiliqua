@@ -18,6 +18,8 @@ fixed = "1.28.0"
 midi-types = "0.1.7"
 serde-json-core = "0.6.0"
 serde = { version="1.0.214", default-features=false }
+tiliqua-hal = { path="../hal", default-features = false }
+embedded-hal = "=1.0.0"
 
 [dev-dependencies]
 critical-section = { version = "1.1.2", features = ["std"] }

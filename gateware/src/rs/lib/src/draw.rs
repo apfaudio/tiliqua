@@ -771,7 +771,6 @@ mod tests {
                        12, 127, 0).ok();
         }
 
-        /*
         draw_tiliqua(&mut disp, H_ACTIVE/2-80, V_ACTIVE/2-200, 0,
             [
             //  "touch  jack "
@@ -811,8 +810,8 @@ mod tests {
             FM effects.\n\
             ",
             ).ok();
-        */
 
+        /*
         draw_cal(&mut disp, H_ACTIVE/2-128, V_ACTIVE/2-128, 0,
                  &[4096, 4096, 4096, 4096],
                  &[4000, 4120, 4090, 4000]);
@@ -823,6 +822,7 @@ mod tests {
                  &[4096, 4096, 4096, 4096],
                  &[4000, 4120, 4090, 4000]
                  );
+        */
 
         draw_name(&mut disp, H_ACTIVE/2, 30, 0, "MACRO-OSC", "b2d3aa").ok();
 

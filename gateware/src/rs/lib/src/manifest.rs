@@ -91,16 +91,3 @@ impl BitstreamManifest {
         Self::from_slice(manifest_slice)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-    #[test]
-    fn parse_manifest() {
-        env_logger::init();
-        let data: &[u8] = &fs::read("example-manifest.json").unwrap();
-        let _ = BitstreamManifest::from_slice(data).unwrap();
-    }
-}

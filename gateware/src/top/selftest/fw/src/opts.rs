@@ -21,8 +21,8 @@ pub enum Screen {
 #[strum(serialize_all = "kebab-case")]
 pub enum AutoZero {
     AdcZero,
-    DacZero,
     AdcScale,
+    DacZero,
     DacScale,
 }
 

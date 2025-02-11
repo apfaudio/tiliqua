@@ -1,3 +1,15 @@
+pub trait EurorackPmod {
+    fn jack(&self) -> u8;
+    fn touch_err(&self) -> u8;
+    fn touch(&self) -> [u8; 8];
+    fn sample_i(&self) -> [i16; 4];
+    fn led_set_manual(&mut self, index: usize, value: i8);
+    fn led_set_auto(&mut self, index: usize);
+    fn led_all_auto(&mut self);
+    fn led_all_manual(&mut self);
+    fn write_calibration_constant(&mut self, ch: u8, a: i32, b: i32);
+}
+
 #[macro_export]
 macro_rules! impl_eurorack_pmod {
     ($(
@@ -16,17 +28,17 @@ macro_rules! impl_eurorack_pmod {
                 }
             }
 
-            impl $PMODX {
+            impl hal::pmod::EurorackPmod for $PMODX {
 
-                pub fn jack(&self) -> u8 {
+                fn jack(&self) -> u8 {
                     self.registers.jack().read().bits() as u8
                 }
 
-                pub fn touch_err(&self) -> u8 {
+                fn touch_err(&self) -> u8 {
                     self.registers.touch_err().read().bits() as u8
                 }
 
-                pub fn touch(&self) -> [u8; 8] {
+                fn touch(&self) -> [u8; 8] {
                     [
                         self.registers.touch0().read().bits() as u8,
                         self.registers.touch1().read().bits() as u8,
@@ -39,7 +51,7 @@ macro_rules! impl_eurorack_pmod {
                     ]
                 }
 
-                pub fn sample_i(&self) -> [i16; 4] {
+                fn sample_i(&self) -> [i16; 4] {
                     [
                         self.registers.sample_i0().read().bits() as i16,
                         self.registers.sample_i1().read().bits() as i16,
@@ -48,7 +60,7 @@ macro_rules! impl_eurorack_pmod {
                     ]
                 }
 
-                pub fn led_set_manual(&mut self, index: usize, value: i8)  {
+                fn led_set_manual(&mut self, index: usize, value: i8)  {
 
                     match index {
                         0 => self.registers.led0().write(|w| unsafe { w.led().bits(value as u8) } ),
@@ -66,7 +78,7 @@ macro_rules! impl_eurorack_pmod {
                     self.registers.led_mode().write(|w| unsafe { w.led().bits(self.led_mode) } );
                 }
 
-                pub fn led_set_auto(&mut self, index: usize)  {
+                fn led_set_auto(&mut self, index: usize)  {
 
                     if index > 7 {
                         panic!("bad index");
@@ -76,17 +88,17 @@ macro_rules! impl_eurorack_pmod {
                     self.registers.led_mode().write(|w| unsafe { w.led().bits(self.led_mode) } );
                 }
 
-                pub fn led_all_auto(&mut self)  {
+                fn led_all_auto(&mut self)  {
                     self.led_mode = 0xff;
                     self.registers.led_mode().write(|w| unsafe { w.led().bits(self.led_mode) } );
                 }
 
-                pub fn led_all_manual(&mut self)  {
+                fn led_all_manual(&mut self)  {
                     self.led_mode = 0xff;
                     self.registers.led_mode().write(|w| unsafe { w.led().bits(self.led_mode) } );
                 }
 
-                pub fn write_calibration_constant(&mut self, ch: u8, a: i32, b: i32) {
+                fn write_calibration_constant(&mut self, ch: u8, a: i32, b: i32) {
                     self.registers.cal_a().write(|w| unsafe { w.value().bits(a as u32) });
                     self.registers.cal_b().write(|w| unsafe { w.value().bits(b as u32) });
                     self.registers.cal_reg().write(|w| unsafe {
