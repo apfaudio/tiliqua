@@ -108,10 +108,10 @@ impl Options {
         Options {
             modify: true,
             screen: EnumOption::new("", Screen::Report),
-            report: ReportOptions::default(),
-            reference: AutocalOptions::default(),
-            caldac: CalOptions::default(),
-            caladc: CalOptions::default(),
+            report: Default::default(),
+            reference: Default::default(),
+            caladc: Default::default(),
+            caldac: Default::default(),
         }
     }
 }
