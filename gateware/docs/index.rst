@@ -15,6 +15,7 @@ Tiliqua Manual
    technical
    install
    gettingstarted
+   calibration
    bootloader
    dsp
    soc

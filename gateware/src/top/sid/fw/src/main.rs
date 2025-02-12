@@ -13,6 +13,8 @@ use tiliqua_hal as hal;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
+use tiliqua_hal::pmod::EurorackPmod;
+use tiliqua_hal::video::Video;
 
 use embedded_graphics::{
     pixelcolor::{Gray8, GrayColor},
@@ -34,7 +36,7 @@ impl_ui!(UI,
 
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
+pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
 struct App {
     ui: UI,
@@ -70,16 +72,16 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             |w| unsafe { w.transaction_data().bits(((data as u16) << 5) | (addr as u16)) } );
     };
 
-    let (opts, x) = critical_section::with(|cs| {
+    let (mut opts, x) = critical_section::with(|cs| {
         let mut app = app.borrow_ref_mut(cs);
         app.ui.update();
         (app.ui.opts.clone(), app.ui.pmod.sample_i())
     });
 
-    let voices: [&VoiceOptions; 3] = [
-        &opts.voice1,
-        &opts.voice2,
-        &opts.voice3,
+    let voices: [&mut VoiceOptions; 3] = [
+        &mut opts.voice1,
+        &mut opts.voice2,
+        &mut opts.voice3,
     ];
 
     let mods: [ModulationTarget; 4] = [
@@ -115,10 +117,8 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         // Propagate modulation back to menu system
 
-        /*
         voices[n_voice].freq.value = freq;
         voices[n_voice].gate.value = gate;
-        */
 
         freq = (freq as f32 * (voices[n_voice].freq_os.value as f32 / 1000.0f32)) as u16;
 
@@ -167,15 +167,16 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
          (opts.filter.v3off.value  << 7) |
          (opts.filter.volume.value << 0)) as u8
         );
-}
 
-pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
-    for i in 0..PX_INTENSITY_MAX {
-        for h in 0..PX_HUE_MAX {
-            let rgb = palette::compute_color(i, h, p);
-            video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
-        }
-    }
+    critical_section::with(|cs| {
+        let mut app = app.borrow_ref_mut(cs);
+        app.ui.opts.voice1.freq.value = voices[0].freq.value;
+        app.ui.opts.voice1.gate.value = voices[0].gate.value;
+        app.ui.opts.voice2.freq.value = voices[1].freq.value;
+        app.ui.opts.voice2.gate.value = voices[1].gate.value;
+        app.ui.opts.voice3.freq.value = voices[2].freq.value;
+        app.ui.opts.voice3.gate.value = voices[2].gate.value;
+    });
 }
 
 #[entry]
@@ -195,11 +196,15 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua SID!");
 
+    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+
     let opts = opts::Options::new();
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 5u8;
 
-    write_palette(&mut video, palette::ColorPalette::Linear);
+    palette::ColorPalette::default().write_to_hardware(&mut video);
     video.set_persist(512);
 
     handler!(timer0 = || timer0_handler(&app));

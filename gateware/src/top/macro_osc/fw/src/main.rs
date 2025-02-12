@@ -21,6 +21,7 @@ use tiliqua_hal as hal;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
+use tiliqua_hal::video::Video;
 use opts::Options;
 use hal::pca9635::*;
 
@@ -172,15 +173,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     });
 }
 
-pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
-    for i in 0..PX_INTENSITY_MAX {
-        for h in 0..PX_HUE_MAX {
-            let rgb = palette::compute_color(i, h, p);
-            video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
-        }
-    }
-}
-
 #[entry]
 fn main() -> ! {
 
@@ -199,6 +191,10 @@ fn main() -> ! {
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
 
     info!("Hello from Tiliqua MACRO-OSCILLATOR!");
+
+    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let mut display = DMADisplay {
         framebuffer_base: PSRAM_FB_BASE as *mut u32,
@@ -291,7 +287,7 @@ fn main() -> ! {
             });
 
             if opts.beam.palette.value != last_palette || first {
-                write_palette(&mut video, opts.beam.palette.value);
+                opts.beam.palette.value.write_to_hardware(&mut video);
                 last_palette = opts.beam.palette.value;
             }
 

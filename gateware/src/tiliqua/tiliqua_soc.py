@@ -167,8 +167,8 @@ class TiliquaSoc(Component):
         self.uart0_base           = 0x00000200
         self.timer0_base          = 0x00000300
         self.timer0_irq           = 0
-        # (gap) was: timer1
-        self.i2c0_base            = 0x00000500
+        self.i2c0_base            = 0x00000400
+        self.i2c1_base            = 0x00000500
         self.encoder0_base        = 0x00000600
         self.pmod0_periph_base    = 0x00000700
         self.dtr0_base            = 0x00000800
@@ -256,8 +256,13 @@ class TiliquaSoc(Component):
         self.psram_periph.add_master(self.video.bus)
 
         # mobo i2c
-        self.i2c0 = i2c.Peripheral(period_cyc=240)
+        self.i2c0 = i2c.Peripheral()
+        self.i2c_stream0 = i2c.I2CStreamer(period_cyc=256)
         self.csr_decoder.add(self.i2c0.bus, addr=self.i2c0_base, name="i2c0")
+
+        # eurorack-pmod i2c
+        self.i2c1 = i2c.Peripheral()
+        self.csr_decoder.add(self.i2c1.bus, addr=self.i2c1_base, name="i2c1")
 
         # encoder
         self.encoder0 = encoder.Peripheral()
@@ -348,10 +353,12 @@ class TiliquaSoc(Component):
 
         # i2c0
         m.submodules.i2c0 = self.i2c0
+        m.submodules.i2c_stream0 = self.i2c_stream0
+        wiring.connect(m, self.i2c0.i2c_stream, self.i2c_stream0.control)
         if sim.is_hw(platform):
             i2c0_provider = i2c.Provider()
             m.submodules.i2c0_provider = i2c0_provider
-            wiring.connect(m, self.i2c0.pins, i2c0_provider.pins)
+            wiring.connect(m, self.i2c_stream0.pins, i2c0_provider.pins)
 
         # encoder0
         m.submodules.encoder0 = self.encoder0
@@ -380,6 +387,9 @@ class TiliquaSoc(Component):
         # audio interface
         m.submodules.pmod0 = self.pmod0
         m.submodules.pmod0_periph = self.pmod0_periph
+        # i2c1 / pmod i2c override
+        m.submodules.i2c1 = self.i2c1
+        wiring.connect(m, self.i2c1.i2c_stream, self.pmod0.i2c_master.i2c_override)
 
         if sim.is_hw(platform):
             # hook up audio interface pins

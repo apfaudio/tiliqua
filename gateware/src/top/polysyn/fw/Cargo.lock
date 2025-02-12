@@ -396,6 +396,7 @@ name = "tiliqua-lib"
 version = "0.1.0"
 dependencies = [
  "embedded-graphics",
+ "embedded-hal",
  "fixed",
  "heapless",
  "log",
@@ -405,6 +406,7 @@ dependencies = [
  "serde-json-core",
  "strum",
  "strum_macros 0.26.4",
+ "tiliqua-hal",
 ]
 
 [[package]]

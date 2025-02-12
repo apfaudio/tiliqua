@@ -49,8 +49,6 @@ macro_rules! impl_i2c {
 
                     use $crate::hal::i2c::Operation;
 
-                    let mut enospace = false;
-
                     let mut total_bytes = 0;
                     for op in operations.iter() {
                         total_bytes += match op {
@@ -66,7 +64,7 @@ macro_rules! impl_i2c {
                         match op {
                             Operation::Write(bytes) => {
                                 for b in bytes.iter() {
-                                    enospace |= self.registers.status().read().full().bit();
+                                    while self.registers.status().read().busy().bit() { }
                                     self.registers.transaction_reg().write( |w| unsafe {
                                         w.rw().bit(false);
                                         w.data().bits(*b);
@@ -77,7 +75,7 @@ macro_rules! impl_i2c {
                             }
                             Operation::Read(bytes) => {
                                 for b in bytes.iter() {
-                                    enospace |= self.registers.status().read().full().bit();
+                                    while self.registers.status().read().busy().bit() { }
                                     self.registers.transaction_reg().write( |w| unsafe {
                                         w.rw().bit(true);
                                         w.last().bit(sent_bytes == total_bytes - 1)
@@ -91,18 +89,10 @@ macro_rules! impl_i2c {
                     // Wait for completion
                     while self.registers.status().read().busy().bit() { }
 
-                    // TODO more explicit error flags!
-
-                    if enospace {
-                        // transaction FIFO ran out of space (we ran and drained it anyway)
-                        return Err($crate::hal::i2c::ErrorKind::Other);
-                    }
-
                     // Note: this error flag is cleared on the next transaction start().
                     if self.registers.status().read().error().bit() {
                         return Err($crate::hal::i2c::ErrorKind::Other);
                     }
-
 
                     // Copy out recieved bytes
                     for op in operations.iter_mut() {

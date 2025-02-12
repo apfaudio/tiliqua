@@ -11,14 +11,13 @@ use heapless::String;
 
 use core::str::FromStr;
 
-use tiliqua_pac as pac;
-use tiliqua_hal as hal;
 use tiliqua_lib::*;
 use tiliqua_lib::opt::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_fw::*;
-use tiliqua_lib::palette::ColorPalette;
 use tiliqua_lib::manifest::*;
+use tiliqua_hal::pmod::EurorackPmod;
+use tiliqua_hal::video::Video;
 
 use embedded_graphics::{
     mono_font::{ascii::FONT_9X15, ascii::FONT_9X15_BOLD, MonoTextStyle},
@@ -214,19 +213,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     });
 }
 
-pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
-    for i in 0..PX_INTENSITY_MAX {
-        for h in 0..PX_HUE_MAX {
-            let rgb = palette::compute_color(i, h, p);
-            video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
-        }
-    }
-}
-
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
-    let pmod = peripherals.PMOD0_PERIPH;
 
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
@@ -245,6 +234,10 @@ fn main() -> ! {
         info!("(entry {}) look for manifest from {:#x} to {:#x}", n, addr, addr+size);
         manifests[n] = manifest::BitstreamManifest::from_addr(addr, size);
     }
+
+    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let opts = opts::Options::new(&manifests);
     let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone())));
@@ -270,7 +263,7 @@ fn main() -> ! {
             .stroke_width(1)
             .build();
 
-        write_palette(&mut video, ColorPalette::Linear);
+        palette::ColorPalette::default().write_to_hardware(&mut video);
 
         loop {
 
@@ -312,7 +305,7 @@ fn main() -> ! {
             }
 
             if let Some(_) = reboot_n {
-                pmod.flags().write(|w|  w.mute().bit(true) );
+                pmod.mute(true);
                 print_rebooting(&mut display, &mut rng);
             }
         }

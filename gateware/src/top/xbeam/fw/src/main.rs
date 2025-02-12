@@ -8,11 +8,11 @@ use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
 
-use tiliqua_pac as pac;
-use tiliqua_hal as hal;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
+use tiliqua_lib::calibration::*;
+use tiliqua_hal::video::Video;
 
 use embedded_graphics::{
     pixelcolor::{Gray8, GrayColor},
@@ -57,15 +57,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     });
 }
 
-pub fn write_palette(video: &mut Video0, p: palette::ColorPalette) {
-    for i in 0..PX_INTENSITY_MAX {
-        for h in 0..PX_HUE_MAX {
-            let rgb = palette::compute_color(i, h, p);
-            video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
-        }
-    }
-}
-
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -81,6 +72,10 @@ fn main() -> ! {
     tiliqua_fw::handlers::logger_init(serial);
 
     info!("Hello from Tiliqua XBEAM!");
+
+    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let opts = opts::Options::new();
     let mut last_palette = opts.beam.palette.value;
@@ -106,7 +101,7 @@ fn main() -> ! {
             });
 
             if opts.beam.palette.value != last_palette || first {
-                write_palette(&mut video, opts.beam.palette.value);
+                opts.beam.palette.value.write_to_hardware(&mut video);
                 last_palette = opts.beam.palette.value;
             }
 

@@ -17,3 +17,37 @@ pub use embedded_hal as hal;
 pub use embedded_hal_nb as hal_nb;
 
 pub use nb;
+
+// Peripherals common to all ordinary tiliqua_soc instances.
+#[macro_export]
+macro_rules! impl_tiliqua_soc_pac {
+    ()  => {
+        tiliqua_hal::impl_serial! {
+            Serial0: tiliqua_pac::UART0,
+        }
+
+        tiliqua_hal::impl_timer! {
+            Timer0: tiliqua_pac::TIMER0,
+        }
+
+        tiliqua_hal::impl_i2c! {
+            I2c0: tiliqua_pac::I2C0,
+        }
+
+        tiliqua_hal::impl_i2c! {
+            I2c1: tiliqua_pac::I2C1,
+        }
+
+        tiliqua_hal::impl_encoder! {
+            Encoder0: tiliqua_pac::ENCODER0,
+        }
+
+        tiliqua_hal::impl_eurorack_pmod! {
+            EurorackPmod0: tiliqua_pac::PMOD0_PERIPH,
+        }
+
+        tiliqua_hal::impl_video! {
+            Video0: tiliqua_pac::VIDEO_PERIPH,
+        }
+    };
+}

@@ -33,6 +33,26 @@ class Provider(Component):
         ]
         return m
 
+class I2CStreamerTransaction(data.Struct):
+    last: unsigned(1)
+    rw:   unsigned(1)
+    data: unsigned(8)
+
+class I2CStreamerStatus(data.Struct):
+    tx_empty: unsigned(1)
+    rx_empty: unsigned(1)
+    busy:  unsigned(1)
+    error: unsigned(1)
+
+class I2CStreamerControl(wiring.Signature):
+    def __init__(self):
+        super().__init__({
+            "address": Out(7),
+            "status":  In(I2CStreamerStatus),
+            "i":       Out(stream.Signature(I2CStreamerTransaction)),
+            "o":       In(stream.Signature(unsigned(8))),
+        })
+
 class I2CStreamer(wiring.Component):
 
     """
@@ -47,15 +67,6 @@ class I2CStreamer(wiring.Component):
     More detail on how transactions are dilineated can be found in the `i2c.Peripheral` core below.
     """
 
-    class I2CTransaction(data.Struct):
-        last: unsigned(1)
-        rw:   unsigned(1)
-        data: unsigned(8)
-
-    class I2CStatus(data.Struct):
-        busy:  unsigned(1)
-        error: unsigned(1)
-
     def __init__(self, period_cyc=None, clk_stretch=False,
                  transaction_depth=32, rx_depth=8, **kwargs):
         self.period_cyc = period_cyc
@@ -64,10 +75,7 @@ class I2CStreamer(wiring.Component):
         self._rx_fifo = SyncFIFOBuffered(width=8, depth=rx_depth)
         super().__init__({
             "pins":    Out(I2CPinSignature()),
-            "address": In(7),
-            "status":  Out(self.I2CStatus),
-            "i":       In(stream.Signature(self.I2CTransaction)),
-            "o":       Out(stream.Signature(unsigned(8))),
+            "control": In(I2CStreamerControl()),
         })
         self.i2c = I2CInitiator(pads=self.pins, period_cyc=self.period_cyc, clk_stretch=self.clk_stretch)
 
@@ -78,10 +86,10 @@ class I2CStreamer(wiring.Component):
         m.submodules.transactions = self._transactions
         m.submodules.i2c = i2c = self.i2c
 
-        wiring.connect(m, wiring.flipped(self.i), self._transactions.w_stream)
-        wiring.connect(m, self._rx_fifo.r_stream, wiring.flipped(self.o))
+        wiring.connect(m, wiring.flipped(self.control.i), self._transactions.w_stream)
+        wiring.connect(m, self._rx_fifo.r_stream, wiring.flipped(self.control.o))
 
-        tx = Signal.like(self.i.payload)
+        tx = Signal.like(self.control.i.payload)
         m.d.comb += [
             tx.eq(self._transactions.r_stream.payload),
             i2c.start.eq(0),
@@ -93,21 +101,21 @@ class I2CStreamer(wiring.Component):
         current_transaction_rw = Signal()
 
         err  = Signal()
-        done = Signal()
-        m.d.comb += done.eq(self._transactions.level == 0)
-        m.d.comb += self.status.error.eq(err)
+        m.d.comb += self.control.status.tx_empty.eq(self._transactions.level == 0)
+        m.d.comb += self.control.status.rx_empty.eq(self._rx_fifo.level == 0)
+        m.d.comb += self.control.status.error.eq(err)
 
         with m.FSM() as fsm:
 
             # We're busy whenever we're not IDLE; indicate so.
-            m.d.comb += self.status.busy.eq(~fsm.ongoing('IDLE'))
+            m.d.comb += self.control.status.busy.eq(~fsm.ongoing('IDLE'))
 
             with m.State('IDLE'):
-                with m.If(self.i.ready & self.i.valid & self.i.payload.last):
+                with m.If(self.control.i.ready & self.control.i.valid & self.control.i.payload.last):
+                    m.d.sync += err.eq(0)
                     m.next = 'START'
 
             with m.State('START'):
-                m.d.sync += err.eq(0)
                 with m.If(~i2c.busy):
                     m.d.comb += i2c.start.eq(1),
                     m.next = 'SEND_DEV_ADDRESS'
@@ -115,7 +123,7 @@ class I2CStreamer(wiring.Component):
             with m.State("SEND_DEV_ADDRESS"):
                 with m.If(~i2c.busy):
                     m.d.comb += [
-                        i2c.data_i     .eq((self.address << 1) | tx.rw),
+                        i2c.data_i     .eq((self.control.address << 1) | tx.rw),
                         i2c.write      .eq(1),
                     ]
                     m.d.sync += current_transaction_rw.eq(tx.rw)
@@ -125,7 +133,7 @@ class I2CStreamer(wiring.Component):
                 with m.If(~i2c.busy):
                     with m.If(~i2c.ack_o):
                         m.next = "ABORT"
-                    with m.Elif(done):
+                    with m.Elif(self.control.status.tx_empty):
                         # zero-length transaction
                         m.next = "FINISH"
                     with m.Elif(current_transaction_rw != tx.rw):
@@ -151,7 +159,7 @@ class I2CStreamer(wiring.Component):
                         self._rx_fifo.w_data.eq(i2c.data_o),
                         self._rx_fifo.w_en.eq(1),
                     ]
-                    with m.If(done):
+                    with m.If(self.control.status.tx_empty):
                         m.next = "FINISH"
                     with m.Elif(tx.rw != 1):
                         m.next = "START"
@@ -171,7 +179,7 @@ class I2CStreamer(wiring.Component):
                 with m.If(~i2c.busy):
                     with m.If(~i2c.ack_o):
                         m.next = "ABORT"
-                    with m.Elif(done):
+                    with m.Elif(self.control.status.tx_empty):
                         m.next = "FINISH"
                     with m.Elif(tx.rw != 0):
                         m.next = "START"
@@ -275,12 +283,10 @@ class Peripheral(wiring.Component):
 
     class StatusReg(csr.Register, access="r"):
         busy:  csr.Field(csr.action.R, unsigned(1))
-        full:  csr.Field(csr.action.R, unsigned(1))
+        ready:  csr.Field(csr.action.R, unsigned(1))
         error: csr.Field(csr.action.R, unsigned(1))
 
     def __init__(self, **kwargs):
-
-        self.i2c_stream = I2CStreamer(**kwargs)
 
         regs = csr.Builder(addr_width=5, data_width=8)
 
@@ -293,7 +299,7 @@ class Peripheral(wiring.Component):
 
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            "pins": Out(I2CPinSignature()),
+            "i2c_stream": Out(I2CStreamerControl()),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -301,24 +307,32 @@ class Peripheral(wiring.Component):
         m = Module()
 
         m.submodules.bridge = self._bridge
-        m.submodules.i2c_stream = self.i2c_stream
 
         wiring.connect(m, flipped(self.bus), self._bridge.bus)
-        wiring.connect(m, flipped(self.pins), self.i2c_stream.pins)
 
         with m.If(self._address.f.address.w_stb):
             m.d.sync += self.i2c_stream.address.eq(self._address.f.address.w_data)
 
         m.d.comb += [
-            self._status.f.busy.r_data.eq(self.i2c_stream.status.busy),
-            self._status.f.full.r_data.eq(~self.i2c_stream.i.ready),
-            self._status.f.error.r_data.eq(self.i2c_stream.status.error),
-
-            self.i2c_stream.i.valid.eq(self._transaction_reg.element.w_stb),
-            self.i2c_stream.i.payload.last.eq(self._transaction_reg.f.last.w_data),
-            self.i2c_stream.i.payload.rw.eq(self._transaction_reg.f.rw.w_data),
-            self.i2c_stream.i.payload.data.eq(self._transaction_reg.f.data.w_data),
+            self._status.f.busy.r_data.eq(self.i2c_stream.status.busy | self.i2c_stream.i.valid),
+            self._status.f.ready.r_data.eq(self.i2c_stream.i.ready),
         ]
+
+        # only if connected!
+        with m.If(self.i2c_stream.i.ready):
+            m.d.sync += self._status.f.error.r_data.eq(
+                    self.i2c_stream.status.error),
+
+        with m.If(self._transaction_reg.element.w_stb):
+            m.d.sync += [
+                self.i2c_stream.i.valid.eq(1),
+                self.i2c_stream.i.payload.last.eq(self._transaction_reg.f.last.w_data),
+                self.i2c_stream.i.payload.rw.eq(self._transaction_reg.f.rw.w_data),
+                self.i2c_stream.i.payload.data.eq(self._transaction_reg.f.data.w_data),
+            ]
+
+        with m.If(self.i2c_stream.i.valid & self.i2c_stream.i.ready):
+            m.d.sync += self.i2c_stream.i.valid.eq(0)
 
         m.d.comb += [
             self._rx_data.f.data.r_data.eq(self.i2c_stream.o.payload),

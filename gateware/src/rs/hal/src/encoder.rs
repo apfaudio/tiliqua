@@ -1,3 +1,9 @@
+pub trait Encoder {
+    fn poke_ticks(&mut self) -> i8;
+    fn poke_btn(&mut self) -> bool;
+    fn update(&mut self);
+}
+
 #[macro_export]
 macro_rules! impl_encoder {
     ($(
@@ -30,15 +36,18 @@ macro_rules! impl_encoder {
                     }
                 }
 
+            }
+
+            impl hal::encoder::Encoder for $ENCODERX {
                 /// Check for pending ticks and clear them.
-                pub fn poke_ticks(&mut self) -> i8 {
+                fn poke_ticks(&mut self) -> i8 {
                     let ticks = self.pending_ticks;
                     self.pending_ticks = 0;
                     ticks
                 }
 
                 /// Check for pending clicks and erase it.
-                pub fn poke_btn(&mut self) -> bool {
+                fn poke_btn(&mut self) -> bool {
                     let btn = self.pending_press && self.pending_release;
                     if btn {
                         self.pending_press = false;
@@ -47,7 +56,7 @@ macro_rules! impl_encoder {
                     btn
                 }
 
-                pub fn update(&mut self) {
+                fn update(&mut self) {
 
                     self.rot += (self.registers.step().read().bits() as i8) as i16;
                     let btn = self.registers.button().read().bits() != 0;

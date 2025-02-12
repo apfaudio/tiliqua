@@ -190,6 +190,15 @@ class I2SCalibrator(wiring.Component):
     # Low latency ADC sample peeking (sync domain, can be used by softcore at same time as streams)
     o_cal_peek: Out(data.ArrayLayout(ASQ, 4))
 
+    # Write port for calibration memory (sync domain)
+    # Set values and assert `valid` until `ready` is strobed by this core, which
+    # indicates the calibration memory write has been committed.
+    cal_mem_write: In(stream.Signature(data.StructLayout({
+        "a": signed(18),
+        "b": signed(18),
+        "channel": unsigned(exact_log2(I2STDM.N_CHANNELS*2))
+        })))
+
     # default calibration constants based on averaging some R3.3 units
     # These should be accurate to +/- 100mV or so on a fresh unit without
     # requiring any initial calibration.
@@ -213,6 +222,10 @@ class I2SCalibrator(wiring.Component):
 
         m = Module()
 
+        #
+        # CALIBRATION MEMORY
+        #
+
         self.ctype = fixed.SQ(2, ASQ.f_width)
         cal_mem = Memory(shape=data.ArrayLayout(self.ctype, 2),
                          depth=I2STDM.N_CHANNELS*2,
@@ -222,8 +235,12 @@ class I2SCalibrator(wiring.Component):
                          ])
         m.submodules.cal_mem = cal_mem # WARN: accessed in 'audio' domain
         cal_read = cal_mem.read_port(domain="comb")
+        cal_write = cal_mem.write_port(domain="audio")
 
-        # FIFOs for crossing clock domains
+        #
+        # FIFOs for crossing between sync / audio domains. Both 4 channels wide.
+        #
+
         m.submodules.adc_fifo = adc_fifo = AsyncFIFO(
             width=I2STDM.S_WIDTH*4,
             depth=self.fifo_depth,
@@ -250,6 +267,10 @@ class I2SCalibrator(wiring.Component):
         # into / out of the scale/cal process
         in_sample = Signal(ASQ)
         out_sample = Signal(ASQ)
+
+        #
+        # CALIBRATION ALGORITHM (simple Ax + B, clamp output to min/max storage of ASQ)
+        #
 
         # calibration logic (single MAC then clamp)
         scaled = Signal(self.ctype)
@@ -295,6 +316,41 @@ class I2SCalibrator(wiring.Component):
                 m.d.audio += self.o_uncal.eq(out_sample.raw())
                 m.next = "IDLE"
 
+        #
+        # CALIBRATION MEMORY UPDATES (sync domain, execute in audio domain)
+        #
+
+        # Bring writes into audio domain
+        cal_write_payload_audio = Signal.like(self.cal_mem_write.payload)
+        cal_write_en_audio = Signal()
+        m.submodules += FFSynchronizer(self.cal_mem_write.payload, cal_write_payload_audio, o_domain="audio",
+                                       init={"a": 0, "b": 0, "channel": 0})
+        m.submodules += FFSynchronizer(self.cal_mem_write.valid, cal_write_en_audio, o_domain="audio")
+
+        # Execute write to calibration memory (in audio domain)
+        with m.If(cal_write_en_audio):
+            m.d.audio += [
+                cal_write.data.eq(Cat(cal_write_payload_audio.a, cal_write_payload_audio.b)),
+                cal_write.en.eq(1),
+            ]
+            # TODO: CLEANUP DAC cal channel off-by-one should be unnecessary!
+            with m.If(cal_write_payload_audio.channel < 4):
+                m.d.audio += cal_write.addr.eq(cal_write_payload_audio.channel)
+            with m.Else():
+                m.d.audio += cal_write.addr.eq(
+                        Mux(cal_write_payload_audio.channel == 4, 7, cal_write_payload_audio.channel-1))
+
+        # `valid` (hence en_audio) should be held high until we strobe `ready` in sync domain
+        # detect a rising edge on en_audio and send a single `ready` strobe (1 cycle) after
+        # the write has been committed to the calibration memory.
+        done_sync = Signal()
+        l_done_sync = Signal()
+        m.submodules += FFSynchronizer(cal_write_en_audio, done_sync, o_domain="sync")
+        m.d.sync += l_done_sync.eq(done_sync)
+        with m.If(done_sync & ~l_done_sync):
+            # detected rising edge (write), strobe once.
+            m.d.comb += self.cal_mem_write.ready.eq(1)
+
         return m
 
 class I2CMaster(wiring.Component):
@@ -312,12 +368,16 @@ class I2CMaster(wiring.Component):
     This kind of stateful stuff is often best suited for a softcore rather
     than pure RTL, however I wanted to make it possible to use all
     functions of the board without having to resort to using a softcore.
+
+    An SoC can optionally inject its own I2C traffic into this state machine
+    (useful for calibration and selftests) using the `i2c_override` port.
     """
 
-    PCA9557_ADDR     = 0x18
-    PCA9635_ADDR     = 0x5
-    AK4619VN_ADDR    = 0x10
-    CY8CMBR3108_ADDR = 0x37
+    PCA9557_ADDR        = 0x18
+    PCA9635_ADDR        = 0x5
+    AK4619VN_ADDR       = 0x10
+    CY8CMBR3108_ADDR    = 0x37
+    EEPROM_24AA025_ADDR = 0x52
 
     N_JACKS   = 8
     N_LEDS    = N_JACKS * 2
@@ -395,13 +455,18 @@ class I2CMaster(wiring.Component):
             "touch_err":      Out(unsigned(8)),
             # assert for at least 100msec for complete muting sequence.
             "codec_mute":     In(1),
+            # I2C override from SoC, not used unless written to.
+            "i2c_override":  In(i2c.I2CStreamerControl()),
         })
 
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.i2c_stream = i2c = self.i2c_stream
+        m.submodules.i2c_stream = self.i2c_stream
+        i2c = self.i2c_stream.control
         wiring.connect(m, wiring.flipped(self.pins), self.i2c_stream.pins)
+        l_i2c_address = Signal.like(i2c.address)
+        m.d.comb += i2c.address.eq(l_i2c_address)
 
         def state_id(ix):
             return (f"i2c_state{ix}", f"i2c_state{ix+1}", ix+1)
@@ -410,7 +475,7 @@ class I2CMaster(wiring.Component):
             # set i2c address of transactions being enqueued
             cur, nxt, ix = state_id(ix)
             with m.State(cur):
-                m.d.sync += i2c.address.eq(addr),
+                m.d.sync += l_i2c_address.eq(addr),
                 m.next = nxt
             return cur, nxt, ix
 
@@ -640,8 +705,27 @@ class I2CMaster(wiring.Component):
                         m.d.sync += mute_count.eq(mute_count+1)
                 with m.Else():
                     m.d.sync += mute_count.eq(0)
-                # Go back to LED brightness update
-                m.next = s_loop_begin
+                with m.If(self.i2c_override.i.valid):
+                    # Pending transaction from SoC?
+                    m.next = "I2C-OVERRIDE"
+                with m.Else():
+                    # Go back to LED brightness update
+                    m.next = s_loop_begin
+
+            #
+            # I2C OVERRIDE
+            # Issue transaction from SoC, then go back to ordinary state machine.
+            #
+
+            with m.State("I2C-OVERRIDE"):
+                wiring.connect(m, wiring.flipped(self.i2c_override), i2c)
+                m.next = "I2C-OVERRIDE-WAIT"
+
+            with m.State("I2C-OVERRIDE-WAIT"):
+                wiring.connect(m, wiring.flipped(self.i2c_override), i2c)
+                # Single transaction has been executed.
+                with m.If(i2c.status.tx_empty & i2c.status.rx_empty & ~i2c.status.busy):
+                    m.next = s_loop_begin
 
         return m
 
@@ -678,6 +762,7 @@ class EurorackPmod(wiring.Component):
     def __init__(self, hardware_r33=True, touch_enabled=True, audio_192=False):
         self.audio_192 = audio_192
         self.i2stdm = I2STDM(audio_192=self.audio_192)
+        self.i2c_master = I2CMaster(audio_192=self.audio_192)
         self.calibrator = I2SCalibrator()
         super().__init__()
 
@@ -709,7 +794,7 @@ class EurorackPmod(wiring.Component):
         # I2C MASTER CONTROL
         #
 
-        m.submodules.i2c_master = i2c_master = I2CMaster(audio_192=self.audio_192)
+        m.submodules.i2c_master = i2c_master = self.i2c_master
 
         # Hook up I2C master pins
         wiring.connect(m, i2c_master.pins, wiring.flipped(self.pins.i2c))
