@@ -19,11 +19,13 @@ class I2CTests(unittest.TestCase):
     def test_i2c_peripheral(self):
 
         m = Module()
-        dut = i2c.Peripheral(period_cyc=4)
+        dut = i2c.Peripheral()
+        i2c_stream = i2c.I2CStreamer(period_cyc=4)
         decoder = csr.Decoder(addr_width=28, data_width=8)
         decoder.add(dut.bus, addr=0, name="dut")
         bridge = wishbone.WishboneCSRBridge(decoder.bus, data_width=32)
-        m.submodules += [dut, decoder, bridge]
+        wiring.connect(m, dut.i2c_stream, i2c_stream.control)
+        m.submodules += [dut, decoder, bridge, i2c_stream]
 
         async def test_stimulus(ctx):
 
@@ -46,18 +48,22 @@ class I2CTests(unittest.TestCase):
             await csr_write(ctx, 0x300, "transaction_reg")
 
             # 3 transactions are enqueued
-            self.assertEqual(ctx.get(dut.i2c_stream._transactions.level), 3)
+            self.assertEqual(ctx.get(i2c_stream._transactions.level), 3)
 
             # busy flag should go high
             self.assertEqual(await csr_read(ctx, "status", "busy"), 1)
 
             await ctx.tick().repeat(500)
 
-            # busy flag should be low
+            await csr_read(ctx, "rx_data")
+
+            await ctx.tick().repeat(200)
+
+            # busy flag should go low
             self.assertEqual(await csr_read(ctx, "status", "busy"), 0)
 
             # all transactions drained.
-            self.assertEqual(ctx.get(dut.i2c_stream._transactions.level), 0)
+            self.assertEqual(ctx.get(i2c_stream._transactions.level), 0)
 
         async def test_response(ctx):
 
@@ -65,19 +71,19 @@ class I2CTests(unittest.TestCase):
             data_written = []
             while True:
                 await ctx.tick()
-                if ctx.get(dut.i2c_stream.status.busy) and not was_busy:
+                if ctx.get(i2c_stream.control.status.busy) and not was_busy:
                     was_busy = True
-                if was_busy and not ctx.get(dut.i2c_stream.status.busy):
+                if was_busy and not ctx.get(i2c_stream.control.status.busy):
                     break
-                if ctx.get(dut.i2c_stream.i2c.start):
+                if ctx.get(i2c_stream.i2c.start):
                     print("i2c.start")
-                if ctx.get(dut.i2c_stream.i2c.write):
-                    v = ctx.get(dut.i2c_stream.i2c.data_i)
+                if ctx.get(i2c_stream.i2c.write):
+                    v = ctx.get(i2c_stream.i2c.data_i)
                     print("i2c.write", hex(v))
                     data_written.append(v)
-                if ctx.get(dut.i2c_stream.i2c.read):
-                    print("i2c.read",  hex(ctx.get(dut.i2c_stream.i2c.data_o)))
-                if ctx.get(dut.i2c_stream.i2c.stop):
+                if ctx.get(i2c_stream.i2c.read):
+                    print("i2c.read",  hex(ctx.get(i2c_stream.i2c.data_o)))
+                if ctx.get(i2c_stream.i2c.stop):
                     print("i2c.stop")
 
             self.assertEqual(data_written, [0xaa, 0x42, 0x13, 0xab])
