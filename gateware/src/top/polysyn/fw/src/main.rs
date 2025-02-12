@@ -16,7 +16,6 @@ use tiliqua_pac as pac;
 use tiliqua_hal as hal;
 use tiliqua_lib::*;
 use tiliqua_lib::draw;
-use tiliqua_lib::leds;
 use tiliqua_lib::dsp::OnePoleSmoother;
 use tiliqua_lib::midi::MidiTouchController;
 use tiliqua_lib::generated_constants::*;
@@ -34,12 +33,6 @@ use embedded_graphics::{
 
 use opts::Options;
 use hal::pca9635::Pca9635Driver;
-
-impl_ui!(UI,
-         Options,
-         Encoder0,
-         Pca9635Driver<I2c0>,
-         EurorackPmod0);
 
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 
@@ -115,7 +108,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 }
 
 struct App {
-    ui: UI,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
     synth: Polysynth0,
     drive_smoother: OnePoleSmoother,
     reso_smoother: OnePoleSmoother,
@@ -136,8 +129,8 @@ impl App {
         let diffusion_smoother = OnePoleSmoother::new(0.05f32);
         let touch_controller = MidiTouchController::new();
         Self {
-            ui: UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                        encoder, pca9635, pmod),
+            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
+                            encoder, pca9635, pmod),
             synth,
             drive_smoother,
             reso_smoother,
@@ -183,11 +176,12 @@ fn main() -> ! {
 
         loop {
 
-            let (opts, notes, cutoffs) = critical_section::with(|cs| {
+            let (opts, notes, cutoffs, draw_options) = critical_section::with(|cs| {
                 let app = app.borrow_ref(cs);
                 (app.ui.opts.clone(),
                  app.synth.voice_notes().clone(),
-                 app.synth.voice_cutoffs().clone())
+                 app.synth.voice_cutoffs().clone(),
+                 app.ui.draw())
             });
 
             let help_screen: bool = opts.screen.value == Screen::Help;
@@ -197,7 +191,7 @@ fn main() -> ! {
                 last_palette = opts.beam.palette.value;
             }
 
-            if opts.draw || help_screen {
+            if draw_options || help_screen {
                 draw::draw_options(&mut display, &opts, H_ACTIVE/2-30, 70,
                                    opts.beam.hue.value).ok();
                 draw::draw_name(&mut display, H_ACTIVE/2, 30, opts.beam.hue.value, UI_NAME, UI_SHA).ok();

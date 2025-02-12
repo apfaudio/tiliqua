@@ -62,6 +62,10 @@ impl<EncoderT: Encoder,
         self.touch_led_mask = mask;
     }
 
+    pub fn draw(&self) -> bool {
+        self.draw
+    }
+
     pub fn update(&mut self) {
         //
         // Consume encoder, update options
