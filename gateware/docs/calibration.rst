@@ -22,6 +22,9 @@ All correction factors are stored as 18-bit fixed-point numbers with a range ``-
 Calibrating the ADCs/DACs
 -------------------------
 
+.. image:: _static/calibration.jpg
+  :width: 694
+
 Pictured above, the ``selftest`` bitstream provides a semi-automated way of performing ADC/DAC calibration.
 In short, the process is as follows:
 
@@ -31,7 +34,7 @@ In short, the process is as follows:
     - ``volts``: DAC reference level. This determines the value sent to the DAC. It is also subtracted from the ADC readings to form the 'delta' plot pictured on the main screen.
     - ``set``: Calibration coefficient to be automatically adjusted. The utility will adjust the selected coefficients until the 'delta' plot on the main screen has been zeroed.
     - ``autozero``: Enable autozero. When set to ``off``, nothing is adjusted. When set to ``run``, the selected calibration coefficients will be adjusted. Usually, you switch to ``run`` until the values are zeroed, then switch it off again.
-    - ``print``: Print the calculated calibration constants out the serial port for saving (TODO persistant storage).
+    - ``write``: Write constants to non-volatile EEPROM and print them out the serial port.
 
 - **Step 1** ADC zero:
 
@@ -62,12 +65,14 @@ In short, the process is as follows:
 
 - **Step 5** Save the results
 
-  - Switch on ``print`` from the menu to dump the cal constants out the serial port. These can be directly pasted into the ``eurorack_pmod.py`` calibration configuration.
-  - TODO persistant storage
+  - Select ``write`` from the menu and turn the encoder to save the calibration to non-volatile EEPROM on the eurorack-pmod PCBA. The constants are also printed out the serial port. On switching to other bitstreams or returning to this bitstream, the previous calibration will be loaded from EEPROM.
+
+.. note::
+
+    As of now, the calibration constants are only loaded from EEPROM in bitstreams that have an SoC. If you want to use the calibration constants in a bitstream without a SoC, for now you can copy and paste the serial-port dump into the default calibration you will find in ``eurorack_pmod.py``.
 
 - **You are done!** optionally, you can also tweak the cal constants from the ``TWEAK-ADC`` and ``TWEAK-DAC`` screens.
 
 .. note::
 
-    During calibration, you may notice the DC offsets moving around ~10mV depending on whether the LEDs are on or off. Unfortunately there is no simple workaround for this as it seems the CODEC DC offsets depend on the CODEC supply voltage, despite us using a dedicated voltage reference. This may be an artifact of us using the CODEC in an unsupported DC-coupled mode, we're not entirely sure yet. In any case, it's best to do the calibration assuming the LEDs are ON, as that is the state they will be in most of the time Tiliqua is being used.
-
+    During calibration, you may notice the DC offsets moving around ~10mV depending on whether the LEDs are on or off. Unfortunately there is no simple workaround for this as it seems the CODEC DC offsets depend on the CODEC supply voltage, despite us using a dedicated voltage reference. You may also see some higher offsets at high negative voltages. This may be an artifact of us using the CODEC in an unsupported DC-coupled mode, we're not entirely sure yet. In any case, it's best to do the calibration assuming the LEDs are ON, as that is the state they will be in most of the time Tiliqua is being used.
