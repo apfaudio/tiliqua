@@ -30,12 +30,6 @@ use embedded_graphics::{
 use opts::Options;
 use hal::pca9635::Pca9635Driver;
 
-impl_ui!(UI,
-         Options,
-         Encoder0,
-         Pca9635Driver<I2c0>,
-         EurorackPmod0);
-
 hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
                        VIDEO_ROTATE_90);
 
@@ -43,7 +37,7 @@ pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 pub const N_MANIFESTS: usize = 8;
 
 struct App {
-    ui: UI,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
     reboot_n: Option<usize>,
     error_n: [Option<String<32>>; N_MANIFESTS],
     time_since_reboot_requested: u32,
@@ -58,8 +52,8 @@ impl App {
         let pca9635 = Pca9635Driver::new(i2cdev);
         let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
         Self {
-            ui: UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                        encoder, pca9635, pmod),
+            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
+                            encoder, pca9635, pmod),
             reboot_n: None,
             error_n: [const { None }; N_MANIFESTS],
             time_since_reboot_requested: 0u32,
@@ -150,7 +144,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         }
 
         if let Some(n) = app.reboot_n {
-            app.time_since_reboot_requested += app.ui.period_ms;
+            app.time_since_reboot_requested += TIMER0_ISR_PERIOD_MS;
             // Give codec time to mute and display time to draw 'REBOOTING'
             if app.time_since_reboot_requested > 500 {
                 // Is there a firmware image to copy to PSRAM before we switch bitstreams?

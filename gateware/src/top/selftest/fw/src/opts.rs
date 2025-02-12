@@ -151,7 +151,6 @@ impl_option_view!(CalOptions,
 #[derive(Clone)]
 pub struct Options {
     pub modify: bool,
-    pub draw: bool,
     pub screen: EnumOption<Screen>,
 
     pub report: ReportOptions,
@@ -171,7 +170,6 @@ impl Options {
     pub fn new() -> Options {
         Options {
             modify: true,
-            draw: true,
             screen: EnumOption {
                 name: String::from_str("screen").unwrap(),
                 value: Screen::Report,

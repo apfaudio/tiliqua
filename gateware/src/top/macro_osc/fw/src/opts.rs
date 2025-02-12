@@ -108,7 +108,6 @@ impl_option_view!(ScopeOptions,
 #[derive(Clone)]
 pub struct Options {
     pub modify: bool,
-    pub draw:   bool,
     pub screen: EnumOption<Screen>,
 
     pub osc:    OscOptions,
@@ -128,7 +127,6 @@ impl Options {
     pub fn new() -> Options {
         Options {
             modify: false,
-            draw:   true,
             screen: EnumOption {
                 name: String::from_str("screen").unwrap(),
                 value: Screen::Osc,

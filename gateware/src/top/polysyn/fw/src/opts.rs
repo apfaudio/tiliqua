@@ -94,7 +94,6 @@ impl_option_view!(UsbOptions,
 #[derive(Clone)]
 pub struct Options {
     pub modify: bool,
-    pub draw: bool,
     pub screen: EnumOption<Screen>,
 
     pub help:   HelpOptions,
@@ -115,7 +114,6 @@ impl Options {
     pub fn new() -> Options {
         Options {
             modify: true,
-            draw: true,
             screen: EnumOption {
                 name: String::from_str("screen").unwrap(),
                 value: Screen::Help,

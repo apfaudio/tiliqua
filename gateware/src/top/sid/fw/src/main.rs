@@ -28,18 +28,12 @@ use hal::pca9635::Pca9635Driver;
 
 use micromath::F32Ext;
 
-impl_ui!(UI,
-         Options,
-         Encoder0,
-         Pca9635Driver<I2c0>,
-         EurorackPmod0);
-
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
 struct App {
-    ui: UI,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
 }
 
 impl App {
@@ -50,8 +44,8 @@ impl App {
         let pca9635 = Pca9635Driver::new(i2cdev);
         let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
         Self {
-            ui: UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                        encoder, pca9635, pmod),
+            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
+                            encoder, pca9635, pmod),
         }
     }
 }

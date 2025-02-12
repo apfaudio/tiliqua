@@ -28,12 +28,6 @@ use hal::pca9635::*;
 
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 
-impl_ui!(UI,
-         Options,
-         Encoder0,
-         Pca9635Driver<I2c0>,
-         EurorackPmod0);
-
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 const BLOCK_SIZE: usize = 64;
 // PSRAM heap for big audio buffers.
@@ -46,7 +40,7 @@ struct App<'a> {
     voice: Voice<'a>,
     patch: Patch,
     modulations: Modulations,
-    ui: UI,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
 }
 
 impl<'a> App<'a> {
@@ -72,8 +66,8 @@ impl<'a> App<'a> {
             voice,
             patch,
             modulations: Modulations::default(),
-            ui: UI::new(opts, TIMER0_ISR_PERIOD_MS, encoder,
-                        pca9635, pmod),
+            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
+                            encoder, pca9635, pmod),
         }
     }
 }
@@ -282,8 +276,9 @@ fn main() -> ! {
             // to copy out the current state of application options.
             //
 
-            let opts = critical_section::with(|cs| {
-                app.borrow_ref(cs).ui.opts.clone()
+            let (opts, draw_options) = critical_section::with(|cs| {
+                let ui = &app.borrow_ref(cs).ui;
+                (ui.opts.clone(), ui.draw()) 
             });
 
             if opts.beam.palette.value != last_palette || first {
@@ -291,7 +286,7 @@ fn main() -> ! {
                 last_palette = opts.beam.palette.value;
             }
 
-            if opts.draw {
+            if draw_options {
                 draw::draw_options(&mut display, &opts, H_ACTIVE-175, V_ACTIVE/2-50, opts.beam.hue.value).ok();
                 draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, opts.beam.hue.value, UI_NAME, UI_SHA).ok();
             }
