@@ -1,6 +1,8 @@
 use heapless::String;
 use heapless::Vec;
 
+use strum::IntoEnumIterator;
+
 use core::fmt::Write;
 use core::str::FromStr;
 
@@ -12,7 +14,7 @@ pub type OptionVec<'a> = Vec<&'a dyn OptionTrait, MAX_OPTS_PER_TAB>;
 pub type OptionVecMut<'a> = Vec<&'a mut dyn OptionTrait, MAX_OPTS_PER_TAB>;
 
 pub trait OptionTrait {
-    fn name(&self) -> &OptionString;
+    fn name(&self) -> &'static str;
     fn value(&self) -> OptionString;
     fn tick_up(&mut self);
     fn tick_down(&mut self);
@@ -45,18 +47,40 @@ pub trait OptionPageEncoderInterface {
 }
 
 #[derive(Clone)]
-pub struct NumOption<T> {
-    pub name: OptionString,
-    pub value: T,
-    pub step: T,
-    pub min: T,
-    pub max: T,
+pub struct NumOption<T: NumOptionConfig> {
+    name: &'static str,
+    pub value: T::Value,
+}
+
+pub trait NumOptionConfig {
+    type Value: Copy + Default;
+    const STEP: Self::Value;
+    const MIN: Self::Value;
+    const MAX: Self::Value;
+}
+
+impl<T: NumOptionConfig> NumOption<T> {
+    pub fn new(name: &'static str, value: T::Value) -> Self {
+        Self {
+            name,
+            value,
+        }
+    }
 }
 
 #[derive(Clone)]
-pub struct EnumOption<T> {
-    pub name: OptionString,
+pub struct EnumOption<T: Copy + IntoEnumIterator> {
+    pub name: &'static str,
     pub value: T,
+}
+
+impl<T: Copy + IntoEnumIterator> EnumOption<T> {
+    pub fn new(name: &'static str, value: T) -> Self {
+        Self {
+            name,
+            value,
+        }
+    }
 }
 
 #[macro_export]
@@ -173,15 +197,18 @@ where
     }
 }
 
-impl<T: Copy +
-        core::ops::Add<Output = T> +
-        core::ops::Sub<Output = T> +
-        core::cmp::PartialOrd +
-        core::fmt::Display>
-    OptionTrait for NumOption<T> where f32: From<T> {
-
-    fn name(&self) -> &OptionString {
-        &self.name
+impl<T: NumOptionConfig> OptionTrait for NumOption<T>
+where
+    T::Value: Copy
+        + Default
+        + core::ops::Add<Output = T::Value>
+        + core::ops::Sub<Output = T::Value>
+        + core::cmp::Ord
+        + core::fmt::Display,
+    f32: From<T::Value>,
+{
+    fn name(&self) -> &'static str {
+        self.name
     }
 
     fn value(&self) -> OptionString {
@@ -191,46 +218,58 @@ impl<T: Copy +
     }
 
     fn tick_up(&mut self) {
-        if self.value >= self.max {
-            self.value = self.max;
-            return
-        }
-        if self.value + self.step >= self.max {
-            self.value = self.max;
-        } else {
-            self.value = self.value + self.step;
-        }
+        self.value = (self.value + T::STEP).clamp(T::MIN, T::MAX);
     }
 
     fn tick_down(&mut self) {
-        if self.value <= self.min {
-            self.value = self.min;
-            return
-        }
-        if self.value - self.step <= self.min {
-            self.value = self.min;
-        } else {
-            self.value = self.value - self.step;
-        }
+        self.value = (self.value - T::STEP).clamp(T::MIN, T::MAX);
     }
 
     fn percent(&self) -> f32 {
-        let n: f32 = f32::from(self.value - self.min);
-        let d: f32 = f32::from(self.max - self.min);
-        n / d
+        let range = T::MAX - T::MIN;
+        let value = self.value - T::MIN;
+        f32::from(value) / f32::from(range)
     }
 
     fn n_unique_values(&self) -> usize {
-        // TODO
+        // Implementation here
         0
     }
 }
 
-impl<T: Copy + strum::IntoEnumIterator + PartialEq + Into<&'static str>>
-    OptionTrait for EnumOption<T> {
+#[macro_export]
+macro_rules! num_option_config {
+    ($name:ident<$t:ty> { step: $step:expr, min: $min:expr, max: $max:expr }) => {
+        #[derive(Clone)]
+        pub struct $name;
 
-    fn name(&self) -> &OptionString {
-        &self.name
+        impl NumOptionConfig for $name {
+            type Value = $t;
+            const STEP: Self::Value = $step;
+            const MIN: Self::Value = $min;
+            const MAX: Self::Value = $max;
+        }
+    };
+    ($name:ident: $t:ty => $step:expr, $min:expr, $max:expr) => {
+        num_option_config!($name<$t> {
+            step: $step,
+            min: $min,
+            max: $max
+        });
+    };
+}
+
+
+impl<T> OptionTrait for EnumOption<T>
+where
+    T: Copy
+        + IntoEnumIterator
+        + PartialEq
+        + Into<&'static str>
+    {
+
+    fn name(&self) -> &'static str {
+        self.name
     }
 
     fn value(&self) -> OptionString {
