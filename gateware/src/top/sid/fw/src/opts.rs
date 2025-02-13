@@ -1,11 +1,7 @@
 use tiliqua_lib::opt::*;
-use tiliqua_lib::impl_option_view;
 use tiliqua_lib::impl_option_page;
-
-use heapless::String;
-
-use core::str::FromStr;
-
+use tiliqua_lib::impl_option_view;
+use tiliqua_lib::num_option_config;
 use strum_macros::{EnumIter, IntoStaticStr};
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
@@ -35,80 +31,132 @@ pub enum Wave {
     Noise,
 }
 
+// Define configs for different numeric ranges
+num_option_config!(FrequencyConfig: u16 => 125, 0, 65500);
+num_option_config!(FreqOffsetConfig: u16 => 10, 500, 2000);
+num_option_config!(PulseWidthConfig: u16 => 128, 0, 4096);
+num_option_config!(EnvelopeConfig: u8 => 1, 0, 15);
+num_option_config!(BinaryConfig: u8 => 1, 0, 1);
+num_option_config!(CutoffConfig: u16 => 100, 0, 2000);
+num_option_config!(VolumeConfig: u8 => 1, 0, 15);
+num_option_config!(TimebaseConfig: u16 => 128, 32, 3872);
+num_option_config!(TriggerLevelConfig: i16 => 512, -16384, 16384);
+num_option_config!(PositionConfig: i16 => 25, -500, 500);
+num_option_config!(ScaleConfig: u8 => 1, 0, 15);
+
 #[derive(Clone)]
 pub struct VoiceOptions {
     pub selected: Option<usize>,
-    pub freq:    NumOption<u16>,
-    pub freq_os: NumOption<u16>,
-    pub pw:      NumOption<u16>,
-    pub wave:    EnumOption<Wave>,
-    pub gate:    NumOption<u8>,
-    pub sync:    NumOption<u8>,
-    pub ring:    NumOption<u8>,
-    pub attack:  NumOption<u8>,
-    pub decay:   NumOption<u8>,
-    pub sustain: NumOption<u8>,
-    pub release: NumOption<u8>,
+    pub freq: NumOption<FrequencyConfig>,
+    pub freq_os: NumOption<FreqOffsetConfig>,
+    pub pw: NumOption<PulseWidthConfig>,
+    pub wave: EnumOption<Wave>,
+    pub gate: NumOption<BinaryConfig>,
+    pub sync: NumOption<BinaryConfig>,
+    pub ring: NumOption<BinaryConfig>,
+    pub attack: NumOption<EnvelopeConfig>,
+    pub decay: NumOption<EnvelopeConfig>,
+    pub sustain: NumOption<EnvelopeConfig>,
+    pub release: NumOption<EnvelopeConfig>,
+}
+
+impl VoiceOptions {
+    fn new() -> Self {
+        Self {
+            selected: None,
+            freq: NumOption::new("f-base", 1000),
+            freq_os: NumOption::new("f-offs", 1000),
+            pw: NumOption::new("pw", 2048),
+            wave: EnumOption::new("wave", Wave::Triangle),
+            gate: NumOption::new("gate", 1),
+            sync: NumOption::new("sync", 0),
+            ring: NumOption::new("ring", 0),
+            attack: NumOption::new("attack", 0),
+            decay: NumOption::new("decay", 0),
+            sustain: NumOption::new("sustain", 15),
+            release: NumOption::new("release", 0),
+        }
+    }
 }
 
 impl_option_view!(VoiceOptions,
-                  freq,
-                  freq_os,
-                  pw,
-                  wave,
-                  gate,
-                  sync,
-                  ring,
-                  attack,
-                  decay,
-                  sustain,
-                  release);
+                  freq, freq_os, pw, wave, gate, sync, ring,
+                  attack, decay, sustain, release);
 
 #[derive(Clone)]
 pub struct FilterOptions {
-    pub selected:  Option<usize>,
-    pub cutoff:    NumOption<u16>,
-    pub reso:      NumOption<u8>,
-    pub filt1:     NumOption<u8>,
-    pub filt2:     NumOption<u8>,
-    pub filt3:     NumOption<u8>,
-    pub lp:        NumOption<u8>,
-    pub bp:        NumOption<u8>,
-    pub hp:        NumOption<u8>,
-    pub v3off:     NumOption<u8>,
-    pub volume:    NumOption<u8>,
+    pub selected: Option<usize>,
+    pub cutoff: NumOption<CutoffConfig>,
+    pub reso: NumOption<EnvelopeConfig>,
+    pub filt1: NumOption<BinaryConfig>,
+    pub filt2: NumOption<BinaryConfig>,
+    pub filt3: NumOption<BinaryConfig>,
+    pub lp: NumOption<BinaryConfig>,
+    pub bp: NumOption<BinaryConfig>,
+    pub hp: NumOption<BinaryConfig>,
+    pub v3off: NumOption<BinaryConfig>,
+    pub volume: NumOption<VolumeConfig>,
+}
+
+impl FilterOptions {
+    fn new() -> Self {
+        Self {
+            selected: None,
+            cutoff: NumOption::new("cutoff", 1500),
+            reso: NumOption::new("reso", 0),
+            filt1: NumOption::new("filt1", 0),
+            filt2: NumOption::new("filt2", 0),
+            filt3: NumOption::new("filt3", 0),
+            lp: NumOption::new("lp", 0),
+            bp: NumOption::new("bp", 0),
+            hp: NumOption::new("hp", 0),
+            v3off: NumOption::new("3off", 0),
+            volume: NumOption::new("volume", 15),
+        }
+    }
 }
 
 impl_option_view!(FilterOptions,
-                  cutoff,
-                  reso,
-                  filt1,
-                  filt2,
-                  filt3,
-                  lp,
-                  bp,
-                  hp,
-                  v3off,
-                  volume);
+                  cutoff, reso, filt1, filt2, filt3,
+                  lp, bp, hp, v3off, volume);
 
 #[derive(Clone)]
 pub struct ScopeOptions {
     pub selected: Option<usize>,
-    pub timebase: NumOption<u16>,
+    pub timebase: NumOption<TimebaseConfig>,
     pub trigger_mode: EnumOption<TriggerMode>,
-    pub trigger_lvl: NumOption<i16>,
-    pub ypos0: NumOption<i16>,
-    pub ypos1: NumOption<i16>,
-    pub ypos2: NumOption<i16>,
-    pub ypos3: NumOption<i16>,
-    pub yscale: NumOption<u8>,
-    pub xscale: NumOption<u8>,
-    pub xpos:  NumOption<i16>,
+    pub trigger_lvl: NumOption<TriggerLevelConfig>,
+    pub ypos0: NumOption<PositionConfig>,
+    pub ypos1: NumOption<PositionConfig>,
+    pub ypos2: NumOption<PositionConfig>,
+    pub ypos3: NumOption<PositionConfig>,
+    pub yscale: NumOption<ScaleConfig>,
+    pub xscale: NumOption<ScaleConfig>,
+    pub xpos: NumOption<PositionConfig>,
+}
+
+impl ScopeOptions {
+    fn new() -> Self {
+        Self {
+            selected: None,
+            timebase: NumOption::new("timebase", 32),
+            trigger_mode: EnumOption::new("trig-mode", TriggerMode::Always),
+            trigger_lvl: NumOption::new("trig-lvl", 0),
+            ypos0: NumOption::new("ypos0", 150),
+            ypos1: NumOption::new("ypos1", -150),
+            ypos2: NumOption::new("ypos2", -50),
+            ypos3: NumOption::new("ypos3", 50),
+            yscale: NumOption::new("yscale", 8),
+            xscale: NumOption::new("xscale", 7),
+            xpos: NumOption::new("xpos", 175),
+        }
+    }
 }
 
 impl_option_view!(ScopeOptions,
                   timebase, trigger_mode, trigger_lvl,
-                  ypos0, ypos1, ypos2, ypos3, yscale, xscale, xpos);
+                  ypos0, ypos1, ypos2, ypos3,
+                  yscale, xscale, xpos);
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
@@ -151,18 +199,26 @@ impl ModulationTarget {
 
 #[derive(Clone)]
 pub struct ModulateOptions {
-    pub selected:  Option<usize>,
-    pub in0:       EnumOption<ModulationTarget>,
-    pub in1:       EnumOption<ModulationTarget>,
-    pub in2:       EnumOption<ModulationTarget>,
-    pub in3:       EnumOption<ModulationTarget>,
+    pub selected: Option<usize>,
+    pub in0: EnumOption<ModulationTarget>,
+    pub in1: EnumOption<ModulationTarget>,
+    pub in2: EnumOption<ModulationTarget>,
+    pub in3: EnumOption<ModulationTarget>,
 }
 
-impl_option_view!(ModulateOptions,
-                  in0,
-                  in1,
-                  in2,
-                  in3);
+impl ModulateOptions {
+    fn new() -> Self {
+        Self {
+            selected: None,
+            in0: EnumOption::new("in0", ModulationTarget::Nothing),
+            in1: EnumOption::new("in1", ModulationTarget::Nothing),
+            in2: EnumOption::new("in2", ModulationTarget::Nothing),
+            in3: EnumOption::new("in3", ModulationTarget::Nothing),
+        }
+    }
+}
+
+impl_option_view!(ModulateOptions, in0, in1, in2, in3);
 
 #[derive(Clone)]
 pub struct Options {
@@ -173,7 +229,7 @@ pub struct Options {
     pub voice2: VoiceOptions,
     pub voice3: VoiceOptions,
     pub filter: FilterOptions,
-    pub scope:  ScopeOptions,
+    pub scope: ScopeOptions,
 }
 
 impl_option_page!(Options,
@@ -182,264 +238,19 @@ impl_option_page!(Options,
                   (Screen::Voice2, voice2),
                   (Screen::Voice3, voice3),
                   (Screen::Filter, filter),
-                  (Screen::Scope,   scope)
-                  );
-
-impl VoiceOptions {
-    fn new() -> VoiceOptions {
-        VoiceOptions {
-            selected: None,
-            freq: NumOption{
-                name: String::from_str("f-base").unwrap(),
-                value: 1000,
-                step: 125,
-                min: 0,
-                max: 65500,
-            },
-            freq_os: NumOption{
-                name: String::from_str("f-offs").unwrap(),
-                value: 1000,
-                step: 10,
-                min: 500,
-                max: 2000,
-            },
-            pw: NumOption{
-                name: String::from_str("pw").unwrap(),
-                value: 2048,
-                step: 128,
-                min: 0,
-                max: 4096,
-            },
-            wave: EnumOption{
-                name: String::from_str("wave").unwrap(),
-                value: Wave::Triangle,
-            },
-            gate: NumOption{
-                name: String::from_str("gate").unwrap(),
-                value: 1,
-                step: 1,
-                min: 0,
-                max: 1,
-            },
-            sync: NumOption{
-                name: String::from_str("sync").unwrap(),
-                value: 0,
-                step: 1,
-                min: 0,
-                max: 1,
-            },
-            ring: NumOption{
-                name: String::from_str("ring").unwrap(),
-                value: 0,
-                step: 1,
-                min: 0,
-                max: 1,
-            },
-            attack: NumOption{
-                name: String::from_str("attack").unwrap(),
-                value: 0,
-                step: 1,
-                min: 0,
-                max: 15,
-            },
-            decay: NumOption{
-                name: String::from_str("decay").unwrap(),
-                value: 0,
-                step: 1,
-                min: 0,
-                max: 15,
-            },
-            sustain: NumOption{
-                name: String::from_str("sustain").unwrap(),
-                value: 15,
-                step: 1,
-                min: 0,
-                max: 15,
-            },
-            release: NumOption{
-                name: String::from_str("release").unwrap(),
-                value: 0,
-                step: 1,
-                min: 0,
-                max: 15,
-            },
-        }
-    }
-}
+                  (Screen::Scope, scope));
 
 impl Options {
     pub fn new() -> Options {
         Options {
             modify: false,
-            screen: EnumOption {
-                name: String::from_str("screen").unwrap(),
-                value: Screen::Voice1,
-            },
-            modulate: ModulateOptions {
-                selected: None,
-                in0: EnumOption {
-                    name: String::from_str("in0").unwrap(),
-                    value: ModulationTarget::Nothing,
-                },
-                in1: EnumOption {
-                    name: String::from_str("in1").unwrap(),
-                    value: ModulationTarget::Nothing,
-                },
-                in2: EnumOption {
-                    name: String::from_str("in2").unwrap(),
-                    value: ModulationTarget::Nothing,
-                },
-                in3: EnumOption {
-                    name: String::from_str("in3").unwrap(),
-                    value: ModulationTarget::Nothing,
-                },
-            },
+            screen: EnumOption::new("screen", Screen::Voice1),
+            modulate: ModulateOptions::new(),
             voice1: VoiceOptions::new(),
             voice2: VoiceOptions::new(),
             voice3: VoiceOptions::new(),
-            filter: FilterOptions {
-                selected: None,
-                cutoff: NumOption{
-                    name: String::from_str("cutoff").unwrap(),
-                    value: 1500,
-                    step: 100,
-                    min: 0,
-                    max: 2000,
-                },
-                reso: NumOption{
-                    name: String::from_str("reso").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-                filt1: NumOption{
-                    name: String::from_str("filt1").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: 0,
-                    max: 1,
-                },
-                filt2: NumOption{
-                    name: String::from_str("filt2").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: 0,
-                    max: 1,
-                },
-                filt3: NumOption{
-                    name: String::from_str("filt3").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: 0,
-                    max: 1,
-                },
-                lp: NumOption{
-                    name: String::from_str("lp").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: 0,
-                    max: 1,
-                },
-                bp: NumOption{
-                    name: String::from_str("bp").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: 0,
-                    max: 1,
-                },
-                hp: NumOption{
-                    name: String::from_str("hp").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: 0,
-                    max: 1,
-                },
-                v3off: NumOption{
-                    name: String::from_str("3off").unwrap(),
-                    value: 0,
-                    step: 1,
-                    min: 0,
-                    max: 1,
-                },
-                volume: NumOption{
-                    name: String::from_str("volume").unwrap(),
-                    value: 15,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-            },
-            scope: ScopeOptions {
-                selected: None,
-                timebase: NumOption{
-                    name: String::from_str("timebase").unwrap(),
-                    value: 32,
-                    step: 128,
-                    min: 32,
-                    max: 3872,
-                },
-                trigger_mode: EnumOption {
-                    name: String::from_str("trig-mode").unwrap(),
-                    value: TriggerMode::Always,
-                },
-                trigger_lvl: NumOption{
-                    name: String::from_str("trig-lvl").unwrap(),
-                    value: 0,
-                    step: 512,
-                    min: -512*32,
-                    max: 512*32,
-                },
-                ypos0: NumOption{
-                    name: String::from_str("ypos0").unwrap(),
-                    value: 150,
-                    step: 25,
-                    min: -500,
-                    max: 500,
-                },
-                ypos1: NumOption{
-                    name: String::from_str("ypos1").unwrap(),
-                    value: -150,
-                    step: 25,
-                    min: -500,
-                    max: 500,
-                },
-                ypos2: NumOption{
-                    name: String::from_str("ypos2").unwrap(),
-                    value: -50,
-                    step: 25,
-                    min: -500,
-                    max: 500,
-                },
-                ypos3: NumOption{
-                    name: String::from_str("ypos3").unwrap(),
-                    value: 50,
-                    step: 25,
-                    min: -500,
-                    max: 500,
-                },
-                yscale: NumOption{
-                    name: String::from_str("yscale").unwrap(),
-                    value: 8,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-                xscale: NumOption{
-                    name: String::from_str("xscale").unwrap(),
-                    value: 7,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-                xpos: NumOption{
-                    name: String::from_str("xpos").unwrap(),
-                    value: 175,
-                    step: 25,
-                    min: -500,
-                    max: 500,
-                },
-            },
+            filter: FilterOptions::new(),
+            scope: ScopeOptions::new(),
         }
     }
 }
