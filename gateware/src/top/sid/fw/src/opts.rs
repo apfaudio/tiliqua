@@ -1,8 +1,8 @@
 use tiliqua_lib::opt::*;
 use tiliqua_lib::impl_option_page;
-use tiliqua_lib::impl_option_view;
 use tiliqua_lib::num_option_config;
 use strum_macros::{EnumIter, IntoStaticStr};
+use opts_macro::OptionSet;
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
@@ -30,127 +30,6 @@ pub enum Wave {
     Pulse,
     Noise,
 }
-
-// Define configs for different numeric ranges
-num_option_config!(FrequencyConfig: u16 => 125, 0, 65500);
-num_option_config!(FreqOffsetConfig: u16 => 10, 500, 2000);
-num_option_config!(PulseWidthConfig: u16 => 128, 0, 4096);
-num_option_config!(EnvelopeConfig: u8 => 1, 0, 15);
-num_option_config!(BinaryConfig: u8 => 1, 0, 1);
-num_option_config!(CutoffConfig: u16 => 100, 0, 2000);
-num_option_config!(VolumeConfig: u8 => 1, 0, 15);
-num_option_config!(TimebaseConfig: u16 => 128, 32, 3872);
-num_option_config!(TriggerLevelConfig: i16 => 512, -16384, 16384);
-num_option_config!(PositionConfig: i16 => 25, -500, 500);
-num_option_config!(ScaleConfig: u8 => 1, 0, 15);
-
-#[derive(Clone)]
-pub struct VoiceOptions {
-    pub freq: NumOption<FrequencyConfig>,
-    pub freq_os: NumOption<FreqOffsetConfig>,
-    pub pw: NumOption<PulseWidthConfig>,
-    pub wave: EnumOption<Wave>,
-    pub gate: NumOption<BinaryConfig>,
-    pub sync: NumOption<BinaryConfig>,
-    pub ring: NumOption<BinaryConfig>,
-    pub attack: NumOption<EnvelopeConfig>,
-    pub decay: NumOption<EnvelopeConfig>,
-    pub sustain: NumOption<EnvelopeConfig>,
-    pub release: NumOption<EnvelopeConfig>,
-}
-
-impl VoiceOptions {
-    fn new() -> Self {
-        Self {
-            freq: NumOption::new("f-base", 1000),
-            freq_os: NumOption::new("f-offs", 1000),
-            pw: NumOption::new("pw", 2048),
-            wave: EnumOption::new("wave", Wave::Triangle),
-            gate: NumOption::new("gate", 1),
-            sync: NumOption::new("sync", 0),
-            ring: NumOption::new("ring", 0),
-            attack: NumOption::new("attack", 0),
-            decay: NumOption::new("decay", 0),
-            sustain: NumOption::new("sustain", 15),
-            release: NumOption::new("release", 0),
-        }
-    }
-}
-
-impl_option_view!(VoiceOptions,
-                  freq, freq_os, pw, wave, gate, sync, ring,
-                  attack, decay, sustain, release);
-
-#[derive(Clone)]
-pub struct FilterOptions {
-    pub cutoff: NumOption<CutoffConfig>,
-    pub reso: NumOption<EnvelopeConfig>,
-    pub filt1: NumOption<BinaryConfig>,
-    pub filt2: NumOption<BinaryConfig>,
-    pub filt3: NumOption<BinaryConfig>,
-    pub lp: NumOption<BinaryConfig>,
-    pub bp: NumOption<BinaryConfig>,
-    pub hp: NumOption<BinaryConfig>,
-    pub v3off: NumOption<BinaryConfig>,
-    pub volume: NumOption<VolumeConfig>,
-}
-
-impl FilterOptions {
-    fn new() -> Self {
-        Self {
-            cutoff: NumOption::new("cutoff", 1500),
-            reso: NumOption::new("reso", 0),
-            filt1: NumOption::new("filt1", 0),
-            filt2: NumOption::new("filt2", 0),
-            filt3: NumOption::new("filt3", 0),
-            lp: NumOption::new("lp", 0),
-            bp: NumOption::new("bp", 0),
-            hp: NumOption::new("hp", 0),
-            v3off: NumOption::new("3off", 0),
-            volume: NumOption::new("volume", 15),
-        }
-    }
-}
-
-impl_option_view!(FilterOptions,
-                  cutoff, reso, filt1, filt2, filt3,
-                  lp, bp, hp, v3off, volume);
-
-#[derive(Clone)]
-pub struct ScopeOptions {
-    pub timebase: NumOption<TimebaseConfig>,
-    pub trigger_mode: EnumOption<TriggerMode>,
-    pub trigger_lvl: NumOption<TriggerLevelConfig>,
-    pub ypos0: NumOption<PositionConfig>,
-    pub ypos1: NumOption<PositionConfig>,
-    pub ypos2: NumOption<PositionConfig>,
-    pub ypos3: NumOption<PositionConfig>,
-    pub yscale: NumOption<ScaleConfig>,
-    pub xscale: NumOption<ScaleConfig>,
-    pub xpos: NumOption<PositionConfig>,
-}
-
-impl ScopeOptions {
-    fn new() -> Self {
-        Self {
-            timebase: NumOption::new("timebase", 32),
-            trigger_mode: EnumOption::new("trig-mode", TriggerMode::Always),
-            trigger_lvl: NumOption::new("trig-lvl", 0),
-            ypos0: NumOption::new("ypos0", 150),
-            ypos1: NumOption::new("ypos1", -150),
-            ypos2: NumOption::new("ypos2", -50),
-            ypos3: NumOption::new("ypos3", 50),
-            yscale: NumOption::new("yscale", 8),
-            xscale: NumOption::new("xscale", 7),
-            xpos: NumOption::new("xpos", 175),
-        }
-    }
-}
-
-impl_option_view!(ScopeOptions,
-                  timebase, trigger_mode, trigger_lvl,
-                  ypos0, ypos1, ypos2, ypos3,
-                  yscale, xscale, xpos);
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
@@ -191,26 +70,105 @@ impl ModulationTarget {
     }
 }
 
-#[derive(Clone)]
+
+// Configs remain unchanged
+num_option_config!(FrequencyConfig: u16 => 125, 0, 65500);
+num_option_config!(FreqOffsetConfig: u16 => 10, 500, 2000);
+num_option_config!(PulseWidthConfig: u16 => 128, 0, 4096);
+num_option_config!(EnvelopeConfig: u8 => 1, 0, 15);
+num_option_config!(BinaryConfig: u8 => 1, 0, 1);
+num_option_config!(CutoffConfig: u16 => 100, 0, 2000);
+num_option_config!(VolumeConfig: u8 => 1, 0, 15);
+num_option_config!(TimebaseConfig: u16 => 128, 32, 3872);
+num_option_config!(TriggerLevelConfig: i16 => 512, -16384, 16384);
+num_option_config!(PositionConfig: i16 => 25, -500, 500);
+num_option_config!(ScaleConfig: u8 => 1, 0, 15);
+
+#[derive(OptionSet, Clone)]
+pub struct VoiceOptions {
+    #[option(1000)]
+    pub freq: NumOption<FrequencyConfig>,
+    #[option(1000)]
+    pub freq_os: NumOption<FreqOffsetConfig>,
+    #[option(2048)]
+    pub pw: NumOption<PulseWidthConfig>,
+    #[option(Wave::Triangle)]
+    pub wave: EnumOption<Wave>,
+    #[option(1)]
+    pub gate: NumOption<BinaryConfig>,
+    #[option(0)]
+    pub sync: NumOption<BinaryConfig>,
+    #[option(0)]
+    pub ring: NumOption<BinaryConfig>,
+    #[option(0)]
+    pub attack: NumOption<EnvelopeConfig>,
+    #[option(0)]
+    pub decay: NumOption<EnvelopeConfig>,
+    #[option(15)]
+    pub sustain: NumOption<EnvelopeConfig>,
+    #[option(0)]
+    pub release: NumOption<EnvelopeConfig>,
+}
+
+#[derive(OptionSet, Clone)]
+pub struct FilterOptions {
+    #[option(1500)]
+    pub cutoff: NumOption<CutoffConfig>,
+    #[option(0)]
+    pub reso: NumOption<EnvelopeConfig>,
+    #[option(0)]
+    pub filt1: NumOption<BinaryConfig>,
+    #[option(0)]
+    pub filt2: NumOption<BinaryConfig>,
+    #[option(0)]
+    pub filt3: NumOption<BinaryConfig>,
+    #[option(0)]
+    pub lp: NumOption<BinaryConfig>,
+    #[option(0)]
+    pub bp: NumOption<BinaryConfig>,
+    #[option(0)]
+    pub hp: NumOption<BinaryConfig>,
+    #[option(0)]
+    pub v3off: NumOption<BinaryConfig>,
+    #[option(15)]
+    pub volume: NumOption<VolumeConfig>,
+}
+
+#[derive(OptionSet, Clone)]
+pub struct ScopeOptions {
+    #[option(32)]
+    pub timebase: NumOption<TimebaseConfig>,
+    #[option(TriggerMode::Always)]
+    pub trigger_mode: EnumOption<TriggerMode>,
+    #[option(0)]
+    pub trigger_lvl: NumOption<TriggerLevelConfig>,
+    #[option(150)]
+    pub ypos0: NumOption<PositionConfig>,
+    #[option(-150)]
+    pub ypos1: NumOption<PositionConfig>,
+    #[option(-50)]
+    pub ypos2: NumOption<PositionConfig>,
+    #[option(50)]
+    pub ypos3: NumOption<PositionConfig>,
+    #[option(8)]
+    pub yscale: NumOption<ScaleConfig>,
+    #[option(7)]
+    pub xscale: NumOption<ScaleConfig>,
+    #[option(175)]
+    pub xpos: NumOption<PositionConfig>,
+}
+
+#[derive(OptionSet, Clone)]
 pub struct ModulateOptions {
+    #[option(ModulationTarget::Nothing)]
     pub in0: EnumOption<ModulationTarget>,
+    #[option(ModulationTarget::Nothing)]
     pub in1: EnumOption<ModulationTarget>,
+    #[option(ModulationTarget::Nothing)]
     pub in2: EnumOption<ModulationTarget>,
+    #[option(ModulationTarget::Nothing)]
     pub in3: EnumOption<ModulationTarget>,
 }
-
-impl ModulateOptions {
-    fn new() -> Self {
-        Self {
-            in0: EnumOption::new("in0", ModulationTarget::Nothing),
-            in1: EnumOption::new("in1", ModulationTarget::Nothing),
-            in2: EnumOption::new("in2", ModulationTarget::Nothing),
-            in3: EnumOption::new("in3", ModulationTarget::Nothing),
-        }
-    }
-}
-
-impl_option_view!(ModulateOptions, in0, in1, in2, in3);
 
 #[derive(Clone)]
 pub struct Options {
@@ -239,12 +197,12 @@ impl Options {
             selected: None,
             modify: false,
             screen: EnumOption::new("screen", Screen::Voice1),
-            modulate: ModulateOptions::new(),
-            voice1: VoiceOptions::new(),
-            voice2: VoiceOptions::new(),
-            voice3: VoiceOptions::new(),
-            filter: FilterOptions::new(),
-            scope: ScopeOptions::new(),
+            modulate: ModulateOptions::default(),
+            voice1: VoiceOptions::default(),
+            voice2: VoiceOptions::default(),
+            voice3: VoiceOptions::default(),
+            filter: FilterOptions::default(),
+            scope: ScopeOptions::default(),
         }
     }
 }

@@ -84,23 +84,6 @@ impl<T: Copy + IntoEnumIterator> EnumOption<T> {
 }
 
 #[macro_export]
-macro_rules! impl_option_view {
-    ($struct_name:ident, $($field:ident),*) => {
-        impl OptionView for $struct_name {
-            fn options(&self) -> OptionVec {
-                OptionVec::from_slice(&[$(&self.$field),*]).unwrap()
-            }
-
-            fn options_mut(&mut self) -> OptionVecMut {
-                let mut r = OptionVecMut::new();
-                $(r.push(&mut self.$field).ok();)*
-                r
-            }
-        }
-    };
-}
-
-#[macro_export]
 macro_rules! impl_option_page {
     ($struct_name:ident, $(($screen:path, $field:ident)),*) => {
         impl OptionPage for $struct_name {
