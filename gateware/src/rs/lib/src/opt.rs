@@ -22,24 +22,24 @@ pub trait OptionTrait {
     fn n_unique_values(&self) -> usize;
 }
 
-pub trait OptionView {
+pub trait OptionPage {
     fn options(&self) -> OptionVec;
     fn options_mut(&mut self) -> OptionVecMut;
 }
 
-pub trait OptionPage {
+pub trait Options {
     fn selected(&self) -> Option<usize>;
     fn set_selected(&mut self, s: Option<usize>);
     fn modify(&self) -> bool;
     fn screen(&self) -> &dyn OptionTrait;
-    fn view(&self) -> &dyn OptionView;
+    fn view(&self) -> &dyn OptionPage;
 
     fn modify_mut(&mut self, modify: bool);
-    fn view_mut(&mut self) -> &mut dyn OptionView;
+    fn view_mut(&mut self) -> &mut dyn OptionPage;
     fn screen_mut(&mut self) -> &mut dyn OptionTrait;
 }
 
-pub trait OptionPageEncoderInterface {
+pub trait OptionsEncoderInterface {
     fn toggle_modify(&mut self);
     fn tick_up(&mut self);
     fn tick_down(&mut self);
@@ -90,9 +90,9 @@ impl<T: Copy + IntoEnumIterator + Default> EnumOption<T> {
     }
 }
 
-impl<T> OptionPageEncoderInterface for T
+impl<T> OptionsEncoderInterface for T
 where
-    T: OptionPage,
+    T: Options,
 {
     fn toggle_modify(&mut self) {
         self.modify_mut(!self.modify());

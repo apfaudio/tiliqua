@@ -1,11 +1,11 @@
 use tiliqua_lib::opt::*;
 use tiliqua_lib::num_params;
 use strum_macros::{EnumIter, IntoStaticStr};
-use opts_macro::{OptionMenu, OptionSet};
+use opts_macro::{Options, OptionPage};
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
-pub enum Screen {
+pub enum Page {
     Modulate,
     #[default]
     Voice1,
@@ -86,8 +86,8 @@ num_params!(TriggerLevelParams<i16> { step: 512, min: -16384, max: 16384 });
 num_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
 num_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
 
-#[derive(OptionSet, Clone)]
-pub struct VoiceOptions {
+#[derive(OptionPage, Clone)]
+pub struct VoiceOpts {
     #[option(1000)]
     pub freq: NumOption<FrequencyParams>,
     #[option(1000)]
@@ -112,8 +112,8 @@ pub struct VoiceOptions {
     pub release: NumOption<EnvelopeParams>,
 }
 
-#[derive(OptionSet, Clone)]
-pub struct FilterOptions {
+#[derive(OptionPage, Clone)]
+pub struct FilterOpts {
     #[option(1500)]
     pub cutoff: NumOption<CutoffParams>,
     #[option]
@@ -136,8 +136,8 @@ pub struct FilterOptions {
     pub volume: NumOption<VolumeParams>,
 }
 
-#[derive(OptionSet, Clone)]
-pub struct ScopeOptions {
+#[derive(OptionPage, Clone)]
+pub struct ScopeOpts {
     #[option(32)]
     pub timebase: NumOption<TimebaseParams>,
     #[option]
@@ -160,8 +160,8 @@ pub struct ScopeOptions {
     pub xpos: NumOption<PositionParams>,
 }
 
-#[derive(OptionSet, Clone)]
-pub struct ModulateOptions {
+#[derive(OptionPage, Clone)]
+pub struct ModulateOpts {
     #[option]
     pub in0: EnumOption<ModulationTarget>,
     #[option]
@@ -172,20 +172,19 @@ pub struct ModulateOptions {
     pub in3: EnumOption<ModulationTarget>,
 }
 
-
-#[derive(OptionMenu, Clone, Default)]
-pub struct Options {
-    pub tracker: ScreenTracker<Screen>,
-    #[option_menu(Screen::Modulate)]
-    pub modulate: ModulateOptions,
-    #[option_menu(Screen::Voice1)]
-    pub voice1: VoiceOptions,
-    #[option_menu(Screen::Voice2)]
-    pub voice2: VoiceOptions,
-    #[option_menu(Screen::Voice3)]
-    pub voice3: VoiceOptions,
-    #[option_menu(Screen::Filter)]
-    pub filter: FilterOptions,
-    #[option_menu(Screen::Scope)]
-    pub scope: ScopeOptions,
+#[derive(Options, Clone, Default)]
+pub struct Opts {
+    pub tracker: ScreenTracker<Page>,
+    #[page(Page::Modulate)]
+    pub modulate: ModulateOpts,
+    #[page(Page::Voice1)]
+    pub voice1: VoiceOpts,
+    #[page(Page::Voice2)]
+    pub voice2: VoiceOpts,
+    #[page(Page::Voice3)]
+    pub voice3: VoiceOpts,
+    #[page(Page::Filter)]
+    pub filter: FilterOpts,
+    #[page(Page::Scope)]
+    pub scope: ScopeOpts,
 }

@@ -15,7 +15,7 @@ where
     EncoderT: Encoder,
     PmodT: EurorackPmod,
     MoboI2CT: I2c,
-    OptionsT: OptionPage + OptionPageEncoderInterface
+    OptionsT: Options + OptionsEncoderInterface
 {
     pub opts: OptionsT,
     encoder: EncoderT,
@@ -34,7 +34,7 @@ where
 impl<EncoderT: Encoder,
      PmodT: EurorackPmod,
      MoboI2CT: I2c,
-     OptionsT: OptionPage + OptionPageEncoderInterface>
+     OptionsT: Options + OptionsEncoderInterface>
          UI<EncoderT, PmodT, MoboI2CT, OptionsT> {
     pub fn new(opts: OptionsT, period_ms: u32, encoder: EncoderT,
                pca9635: Pca9635Driver<MoboI2CT>, pmod: PmodT) -> Self {

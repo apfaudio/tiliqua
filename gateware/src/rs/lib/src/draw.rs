@@ -16,7 +16,7 @@ pub fn draw_options<D, O>(d: &mut D, opts: &O,
                        pos_x: u32, pos_y: u32, hue: u8) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = Gray8>,
-    O: opt::OptionPage
+    O: opt::Options
 {
     let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
     let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
@@ -748,7 +748,7 @@ mod tests {
 
     #[test]
     fn draw_screen() {
-        use crate::opt::OptionPageEncoderInterface;
+        use crate::opt::OptionsEncoderInterface;
 
         let mut disp = FakeDisplay {
             img: ImageBuffer::new(H_ACTIVE, V_ACTIVE)

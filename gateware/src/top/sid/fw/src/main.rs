@@ -23,7 +23,7 @@ use embedded_graphics::{
     text::Text,
 };
 
-use opts::Options;
+use opts::Opts;
 use hal::pca9635::Pca9635Driver;
 
 use micromath::F32Ext;
@@ -33,11 +33,11 @@ tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
 
 impl App {
-    pub fn new(opts: Options) -> Self {
+    pub fn new(opts: Opts) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -57,7 +57,7 @@ fn volts_to_freq(volts: f32) -> f32 {
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
-    use tiliqua_fw::opts::{VoiceOptions, ModulationTarget, VoiceModulationType};
+    use tiliqua_fw::opts::{VoiceOpts, ModulationTarget, VoiceModulationType};
 
     let peripherals = unsafe { pac::Peripherals::steal() };
     let sid = peripherals.SID_PERIPH;
@@ -72,7 +72,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         (app.ui.opts.clone(), app.ui.pmod.sample_i())
     });
 
-    let voices: [&mut VoiceOptions; 3] = [
+    let voices: [&mut VoiceOpts; 3] = [
         &mut opts.voice1,
         &mut opts.voice2,
         &mut opts.voice3,
@@ -194,7 +194,7 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = opts::Options::default();
+    let opts = opts::Opts::default();
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 5u8;
 
@@ -223,9 +223,9 @@ fn main() -> ! {
 
             // Draw SID visualization
             let hl_wfm: Option<u8> = match opts.tracker.screen.value {
-                opts::Screen::Voice1 => Some(0),
-                opts::Screen::Voice2 => Some(1),
-                opts::Screen::Voice3 => Some(2),
+                opts::Page::Voice1 => Some(0),
+                opts::Page::Voice2 => Some(1),
+                opts::Page::Voice3 => Some(2),
                 _ => None,
             };
 
@@ -247,7 +247,7 @@ fn main() -> ! {
                 opts.filter.hp.value == 1,
             ];
 
-            let hl_filter: bool = opts.tracker.screen.value == opts::Screen::Filter;
+            let hl_filter: bool = opts.tracker.screen.value == opts::Page::Filter;
 
             draw::draw_sid(&mut display, 100, V_ACTIVE/4+25, hue, hl_wfm, gates, hl_filter, switches, filter_types).ok();
 

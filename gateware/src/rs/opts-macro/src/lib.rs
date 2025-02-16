@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Data, Fields, Type, Expr, Meta};
 
-#[proc_macro_derive(OptionSet, attributes(option))]
+#[proc_macro_derive(OptionPage, attributes(option))]
 pub fn derive_option(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
@@ -10,9 +10,9 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
     let fields = match &input.data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(fields) => &fields.named,
-            _ => panic!("OptionSet only supports structs with named fields"),
+            _ => panic!("OptionPage only supports structs with named fields"),
         },
-        _ => panic!("OptionSet only supports structs"),
+        _ => panic!("OptionPage only supports structs"),
     };
 
     let field_inits = fields.iter().map(|field| {
@@ -38,7 +38,7 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
         } else if is_float_option(field_type) {
             quote! { FloatOption::new }
         } else {
-            panic!("Unsupported field type for OptionSet")
+            panic!("Unsupported field type for OptionPage")
         };
 
         let field_name_str = field_name.as_ref().unwrap().to_string().replace("_","-");
@@ -61,7 +61,7 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl OptionView for #name {
+        impl OptionPage for #name {
             fn options(&self) -> OptionVec {
                 OptionVec::from_slice(&[
                     #(&self.#option_fields),*
@@ -102,8 +102,8 @@ fn is_option_type(ty: &Type) -> bool {
     is_num_option(ty) || is_enum_option(ty) || is_float_option(ty)
 }
 
-#[proc_macro_derive(OptionMenu, attributes(option_menu))]
-pub fn option_menu_derive(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Options, attributes(page))]
+pub fn page_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let name = &input.ident;
@@ -112,10 +112,10 @@ pub fn option_menu_derive(input: TokenStream) -> TokenStream {
         if let Fields::Named(fields) = &data.fields {
             &fields.named
         } else {
-            panic!("OptionMenu can only be derived for structs with named fields");
+            panic!("Options can only be derived for structs with named fields");
         }
     } else {
-        panic!("OptionMenu can only be derived for structs");
+        panic!("Options can only be derived for structs");
     };
 
     let mut screen_fields = Vec::new();
@@ -124,7 +124,7 @@ pub fn option_menu_derive(input: TokenStream) -> TokenStream {
         let field_name = &field.ident;
         let attrs = &field.attrs;
         for attr in attrs {
-            if attr.path().is_ident("option_menu") {
+            if attr.path().is_ident("page") {
                 if let Ok(Meta::Path(meta_path)) = attr.parse_args() {
                     screen_fields.push((field_name.clone(), meta_path));
                 }
@@ -145,7 +145,7 @@ pub fn option_menu_derive(input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        impl OptionPage for #name {
+        impl Options for #name {
             fn selected(&self) -> Option<usize> {
                 self.tracker.selected
             }
@@ -170,13 +170,13 @@ pub fn option_menu_derive(input: TokenStream) -> TokenStream {
                 &mut self.tracker.screen
             }
 
-            fn view(&self) -> &dyn OptionView {
+            fn view(&self) -> &dyn OptionPage {
                 match self.tracker.screen.value {
                     #(#view_match_arms)*
                 }
             }
 
-            fn view_mut(&mut self) -> &mut dyn OptionView {
+            fn view_mut(&mut self) -> &mut dyn OptionPage {
                 match self.tracker.screen.value {
                     #(#view_mut_match_arms)*
                 }
