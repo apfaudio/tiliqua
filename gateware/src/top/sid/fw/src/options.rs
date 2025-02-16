@@ -171,8 +171,7 @@ pub struct ModulateOpts {
 }
 
 #[derive(Options, Clone, Default)]
-pub struct Opts {
-    pub tracker: ScreenTracker<Page>,
+pub struct AllOptions {
     #[page(Page::Modulate)]
     pub modulate: ModulateOpts,
     #[page(Page::Voice1)]
@@ -186,3 +185,5 @@ pub struct Opts {
     #[page(Page::Scope)]
     pub scope: ScopeOpts,
 }
+
+type Opts = Optif::<Page, AllOptions>

@@ -6,41 +6,40 @@ use embedded_graphics::{
     prelude::*,
 };
 
-use opts::Options;
 use crate::logo_coords;
 
 use heapless::String;
 use core::fmt::Write;
 
-pub fn draw_options<D, O>(d: &mut D, opts: &O,
+pub fn draw_options<D, O>(d: &mut D, optif: &O,
                        pos_x: u32, pos_y: u32, hue: u8) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = Gray8>,
-    O: Options
+    O: opts::OptionsEncoderInterface
 {
     let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
     let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
 
-    let opts_view = opts.view().options();
+    let opts_view = optif.current_opts();
 
     let vx = pos_x as i32;
     let vy = pos_y as usize;
     let vspace: usize = 18;
     let hspace: i32 = 150;
 
-    let screen_hl = match (opts.selected(), opts.modify()) {
+    let screen_hl = match (optif.selected(), optif.modify()) {
         (None, _) => true,
         _ => false,
     };
 
     Text::with_alignment(
-        &opts.page().value(),
+        &optif.current_page(),
         Point::new(vx-12, vy as i32),
         if screen_hl { font_small_white } else { font_small_grey },
         Alignment::Right
     ).draw(d)?;
 
-    if screen_hl && opts.modify() {
+    if screen_hl && optif.modify() {
         Text::with_alignment(
             "^",
             Point::new(vx-12, (vy + vspace) as i32),
@@ -53,10 +52,10 @@ where
 
     for (n, opt) in opts_view.iter().enumerate() {
         let mut font = font_small_grey;
-        if let Some(n_selected) = opts.selected() {
+        if let Some(n_selected) = optif.selected() {
             if n_selected == n {
                 font = font_small_white;
-                if opts.modify() {
+                if optif.modify() {
                     Text::with_alignment(
                         "<",
                         Point::new(vx+hspace+2, (vy+vspace*n) as i32),

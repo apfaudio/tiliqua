@@ -3,7 +3,7 @@
 // to automatic CV LEDs when nothing is touched for a bit.
 //
 
-use opts::{Options, OptionsEncoderInterface};
+use opts::OptionsEncoderInterface;
 use crate::leds;
 use embedded_hal::i2c::I2c;
 use tiliqua_hal::encoder::Encoder;
@@ -15,9 +15,9 @@ where
     EncoderT: Encoder,
     PmodT: EurorackPmod,
     MoboI2CT: I2c,
-    OptionsT: Options + OptionsEncoderInterface
+    OptionsT: OptionsEncoderInterface
 {
-    pub opts: OptionsT,
+    pub optif: OptionsT,
     encoder: EncoderT,
     pca9635: Pca9635Driver<MoboI2CT>,
     pub pmod: PmodT,
@@ -34,12 +34,12 @@ where
 impl<EncoderT: Encoder,
      PmodT: EurorackPmod,
      MoboI2CT: I2c,
-     OptionsT: Options + OptionsEncoderInterface>
+     OptionsT: OptionsEncoderInterface>
          UI<EncoderT, PmodT, MoboI2CT, OptionsT> {
-    pub fn new(opts: OptionsT, period_ms: u32, encoder: EncoderT,
+    pub fn new(optif: OptionsT, period_ms: u32, encoder: EncoderT,
                pca9635: Pca9635Driver<MoboI2CT>, pmod: PmodT) -> Self {
         Self {
-            opts,
+            optif,
             encoder,
             pca9635,
             pmod,
@@ -79,11 +79,11 @@ impl<EncoderT: Encoder,
 
         let ticks = self.encoder.poke_ticks();
         if ticks != 0 {
-            self.opts.consume_ticks(ticks);
+            self.optif.consume_ticks(ticks);
             self.time_since_encoder_touched = 0;
         }
         if self.encoder.poke_btn() {
-            self.opts.toggle_modify();
+            self.optif.toggle_modify();
             self.time_since_encoder_touched = 0;
         }
 
@@ -100,7 +100,7 @@ impl<EncoderT: Encoder,
             self.pca9635.leds[n] = 0u8;
         }
 
-        leds::mobo_pca9635_set_bargraph(&self.opts, &mut self.pca9635.leds,
+        leds::mobo_pca9635_set_bargraph(&self.optif, &mut self.pca9635.leds,
                                         self.toggle_leds);
 
         if self.time_since_midi_activity < 100 {
@@ -109,21 +109,24 @@ impl<EncoderT: Encoder,
             leds::mobo_pca9635_set_midi(&mut self.pca9635.leds, 0x0, 0x0);
         }
 
-        if self.opts.modify() {
+        if self.optif.modify() {
             // Flashing if we're modifying something
             self.pmod.led_all_auto();
             if self.toggle_leds {
-                if let Some(n) = self.opts.selected() {
+                if let Some(n) = self.optif.selected() {
                     // red for option selection
                     if n < 8 {
                         self.pmod.led_set_manual(n, i8::MAX);
                     }
                 } else {
                     // green for screen selection
-                    let n = (self.opts.page().percent() * (self.opts.page().n_unique_values() as f32)) as usize;
+                    // TODO
+                    /*
+                    let n = (self.optif.page().percent() * (self.opts.page().n_unique_values() as f32)) as usize;
                     if n < 8 {
                         self.pmod.led_set_manual(n, i8::MIN);
                     }
+                    */
                 }
             }
         } else {
@@ -134,7 +137,7 @@ impl<EncoderT: Encoder,
                 }
                 let fade: i8 = (((self.encoder_fade_ms-self.time_since_encoder_touched) * 120) /
                                  self.encoder_fade_ms) as i8;
-                if let Some(n) = self.opts.selected() {
+                if let Some(n) = self.optif.selected() {
                     // red for option selection
                     if n < 8 {
                         self.pmod.led_set_manual(n, fade);
@@ -159,6 +162,6 @@ impl<EncoderT: Encoder,
 
         self.pca9635.push().ok();
 
-        self.draw = self.time_since_encoder_touched < self.encoder_fade_ms || self.opts.modify();
+        self.draw = self.time_since_encoder_touched < self.encoder_fade_ms || self.optif.modify();
     }
 }

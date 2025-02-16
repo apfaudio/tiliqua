@@ -33,11 +33,11 @@ tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, opts::Optif::<options::Page, options::Opts>>,
 }
 
 impl App {
-    pub fn new(opts: Opts) -> Self {
+    pub fn new(opts: opts::Optif::<options::Page, options::Opts>) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -194,8 +194,8 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = options::Opts::default();
-    let app = Mutex::new(RefCell::new(App::new(opts)));
+    let optif = opts::Optif::<options::Page, options::Opts>::default();
+    let app = Mutex::new(RefCell::new(App::new(optif)));
     let hue = 5u8;
 
     palette::ColorPalette::default().write_to_hardware(&mut video);

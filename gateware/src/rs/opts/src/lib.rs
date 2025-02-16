@@ -30,6 +30,10 @@ pub trait OptionsEncoderInterface {
     fn tick_up(&mut self);
     fn tick_down(&mut self);
     fn consume_ticks(&mut self, ticks: i8);
+    fn current_page(&self) -> OptionString;
+    fn current_opts(&self) -> OptionVec;
+    fn selected(&self) -> Option<usize>;
+    fn modify(&self) -> bool;
 }
 
 impl<S, T> OptionsEncoderInterface for Optif<S, T>
@@ -82,6 +86,22 @@ where
                 self.tick_down();
             }
         }
+    }
+
+    fn current_opts(&self) -> OptionVec {
+        self.opts.page(&self.page.value).options()
+    }
+
+    fn selected(&self) -> Option<usize> {
+        self.selected
+    }
+
+    fn modify(&self) -> bool {
+        self.modify
+    }
+
+    fn current_page(&self) -> OptionString {
+        self.page.value()
     }
 }
 
