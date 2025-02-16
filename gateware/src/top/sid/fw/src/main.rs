@@ -194,7 +194,7 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = opts::Options::new();
+    let opts = opts::Options::default();
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 5u8;
 

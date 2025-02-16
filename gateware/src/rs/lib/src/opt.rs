@@ -46,8 +46,8 @@ pub trait OptionPageEncoderInterface {
     fn consume_ticks(&mut self, ticks: i8);
 }
 
-#[derive(Clone)]
-pub struct ScreenTracker<ScreenT: Copy + IntoEnumIterator> {
+#[derive(Clone, Default)]
+pub struct ScreenTracker<ScreenT: Copy + IntoEnumIterator + Default> {
     pub selected: Option<usize>,
     pub modify: bool,
     pub screen: EnumOption<ScreenT>,
@@ -75,13 +75,13 @@ impl<T: NumOptionConfig> NumOption<T> {
     }
 }
 
-#[derive(Clone)]
-pub struct EnumOption<T: Copy + IntoEnumIterator> {
+#[derive(Clone, Default)]
+pub struct EnumOption<T: Copy + IntoEnumIterator + Default> {
     pub name: &'static str,
     pub value: T,
 }
 
-impl<T: Copy + IntoEnumIterator> EnumOption<T> {
+impl<T: Copy + IntoEnumIterator + Default> EnumOption<T> {
     pub fn new(name: &'static str, value: T) -> Self {
         Self {
             name,
@@ -211,6 +211,7 @@ where
         + IntoEnumIterator
         + PartialEq
         + Into<&'static str>
+        + Default
     {
 
     fn name(&self) -> &'static str {

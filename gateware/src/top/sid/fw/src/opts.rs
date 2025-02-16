@@ -3,10 +3,11 @@ use tiliqua_lib::num_option_config;
 use strum_macros::{EnumIter, IntoStaticStr};
 use opts_macro::{OptionMenu, OptionSet};
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Screen {
     Modulate,
+    #[default]
     Voice1,
     Voice2,
     Voice3,
@@ -14,25 +15,28 @@ pub enum Screen {
     Scope,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TriggerMode {
+    #[default]
     Always,
     Rising,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Wave {
+    #[default]
     Triangle,
     Saw,
     Pulse,
     Noise,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ModulationTarget {
+    #[default]
     Nothing,
     Freq1,
     Freq2,
@@ -169,7 +173,7 @@ pub struct ModulateOptions {
 }
 
 
-#[derive(OptionMenu, Clone)]
+#[derive(OptionMenu, Clone, Default)]
 pub struct Options {
     pub tracker: ScreenTracker<Screen>,
     #[option_menu(Screen::Modulate)]
@@ -184,22 +188,4 @@ pub struct Options {
     pub filter: FilterOptions,
     #[option_menu(Screen::Scope)]
     pub scope: ScopeOptions,
-}
-
-impl Options {
-    pub fn new() -> Options {
-        Options {
-            tracker: ScreenTracker {
-                selected: None,
-                modify: false,
-                screen: EnumOption::new("", Screen::Voice1),
-            },
-            modulate: ModulateOptions::default(),
-            voice1: VoiceOptions::default(),
-            voice2: VoiceOptions::default(),
-            voice3: VoiceOptions::default(),
-            filter: FilterOptions::default(),
-            scope: ScopeOptions::default(),
-        }
-    }
 }
