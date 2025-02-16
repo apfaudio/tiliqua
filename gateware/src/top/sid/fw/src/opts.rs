@@ -98,17 +98,17 @@ pub struct VoiceOptions {
     pub wave: EnumOption<Wave>,
     #[option(1)]
     pub gate: NumOption<BinaryConfig>,
-    #[option(0)]
+    #[option]
     pub sync: NumOption<BinaryConfig>,
-    #[option(0)]
+    #[option]
     pub ring: NumOption<BinaryConfig>,
-    #[option(0)]
+    #[option]
     pub attack: NumOption<EnvelopeConfig>,
-    #[option(0)]
+    #[option]
     pub decay: NumOption<EnvelopeConfig>,
     #[option(15)]
     pub sustain: NumOption<EnvelopeConfig>,
-    #[option(0)]
+    #[option]
     pub release: NumOption<EnvelopeConfig>,
 }
 
@@ -116,21 +116,21 @@ pub struct VoiceOptions {
 pub struct FilterOptions {
     #[option(1500)]
     pub cutoff: NumOption<CutoffConfig>,
-    #[option(0)]
+    #[option]
     pub reso: NumOption<EnvelopeConfig>,
-    #[option(0)]
+    #[option]
     pub filt1: NumOption<BinaryConfig>,
-    #[option(0)]
+    #[option]
     pub filt2: NumOption<BinaryConfig>,
-    #[option(0)]
+    #[option]
     pub filt3: NumOption<BinaryConfig>,
-    #[option(0)]
+    #[option]
     pub lp: NumOption<BinaryConfig>,
-    #[option(0)]
+    #[option]
     pub bp: NumOption<BinaryConfig>,
-    #[option(0)]
+    #[option]
     pub hp: NumOption<BinaryConfig>,
-    #[option(0)]
+    #[option]
     pub v3off: NumOption<BinaryConfig>,
     #[option(15)]
     pub volume: NumOption<VolumeConfig>,
@@ -142,7 +142,7 @@ pub struct ScopeOptions {
     pub timebase: NumOption<TimebaseConfig>,
     #[option]
     pub trigger_mode: EnumOption<TriggerMode>,
-    #[option(0)]
+    #[option]
     pub trigger_lvl: NumOption<TriggerLevelConfig>,
     #[option(150)]
     pub ypos0: NumOption<PositionConfig>,
