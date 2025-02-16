@@ -1,4 +1,4 @@
-use crate::opt::Options;
+use opts::Options;
 
 const PCA9635_BAR_GREEN: [usize; 6] = [0, 2, 14, 12, 6, 4];
 const PCA9635_BAR_RED:   [usize; 6] = [1, 3, 15, 13, 7, 5];

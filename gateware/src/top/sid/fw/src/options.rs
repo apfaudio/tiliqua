@@ -1,7 +1,5 @@
-use tiliqua_lib::opt::*;
-use tiliqua_lib::num_params;
+use opts::*;
 use strum_macros::{EnumIter, IntoStaticStr};
-use opts_macro::{Options, OptionPage};
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]

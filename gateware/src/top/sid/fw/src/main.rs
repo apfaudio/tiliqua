@@ -23,7 +23,7 @@ use embedded_graphics::{
     text::Text,
 };
 
-use opts::Opts;
+use options::Opts;
 use hal::pca9635::Pca9635Driver;
 
 use micromath::F32Ext;
@@ -57,7 +57,7 @@ fn volts_to_freq(volts: f32) -> f32 {
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
-    use tiliqua_fw::opts::{VoiceOpts, ModulationTarget, VoiceModulationType};
+    use tiliqua_fw::options::{VoiceOpts, ModulationTarget, VoiceModulationType};
 
     let peripherals = unsafe { pac::Peripherals::steal() };
     let sid = peripherals.SID_PERIPH;
@@ -123,7 +123,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         sid_poke(&sid, base+3, (voices[n_voice].pw.value>>8) as u8);
 
         let mut reg04 = 0u8;
-        use crate::opts::Wave;
+        use crate::options::Wave;
         match voices[n_voice].wave.value {
             Wave::Triangle => { reg04 |= 0x10; }
             Wave::Saw      => { reg04 |= 0x20; }
@@ -194,7 +194,7 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = opts::Opts::default();
+    let opts = options::Opts::default();
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 5u8;
 
@@ -223,9 +223,9 @@ fn main() -> ! {
 
             // Draw SID visualization
             let hl_wfm: Option<u8> = match opts.tracker.page.value {
-                opts::Page::Voice1 => Some(0),
-                opts::Page::Voice2 => Some(1),
-                opts::Page::Voice3 => Some(2),
+                options::Page::Voice1 => Some(0),
+                options::Page::Voice2 => Some(1),
+                options::Page::Voice3 => Some(2),
                 _ => None,
             };
 
@@ -247,7 +247,7 @@ fn main() -> ! {
                 opts.filter.hp.value == 1,
             ];
 
-            let hl_filter: bool = opts.tracker.page.value == opts::Page::Filter;
+            let hl_filter: bool = opts.tracker.page.value == options::Page::Filter;
 
             draw::draw_sid(&mut display, 100, V_ACTIVE/4+25, hue, hl_wfm, gates, hl_filter, switches, filter_types).ok();
 
@@ -305,7 +305,7 @@ fn main() -> ! {
             scope.xpos().write(|w| unsafe { w.xpos().bits(opts.scope.xpos.value as u16) } );
 
             scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trigger_mode.value == opts::TriggerMode::Always));
+                |w| w.trigger_always().bit(opts.scope.trigger_mode.value == options::TriggerMode::Always));
 
             scope.en().write(|w| w.enable().bit(true));
         }

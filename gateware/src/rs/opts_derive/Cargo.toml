@@ -1,5 +1,5 @@
 [package]
-name = "opts-macro"
+name = "opts-derive"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,4 +9,3 @@ proc-macro = true
 [dependencies]
 quote = "1.0.38"
 syn = "2.0.98"
-tiliqua-lib = { path="../lib", default-features = false }

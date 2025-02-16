@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), no_std)]
+
 use heapless::String;
 use heapless::Vec;
 
@@ -5,6 +7,8 @@ use strum::IntoEnumIterator;
 
 use core::fmt::Write;
 use core::str::FromStr;
+
+pub use opts_derive::{OptionPage, Options};
 
 pub const MAX_OPTS_PER_TAB: usize = 16;
 pub const MAX_OPT_NAME:     usize = 32;
@@ -367,4 +371,49 @@ macro_rules! float_params {
             const FORMAT: FloatFormat = $format;
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use log::info;
+    use super::*;
+    use strum::{EnumIter, IntoStaticStr};
+
+    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+    #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
+    pub enum Page {
+        #[default]
+        Scope,
+    }
+
+    num_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
+    num_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
+
+    #[derive(OptionPage, Clone)]
+    pub struct ScopeOpts {
+        #[option]
+        pub ypos0: NumOption<PositionParams>,
+        #[option(-150)]
+        pub ypos1: NumOption<PositionParams>,
+        #[option(7)]
+        pub xscale: NumOption<ScaleParams>,
+    }
+
+    #[derive(Options, Clone, Default)]
+    pub struct Opts {
+        pub tracker: ScreenTracker<Page>,
+        #[page(Page::Scope)]
+        pub scope: ScopeOpts,
+    }
+
+    #[test]
+    fn test_opts() {
+        env_logger::init();
+        let opts = Opts::default();
+        info!("page: {}", opts.page().value());
+        for opt in opts.view().options() {
+            info!("\t{}: {}", opt.name(), opt.value());
+        }
+    }
+
 }

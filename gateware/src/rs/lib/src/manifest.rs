@@ -1,7 +1,7 @@
 use heapless::{String, Vec};
 use serde::{Deserialize};
 use log::info;
-use crate::opt::OptionString;
+use opts::OptionString;
 
 #[derive(Deserialize, Clone)]
 pub struct MemoryRegion {

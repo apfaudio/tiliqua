@@ -3,7 +3,7 @@
 // to automatic CV LEDs when nothing is touched for a bit.
 //
 
-use crate::opt::*;
+use opts::{Options, OptionsEncoderInterface};
 use crate::leds;
 use embedded_hal::i2c::I2c;
 use tiliqua_hal::encoder::Encoder;

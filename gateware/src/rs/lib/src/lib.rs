@@ -1,6 +1,5 @@
 #![cfg_attr(not(test), no_std)]
 
-pub mod opt;
 pub mod draw;
 pub mod logger;
 pub mod generated_constants;
