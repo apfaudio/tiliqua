@@ -75,6 +75,7 @@ num_option_config!(FreqOffsetConfig: u16 => 10, 500, 2000);
 num_option_config!(PulseWidthConfig: u16 => 128, 0, 4096);
 num_option_config!(EnvelopeConfig: u8 => 1, 0, 15);
 num_option_config!(BinaryConfig: u8 => 1, 0, 1);
+num_option_config!(CutoffConfig: u16 => 100, 0, 2000);
 num_option_config!(VolumeConfig: u8 => 1, 0, 15);
 num_option_config!(TimebaseConfig: u16 => 128, 32, 3872);
 num_option_config!(TriggerLevelConfig: i16 => 512, -16384, 16384);
@@ -170,9 +171,7 @@ pub struct ModulateOptions {
 
 #[derive(OptionMenu, Clone)]
 pub struct Options {
-    pub selected: Option<usize>,
-    pub modify: bool,
-    pub screen: EnumOption<Screen>,
+    pub tracker: ScreenTracker<Screen>,
     #[option_menu(Screen::Modulate)]
     pub modulate: ModulateOptions,
     #[option_menu(Screen::Voice1)]
@@ -190,9 +189,11 @@ pub struct Options {
 impl Options {
     pub fn new() -> Options {
         Options {
-            selected: None,
-            modify: false,
-            screen: EnumOption::new("screen", Screen::Voice1),
+            tracker: ScreenTracker {
+                selected: None,
+                modify: false,
+                screen: EnumOption::new("", Screen::Voice1),
+            },
             modulate: ModulateOptions::default(),
             voice1: VoiceOptions::default(),
             voice2: VoiceOptions::default(),

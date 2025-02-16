@@ -143,37 +143,37 @@ pub fn option_menu_derive(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl OptionPage for #name {
             fn selected(&self) -> Option<usize> {
-                self.selected
+                self.tracker.selected
             }
 
             fn set_selected(&mut self, s: Option<usize>) {
-                self.selected = s;
+                self.tracker.selected = s;
             }
 
             fn modify(&self) -> bool {
-                self.modify
+                self.tracker.modify
             }
 
             fn modify_mut(&mut self, modify: bool) {
-                self.modify = modify;
+                self.tracker.modify = modify;
             }
 
             fn screen(&self) -> &dyn OptionTrait {
-                &self.screen
+                &self.tracker.screen
             }
 
             fn screen_mut(&mut self) -> &mut dyn OptionTrait {
-                &mut self.screen
+                &mut self.tracker.screen
             }
 
             fn view(&self) -> &dyn OptionView {
-                match self.screen.value {
+                match self.tracker.screen.value {
                     #(#view_match_arms)*
                 }
             }
 
             fn view_mut(&mut self) -> &mut dyn OptionView {
-                match self.screen.value {
+                match self.tracker.screen.value {
                     #(#view_mut_match_arms)*
                 }
             }

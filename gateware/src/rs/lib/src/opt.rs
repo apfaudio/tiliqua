@@ -47,6 +47,13 @@ pub trait OptionPageEncoderInterface {
 }
 
 #[derive(Clone)]
+pub struct ScreenTracker<ScreenT: Copy + IntoEnumIterator> {
+    pub selected: Option<usize>,
+    pub modify: bool,
+    pub screen: EnumOption<ScreenT>,
+}
+
+#[derive(Clone)]
 pub struct NumOption<T: NumOptionConfig> {
     name: &'static str,
     pub value: T::Value,
