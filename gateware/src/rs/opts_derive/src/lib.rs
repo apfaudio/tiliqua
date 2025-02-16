@@ -146,38 +146,16 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl Options for #name {
-            fn selected(&self) -> Option<usize> {
-                self.tracker.selected
-            }
+            type PageT = Page;
 
-            fn set_selected(&mut self, s: Option<usize>) {
-                self.tracker.selected = s;
-            }
-
-            fn modify(&self) -> bool {
-                self.tracker.modify
-            }
-
-            fn modify_mut(&mut self, modify: bool) {
-                self.tracker.modify = modify;
-            }
-
-            fn page(&self) -> &dyn OptionTrait {
-                &self.tracker.page
-            }
-
-            fn page_mut(&mut self) -> &mut dyn OptionTrait {
-                &mut self.tracker.page
-            }
-
-            fn view(&self) -> &dyn OptionPage {
-                match self.tracker.page.value {
+            fn page(&self, page: &Self::PageT) -> &dyn OptionPage {
+                match page {
                     #(#view_match_arms)*
                 }
             }
 
-            fn view_mut(&mut self) -> &mut dyn OptionPage {
-                match self.tracker.page.value {
+            fn page_mut(&mut self, page: &Self::PageT) -> &mut dyn OptionPage {
+                match page {
                     #(#view_mut_match_arms)*
                 }
             }
