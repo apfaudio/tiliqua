@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data, Fields, Type, Expr};
+use syn::{parse_macro_input, DeriveInput, Data, Fields, Type, Expr, Meta};
 
 #[proc_macro_derive(OptionSet, attributes(option))]
 pub fn derive_option(input: TokenStream) -> TokenStream {
@@ -96,4 +96,89 @@ fn is_float_option(ty: &Type) -> bool {
 
 fn is_option_type(ty: &Type) -> bool {
     is_num_option(ty) || is_enum_option(ty) || is_float_option(ty)
+}
+
+#[proc_macro_derive(OptionMenu, attributes(option_menu))]
+pub fn option_menu_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let name = &input.ident;
+
+    let fields = if let Data::Struct(data) = &input.data {
+        if let Fields::Named(fields) = &data.fields {
+            &fields.named
+        } else {
+            panic!("OptionMenu can only be derived for structs with named fields");
+        }
+    } else {
+        panic!("OptionMenu can only be derived for structs");
+    };
+
+    let mut screen_fields = Vec::new();
+
+    for field in fields {
+        let field_name = &field.ident;
+        let attrs = &field.attrs;
+        for attr in attrs {
+            if attr.path().is_ident("option_menu") {
+                if let Ok(Meta::Path(meta_path)) = attr.parse_args() {
+                    screen_fields.push((field_name.clone(), meta_path));
+                }
+            }
+        }
+    }
+
+    let view_match_arms = screen_fields.iter().map(|(field_name, screen_value)| {
+        quote! {
+            #screen_value => &self.#field_name,
+        }
+    });
+
+    let view_mut_match_arms = screen_fields.iter().map(|(field_name, screen_value)| {
+        quote! {
+            #screen_value => &mut self.#field_name,
+        }
+    });
+
+    let expanded = quote! {
+        impl OptionPage for #name {
+            fn selected(&self) -> Option<usize> {
+                self.selected
+            }
+
+            fn set_selected(&mut self, s: Option<usize>) {
+                self.selected = s;
+            }
+
+            fn modify(&self) -> bool {
+                self.modify
+            }
+
+            fn modify_mut(&mut self, modify: bool) {
+                self.modify = modify;
+            }
+
+            fn screen(&self) -> &dyn OptionTrait {
+                &self.screen
+            }
+
+            fn screen_mut(&mut self) -> &mut dyn OptionTrait {
+                &mut self.screen
+            }
+
+            fn view(&self) -> &dyn OptionView {
+                match self.screen.value {
+                    #(#view_match_arms)*
+                }
+            }
+
+            fn view_mut(&mut self) -> &mut dyn OptionView {
+                match self.screen.value {
+                    #(#view_mut_match_arms)*
+                }
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
 }

@@ -1,8 +1,7 @@
 use tiliqua_lib::opt::*;
-use tiliqua_lib::impl_option_page;
 use tiliqua_lib::num_option_config;
 use strum_macros::{EnumIter, IntoStaticStr};
-use opts_macro::OptionSet;
+use opts_macro::{OptionMenu, OptionSet};
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
@@ -71,13 +70,11 @@ impl ModulationTarget {
 }
 
 
-// Configs remain unchanged
 num_option_config!(FrequencyConfig: u16 => 125, 0, 65500);
 num_option_config!(FreqOffsetConfig: u16 => 10, 500, 2000);
 num_option_config!(PulseWidthConfig: u16 => 128, 0, 4096);
 num_option_config!(EnvelopeConfig: u8 => 1, 0, 15);
 num_option_config!(BinaryConfig: u8 => 1, 0, 1);
-num_option_config!(CutoffConfig: u16 => 100, 0, 2000);
 num_option_config!(VolumeConfig: u8 => 1, 0, 15);
 num_option_config!(TimebaseConfig: u16 => 128, 32, 3872);
 num_option_config!(TriggerLevelConfig: i16 => 512, -16384, 16384);
@@ -170,26 +167,25 @@ pub struct ModulateOptions {
     pub in3: EnumOption<ModulationTarget>,
 }
 
-#[derive(Clone)]
+
+#[derive(OptionMenu, Clone)]
 pub struct Options {
     pub selected: Option<usize>,
     pub modify: bool,
     pub screen: EnumOption<Screen>,
+    #[option_menu(Screen::Modulate)]
     pub modulate: ModulateOptions,
+    #[option_menu(Screen::Voice1)]
     pub voice1: VoiceOptions,
+    #[option_menu(Screen::Voice2)]
     pub voice2: VoiceOptions,
+    #[option_menu(Screen::Voice3)]
     pub voice3: VoiceOptions,
+    #[option_menu(Screen::Filter)]
     pub filter: FilterOptions,
+    #[option_menu(Screen::Scope)]
     pub scope: ScopeOptions,
 }
-
-impl_option_page!(Options,
-                  (Screen::Modulate, modulate),
-                  (Screen::Voice1, voice1),
-                  (Screen::Voice2, voice2),
-                  (Screen::Voice3, voice3),
-                  (Screen::Filter, filter),
-                  (Screen::Scope, scope));
 
 impl Options {
     pub fn new() -> Options {
