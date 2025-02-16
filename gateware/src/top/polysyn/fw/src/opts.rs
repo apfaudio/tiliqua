@@ -19,8 +19,8 @@ pub enum Page {
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TouchControl {
-    #[default]
     Off,
+    #[default]
     On,
 }
 

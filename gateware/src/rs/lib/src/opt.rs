@@ -163,11 +163,18 @@ where
     }
 
     fn tick_up(&mut self) {
-        self.value = (self.value + T::STEP).clamp(T::MIN, T::MAX);
+        let new_value = self.value + T::STEP;
+        // Tolerate unsigned overflow.
+        if new_value <= T::MAX && new_value > self.value {
+            self.value = new_value;
+        }
     }
 
     fn tick_down(&mut self) {
-        self.value = (self.value - T::STEP).clamp(T::MIN, T::MAX);
+        let new_value = self.value - T::STEP;
+        if new_value >= T::MIN && new_value < self.value {
+            self.value = new_value;
+        }
     }
 
     fn percent(&self) -> f32 {
