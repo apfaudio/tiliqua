@@ -4,19 +4,19 @@ use core::fmt::Write;
 use crate::traits::*;
 
 #[derive(Clone)]
-pub struct NumOption<T: NumOptionParams> {
+pub struct IntOption<T: IntOptionParams> {
     name: &'static str,
     pub value: T::Value,
 }
 
-pub trait NumOptionParams {
+pub trait IntOptionParams {
     type Value: Copy + Default;
     const STEP: Self::Value;
     const MIN: Self::Value;
     const MAX: Self::Value;
 }
 
-impl<T: NumOptionParams> NumOption<T> {
+impl<T: IntOptionParams> IntOption<T> {
     pub fn new(name: &'static str, value: T::Value) -> Self {
         Self {
             name,
@@ -25,7 +25,7 @@ impl<T: NumOptionParams> NumOption<T> {
     }
 }
 
-impl<T: NumOptionParams> OptionTrait for NumOption<T>
+impl<T: IntOptionParams> OptionTrait for IntOption<T>
 where
     T::Value: Copy
         + Default
@@ -73,12 +73,12 @@ where
 }
 
 #[macro_export]
-macro_rules! num_params {
+macro_rules! int_params {
     ($name:ident<$t:ty> { step: $step:expr, min: $min:expr, max: $max:expr }) => {
         #[derive(Clone)]
         pub struct $name;
 
-        impl NumOptionParams for $name {
+        impl IntOptionParams for $name {
             type Value = $t;
             const STEP: Self::Value = $step;
             const MIN: Self::Value = $min;

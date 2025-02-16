@@ -31,8 +31,8 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
             })
             .unwrap_or_else(|| syn::parse_quote! { Default::default() });
 
-        let constructor = if is_num_option(field_type) {
-            quote! { NumOption::new }
+        let constructor = if is_int_option(field_type) {
+            quote! { IntOption::new }
         } else if is_enum_option(field_type) {
             quote! { EnumOption::new }
         } else if is_float_option(field_type) {
@@ -80,9 +80,9 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
 }
 
 // Helper functions remain unchanged
-fn is_num_option(ty: &Type) -> bool {
+fn is_int_option(ty: &Type) -> bool {
     matches!(ty, Type::Path(path) if path.path.segments.first()
-        .map(|seg| seg.ident == "NumOption")
+        .map(|seg| seg.ident == "IntOption")
         .unwrap_or(false))
 }
 
@@ -99,7 +99,7 @@ fn is_float_option(ty: &Type) -> bool {
 }
 
 fn is_option_type(ty: &Type) -> bool {
-    is_num_option(ty) || is_enum_option(ty) || is_float_option(ty)
+    is_int_option(ty) || is_enum_option(ty) || is_float_option(ty)
 }
 
 #[proc_macro_derive(Options, attributes(page))]

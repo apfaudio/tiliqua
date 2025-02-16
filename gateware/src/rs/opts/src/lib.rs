@@ -34,17 +34,17 @@ mod tests {
         Scope,
     }
 
-    num_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
-    num_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
+    int_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
+    int_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
 
     #[derive(OptionPage, Clone)]
     pub struct ScopeOpts {
         #[option]
-        pub ypos0: NumOption<PositionParams>,
+        pub ypos0: IntOption<PositionParams>,
         #[option(-150)]
-        pub ypos1: NumOption<PositionParams>,
+        pub ypos1: IntOption<PositionParams>,
         #[option(7)]
-        pub xscale: NumOption<ScaleParams>,
+        pub xscale: IntOption<ScaleParams>,
     }
 
     #[derive(Options, Clone, Default)]
