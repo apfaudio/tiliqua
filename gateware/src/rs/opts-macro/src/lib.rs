@@ -19,11 +19,15 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
         let field_name = &field.ident;
         let field_type = &field.ty;
 
-        let default_value = field.attrs.iter()
+       let default_value = field.attrs.iter()
             .find(|attr| attr.path().is_ident("option"))
             .map(|attr| {
-                attr.parse_args::<Expr>()
-                    .expect("Failed to parse option argument as an expression")
+                if let Meta::List(meta_list) = &attr.meta {
+                    meta_list.parse_args::<Expr>()
+                        .expect("Failed to parse option argument as an expression")
+                } else {
+                    syn::parse_quote! { Default::default() }
+                }
             })
             .unwrap_or_else(|| syn::parse_quote! { Default::default() });
 

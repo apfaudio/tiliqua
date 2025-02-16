@@ -94,7 +94,7 @@ pub struct VoiceOptions {
     pub freq_os: NumOption<FreqOffsetConfig>,
     #[option(2048)]
     pub pw: NumOption<PulseWidthConfig>,
-    #[option(Wave::Triangle)]
+    #[option]
     pub wave: EnumOption<Wave>,
     #[option(1)]
     pub gate: NumOption<BinaryConfig>,
@@ -140,7 +140,7 @@ pub struct FilterOptions {
 pub struct ScopeOptions {
     #[option(32)]
     pub timebase: NumOption<TimebaseConfig>,
-    #[option(TriggerMode::Always)]
+    #[option]
     pub trigger_mode: EnumOption<TriggerMode>,
     #[option(0)]
     pub trigger_lvl: NumOption<TriggerLevelConfig>,
@@ -162,13 +162,13 @@ pub struct ScopeOptions {
 
 #[derive(OptionSet, Clone)]
 pub struct ModulateOptions {
-    #[option(ModulationTarget::Nothing)]
+    #[option]
     pub in0: EnumOption<ModulationTarget>,
-    #[option(ModulationTarget::Nothing)]
+    #[option]
     pub in1: EnumOption<ModulationTarget>,
-    #[option(ModulationTarget::Nothing)]
+    #[option]
     pub in2: EnumOption<ModulationTarget>,
-    #[option(ModulationTarget::Nothing)]
+    #[option]
     pub in3: EnumOption<ModulationTarget>,
 }
 
