@@ -54,19 +54,19 @@ pub struct ScreenTracker<ScreenT: Copy + IntoEnumIterator + Default> {
 }
 
 #[derive(Clone)]
-pub struct NumOption<T: NumOptionConfig> {
+pub struct NumOption<T: NumOptionParams> {
     name: &'static str,
     pub value: T::Value,
 }
 
-pub trait NumOptionConfig {
+pub trait NumOptionParams {
     type Value: Copy + Default;
     const STEP: Self::Value;
     const MIN: Self::Value;
     const MAX: Self::Value;
 }
 
-impl<T: NumOptionConfig> NumOption<T> {
+impl<T: NumOptionParams> NumOption<T> {
     pub fn new(name: &'static str, value: T::Value) -> Self {
         Self {
             name,
@@ -142,7 +142,7 @@ where
     }
 }
 
-impl<T: NumOptionConfig> OptionTrait for NumOption<T>
+impl<T: NumOptionParams> OptionTrait for NumOption<T>
 where
     T::Value: Copy
         + Default
@@ -177,30 +177,23 @@ where
     }
 
     fn n_unique_values(&self) -> usize {
-        // Implementation here
+        // TODO
         0
     }
 }
 
 #[macro_export]
-macro_rules! num_option_config {
+macro_rules! num_params {
     ($name:ident<$t:ty> { step: $step:expr, min: $min:expr, max: $max:expr }) => {
         #[derive(Clone)]
         pub struct $name;
 
-        impl NumOptionConfig for $name {
+        impl NumOptionParams for $name {
             type Value = $t;
             const STEP: Self::Value = $step;
             const MIN: Self::Value = $min;
             const MAX: Self::Value = $max;
         }
-    };
-    ($name:ident: $t:ty => $step:expr, $min:expr, $max:expr) => {
-        num_option_config!($name<$t> {
-            step: $step,
-            min: $min,
-            max: $max
-        });
     };
 }
 
@@ -272,12 +265,12 @@ pub enum FloatFormat {
 }
 
 #[derive(Clone)]
-pub struct FloatOption<T: FloatOptionConfig> {
+pub struct FloatOption<T: FloatOptionParams> {
     name: &'static str,
     pub value: T::Value,
 }
 
-pub trait FloatOptionConfig {
+pub trait FloatOptionParams {
     type Value: Copy + Default;
     const STEP: Self::Value;
     const MIN: Self::Value;
@@ -285,7 +278,7 @@ pub trait FloatOptionConfig {
     const FORMAT: FloatFormat;
 }
 
-impl<T: FloatOptionConfig> FloatOption<T> {
+impl<T: FloatOptionParams> FloatOption<T> {
     pub fn new(name: &'static str, value: T::Value) -> Self {
         Self {
             name,
@@ -294,7 +287,7 @@ impl<T: FloatOptionConfig> FloatOption<T> {
     }
 }
 
-impl<T: FloatOptionConfig> OptionTrait for FloatOption<T>
+impl<T: FloatOptionParams> OptionTrait for FloatOption<T>
 where
     T::Value: Copy
         + Default
@@ -354,25 +347,17 @@ where
 
 // Macro for creating float option configs
 #[macro_export]
-macro_rules! float_option_config {
+macro_rules! float_params {
     ($name:ident<$t:ty> { step: $step:expr, min: $min:expr, max: $max:expr, format: $format:expr }) => {
         #[derive(Clone)]
         pub struct $name;
 
-        impl FloatOptionConfig for $name {
+        impl FloatOptionParams for $name {
             type Value = $t;
             const STEP: Self::Value = $step;
             const MIN: Self::Value = $min;
             const MAX: Self::Value = $max;
             const FORMAT: FloatFormat = $format;
         }
-    };
-    ($name:ident: $t:ty => $step:expr, $min:expr, $max:expr, $format:expr) => {
-        float_option_config!($name<$t> {
-            step: $step,
-            min: $min,
-            max: $max,
-            format: $format
-        });
     };
 }

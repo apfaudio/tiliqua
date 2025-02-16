@@ -1,5 +1,5 @@
 use tiliqua_lib::opt::*;
-use tiliqua_lib::num_option_config;
+use tiliqua_lib::num_params;
 use strum_macros::{EnumIter, IntoStaticStr};
 use opts_macro::{OptionMenu, OptionSet};
 
@@ -74,90 +74,90 @@ impl ModulationTarget {
 }
 
 
-num_option_config!(FrequencyConfig: u16 => 125, 0, 65500);
-num_option_config!(FreqOffsetConfig: u16 => 10, 500, 2000);
-num_option_config!(PulseWidthConfig: u16 => 128, 0, 4096);
-num_option_config!(EnvelopeConfig: u8 => 1, 0, 15);
-num_option_config!(BinaryConfig: u8 => 1, 0, 1);
-num_option_config!(CutoffConfig: u16 => 100, 0, 2000);
-num_option_config!(VolumeConfig: u8 => 1, 0, 15);
-num_option_config!(TimebaseConfig: u16 => 128, 32, 3872);
-num_option_config!(TriggerLevelConfig: i16 => 512, -16384, 16384);
-num_option_config!(PositionConfig: i16 => 25, -500, 500);
-num_option_config!(ScaleConfig: u8 => 1, 0, 15);
+num_params!(FrequencyParams<u16>    { step: 125, min: 0,      max: 65500 });
+num_params!(FreqOffsetParams<u16>   { step: 10,  min: 500,    max: 2000 });
+num_params!(PulseWidthParams<u16>   { step: 128, min: 0,      max: 4096 });
+num_params!(EnvelopeParams<u8>      { step: 1,   min: 0,      max: 15 });
+num_params!(BinaryParams<u8>        { step: 1,   min: 0,      max: 1 });
+num_params!(CutoffParams<u16>       { step: 100, min: 0,      max: 2000 });
+num_params!(VolumeParams<u8>        { step: 1,   min: 0,      max: 15 });
+num_params!(TimebaseParams<u16>     { step: 128, min: 32,     max: 3872 });
+num_params!(TriggerLevelParams<i16> { step: 512, min: -16384, max: 16384 });
+num_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
+num_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
 
 #[derive(OptionSet, Clone)]
 pub struct VoiceOptions {
     #[option(1000)]
-    pub freq: NumOption<FrequencyConfig>,
+    pub freq: NumOption<FrequencyParams>,
     #[option(1000)]
-    pub freq_os: NumOption<FreqOffsetConfig>,
+    pub freq_os: NumOption<FreqOffsetParams>,
     #[option(2048)]
-    pub pw: NumOption<PulseWidthConfig>,
+    pub pw: NumOption<PulseWidthParams>,
     #[option]
     pub wave: EnumOption<Wave>,
     #[option(1)]
-    pub gate: NumOption<BinaryConfig>,
+    pub gate: NumOption<BinaryParams>,
     #[option]
-    pub sync: NumOption<BinaryConfig>,
+    pub sync: NumOption<BinaryParams>,
     #[option]
-    pub ring: NumOption<BinaryConfig>,
+    pub ring: NumOption<BinaryParams>,
     #[option]
-    pub attack: NumOption<EnvelopeConfig>,
+    pub attack: NumOption<EnvelopeParams>,
     #[option]
-    pub decay: NumOption<EnvelopeConfig>,
+    pub decay: NumOption<EnvelopeParams>,
     #[option(15)]
-    pub sustain: NumOption<EnvelopeConfig>,
+    pub sustain: NumOption<EnvelopeParams>,
     #[option]
-    pub release: NumOption<EnvelopeConfig>,
+    pub release: NumOption<EnvelopeParams>,
 }
 
 #[derive(OptionSet, Clone)]
 pub struct FilterOptions {
     #[option(1500)]
-    pub cutoff: NumOption<CutoffConfig>,
+    pub cutoff: NumOption<CutoffParams>,
     #[option]
-    pub reso: NumOption<EnvelopeConfig>,
+    pub reso: NumOption<EnvelopeParams>,
     #[option]
-    pub filt1: NumOption<BinaryConfig>,
+    pub filt1: NumOption<BinaryParams>,
     #[option]
-    pub filt2: NumOption<BinaryConfig>,
+    pub filt2: NumOption<BinaryParams>,
     #[option]
-    pub filt3: NumOption<BinaryConfig>,
+    pub filt3: NumOption<BinaryParams>,
     #[option]
-    pub lp: NumOption<BinaryConfig>,
+    pub lp: NumOption<BinaryParams>,
     #[option]
-    pub bp: NumOption<BinaryConfig>,
+    pub bp: NumOption<BinaryParams>,
     #[option]
-    pub hp: NumOption<BinaryConfig>,
+    pub hp: NumOption<BinaryParams>,
     #[option]
-    pub v3off: NumOption<BinaryConfig>,
+    pub v3off: NumOption<BinaryParams>,
     #[option(15)]
-    pub volume: NumOption<VolumeConfig>,
+    pub volume: NumOption<VolumeParams>,
 }
 
 #[derive(OptionSet, Clone)]
 pub struct ScopeOptions {
     #[option(32)]
-    pub timebase: NumOption<TimebaseConfig>,
+    pub timebase: NumOption<TimebaseParams>,
     #[option]
     pub trigger_mode: EnumOption<TriggerMode>,
     #[option]
-    pub trigger_lvl: NumOption<TriggerLevelConfig>,
+    pub trigger_lvl: NumOption<TriggerLevelParams>,
     #[option(150)]
-    pub ypos0: NumOption<PositionConfig>,
+    pub ypos0: NumOption<PositionParams>,
     #[option(-150)]
-    pub ypos1: NumOption<PositionConfig>,
+    pub ypos1: NumOption<PositionParams>,
     #[option(-50)]
-    pub ypos2: NumOption<PositionConfig>,
+    pub ypos2: NumOption<PositionParams>,
     #[option(50)]
-    pub ypos3: NumOption<PositionConfig>,
+    pub ypos3: NumOption<PositionParams>,
     #[option(8)]
-    pub yscale: NumOption<ScaleConfig>,
+    pub yscale: NumOption<ScaleParams>,
     #[option(7)]
-    pub xscale: NumOption<ScaleConfig>,
+    pub xscale: NumOption<ScaleParams>,
     #[option(175)]
-    pub xpos: NumOption<PositionConfig>,
+    pub xpos: NumOption<PositionParams>,
 }
 
 #[derive(OptionSet, Clone)]
