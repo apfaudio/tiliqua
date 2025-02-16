@@ -118,7 +118,7 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
         panic!("Options can only be derived for structs");
     };
 
-    let mut screen_fields = Vec::new();
+    let mut page_fields = Vec::new();
 
     for field in fields {
         let field_name = &field.ident;
@@ -126,21 +126,21 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
         for attr in attrs {
             if attr.path().is_ident("page") {
                 if let Ok(Meta::Path(meta_path)) = attr.parse_args() {
-                    screen_fields.push((field_name.clone(), meta_path));
+                    page_fields.push((field_name.clone(), meta_path));
                 }
             }
         }
     }
 
-    let view_match_arms = screen_fields.iter().map(|(field_name, screen_value)| {
+    let view_match_arms = page_fields.iter().map(|(field_name, page_value)| {
         quote! {
-            #screen_value => &self.#field_name,
+            #page_value => &self.#field_name,
         }
     });
 
-    let view_mut_match_arms = screen_fields.iter().map(|(field_name, screen_value)| {
+    let view_mut_match_arms = page_fields.iter().map(|(field_name, page_value)| {
         quote! {
-            #screen_value => &mut self.#field_name,
+            #page_value => &mut self.#field_name,
         }
     });
 
@@ -162,22 +162,22 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
                 self.tracker.modify = modify;
             }
 
-            fn screen(&self) -> &dyn OptionTrait {
-                &self.tracker.screen
+            fn page(&self) -> &dyn OptionTrait {
+                &self.tracker.page
             }
 
-            fn screen_mut(&mut self) -> &mut dyn OptionTrait {
-                &mut self.tracker.screen
+            fn page_mut(&mut self) -> &mut dyn OptionTrait {
+                &mut self.tracker.page
             }
 
             fn view(&self) -> &dyn OptionPage {
-                match self.tracker.screen.value {
+                match self.tracker.page.value {
                     #(#view_match_arms)*
                 }
             }
 
             fn view_mut(&mut self) -> &mut dyn OptionPage {
-                match self.tracker.screen.value {
+                match self.tracker.page.value {
                     #(#view_mut_match_arms)*
                 }
             }

@@ -120,7 +120,7 @@ impl<EncoderT: Encoder,
                     }
                 } else {
                     // green for screen selection
-                    let n = (self.opts.screen().percent() * (self.opts.screen().n_unique_values() as f32)) as usize;
+                    let n = (self.opts.page().percent() * (self.opts.page().n_unique_values() as f32)) as usize;
                     if n < 8 {
                         self.pmod.led_set_manual(n, i8::MIN);
                     }

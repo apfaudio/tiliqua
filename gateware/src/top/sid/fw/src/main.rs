@@ -222,7 +222,7 @@ fn main() -> ! {
             draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, hue, UI_NAME, UI_SHA).ok();
 
             // Draw SID visualization
-            let hl_wfm: Option<u8> = match opts.tracker.screen.value {
+            let hl_wfm: Option<u8> = match opts.tracker.page.value {
                 opts::Page::Voice1 => Some(0),
                 opts::Page::Voice2 => Some(1),
                 opts::Page::Voice3 => Some(2),
@@ -247,7 +247,7 @@ fn main() -> ! {
                 opts.filter.hp.value == 1,
             ];
 
-            let hl_filter: bool = opts.tracker.screen.value == opts::Page::Filter;
+            let hl_filter: bool = opts.tracker.page.value == opts::Page::Filter;
 
             draw::draw_sid(&mut display, 100, V_ACTIVE/4+25, hue, hl_wfm, gates, hl_filter, switches, filter_types).ok();
 

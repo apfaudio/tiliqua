@@ -34,7 +34,7 @@ where
     };
 
     Text::with_alignment(
-        &opts.screen().value(),
+        &opts.page().value(),
         Point::new(vx-12, vy as i32),
         if screen_hl { font_small_white } else { font_small_grey },
         Alignment::Right

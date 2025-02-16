@@ -31,12 +31,12 @@ pub trait Options {
     fn selected(&self) -> Option<usize>;
     fn set_selected(&mut self, s: Option<usize>);
     fn modify(&self) -> bool;
-    fn screen(&self) -> &dyn OptionTrait;
+    fn page(&self) -> &dyn OptionTrait;
     fn view(&self) -> &dyn OptionPage;
 
     fn modify_mut(&mut self, modify: bool);
     fn view_mut(&mut self) -> &mut dyn OptionPage;
-    fn screen_mut(&mut self) -> &mut dyn OptionTrait;
+    fn page_mut(&mut self) -> &mut dyn OptionTrait;
 }
 
 pub trait OptionsEncoderInterface {
@@ -50,7 +50,7 @@ pub trait OptionsEncoderInterface {
 pub struct ScreenTracker<ScreenT: Copy + IntoEnumIterator + Default> {
     pub selected: Option<usize>,
     pub modify: bool,
-    pub screen: EnumOption<ScreenT>,
+    pub page: EnumOption<ScreenT>,
 }
 
 #[derive(Clone)]
@@ -106,7 +106,7 @@ where
                 self.set_selected(Some(n_selected + 1));
             }
         } else if self.modify() {
-            self.screen_mut().tick_up();
+            self.page_mut().tick_up();
         } else if !self.view().options().is_empty() {
             self.set_selected(Some(0));
         }
@@ -119,12 +119,12 @@ where
             } else if n_selected != 0 {
                 self.set_selected(Some(n_selected - 1));
             } else {
-                if self.screen().n_unique_values() > 1 {
+                if self.page().n_unique_values() > 1 {
                     self.set_selected(None);
                 }
             }
         } else if self.modify() {
-            self.screen_mut().tick_down();
+            self.page_mut().tick_down();
         }
     }
 

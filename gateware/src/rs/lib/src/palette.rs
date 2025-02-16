@@ -5,10 +5,11 @@ use strum_macros::{EnumIter, IntoStaticStr};
 
 use micromath::F32Ext;
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ColorPalette {
     Exp,
+    #[default]
     Linear,
     Gray,
     InvGray,

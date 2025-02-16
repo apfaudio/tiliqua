@@ -22,7 +22,7 @@ use tiliqua_lib::generated_constants::*;
 use tiliqua_fw::*;
 use tiliqua_fw::opts::TouchControl;
 use tiliqua_fw::opts::UsbHost;
-use tiliqua_fw::opts::Screen;
+use tiliqua_fw::opts::Page;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::video::Video;
 
@@ -31,7 +31,7 @@ use embedded_graphics::{
     prelude::*,
 };
 
-use opts::Options;
+use opts::Opts;
 use hal::pca9635::Pca9635Driver;
 
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
@@ -108,7 +108,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 }
 
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
     synth: Polysynth0,
     drive_smoother: OnePoleSmoother,
     reso_smoother: OnePoleSmoother,
@@ -117,7 +117,7 @@ struct App {
 }
 
 impl App {
-    pub fn new(opts: Options) -> Self {
+    pub fn new(opts: Opts) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
@@ -158,7 +158,7 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = opts::Options::new();
+    let opts = opts::Opts::default();
     let mut last_palette = opts.beam.palette.value.clone();
     let app = Mutex::new(RefCell::new(App::new(opts)));
 
@@ -184,7 +184,7 @@ fn main() -> ! {
                  app.ui.draw())
             });
 
-            let help_screen: bool = opts.screen.value == Screen::Help;
+            let help_screen: bool = opts.tracker.page.value == Page::Help;
 
             if opts.beam.palette.value != last_palette || first {
                 opts.beam.palette.value.write_to_hardware(&mut video);

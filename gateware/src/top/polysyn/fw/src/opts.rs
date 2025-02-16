@@ -1,17 +1,14 @@
 use tiliqua_lib::opt::*;
-use tiliqua_lib::impl_option_view;
-use tiliqua_lib::impl_option_page;
+use tiliqua_lib::num_params;
+use strum_macros::{EnumIter, IntoStaticStr};
+use opts_macro::{Options, OptionPage};
+
 use tiliqua_lib::palette::ColorPalette;
 
-use heapless::String;
-
-use core::str::FromStr;
-
-use strum_macros::{EnumIter, IntoStaticStr};
-
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
-pub enum Screen {
+pub enum Page {
+    #[default]
     Help,
     Poly,
     Beam,
@@ -19,216 +16,96 @@ pub enum Screen {
     Usb,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TouchControl {
+    #[default]
     Off,
     On,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum UsbHost {
+    #[default]
     Off,
     Enable,
 }
 
-#[derive(Clone)]
-pub struct HelpOptions {
-    pub selected:  Option<usize>,
-    pub page:      NumOption<u16>,
+num_params!(PageNumParams<u16>    { step: 1, min: 0, max: 0 });
+num_params!(DriveParams<u16>      { step: 2048, min: 0, max: 32768 });
+num_params!(ResoParams<u16>       { step: 2048, min: 8192, max: 32768 });
+num_params!(DiffuseParams<u16>    { step: 2048, min: 0, max: 32768 });
+num_params!(PersistParams<u16>    { step: 256, min: 256, max: 32768 });
+num_params!(DecayParams<u8>       { step: 1, min: 0, max: 15 });
+num_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
+num_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
+num_params!(XScaleParams<u8>      { step: 1, min: 0, max: 15 });
+num_params!(YScaleParams<u8>      { step: 1, min: 0, max: 15 });
+num_params!(CfgIdParams<u8>       { step: 1, min: 1, max: 15 });
+num_params!(EndptIdParams<u8>     { step: 1, min: 1, max: 15 });
+
+#[derive(OptionPage, Clone)]
+pub struct HelpOpts {
+    #[option]
+    pub page: NumOption<PageNumParams>,
 }
 
-impl_option_view!(HelpOptions,
-                  page);
-
-#[derive(Clone)]
-pub struct PolyOptions {
-    pub selected: Option<usize>,
+#[derive(OptionPage, Clone)]
+pub struct PolyOpts {
+    #[option]
     pub touch_control: EnumOption<TouchControl>,
-    pub drive: NumOption<u16>,
-    pub reso: NumOption<u16>,
-    pub diffuse: NumOption<u16>,
+    #[option(16384)]
+    pub drive: NumOption<DriveParams>,
+    #[option(16384)]
+    pub reso: NumOption<ResoParams>,
+    #[option(12288)]
+    pub diffuse: NumOption<DiffuseParams>,
 }
 
-impl_option_view!(PolyOptions,
-                  touch_control,
-                  drive,
-                  reso,
-                  diffuse);
-
-#[derive(Clone)]
-pub struct VectorOptions {
-    pub selected: Option<usize>,
-    pub xscale: NumOption<u8>,
-    pub yscale: NumOption<u8>,
+#[derive(OptionPage, Clone)]
+pub struct VectorOpts {
+    #[option(7)]
+    pub xscale: NumOption<XScaleParams>,
+    #[option(7)]
+    pub yscale: NumOption<YScaleParams>,
 }
 
-impl_option_view!(VectorOptions,
-                  xscale, yscale);
-
-#[derive(Clone)]
-pub struct BeamOptions {
-    pub selected: Option<usize>,
-    pub persist: NumOption<u16>,
-    pub decay: NumOption<u8>,
-    pub intensity: NumOption<u8>,
-    pub hue: NumOption<u8>,
+#[derive(OptionPage, Clone)]
+pub struct BeamOpts {
+    #[option(512)]
+    pub persist: NumOption<PersistParams>,
+    #[option(1)]
+    pub decay: NumOption<DecayParams>,
+    #[option(8)]
+    pub intensity: NumOption<IntensityParams>,
+    #[option(10)]
+    pub hue: NumOption<HueParams>,
+    #[option]
     pub palette: EnumOption<ColorPalette>,
 }
 
-impl_option_view!(BeamOptions,
-                  persist, decay, intensity, hue, palette);
-
-#[derive(Clone)]
-pub struct UsbOptions {
-    pub selected: Option<usize>,
+#[derive(OptionPage, Clone)]
+pub struct UsbOpts {
+    #[option]
     pub host: EnumOption<UsbHost>,
-    pub cfg_id: NumOption<u8>,
-    pub endpt_id: NumOption<u8>,
+    #[option(1)]
+    pub cfg_id: NumOption<CfgIdParams>,
+    #[option(2)]
+    pub endpt_id: NumOption<EndptIdParams>,
 }
 
-impl_option_view!(UsbOptions,
-                  host, cfg_id, endpt_id);
-
-#[derive(Clone)]
-pub struct Options {
-    pub modify: bool,
-    pub screen: EnumOption<Screen>,
-
-    pub help:   HelpOptions,
-    pub poly:   PolyOptions,
-    pub beam:   BeamOptions,
-    pub vector: VectorOptions,
-    pub usb: UsbOptions,
-}
-
-impl_option_page!(Options,
-                  (Screen::Help,   help),
-                  (Screen::Poly,   poly),
-                  (Screen::Beam,   beam),
-                  (Screen::Vector, vector),
-                  (Screen::Usb,    usb));
-
-impl Options {
-    pub fn new() -> Options {
-        Options {
-            modify: true,
-            screen: EnumOption {
-                name: String::from_str("screen").unwrap(),
-                value: Screen::Help,
-            },
-            help: HelpOptions {
-                selected: None,
-                page: NumOption{
-                    name: String::from_str("page").unwrap(),
-                    value: 0,
-                    step: 0,
-                    min: 0,
-                    max: 0,
-                },
-            },
-            poly: PolyOptions {
-                selected: None,
-                touch_control: EnumOption{
-                    name: String::from_str("touch").unwrap(),
-                    value: TouchControl::On,
-                },
-                drive: NumOption{
-                    name: String::from_str("overdrive").unwrap(),
-                    value: 16384,
-                    step: 2048,
-                    min: 0,
-                    max: 32768,
-                },
-                reso: NumOption{
-                    name: String::from_str("resonance").unwrap(),
-                    value: 16384,
-                    step: 2048,
-                    min: 8192,
-                    max: 32768,
-                },
-                diffuse: NumOption{
-                    name: String::from_str("diffusion").unwrap(),
-                    value: 12288,
-                    step: 2048,
-                    min: 0,
-                    max: 32768,
-                },
-            },
-            beam: BeamOptions {
-                selected: None,
-                persist: NumOption{
-                    name: String::from_str("persist").unwrap(),
-                    value: 512,
-                    step: 256,
-                    min: 256,
-                    max: 32768,
-                },
-                decay: NumOption{
-                    name: String::from_str("decay").unwrap(),
-                    value: 1,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-                intensity: NumOption{
-                    name: String::from_str("intensity").unwrap(),
-                    value: 8,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-                hue: NumOption{
-                    name: String::from_str("hue").unwrap(),
-                    value: 10,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-                palette: EnumOption {
-                    name: String::from_str("palette").unwrap(),
-                    value: ColorPalette::Linear,
-                },
-            },
-            vector: VectorOptions {
-                selected: None,
-                xscale: NumOption{
-                    name: String::from_str("xscale").unwrap(),
-                    value: 7,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-                yscale: NumOption{
-                    name: String::from_str("yscale").unwrap(),
-                    value: 7,
-                    step: 1,
-                    min: 0,
-                    max: 15,
-                },
-            },
-            usb: UsbOptions {
-                selected: None,
-                host: EnumOption{
-                    name: String::from_str("host").unwrap(),
-                    value: UsbHost::Off,
-                },
-                cfg_id: NumOption{
-                    name: String::from_str("cfg-id").unwrap(),
-                    value: 1,
-                    step: 1,
-                    min: 1,
-                    max: 15,
-                },
-                endpt_id: NumOption{
-                    name: String::from_str("endpt-id").unwrap(),
-                    value: 2,
-                    step: 1,
-                    min: 1,
-                    max: 15,
-                },
-            }
-        }
-    }
+#[derive(Options, Clone, Default)]
+pub struct Opts {
+    pub tracker: ScreenTracker<Page>,
+    #[page(Page::Help)]
+    pub help: HelpOpts,
+    #[page(Page::Poly)]
+    pub poly: PolyOpts,
+    #[page(Page::Beam)]
+    pub beam: BeamOpts,
+    #[page(Page::Vector)]
+    pub vector: VectorOpts,
+    #[page(Page::Usb)]
+    pub usb: UsbOpts,
 }
