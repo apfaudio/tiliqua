@@ -23,13 +23,13 @@ pub trait OptionTrait {
 }
 
 pub trait OptionView {
-    fn selected(&self) -> Option<usize>;
-    fn set_selected(&mut self, s: Option<usize>);
     fn options(&self) -> OptionVec;
     fn options_mut(&mut self) -> OptionVecMut;
 }
 
 pub trait OptionPage {
+    fn selected(&self) -> Option<usize>;
+    fn set_selected(&mut self, s: Option<usize>);
     fn modify(&self) -> bool;
     fn screen(&self) -> &dyn OptionTrait;
     fn view(&self) -> &dyn OptionView;
@@ -87,14 +87,6 @@ impl<T: Copy + IntoEnumIterator> EnumOption<T> {
 macro_rules! impl_option_view {
     ($struct_name:ident, $($field:ident),*) => {
         impl OptionView for $struct_name {
-            fn selected(&self) -> Option<usize> {
-                self.selected
-            }
-
-            fn set_selected(&mut self, s: Option<usize>) {
-                self.selected = s;
-            }
-
             fn options(&self) -> OptionVec {
                 OptionVec::from_slice(&[$(&self.$field),*]).unwrap()
             }
@@ -112,6 +104,14 @@ macro_rules! impl_option_view {
 macro_rules! impl_option_page {
     ($struct_name:ident, $(($screen:path, $field:ident)),*) => {
         impl OptionPage for $struct_name {
+            fn selected(&self) -> Option<usize> {
+                self.selected
+            }
+
+            fn set_selected(&mut self, s: Option<usize>) {
+                self.selected = s;
+            }
+
             fn modify(&self) -> bool {
                 self.modify
             }
@@ -154,28 +154,28 @@ where
     }
 
     fn tick_up(&mut self) {
-        if let Some(n_selected) = self.view().selected() {
+        if let Some(n_selected) = self.selected() {
             if self.modify() {
                 self.view_mut().options_mut()[n_selected].tick_up();
             } else if n_selected < self.view().options().len()-1 {
-                self.view_mut().set_selected(Some(n_selected + 1));
+                self.set_selected(Some(n_selected + 1));
             }
         } else if self.modify() {
             self.screen_mut().tick_up();
         } else if !self.view().options().is_empty() {
-            self.view_mut().set_selected(Some(0));
+            self.set_selected(Some(0));
         }
     }
 
     fn tick_down(&mut self) {
-        if let Some(n_selected) = self.view().selected() {
+        if let Some(n_selected) = self.selected() {
             if self.modify() {
                 self.view_mut().options_mut()[n_selected].tick_down();
             } else if n_selected != 0 {
-                self.view_mut().set_selected(Some(n_selected - 1));
+                self.set_selected(Some(n_selected - 1));
             } else {
                 if self.screen().n_unique_values() > 1 {
-                    self.view_mut().set_selected(None);
+                    self.set_selected(None);
                 }
             }
         } else if self.modify() {

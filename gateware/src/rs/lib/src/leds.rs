@@ -6,7 +6,7 @@ const PCA9635_MIDI:      [usize; 2] = [8, 9];
 
 pub fn mobo_pca9635_set_bargraph<T: OptionPage>(
     opts: &T, leds: &mut [u8; 16], toggle: bool) {
-    if let Some(n) = opts.view().selected() {
+    if let Some(n) = opts.selected() {
         if n > 7 {
             return;
         }

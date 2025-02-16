@@ -113,7 +113,7 @@ impl<EncoderT: Encoder,
             // Flashing if we're modifying something
             self.pmod.led_all_auto();
             if self.toggle_leds {
-                if let Some(n) = self.opts.view().selected() {
+                if let Some(n) = self.opts.selected() {
                     // red for option selection
                     if n < 8 {
                         self.pmod.led_set_manual(n, i8::MAX);
@@ -134,7 +134,7 @@ impl<EncoderT: Encoder,
                 }
                 let fade: i8 = (((self.encoder_fade_ms-self.time_since_encoder_touched) * 120) /
                                  self.encoder_fade_ms) as i8;
-                if let Some(n) = self.opts.view().selected() {
+                if let Some(n) = self.opts.selected() {
                     // red for option selection
                     if n < 8 {
                         self.pmod.led_set_manual(n, fade);

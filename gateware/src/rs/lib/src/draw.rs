@@ -28,7 +28,7 @@ where
     let vspace: usize = 18;
     let hspace: i32 = 150;
 
-    let screen_hl = match (opts.view().selected(), opts.modify()) {
+    let screen_hl = match (opts.selected(), opts.modify()) {
         (None, _) => true,
         _ => false,
     };
@@ -53,7 +53,7 @@ where
 
     for (n, opt) in opts_view.iter().enumerate() {
         let mut font = font_small_grey;
-        if let Some(n_selected) = opts.view().selected() {
+        if let Some(n_selected) = opts.selected() {
             if n_selected == n {
                 font = font_small_white;
                 if opts.modify() {

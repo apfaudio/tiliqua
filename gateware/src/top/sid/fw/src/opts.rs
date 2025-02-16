@@ -46,7 +46,6 @@ num_option_config!(ScaleConfig: u8 => 1, 0, 15);
 
 #[derive(Clone)]
 pub struct VoiceOptions {
-    pub selected: Option<usize>,
     pub freq: NumOption<FrequencyConfig>,
     pub freq_os: NumOption<FreqOffsetConfig>,
     pub pw: NumOption<PulseWidthConfig>,
@@ -63,7 +62,6 @@ pub struct VoiceOptions {
 impl VoiceOptions {
     fn new() -> Self {
         Self {
-            selected: None,
             freq: NumOption::new("f-base", 1000),
             freq_os: NumOption::new("f-offs", 1000),
             pw: NumOption::new("pw", 2048),
@@ -85,7 +83,6 @@ impl_option_view!(VoiceOptions,
 
 #[derive(Clone)]
 pub struct FilterOptions {
-    pub selected: Option<usize>,
     pub cutoff: NumOption<CutoffConfig>,
     pub reso: NumOption<EnvelopeConfig>,
     pub filt1: NumOption<BinaryConfig>,
@@ -101,7 +98,6 @@ pub struct FilterOptions {
 impl FilterOptions {
     fn new() -> Self {
         Self {
-            selected: None,
             cutoff: NumOption::new("cutoff", 1500),
             reso: NumOption::new("reso", 0),
             filt1: NumOption::new("filt1", 0),
@@ -122,7 +118,6 @@ impl_option_view!(FilterOptions,
 
 #[derive(Clone)]
 pub struct ScopeOptions {
-    pub selected: Option<usize>,
     pub timebase: NumOption<TimebaseConfig>,
     pub trigger_mode: EnumOption<TriggerMode>,
     pub trigger_lvl: NumOption<TriggerLevelConfig>,
@@ -138,7 +133,6 @@ pub struct ScopeOptions {
 impl ScopeOptions {
     fn new() -> Self {
         Self {
-            selected: None,
             timebase: NumOption::new("timebase", 32),
             trigger_mode: EnumOption::new("trig-mode", TriggerMode::Always),
             trigger_lvl: NumOption::new("trig-lvl", 0),
@@ -199,7 +193,6 @@ impl ModulationTarget {
 
 #[derive(Clone)]
 pub struct ModulateOptions {
-    pub selected: Option<usize>,
     pub in0: EnumOption<ModulationTarget>,
     pub in1: EnumOption<ModulationTarget>,
     pub in2: EnumOption<ModulationTarget>,
@@ -209,7 +202,6 @@ pub struct ModulateOptions {
 impl ModulateOptions {
     fn new() -> Self {
         Self {
-            selected: None,
             in0: EnumOption::new("in0", ModulationTarget::Nothing),
             in1: EnumOption::new("in1", ModulationTarget::Nothing),
             in2: EnumOption::new("in2", ModulationTarget::Nothing),
@@ -222,6 +214,7 @@ impl_option_view!(ModulateOptions, in0, in1, in2, in3);
 
 #[derive(Clone)]
 pub struct Options {
+    pub selected: Option<usize>,
     pub modify: bool,
     pub screen: EnumOption<Screen>,
     pub modulate: ModulateOptions,
@@ -243,6 +236,7 @@ impl_option_page!(Options,
 impl Options {
     pub fn new() -> Options {
         Options {
+            selected: None,
             modify: false,
             screen: EnumOption::new("screen", Screen::Voice1),
             modulate: ModulateOptions::new(),
