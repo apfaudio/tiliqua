@@ -20,9 +20,7 @@ use tiliqua_lib::dsp::OnePoleSmoother;
 use tiliqua_lib::midi::MidiTouchController;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_fw::*;
-use tiliqua_fw::opts::TouchControl;
-use tiliqua_fw::opts::UsbHost;
-use tiliqua_fw::opts::Page;
+use tiliqua_fw::options::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::video::Video;
 
@@ -31,7 +29,6 @@ use embedded_graphics::{
     prelude::*,
 };
 
-use opts::Opts;
 use hal::pca9635::Pca9635Driver;
 
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
@@ -158,7 +155,7 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = opts::Opts::default();
+    let opts = Opts::default();
     let mut last_palette = opts.beam.palette.value.clone();
     let app = Mutex::new(RefCell::new(App::new(opts)));
 

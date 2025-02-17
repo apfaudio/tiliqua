@@ -205,12 +205,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "opts-macro"
+name = "opts"
+version = "0.1.0"
+dependencies = [
+ "fixed",
+ "heapless",
+ "log",
+ "micromath",
+ "opts-derive",
+ "strum",
+ "strum_macros 0.26.4",
+]
+
+[[package]]
+name = "opts-derive"
 version = "0.1.0"
 dependencies = [
  "quote",
  "syn",
- "tiliqua-lib",
 ]
 
 [[package]]
@@ -379,7 +391,7 @@ dependencies = [
  "micromath",
  "midi-convert",
  "midi-types",
- "opts-macro",
+ "opts",
  "panic-halt",
  "riscv",
  "riscv-rt",
@@ -412,6 +424,7 @@ dependencies = [
  "log",
  "micromath",
  "midi-types",
+ "opts",
  "serde",
  "serde-json-core",
  "strum",

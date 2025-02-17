@@ -14,4 +14,4 @@ tiliqua_hal::impl_polysynth! {
 }
 
 pub mod handlers;
-pub mod opts;
+pub mod options;

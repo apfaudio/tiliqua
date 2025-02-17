@@ -7,7 +7,7 @@ edition = "2021"
 tiliqua-hal = { path="../../../rs/hal", default-features = false }
 tiliqua-lib = { path = "../../../rs/lib" }
 tiliqua-pac = { path="../../../rs/pac", default-features = false, features = ["critical-section", "vexriscv"] }
-opts-macro = { path = "../../../rs/opts-macro" }
+opts = { path = "../../../rs/opts" }
 
 log = "0.4.17"
 embedded-hal = "=1.0.0"
