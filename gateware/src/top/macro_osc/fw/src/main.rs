@@ -22,7 +22,7 @@ use tiliqua_fw::*;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_hal::video::Video;
-use opts::Options;
+use options::*;
 use hal::pca9635::*;
 
 
@@ -40,11 +40,11 @@ struct App<'a> {
     voice: Voice<'a>,
     patch: Patch,
     modulations: Modulations,
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
 
 impl<'a> App<'a> {
-    pub fn new(opts: Options) -> Self {
+    pub fn new(opts: Opts) -> Self {
         let mut voice = Voice::new(&HEAP, BLOCK_SIZE);
         let mut patch = Patch::default();
 
@@ -206,7 +206,7 @@ fn main() -> ! {
 
     unsafe { HEAP.init(HEAP_START, HEAP_SIZE) }
 
-    let opts = opts::Options::new();
+    let opts = Opts::default();
     let mut last_palette = opts.beam.palette.value;
     let app = App::new(opts);
     let app = Mutex::new(RefCell::new(app));
@@ -315,14 +315,14 @@ fn main() -> ! {
             }
 
             scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trigger_mode.value == opts::TriggerMode::Always) );
+                |w| w.trigger_always().bit(opts.scope.trigger_mode.value == TriggerMode::Always) );
 
-            if opts.screen.value == opts::Screen::Vector {
+            if opts.tracker.page.value == Page::Vector {
                 scope.en().write(|w| w.enable().bit(false) );
                 vscope.en().write(|w| w.enable().bit(true) );
             }
 
-            if opts.screen.value == opts::Screen::Scope {
+            if opts.tracker.page.value == Page::Scope {
                 scope.en().write(|w| w.enable().bit(true) );
                 vscope.en().write(|w| w.enable().bit(false) );
             }

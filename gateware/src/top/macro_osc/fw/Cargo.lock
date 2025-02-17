@@ -247,6 +247,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "opts"
+version = "0.1.0"
+dependencies = [
+ "fixed",
+ "heapless",
+ "log",
+ "micromath",
+ "opts-derive",
+ "strum",
+ "strum_macros 0.26.4",
+]
+
+[[package]]
+name = "opts-derive"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.98",
+]
+
+[[package]]
 name = "panic-halt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -263,9 +284,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.36"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fa76aaf39101c457836aec0ce2316dbdc3ab723cdda1c6bd4e6ad4208acaca7"
+checksum = "0e4dccaaaf89514f546c693ddc140f729f958c247918a13380cccc6078391acc"
 dependencies = [
  "proc-macro2",
 ]
@@ -353,7 +374,7 @@ checksum = "5a9bf7cf98d04a2b28aead066b7496853d4779c9cc183c440dbac457641e19a0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.92",
+ "syn 2.0.98",
 ]
 
 [[package]]
@@ -381,7 +402,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.92",
+ "syn 2.0.98",
 ]
 
 [[package]]
@@ -394,7 +415,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.92",
+ "syn 2.0.98",
 ]
 
 [[package]]
@@ -423,9 +444,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.92"
+version = "2.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70ae51629bf965c5c098cc9e87908a3df5301051a9e087d6f9bef5c9771ed126"
+checksum = "36147f1a48ae0ec2b5b3bc5b537d267457555a10dc06f3dbc8cb11ba3006d3b1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -447,6 +468,7 @@ dependencies = [
  "log",
  "mi-plaits-dsp",
  "micromath",
+ "opts",
  "panic-halt",
  "riscv",
  "riscv-rt",
@@ -479,6 +501,7 @@ dependencies = [
  "log",
  "micromath",
  "midi-types",
+ "opts",
  "serde",
  "serde-json-core",
  "strum",
