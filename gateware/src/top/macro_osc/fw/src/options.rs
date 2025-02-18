@@ -5,8 +5,8 @@ use tiliqua_lib::palette::ColorPalette;
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
-    #[default]
     Scope,
+    #[default]
     Osc,
     Beam,
     Vector,
@@ -65,7 +65,7 @@ int_params!(YPosParams<i16>       { step: 25, min: -500, max: 500 });
 pub struct OscOpts {
     #[option]
     pub engine: EnumOption<Engine>,
-    #[option(60)]
+    #[option(77)] // empirically match frequency knob full left
     pub note: IntOption<NoteParams>,
     #[option(96)]
     pub harmonics: IntOption<HarmonicsParams>,
@@ -102,9 +102,9 @@ pub struct ScopeOpts {
     #[option(2048)]
     pub timebase: IntOption<TimebaseParams>,
     #[option]
-    pub trigger_mode: EnumOption<TriggerMode>,
+    pub trig_mode: EnumOption<TriggerMode>,
     #[option(512)]
-    pub trigger_lvl: IntOption<TriggerLvlParams>,
+    pub trig_lvl: IntOption<TriggerLvlParams>,
     #[option(-200)]
     pub ypos0: IntOption<YPosParams>,
     #[option(200)]

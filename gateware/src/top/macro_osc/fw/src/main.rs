@@ -131,7 +131,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         if note_patched {
             // 1V/oct
-            let v_oct = ((pmod.sample_i0().read().bits() as i16) as f32) / 4096.0f32;
+            let v_oct = ((pmod.sample_i0().read().bits() as i16) as f32) / 4000.0f32;
             modulations.note = v_oct * 12.0f32;
         }
 
@@ -303,7 +303,7 @@ fn main() -> ! {
                 scope.hue().write(|w| w.hue().bits(opts.beam.hue.value+6));
                 scope.intensity().write(|w| w.intensity().bits(opts.beam.intensity.value));
 
-                scope.trigger_lvl().write(|w| w.trigger_level().bits(opts.scope.trigger_lvl.value as u16));
+                scope.trigger_lvl().write(|w| w.trigger_level().bits(opts.scope.trig_lvl.value as u16));
                 scope.xscale().write(|w| w.xscale().bits(opts.scope.xscale.value));
                 scope.yscale().write(|w| w.yscale().bits(opts.scope.yscale.value));
                 scope.timebase().write(|w| w.timebase().bits(opts.scope.timebase.value));
@@ -315,7 +315,7 @@ fn main() -> ! {
             }
 
             scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trigger_mode.value == TriggerMode::Always) );
+                |w| w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always) );
 
             if opts.tracker.page.value == Page::Vector {
                 scope.en().write(|w| w.enable().bit(false) );
