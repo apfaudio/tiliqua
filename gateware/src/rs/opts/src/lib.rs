@@ -8,11 +8,13 @@ mod traits;
 mod integer;
 mod enumeration;
 mod float;
+mod string;
 
 pub use crate::traits::*;
 pub use crate::integer::*;
 pub use crate::enumeration::*;
 pub use crate::float::*;
+pub use crate::string::*;
 
 #[derive(Clone, Default)]
 pub struct ScreenTracker<ScreenT: Copy + IntoEnumIterator + Default> {
@@ -34,6 +36,14 @@ mod tests {
         Scope,
     }
 
+    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+    #[strum(serialize_all = "kebab-case")]
+    pub enum TestEnum {
+        EnumValue1,
+        #[default]
+        EnumValue2,
+    }
+
     int_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
     int_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
 
@@ -45,6 +55,10 @@ mod tests {
         pub ypos1: IntOption<PositionParams>,
         #[option(7)]
         pub xscale: IntOption<ScaleParams>,
+        #[option]
+        pub enumo: EnumOption<TestEnum>,
+        #[option("hello")]
+        pub stro: StringOption,
     }
 
     #[derive(Options, Clone, Default)]
