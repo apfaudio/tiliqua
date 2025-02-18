@@ -26,14 +26,12 @@ use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_lib::draw;
 use tiliqua_lib::calibration::*;
-use tiliqua_fw::opts::*;
+use tiliqua_fw::options::*;
 use tiliqua_hal::video::Video;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::pca9635::Pca9635Driver;
 
 const TUSB322I_ADDR:  u8 = 0x47;
-
-use opts::Options;
 
 pub type ReportString = String<512>;
 
@@ -55,8 +53,8 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         let opts_ro = app.ui.opts.clone();
 
-        if opts_ro.reference.run.value == EnAutoZero::Run {
-            let stimulus_raw = 4000 * opts_ro.reference.volts.value as i16;
+        if opts_ro.autocal.autozero.value == EnAutoZero::Run {
+            let stimulus_raw = 4000 * opts_ro.autocal.volts.value as i16;
             let sample_i = app.ui.pmod.sample_i();
             let mut deltas = [0i16; 4];
             for ch in 0..4 {
@@ -69,7 +67,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     }
                 }
             }
-            match opts_ro.reference.autozero.value {
+            match opts_ro.autocal.set.value {
                 AutoZero::AdcZero => {
                     app.ui.opts.caladc.zero0.value  += deltas[0];
                     app.ui.opts.caladc.zero1.value  += deltas[1];
@@ -297,11 +295,11 @@ fn print_die_temperature(s: &mut ReportString, dtr: &pac::DTR0)
 }
 
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
 
 impl App {
-    pub fn new(opts: Options) -> Self {
+    pub fn new(opts: Opts) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
@@ -314,7 +312,7 @@ impl App {
     }
 }
 
-fn push_to_opts(constants: &CalibrationConstants, options: &mut Options) {
+fn push_to_opts(constants: &CalibrationConstants, options: &mut Opts) {
     let c = constants.to_tweakable();
     options.caladc.scale0.value = c.adc_scale[0];
     options.caladc.scale1.value = c.adc_scale[1];
@@ -370,7 +368,7 @@ fn main() -> ! {
     palette::ColorPalette::default().write_to_hardware(&mut video);
     video.set_persist(512);
 
-    let mut opts = opts::Options::new();
+    let mut opts = Opts::default();
 
     if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
         push_to_opts(&cal_constants, &mut opts);
@@ -399,20 +397,20 @@ fn main() -> ! {
                 // Single-shot commit: when 'write' is selected and the encoder
                 // is turned, write once and change the enum back.
                 let mut commit_to_eeprom = false;
-                if app.ui.opts.reference.write.value != EnWrite::Turn {
+                if app.ui.opts.autocal.write.value != EnWrite::Turn {
                     commit_to_eeprom = true;
-                    app.ui.opts.reference.write.value = EnWrite::Turn;
+                    app.ui.opts.autocal.write.value = EnWrite::Turn;
                 }
                 (app.ui.opts.clone(), commit_to_eeprom)
             });
 
-            let stimulus_raw = 4000 * opts.reference.volts.value as i16;
+            let stimulus_raw = 4000 * opts.autocal.volts.value as i16;
 
             draw::draw_options(&mut display, &opts, H_ACTIVE/2-30, 70,
                                hue).ok();
             draw::draw_name(&mut display, H_ACTIVE/2, 30, hue, UI_NAME, UI_SHA).ok();
 
-            if opts.screen.value == opts::Screen::Report {
+            if opts.tracker.page.value == Page::Report {
                 let mut status_report = ReportString::new();
                 let (page_name, report_str) = match opts.report.page.value {
                     ReportPage::Startup => ("[startup report]", &startup_report),
@@ -449,7 +447,7 @@ fn main() -> ! {
                 ).ok();
             }
 
-            if opts.screen.value == opts::Screen::Autocal {
+            if opts.tracker.page.value == Page::Autocal {
                 pmod.registers.sample_o0().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
                 pmod.registers.sample_o1().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
                 pmod.registers.sample_o2().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
@@ -489,7 +487,7 @@ fn main() -> ! {
             );
             constants.write_to_pmod(&mut pmod);
 
-            if opts.screen.value != opts::Screen::Report {
+            if opts.tracker.page.value != Page::Report {
                 draw::draw_cal(&mut display, H_ACTIVE/2-128, V_ACTIVE/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
                                &pmod.sample_i()).ok();

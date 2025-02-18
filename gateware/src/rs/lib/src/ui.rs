@@ -3,7 +3,7 @@
 // to automatic CV LEDs when nothing is touched for a bit.
 //
 
-use crate::opt::*;
+use opts::{Options, OptionsEncoderInterface};
 use crate::leds;
 use embedded_hal::i2c::I2c;
 use tiliqua_hal::encoder::Encoder;
@@ -15,7 +15,7 @@ where
     EncoderT: Encoder,
     PmodT: EurorackPmod,
     MoboI2CT: I2c,
-    OptionsT: OptionPage + OptionPageEncoderInterface
+    OptionsT: Options + OptionsEncoderInterface
 {
     pub opts: OptionsT,
     encoder: EncoderT,
@@ -34,7 +34,7 @@ where
 impl<EncoderT: Encoder,
      PmodT: EurorackPmod,
      MoboI2CT: I2c,
-     OptionsT: OptionPage + OptionPageEncoderInterface>
+     OptionsT: Options + OptionsEncoderInterface>
          UI<EncoderT, PmodT, MoboI2CT, OptionsT> {
     pub fn new(opts: OptionsT, period_ms: u32, encoder: EncoderT,
                pca9635: Pca9635Driver<MoboI2CT>, pmod: PmodT) -> Self {
@@ -113,14 +113,14 @@ impl<EncoderT: Encoder,
             // Flashing if we're modifying something
             self.pmod.led_all_auto();
             if self.toggle_leds {
-                if let Some(n) = self.opts.view().selected() {
+                if let Some(n) = self.opts.selected() {
                     // red for option selection
                     if n < 8 {
                         self.pmod.led_set_manual(n, i8::MAX);
                     }
                 } else {
                     // green for screen selection
-                    let n = (self.opts.screen().percent() * (self.opts.screen().n_unique_values() as f32)) as usize;
+                    let n = (self.opts.page().percent() * (self.opts.page().n_unique_values() as f32)) as usize;
                     if n < 8 {
                         self.pmod.led_set_manual(n, i8::MIN);
                     }
@@ -134,7 +134,7 @@ impl<EncoderT: Encoder,
                 }
                 let fade: i8 = (((self.encoder_fade_ms-self.time_since_encoder_touched) * 120) /
                                  self.encoder_fade_ms) as i8;
-                if let Some(n) = self.opts.view().selected() {
+                if let Some(n) = self.opts.selected() {
                     // red for option selection
                     if n < 8 {
                         self.pmod.led_set_manual(n, fade);

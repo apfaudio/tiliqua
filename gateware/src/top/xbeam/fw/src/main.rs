@@ -19,7 +19,7 @@ use embedded_graphics::{
     prelude::*,
 };
 
-use opts::Options;
+use options::*;
 use hal::pca9635::Pca9635Driver;
 
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
@@ -27,11 +27,11 @@ tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
 
 impl App {
-    pub fn new(opts: Options) -> Self {
+    pub fn new(opts: Opts) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -71,7 +71,7 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = opts::Options::new();
+    let opts = Opts::default();
     let mut last_palette = opts.beam.palette.value;
     let app = Mutex::new(RefCell::new(App::new(opts)));
 
@@ -116,7 +116,7 @@ fn main() -> ! {
             scope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
             scope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
 
-            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trigger_lvl.value as u16) } );
+            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trig_lvl.value as u16) } );
             scope.xscale().write(|w| unsafe { w.xscale().bits(opts.scope.xscale.value) } );
             scope.yscale().write(|w| unsafe { w.yscale().bits(opts.scope.yscale.value) } );
             scope.timebase().write(|w| unsafe { w.timebase().bits(opts.scope.timebase.value) } );
@@ -127,14 +127,14 @@ fn main() -> ! {
             scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope.ypos3.value as u16) } );
 
             scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trigger_mode.value == opts::TriggerMode::Always) );
+                |w| w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always) );
 
-            if opts.screen.value == opts::Screen::Vector {
+            if opts.tracker.page.value == Page::Vector {
                 scope.en().write(|w| w.enable().bit(false) );
                 vscope.en().write(|w| w.enable().bit(true) );
             }
 
-            if opts.screen.value == opts::Screen::Scope {
+            if opts.tracker.page.value == Page::Scope {
                 scope.en().write(|w| w.enable().bit(true) );
                 vscope.en().write(|w| w.enable().bit(false) );
             }

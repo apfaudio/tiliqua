@@ -23,7 +23,7 @@ use embedded_graphics::{
     text::Text,
 };
 
-use opts::Options;
+use options::Opts;
 use hal::pca9635::Pca9635Driver;
 
 use micromath::F32Ext;
@@ -33,11 +33,11 @@ tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
 
 impl App {
-    pub fn new(opts: Options) -> Self {
+    pub fn new(opts: Opts) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -52,12 +52,12 @@ impl App {
 
 fn volts_to_freq(volts: f32) -> f32 {
     let a3_freq_hz: f32 = 440.0f32;
-    (a3_freq_hz / 8.0f32) * (2.0f32).powf(volts + 2.0f32 - 3.0f32/4.0f32)
+    (a3_freq_hz / 2.0f32) * (2.0f32).powf(volts + 2.0f32 - 3.0f32/4.0f32)
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
-    use tiliqua_fw::opts::{VoiceOptions, ModulationTarget, VoiceModulationType};
+    use tiliqua_fw::options::{VoiceOpts, ModulationTarget, VoiceModulationType};
 
     let peripherals = unsafe { pac::Peripherals::steal() };
     let sid = peripherals.SID_PERIPH;
@@ -72,7 +72,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         (app.ui.opts.clone(), app.ui.pmod.sample_i())
     });
 
-    let voices: [&mut VoiceOptions; 3] = [
+    let voices: [&mut VoiceOpts; 3] = [
         &mut opts.voice1,
         &mut opts.voice2,
         &mut opts.voice3,
@@ -123,7 +123,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         sid_poke(&sid, base+3, (voices[n_voice].pw.value>>8) as u8);
 
         let mut reg04 = 0u8;
-        use crate::opts::Wave;
+        use crate::options::Wave;
         match voices[n_voice].wave.value {
             Wave::Triangle => { reg04 |= 0x10; }
             Wave::Saw      => { reg04 |= 0x20; }
@@ -194,7 +194,7 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = opts::Options::new();
+    let opts = options::Opts::default();
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 5u8;
 
@@ -222,10 +222,10 @@ fn main() -> ! {
             draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, hue, UI_NAME, UI_SHA).ok();
 
             // Draw SID visualization
-            let hl_wfm: Option<u8> = match opts.screen.value {
-                opts::Screen::Voice1 => Some(0),
-                opts::Screen::Voice2 => Some(1),
-                opts::Screen::Voice3 => Some(2),
+            let hl_wfm: Option<u8> = match opts.tracker.page.value {
+                options::Page::Voice1 => Some(0),
+                options::Page::Voice2 => Some(1),
+                options::Page::Voice3 => Some(2),
                 _ => None,
             };
 
@@ -247,7 +247,7 @@ fn main() -> ! {
                 opts.filter.hp.value == 1,
             ];
 
-            let hl_filter: bool = opts.screen.value == opts::Screen::Filter;
+            let hl_filter: bool = opts.tracker.page.value == options::Page::Filter;
 
             draw::draw_sid(&mut display, 100, V_ACTIVE/4+25, hue, hl_wfm, gates, hl_filter, switches, filter_types).ok();
 
@@ -291,7 +291,7 @@ fn main() -> ! {
             }
 
             // Update scope settings
-            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trigger_lvl.value as u16) });
+            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trig_lvl.value as u16) });
             scope.xscale().write(|w| unsafe { w.xscale().bits(opts.scope.xscale.value) });
             scope.yscale().write(|w| unsafe { w.yscale().bits(opts.scope.yscale.value) });
             scope.timebase().write(|w| unsafe { w.timebase().bits(opts.scope.timebase.value) });
@@ -305,7 +305,7 @@ fn main() -> ! {
             scope.xpos().write(|w| unsafe { w.xpos().bits(opts.scope.xpos.value as u16) } );
 
             scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trigger_mode.value == opts::TriggerMode::Always));
+                |w| w.trigger_always().bit(opts.scope.trig_mode.value == options::TriggerMode::Always));
 
             scope.en().write(|w| w.enable().bit(true));
         }

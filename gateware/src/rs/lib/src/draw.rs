@@ -6,7 +6,7 @@ use embedded_graphics::{
     prelude::*,
 };
 
-use crate::opt;
+use opts::Options;
 use crate::logo_coords;
 
 use heapless::String;
@@ -16,7 +16,7 @@ pub fn draw_options<D, O>(d: &mut D, opts: &O,
                        pos_x: u32, pos_y: u32, hue: u8) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = Gray8>,
-    O: opt::OptionPage
+    O: Options
 {
     let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
     let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
@@ -28,13 +28,13 @@ where
     let vspace: usize = 18;
     let hspace: i32 = 150;
 
-    let screen_hl = match (opts.view().selected(), opts.modify()) {
+    let screen_hl = match (opts.selected(), opts.modify()) {
         (None, _) => true,
         _ => false,
     };
 
     Text::with_alignment(
-        &opts.screen().value(),
+        &opts.page().value(),
         Point::new(vx-12, vy as i32),
         if screen_hl { font_small_white } else { font_small_grey },
         Alignment::Right
@@ -53,7 +53,7 @@ where
 
     for (n, opt) in opts_view.iter().enumerate() {
         let mut font = font_small_grey;
-        if let Some(n_selected) = opts.view().selected() {
+        if let Some(n_selected) = opts.selected() {
             if n_selected == n {
                 font = font_small_white;
                 if opts.modify() {
@@ -628,87 +628,44 @@ where
 
 #[cfg(test)]
 mod test_data {
+    use opts::*;
+    use crate::palette;
+    use strum::{EnumIter, IntoStaticStr};
 
     // Fake set of options for quick render testing
-
-    use heapless::String;
-    use core::str::FromStr;
-    use strum_macros::{EnumIter, IntoStaticStr};
-
-    use crate::opt::*;
-    use crate::impl_option_view;
-    use crate::impl_option_page;
-
-    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
     #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
-    pub enum Screen {
-        Xbeam,
+    pub enum Page {
+        #[default]
+        Scope,
     }
 
-    #[derive(Clone)]
-    pub struct XbeamOptions {
-        pub selected: Option<usize>,
-        pub persist: NumOption<u16>,
-        pub hue: NumOption<u8>,
-        pub intensity: NumOption<u8>,
+    int_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
+    int_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
+
+    #[derive(OptionPage, Clone)]
+    pub struct ScopeOpts {
+        #[option]
+        pub ypos0: IntOption<PositionParams>,
+        #[option(-150)]
+        pub ypos1: IntOption<PositionParams>,
+        #[option(7)]
+        pub xscale: IntOption<ScaleParams>,
+        #[option]
+        pub palette: EnumOption<palette::ColorPalette>,
     }
 
-    impl_option_view!(XbeamOptions,
-                      persist, hue, intensity);
-
-    #[derive(Clone)]
-    pub struct Options {
-        pub modify: bool,
-        pub screen: EnumOption<Screen>,
-
-        pub xbeam: XbeamOptions,
-    }
-
-
-    impl_option_page!(Options,
-                      (Screen::Xbeam, xbeam));
-
-    impl Options {
-        pub fn new() -> Options {
-            Options {
-                modify: true,
-                screen: EnumOption {
-                    name: String::from_str("screen").unwrap(),
-                    value: Screen::Xbeam,
-                },
-                xbeam: XbeamOptions {
-                    selected: None,
-                    persist: NumOption{
-                        name: String::from_str("persist").unwrap(),
-                        value: 1024,
-                        step: 256,
-                        min: 512,
-                        max: 32768,
-                    },
-                    hue: NumOption{
-                        name: String::from_str("hue").unwrap(),
-                        value: 0,
-                        step: 1,
-                        min: 0,
-                        max: 15,
-                    },
-                    intensity: NumOption{
-                        name: String::from_str("intensity").unwrap(),
-                        value: 6,
-                        step: 1,
-                        min: 0,
-                        max: 15,
-                    },
-                },
-            }
-        }
+    #[derive(Options, Clone, Default)]
+    pub struct Opts {
+        pub tracker: ScreenTracker<Page>,
+        #[page(Page::Scope)]
+        pub scope: ScopeOpts,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use image::{ImageBuffer, RgbImage, Rgb};
 
     const H_ACTIVE: u32 = 720;
@@ -735,7 +692,6 @@ mod tests {
                     ]);
                 }
             }
-
             Ok(())
         }
     }
@@ -746,53 +702,70 @@ mod tests {
         }
     }
 
-    #[test]
-    fn draw_screen() {
-        use crate::opt::OptionPageEncoderInterface;
-
+    // Helper function to create a new display with cleared background
+    fn setup_display() -> FakeDisplay {
         let mut disp = FakeDisplay {
             img: ImageBuffer::new(H_ACTIVE, V_ACTIVE)
         };
+        disp.clear(Gray8::BLACK).ok();
+        disp
+    }
 
-        let mut opts = test_data::Options::new();
+    #[test]
+    fn test_draw_title_and_options() {
+        use opts::OptionsEncoderInterface;
+        let mut disp = setup_display();
+
+        let mut opts = test_data::Opts::default();
         opts.tick_up();
         opts.toggle_modify();
         opts.tick_up();
         opts.toggle_modify();
 
-        disp.img = ImageBuffer::new(H_ACTIVE, V_ACTIVE);
+        draw_name(&mut disp, H_ACTIVE/2, 30, 0, "MACRO-OSC", "b2d3aa").ok();
         draw_options(&mut disp, &opts, H_ACTIVE/2-30, 70, 0).ok();
+        disp.img.save("draw_options.png").unwrap();
+    }
 
+    #[test]
+    fn test_draw_voices() {
+        let mut disp = setup_display();
         let n_voices = 8;
         for n in 0..n_voices {
-            draw_voice(&mut disp,
-                       ((H_ACTIVE as f32)/2.0f32 + 250.0f32*f32::cos(2.3f32 + 2.0f32 * n as f32 / 8.0f32)) as i32,
-                       ((V_ACTIVE as f32)/2.0f32 + 250.0f32*f32::sin(2.3f32 + 2.0f32 * n as f32 / 8.0f32)) as u32,
-                       12, 127, 0).ok();
+            let angle = 2.3f32 + 2.0f32 * n as f32 / 8.0f32;
+            let x = ((H_ACTIVE as f32)/2.0f32 + 250.0f32 * f32::cos(angle)) as i32;
+            let y = ((V_ACTIVE as f32)/2.0f32 + 250.0f32 * f32::sin(angle)) as u32;
+            draw_voice(&mut disp, x, y, 12, 127, 0).ok();
         }
+        disp.img.save("draw_voices.png").unwrap();
+    }
 
-        draw_tiliqua(&mut disp, H_ACTIVE/2-80, V_ACTIVE/2-200, 0,
-            [
-            //  "touch  jack "
-                "C0     phase",
-                "G0     -    ",
-                "E0     -    ",
-                "D0     -    ",
-                "E0     -    ",
-                "F0     -    ",
-                "-      out L",
-                "-      out R",
-            ],
-            [
-                "menu",
-                "-",
-                "video",
-                "-",
-                "-",
-                "midi notes (+mod, +pitch)",
-            ],
-            "[8-voice polyphonic synthesizer]",
-            "The synthesizer can be controlled by touching\n\
+    #[test]
+    fn test_draw_help() {
+        let mut disp = setup_display();
+
+        let connection_labels = [
+            "C0     phase",
+            "G0     -    ",
+            "E0     -    ",
+            "D0     -    ",
+            "E0     -    ",
+            "F0     -    ",
+            "-      out L",
+            "-      out R",
+        ];
+
+        let menu_items = [
+            "menu",
+            "-",
+            "video",
+            "-",
+            "-",
+            "midi notes (+mod, +pitch)",
+        ];
+
+        let title = "[8-voice polyphonic synthesizer]";
+        let help_text = "The synthesizer can be controlled by touching\n\
             jacks 0-5 or using a MIDI keyboard through TRS\n\
             midi. Control source is selected in the menu.\n\
             \n\
@@ -807,26 +780,35 @@ mod tests {
             phase modulation of all oscillators, so you\n\
             can patch input jack 0 to an LFO for retro-sounding\n\
             slow vibrato, or to an oscillator for some wierd\n\
-            FM effects.\n\
-            ",
-            ).ok();
+            FM effects.\n";
 
-        /*
+        draw_tiliqua(
+            &mut disp,
+            H_ACTIVE/2-80,
+            V_ACTIVE/2-200,
+            0,
+            connection_labels,
+            menu_items,
+            title,
+            help_text,
+        ).ok();
+        disp.img.save("draw_help.png").unwrap();
+    }
+
+    #[test]
+    fn test_draw_calibration() {
+        let mut disp = setup_display();
+
         draw_cal(&mut disp, H_ACTIVE/2-128, V_ACTIVE/2-128, 0,
                  &[4096, 4096, 4096, 4096],
-                 &[4000, 4120, 4090, 4000]);
-
+                 &[4000, 4120, 4090, 4000]).ok();
         draw_cal_constants(&mut disp, H_ACTIVE/2-128, V_ACTIVE/2+64, 0,
                  &[4096, 4096, 4096, 4096],
                  &[4000, 4120, 4090, 4000],
                  &[4096, 4096, 4096, 4096],
                  &[4000, 4120, 4090, 4000]
-                 );
-        */
+                 ).ok();
 
-        draw_name(&mut disp, H_ACTIVE/2, 30, 0, "MACRO-OSC", "b2d3aa").ok();
-
-        disp.img.save("draw_opt_test.png").unwrap();
+        disp.img.save("draw_cal.png").unwrap();
     }
-
 }

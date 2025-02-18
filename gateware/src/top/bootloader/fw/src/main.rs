@@ -12,12 +12,12 @@ use heapless::String;
 use core::str::FromStr;
 
 use tiliqua_lib::*;
-use tiliqua_lib::opt::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_fw::*;
 use tiliqua_lib::manifest::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::video::Video;
+use opts::OptionString;
 
 use embedded_graphics::{
     mono_font::{ascii::FONT_9X15, ascii::FONT_9X15_BOLD, MonoTextStyle},
@@ -27,7 +27,7 @@ use embedded_graphics::{
     text::{Alignment, Text},
 };
 
-use opts::Options;
+use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;
 
 hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
@@ -37,7 +37,7 @@ pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 pub const N_MANIFESTS: usize = 8;
 
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Options>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
     reboot_n: Option<usize>,
     error_n: [Option<String<32>>; N_MANIFESTS],
     time_since_reboot_requested: u32,
@@ -45,7 +45,7 @@ struct App {
 }
 
 impl App {
-    pub fn new(opts: Options, manifests: [Option<BitstreamManifest>; N_MANIFESTS]) -> Self {
+    pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS]) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -137,8 +137,8 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         app.ui.update();
 
-        if app.ui.opts.modify() {
-            if let Some(n) = app.ui.opts.view().selected() {
+        if app.ui.opts.tracker.modify {
+            if let Some(n) = app.ui.opts.tracker.selected {
                 app.reboot_n = Some(n)
             }
         }
@@ -197,7 +197,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     loop {}
                 } else {
                     // Bad CRC: cancel reboot, draw an error.
-                    app.ui.opts.toggle_modify();
+                    app.ui.opts.tracker.modify = false;
                     app.reboot_n = None;
                     app.time_since_reboot_requested = 0;
                     app.error_n[n] = Some(String::from_str("ERR: CRC FAIL").unwrap());
@@ -233,7 +233,24 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = opts::Options::new(&manifests);
+    let mut opts = Opts::default();
+
+    // Populate option string values with bitstream names from manifest.
+    let mut names: [OptionString; 8] = [const { OptionString::new() }; 8];
+    for n in 0..manifests.len() {
+        if let Some(manifest) = &manifests[n] {
+            names[n] = manifest.name.clone();
+        }
+    }
+    opts.boot.slot0.value = names[0].clone();
+    opts.boot.slot1.value = names[1].clone();
+    opts.boot.slot2.value = names[2].clone();
+    opts.boot.slot3.value = names[3].clone();
+    opts.boot.slot4.value = names[4].clone();
+    opts.boot.slot5.value = names[5].clone();
+    opts.boot.slot6.value = names[6].clone();
+    opts.boot.slot7.value = names[7].clone();
+    opts.tracker.selected = Some(0); // Don't start with page highlighted.
     let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone())));
 
     handler!(timer0 = || timer0_handler(&app));
@@ -270,7 +287,7 @@ fn main() -> ! {
             draw::draw_options(&mut display, &opts, 100, V_ACTIVE/2-50, 0).ok();
             draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
 
-            if let Some(n) = opts.boot.selected {
+            if let Some(n) = opts.tracker.selected {
                 if let Some(manifest) = &manifests[n] {
                     draw_summary(&mut display, &manifest, -20, -18, 0);
                     Line::new(Point::new(255, (V_ACTIVE/2 - 55 + (n as u32)*18) as i32),
