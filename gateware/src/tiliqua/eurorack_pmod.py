@@ -431,12 +431,12 @@ class I2CMaster(wiring.Component):
         0x10, # PWM13
         0x10, # PWM14
         0x10, # PWM15
-        0xFF, # GRPPWM
+        0x80, # GRPPWM
         0x00, # GRPFREQ
-        0xAA, # LEDOUT0
-        0xAA, # LEDOUT1
-        0xAA, # LEDOUT2
-        0xAA, # LEDOUT3
+        0xFF, # LEDOUT0
+        0xFF, # LEDOUT1
+        0xFF, # LEDOUT2
+        0xFF, # LEDOUT3
     ]
 
     def __init__(self, audio_192):
