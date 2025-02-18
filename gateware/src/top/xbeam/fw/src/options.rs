@@ -56,9 +56,9 @@ pub struct ScopeOpts {
     #[option(32)]
     pub timebase: IntOption<TimebaseParams>,
     #[option]
-    pub trigger_mode: EnumOption<TriggerMode>,
+    pub trig_mode: EnumOption<TriggerMode>,
     #[option]
-    pub trigger_lvl: IntOption<TriggerLvlParams>,
+    pub trig_lvl: IntOption<TriggerLvlParams>,
     #[option(-250)]
     pub ypos0: IntOption<YPosParams>,
     #[option(-75)]

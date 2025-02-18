@@ -116,7 +116,7 @@ fn main() -> ! {
             scope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
             scope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
 
-            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trigger_lvl.value as u16) } );
+            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trig_lvl.value as u16) } );
             scope.xscale().write(|w| unsafe { w.xscale().bits(opts.scope.xscale.value) } );
             scope.yscale().write(|w| unsafe { w.yscale().bits(opts.scope.yscale.value) } );
             scope.timebase().write(|w| unsafe { w.timebase().bits(opts.scope.timebase.value) } );
@@ -127,7 +127,7 @@ fn main() -> ! {
             scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope.ypos3.value as u16) } );
 
             scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trigger_mode.value == TriggerMode::Always) );
+                |w| w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always) );
 
             if opts.tracker.page.value == Page::Vector {
                 scope.en().write(|w| w.enable().bit(false) );
