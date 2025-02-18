@@ -60,9 +60,9 @@ pub struct AutocalOpts {
     #[option]
     pub volts: IntOption<RefVoltageParams>,
     #[option]
-    pub autozero: EnumOption<AutoZero>,
+    pub set: EnumOption<AutoZero>,
     #[option]
-    pub run: EnumOption<EnAutoZero>,
+    pub autozero: EnumOption<EnAutoZero>,
     #[option]
     pub write: EnumOption<EnWrite>,
 }

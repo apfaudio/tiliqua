@@ -53,7 +53,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         let opts_ro = app.ui.opts.clone();
 
-        if opts_ro.autocal.run.value == EnAutoZero::Run {
+        if opts_ro.autocal.autozero.value == EnAutoZero::Run {
             let stimulus_raw = 4000 * opts_ro.autocal.volts.value as i16;
             let sample_i = app.ui.pmod.sample_i();
             let mut deltas = [0i16; 4];
@@ -67,7 +67,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     }
                 }
             }
-            match opts_ro.autocal.autozero.value {
+            match opts_ro.autocal.set.value {
                 AutoZero::AdcZero => {
                     app.ui.opts.caladc.zero0.value  += deltas[0];
                     app.ui.opts.caladc.zero1.value  += deltas[1];
