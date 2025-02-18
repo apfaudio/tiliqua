@@ -456,6 +456,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "opts"
+version = "0.1.0"
+dependencies = [
+ "fixed",
+ "heapless",
+ "log",
+ "micromath",
+ "opts-derive",
+ "strum",
+ "strum_macros 0.26.4",
+]
+
+[[package]]
+name = "opts-derive"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "png"
 version = "0.17.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -488,9 +509,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.36"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fa76aaf39101c457836aec0ce2316dbdc3ab723cdda1c6bd4e6ad4208acaca7"
+checksum = "0e4dccaaaf89514f546c693ddc140f729f958c247918a13380cccc6078391acc"
 dependencies = [
  "proc-macro2",
 ]
@@ -667,9 +688,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.91"
+version = "2.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d53cbcb5a243bd33b7858b1d7f4aca2153490815872d86d955d6ea29f743c035"
+checksum = "36147f1a48ae0ec2b5b3bc5b537d267457555a10dc06f3dbc8cb11ba3006d3b1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -712,6 +733,7 @@ dependencies = [
  "log",
  "micromath",
  "midi-types",
+ "opts",
  "serde",
  "serde-json-core",
  "strum",
