@@ -52,7 +52,7 @@ impl App {
 
 fn volts_to_freq(volts: f32) -> f32 {
     let a3_freq_hz: f32 = 440.0f32;
-    (a3_freq_hz / 8.0f32) * (2.0f32).powf(volts + 2.0f32 - 3.0f32/4.0f32)
+    (a3_freq_hz / 2.0f32) * (2.0f32).powf(volts + 2.0f32 - 3.0f32/4.0f32)
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
@@ -291,7 +291,7 @@ fn main() -> ! {
             }
 
             // Update scope settings
-            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trigger_lvl.value as u16) });
+            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trig_lvl.value as u16) });
             scope.xscale().write(|w| unsafe { w.xscale().bits(opts.scope.xscale.value) });
             scope.yscale().write(|w| unsafe { w.yscale().bits(opts.scope.yscale.value) });
             scope.timebase().write(|w| unsafe { w.timebase().bits(opts.scope.timebase.value) });
@@ -305,7 +305,7 @@ fn main() -> ! {
             scope.xpos().write(|w| unsafe { w.xpos().bits(opts.scope.xpos.value as u16) } );
 
             scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trigger_mode.value == options::TriggerMode::Always));
+                |w| w.trigger_always().bit(opts.scope.trig_mode.value == options::TriggerMode::Always));
 
             scope.en().write(|w| w.enable().bit(true));
         }
