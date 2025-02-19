@@ -6,6 +6,7 @@
 
 from amaranth         import *
 from amaranth.lib.cdc import FFSynchronizer
+from amaranth.lib     import wiring
 from tiliqua          import video
 from dataclasses      import dataclass
 
@@ -154,6 +155,52 @@ def create_dynamic_dvi_pll(reset, locked):
             a_MFG_GMCREF_SEL="2",
     )
 
+class ClockStabilityMonitor(wiring.Component):
+    """
+    Synchronous reset generation for external clock.
+    TODO: 'unlock' is not implemented, this only works ONCE.
+
+    Begins with `reset_out` asserted.
+    Deasserts `reset_out` once we have seen `clk_in` (`target_domain`)
+    toggling for a while (from the perspective of `monitor_domain`).
+    """
+    clk_in: wiring.In(1)          # Clock input in `target_domain` (monitoried in `monitor_domain`)
+    reset_out: wiring.Out(1)      # Synchronous reset in `target_domain`
+
+    def __init__(self, *, monitor_domain="sync", target_domain="audio", counter_bits=8):
+        super().__init__()
+        self.monitor_domain = monitor_domain
+        self.target_domain = target_domain
+        self.counter_bits = counter_bits
+
+    def elaborate(self, platform):
+        m = Module()
+
+        # Bring `clk_in` into `monitor_domain`
+        clk_sync = Signal()
+        prev_clk = Signal()
+        m.submodules += DomainRenamer(self.monitor_domain)(
+            FFSynchronizer(self.clk_in, clk_sync, reset=0)
+        )
+
+        # In `monitor_domain`, count transitions
+        transition_count = Signal(self.counter_bits)
+        reset_hold = Signal(reset=1)
+        m.d[self.monitor_domain] += prev_clk.eq(clk_sync)
+        with m.If(transition_count != (2**self.counter_bits - 1)):
+            m.d.comb += reset_hold.eq(1)
+            with m.If(clk_sync != prev_clk):
+                m.d[self.monitor_domain] += transition_count.eq(transition_count + 1)
+        with m.Else():
+            m.d.comb += reset_hold.eq(0)
+
+        # Bring `reset_sync` back to `target_domain`.
+        m.submodules += DomainRenamer(self.target_domain)(
+            FFSynchronizer(reset_hold, self.reset_out, reset=1)
+        )
+
+        return m
+
 class TiliquaDomainGeneratorPLLExternal(Elaboratable):
 
     """
@@ -195,36 +242,16 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             ResetSignal("expll_clk1").eq(0),
         ]
 
-        # External PLL: synchronous reset generation
-        # TODO: 'unlock' is not implemented, this only works ONCE.
-        #
-        # Lift synchronous reset on "audio" clock domain once we have seen "raw_audio" toggling for a while
-        # (from the perspective of "sync" domain) - i.e. the external PLL is initialized and alive.
-
-        # Bring expll_clk0 into "sync" domain
-        expll_clk0_sync = Signal()
-        expll_clk0_l_sync = Signal()
-        m.submodules += DomainRenamer("sync")(FFSynchronizer(ClockSignal("expll_clk0"), expll_clk0_sync, reset=0))
-
-        # In "sync" domain, count transitions
-        expll_clk0_cycles = Signal(8)
-        expll_clk0_reset_sync = Signal(init=1)
-        m.d.sync += expll_clk0_l_sync.eq(expll_clk0_sync)
-        with m.If(expll_clk0_cycles != 0xff):
-            m.d.comb += expll_clk0_reset_sync.eq(1)
-            with m.If(expll_clk0_sync != expll_clk0_l_sync):
-                m.d.sync += expll_clk0_cycles.eq(expll_clk0_cycles+1)
-        with m.Else():
-            m.d.comb += expll_clk0_reset_sync.eq(0)
-
-        # Bring "reset_sync" back into "expll_clk0" domain.
-        expll_clk0_reset = Signal()
-        m.submodules += DomainRenamer("expll_clk0")(FFSynchronizer(expll_clk0_reset_sync, expll_clk0_reset, reset=1))
-
-        # "audio" domain is expll_clk0 with a synchronous reset.
+        # Generate synchronous reset for audio domain (there is no internal
+        # PLL between the external PLL clock and the audio domain).
+        m.submodules.clock_monitor = clock_monitor = ClockStabilityMonitor(
+            monitor_domain="sync",
+            target_domain="expll_clk0"
+        )
         m.d.comb += [
-            ClockSignal("audio").eq(ClockSignal("expll_clk0")),
-            ResetSignal("audio").eq(expll_clk0_reset),
+            clock_monitor.clk_in.eq(ClockSignal("expll_clk0")),
+            ClockSignal("audio").eq(clock_monitor.clk_in),
+            ResetSignal("audio").eq(clock_monitor.reset_out),
         ]
 
         # ecppll -i 48 --clkout0 60 --clkout1 120 --clkout2 50 --reset -f pll60.v
