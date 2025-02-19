@@ -1,27 +1,35 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::must_use_candidate)]
 
+#[cfg(test)]
+#[macro_use]
+extern crate std;
+
 // modules
-pub mod serial;
-pub mod timer;
-pub mod i2c;
 pub mod dma_display;
 pub mod encoder;
+pub mod i2c;
 pub mod pca9635;
 pub mod pmod;
 pub mod polysynth;
+pub mod serial;
+pub mod si5351;
+pub mod timer;
 pub mod video;
 
 pub use embedded_hal as hal;
 pub use embedded_hal_nb as hal_nb;
+
+#[macro_use]
+extern crate bitflags;
 
 pub use nb;
 
 // Peripherals common to all ordinary tiliqua_soc instances.
 #[macro_export]
 macro_rules! impl_tiliqua_soc_pac {
-    ()  => {
+    () => {
         tiliqua_hal::impl_serial! {
             Serial0: tiliqua_pac::UART0,
         }
