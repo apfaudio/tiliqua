@@ -290,8 +290,9 @@ class _TiliquaR3Mobo:
 class _TiliquaR4Mobo:
     resources   = [
         # External PLL (SI5351A) clock inputs.
-        Resource("expll_clk0", 0, Pins("44", dir="i"), Attrs(IO_TYPE="LVCMOS33")),
-        Resource("expll_clk1", 0, Pins("40", dir="i"), Attrs(IO_TYPE="LVCMOS33")),
+        # Clock frequencies are dynamic, so set them to the maximum expected settings in each domain.
+        Resource("expll_clk0", 0, Pins("44", dir="i", conn=("m2", 0)), Clock(49.152e6), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("expll_clk1", 0, Pins("40", dir="i", conn=("m2", 0)), Clock(74.250e6), Attrs(IO_TYPE="LVCMOS33")),
 
         # Quadrature rotary encoder and switch. These are already debounced by an RC filter.
         Resource("encoder", 0,
@@ -346,7 +347,7 @@ class _TiliquaR4Mobo:
             Subsignal("pdn_clk", Pins("56", dir="o",  conn=("m2", 0))),
             Subsignal("i2c_sda", Pins("71", dir="io", conn=("m2", 0))),
             Subsignal("i2c_scl", Pins("69", dir="io", conn=("m2", 0))),
-            Attrs(IO_TYPE="LVCMOS33")
+            Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
         ),
 
         # DVI
@@ -425,7 +426,7 @@ class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
     name                   = ("Tiliqua R4 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
     version_major          = 4
-    clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
+    clock_domain_generator = tiliqua_pll.TiliquaDomainGeneratorPLLExternal
     precise_audio_clocks   = True
     default_usb_connection = "ulpi"
 

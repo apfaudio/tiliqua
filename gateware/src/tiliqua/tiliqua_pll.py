@@ -4,9 +4,10 @@
 
 """ Tiliqua and SoldierCrab PLL configurations. """
 
-from amaranth    import *
-from tiliqua     import video
-from dataclasses import dataclass
+from amaranth         import *
+from amaranth.lib.cdc import FFSynchronizer
+from tiliqua          import video
+from dataclasses      import dataclass
 
 @dataclass
 class ClockFrequencies:
@@ -40,7 +41,7 @@ def expected_clocks(audio_precise: bool, audio_192: bool, pixclk_pll: video.DVIP
 
 def create_dvi_pll(pll_settings: video.DVIPLL, clk48, reset, feedback, locked):
     """
-    Create a PLL to generate DVI clocks (depends on resolution selected).
+    Create a fixed PLL to generate DVI clocks (depends on resolution selected).
     1x pixel clock and 5x (half DVI TDMS clock, output is DDR).
     """
     return Instance("EHXPLLL",
@@ -96,6 +97,228 @@ def create_dvi_pll(pll_settings: video.DVIPLL, clk48, reset, feedback, locked):
             a_ICP_CURRENT="12",
             a_LPF_RESISTOR="8"
     )
+
+def create_dynamic_dvi_pll(reset, locked):
+    """
+    Create dynamic PLL to generate DVI clocks (locks to pixel frequency of external PLL).
+    1x pixel clock and 5x (half DVI TDMS clock, output is DDR).
+    """
+    return Instance("EHXPLLL",
+            # Clock in.
+            i_CLKI=ClockSignal("expll_clk1"),
+            # Generated clock outputs.
+            o_CLKOP=ClockSignal("dvi5x"),
+            o_CLKOS=ClockSignal("dvi"),
+            # Status.
+            o_LOCK=locked,
+            # PLL parameters...
+            p_PLLRST_ENA      = "ENABLED",
+            p_INTFB_WAKE      = "DISABLED",
+            p_STDBY_ENABLE    = "DISABLED",
+            p_DPHASE_SOURCE   = "DISABLED",
+            p_OUTDIVIDER_MUXA = "DIVA",
+            p_OUTDIVIDER_MUXB = "DIVB",
+            p_OUTDIVIDER_MUXC = "DIVC",
+            p_OUTDIVIDER_MUXD = "DIVD",
+            p_CLKI_DIV        = 1,
+            p_CLKOP_ENABLE    = "ENABLED",
+            p_CLKOP_DIV       = 2,
+            p_CLKOP_CPHASE    = 0,
+            p_CLKOP_FPHASE    = 0,
+            p_CLKOS_ENABLE    = "ENABLED",
+            p_CLKOS_DIV       = 10,
+            p_CLKOS_CPHASE    = 0,
+            p_CLKOS_FPHASE    = 0,
+            p_FEEDBK_PATH     = "CLKOP",
+            p_CLKFB_DIV       = 5,
+            # Internal feedback.
+            i_CLKFB=ClockSignal("dvi5x"),
+            # Control signals.
+            i_RST=reset,
+            i_PHASESEL0=0,
+            i_PHASESEL1=0,
+            i_PHASEDIR=1,
+            i_PHASESTEP=1,
+            i_PHASELOADREG=1,
+            i_STDBY=0,
+            i_PLLWAKESYNC=0,
+            # Output Enables.
+            i_ENCLKOP=0,
+            i_ENCLKOS=0,
+            i_ENCLKOS2=0,
+            i_ENCLKOS3=0,
+            # Synthesis attributes.
+            a_ICP_CURRENT="12",
+            a_LPF_RESISTOR="8",
+            a_MFG_ENABLE_FILTEROPAMP="1",
+            a_MFG_GMCREF_SEL="2",
+    )
+
+class TiliquaDomainGeneratorPLLExternal(Elaboratable):
+
+    """
+    Top-level clocks and resets for Tiliqua platform using 1 FPGA PLL and 2 external clocks (from si5351):
+
+    sync, usb: 60 MHz (Main clock)
+    fast:      120 MHz (PSRAM DDR clock)
+    audio:     external PLL: 12.288 MHz or 49.152 MHz (audio CODEC master clock, divide by 256 for CODEC sample rate)
+    dvi/dvi5x: video clocks, depend on resolution passed with `--resolution` flag.
+
+    """
+
+    def __init__(self, *, pixclk_pll=None, audio_192=False, clock_frequencies=None, clock_signal_name=None):
+        super().__init__()
+        self.pixclk_pll = pixclk_pll
+        self.audio_192  = audio_192
+
+    def elaborate(self, platform):
+        m = Module()
+
+        # Create our domains.
+        m.domains.sync       = ClockDomain()
+        m.domains.usb        = ClockDomain()
+        m.domains.fast       = ClockDomain()
+        m.domains.audio      = ClockDomain()
+        m.domains.raw48      = ClockDomain()
+        m.domains.expll_clk0 = ClockDomain()
+        m.domains.expll_clk1 = ClockDomain()
+
+        clk48 = platform.request(platform.default_clk, dir='i').i
+        reset  = Signal(init=0)
+
+        m.d.comb += [
+            ClockSignal("raw48")     .eq(clk48),
+            # external PLL clock domain with no synchronous reset.
+            ClockSignal("expll_clk0").eq(platform.request("expll_clk0").i),
+            ResetSignal("expll_clk0").eq(0),
+            ClockSignal("expll_clk1").eq(platform.request("expll_clk1").i),
+            ResetSignal("expll_clk1").eq(0),
+        ]
+
+        # External PLL: synchronous reset generation
+        # TODO: 'unlock' is not implemented, this only works ONCE.
+        #
+        # Lift synchronous reset on "audio" clock domain once we have seen "raw_audio" toggling for a while
+        # (from the perspective of "sync" domain) - i.e. the external PLL is initialized and alive.
+
+        # Bring expll_clk0 into "sync" domain
+        expll_clk0_sync = Signal()
+        expll_clk0_l_sync = Signal()
+        m.submodules += DomainRenamer("sync")(FFSynchronizer(ClockSignal("expll_clk0"), expll_clk0_sync, reset=0))
+
+        # In "sync" domain, count transitions
+        expll_clk0_cycles = Signal(8)
+        expll_clk0_reset_sync = Signal(init=1)
+        m.d.sync += expll_clk0_l_sync.eq(expll_clk0_sync)
+        with m.If(expll_clk0_cycles != 0xff):
+            m.d.comb += expll_clk0_reset_sync.eq(1)
+            with m.If(expll_clk0_sync != expll_clk0_l_sync):
+                m.d.sync += expll_clk0_cycles.eq(expll_clk0_cycles+1)
+        with m.Else():
+            m.d.comb += expll_clk0_reset_sync.eq(0)
+
+        # Bring "reset_sync" back into "expll_clk0" domain.
+        expll_clk0_reset = Signal()
+        m.submodules += DomainRenamer("expll_clk0")(FFSynchronizer(expll_clk0_reset_sync, expll_clk0_reset, reset=1))
+
+        # "audio" domain is expll_clk0 with a synchronous reset.
+        m.d.comb += [
+            ClockSignal("audio").eq(ClockSignal("expll_clk0")),
+            ResetSignal("audio").eq(expll_clk0_reset),
+        ]
+
+        # ecppll -i 48 --clkout0 60 --clkout1 120 --clkout2 50 --reset -f pll60.v
+        # 60MHz for USB (currently also sync domain. fast is for DQS)
+
+        feedback60 = Signal()
+        locked60   = Signal()
+        m.submodules.pll = Instance("EHXPLLL",
+
+                # Clock in.
+                i_CLKI=clk48,
+
+                # Generated clock outputs.
+                o_CLKOP=feedback60,
+                o_CLKOS=ClockSignal("fast"),
+
+                # Status.
+                o_LOCK=locked60,
+
+                # PLL parameters...
+                p_PLLRST_ENA="ENABLED",
+                p_INTFB_WAKE="DISABLED",
+                p_STDBY_ENABLE="DISABLED",
+                p_DPHASE_SOURCE="DISABLED",
+                p_OUTDIVIDER_MUXA="DIVA",
+                p_OUTDIVIDER_MUXB="DIVB",
+                p_OUTDIVIDER_MUXC="DIVC",
+                p_OUTDIVIDER_MUXD="DIVD",
+                p_CLKI_DIV=4,
+                p_CLKOP_ENABLE="ENABLED",
+                p_CLKOP_DIV=10,
+                p_CLKOP_CPHASE=4,
+                p_CLKOP_FPHASE=0,
+                p_CLKOS_ENABLE="ENABLED",
+                p_CLKOS_DIV=5,
+                p_CLKOS_CPHASE=4,
+                p_CLKOS_FPHASE=0,
+                p_FEEDBK_PATH="CLKOP",
+                p_CLKFB_DIV=5,
+
+                # Internal feedback.
+                i_CLKFB=feedback60,
+
+                # Control signals.
+                i_RST=reset,
+                i_PHASESEL0=0,
+                i_PHASESEL1=0,
+                i_PHASEDIR=1,
+                i_PHASESTEP=1,
+                i_PHASELOADREG=1,
+                i_STDBY=0,
+                i_PLLWAKESYNC=0,
+
+                # Output Enables.
+                i_ENCLKOP=0,
+                i_ENCLKOS=0,
+                i_ENCLKOS2=0,
+                i_ENCLKOS3=0,
+
+                # Synthesis attributes.
+                a_ICP_CURRENT="12",
+                a_LPF_RESISTOR="8",
+        )
+
+        # Video PLL and derived signals
+        if self.pixclk_pll is not None:
+
+            m.domains.dvi   = ClockDomain()
+            m.domains.dvi5x = ClockDomain()
+
+            locked_dvi   = Signal()
+            m.submodules.pll_dvi = create_dynamic_dvi_pll(reset, locked_dvi)
+
+            m.d.comb += [
+                ResetSignal("dvi")  .eq(~locked_dvi),
+                ResetSignal("dvi5x").eq(~locked_dvi),
+            ]
+
+            m.d.comb += [
+                platform.request("led_a").o.eq(locked60),
+                platform.request("led_b").o.eq(locked_dvi),
+            ]
+
+        # Derived clocks and resets
+        m.d.comb += [
+            ClockSignal("sync")  .eq(feedback60),
+            ClockSignal("usb")   .eq(feedback60),
+
+            ResetSignal("sync")  .eq(~locked60),
+            ResetSignal("fast")  .eq(~locked60),
+            ResetSignal("usb")   .eq(~locked60),
+        ]
+
+        return m
 
 class TiliquaDomainGenerator2PLLs(Elaboratable):
 
