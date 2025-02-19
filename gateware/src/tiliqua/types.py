@@ -11,6 +11,12 @@ from dataclasses_json import dataclass_json
 
 BITSTREAM_MANIFEST_VERSION = 0
 
+class TiliquaRevision(str, enum.Enum):
+    R2    = "r2"
+    R2SC3 = "r2sc3"
+    R3    = "r3"
+    R4    = "r4"
+
 class FirmwareLocation(str, enum.Enum):
     BRAM      = "bram"
     SPIFlash  = "spiflash"

@@ -4,8 +4,39 @@
 
 """ Tiliqua and SoldierCrab PLL configurations. """
 
-from amaranth import *
-from tiliqua  import video
+from amaranth    import *
+from tiliqua     import video
+from dataclasses import dataclass
+
+@dataclass
+class ClockFrequencies:
+    sync:  int # CPU, SoC, USB, most synchronous logic
+    fast:  int # RAM controller (2x sync)
+    audio: int # fs*256, audio master clock (codec MCLK)
+    dvi:   int # Video pixel clock
+    dvi5x: int # Video 5x pixel clock (DDR TMDS clock)
+
+def expected_clocks(audio_precise: bool, audio_192: bool, pixclk_pll: video.DVIPLL):
+    """
+    Calculate frequency of all clocks used by Tiliqua gateware given an intended PLL configuration.
+    This does not drive the PLL configuration itself, but it should match what the PLLs
+    end up generating, as these constants are used in downstream logic.
+    """
+    clocks = ClockFrequencies(
+        sync=60_000_000,
+        fast=120_000_000,
+        audio=None,
+        dvi=None,
+        dvi5x=None
+    )
+    if audio_precise:
+        clocks.audio = 49_152_000 if audio_192 else 12_288_000
+    else:
+        clocks.audio = 50_000_000 if audio_192 else 12_500_000
+    if isinstance(pixclk_pll, video.DVIPLL):
+        clocks.dvi = int(pixclk_pll.pixel_clk_mhz*1_000_000)
+        clocks.dvi5x = 5*int(pixclk_pll.pixel_clk_mhz*1_000_000)
+    return clocks
 
 def create_dvi_pll(pll_settings: video.DVIPLL, clk48, reset, feedback, locked):
     """
@@ -78,23 +109,10 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
 
     """
 
-    def __init__(self, *, pixclk_pll=None, audio_192=False, clock_frequencies=None, clock_signal_name=None):
+    def __init__(self, *, pixclk_pll=None, audio_192=False):
         super().__init__()
         self.pixclk_pll = pixclk_pll
         self.audio_192  = audio_192
-
-        self.clocks_hz = {
-            "sync":  60_000_000,
-            "fast": 120_000_000,
-            "audio": 50_000_000 if audio_192 else 12_500_000,
-        }
-        if isinstance(pixclk_pll, video.DVIPLL):
-            self.clocks_hz |= {
-                "dvi": int(pixclk_pll.pixel_clk_mhz*1_000_000),
-                "dvi5x": 5*int(pixclk_pll.pixel_clk_mhz*1_000_000),
-            }
-
-        print("PLL outputs:", self.clocks_hz)
 
     def elaborate(self, platform):
         m = Module()
@@ -219,23 +237,10 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
     dvi/dvi5x: video clocks, depend on resolution passed with `--resolution` flag.
     """
 
-    def __init__(self, *, pixclk_pll=None, audio_192=False, clock_frequencies=None, clock_signal_name=None):
+    def __init__(self, *, pixclk_pll=None, audio_192=False):
         super().__init__()
         self.pixclk_pll = pixclk_pll
         self.audio_192  = audio_192
-
-        self.clocks_hz = {
-            "sync":  60_000_000,
-            "fast": 120_000_000,
-            "audio": 49_152_000 if audio_192 else 12_288_000,
-        }
-        if isinstance(pixclk_pll, video.DVIPLL):
-            self.clocks_hz |= {
-                "dvi": int(pixclk_pll.pixel_clk_mhz*1_000_000),
-                "dvi5x": 5*int(pixclk_pll.pixel_clk_mhz*1_000_000),
-            }
-
-        print("PLL outputs:", self.clocks_hz)
 
     def elaborate(self, platform):
         m = Module()

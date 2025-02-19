@@ -251,6 +251,27 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua bootloader!");
 
+    if HW_REV_MAJOR >= 4 {
+        // Configure external PLL
+        use hal::si5351::*;
+        let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
+        let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
+        let info = si5351drv.init_adafruit_module();
+        info!("si5351_init: {:?}", info);
+        let set = si5351drv.set_frequencies(
+                PLL::A,
+                &[
+                    ClockOutput::Clk0,
+                    ClockOutput::Clk1,
+                ],
+                &[
+                    CLOCK_AUDIO_HZ,
+                    CLOCK_DVI_HZ,
+                ],
+                Some(0.01)); // 1% spread spectrum
+        info!("si5351_set: {:?}", set);
+    }
+
     let mut manifests: [Option<manifest::BitstreamManifest>; 8] = [const { None }; 8];
     for n in 0usize..N_MANIFESTS {
         let size: usize = 1024usize;
@@ -265,7 +286,6 @@ fn main() -> ! {
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let mut opts = Opts::default();
-
     // Populate option string values with bitstream names from manifest.
     let mut names: [OptionString; 8] = [const { OptionString::new() }; 8];
     for n in 0..manifests.len() {

@@ -370,8 +370,9 @@ class _TiliquaR4Mobo:
 class TiliquaR2SC2Platform(SoldierCrabR2Platform, LUNAPlatform):
     name                   = ("Tiliqua R2 / SoldierCrab R2 "
                               f"({SoldierCrabR2Platform.device}/{SoldierCrabR2Platform.psram_id})")
-    brief                  = "r2"
+    version_major          = 2
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator4PLLs
+    precise_audio_clocks   = True
     default_usb_connection = "ulpi"
 
     resources = [
@@ -387,8 +388,9 @@ class TiliquaR2SC2Platform(SoldierCrabR2Platform, LUNAPlatform):
 class TiliquaR2SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
     name                   = ("Tiliqua R2 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
-    brief                  = "r2sc3"
+    version_major          = 2
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
+    precise_audio_clocks   = False
     default_usb_connection = "ulpi"
 
     resources = [
@@ -404,8 +406,9 @@ class TiliquaR2SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
 class TiliquaR3SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
     name                   = ("Tiliqua R3 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
-    brief                  = "r3"
+    version_major          = 3
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
+    precise_audio_clocks   = False
     default_usb_connection = "ulpi"
 
     resources = [
@@ -421,8 +424,9 @@ class TiliquaR3SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
 class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
     name                   = ("Tiliqua R4 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
-    brief                  = "r4"
+    version_major          = 4
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
+    precise_audio_clocks   = True
     default_usb_connection = "ulpi"
 
     resources = [

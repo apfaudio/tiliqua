@@ -124,12 +124,17 @@ def top_level_cli(
                         help="Bitstream name to display in bootloader and bottom of screen.")
     parser.add_argument('--brief', type=str, default=None,
                         help="Brief description to display in bootloader.")
-    parser.add_argument('--sc3', action='store_true',
-                        help="platform override: Tiliqua R2 with a SoldierCrab R3")
-    parser.add_argument('--hw3', action='store_true',
-                        help="platform override: Tiliqua R3 with a SoldierCrab R3")
-    parser.add_argument('--hw4', action='store_true',
-                        help="platform override: Tiliqua R4 with a SoldierCrab R3")
+    hw_revision_default = TiliquaRevision.R2.value
+    parser.add_argument("--hw",
+                        type=TiliquaRevision,
+                        default=hw_revision_default,
+                        choices=[
+                            TiliquaRevision.R2.value,
+                            TiliquaRevision.R2SC3.value,
+                            TiliquaRevision.R3.value,
+                            TiliquaRevision.R4.value,
+                        ],
+                        help=(f"Tiliqua hardware revision (default={hw_revision_default})"))
     parser.add_argument('--bootaddr', type=str, default="0x0",
                         help="'bootaddr' argument of ecppack (default: 0x0).")
     parser.add_argument('--verbose', action='store_true',
@@ -166,6 +171,13 @@ def top_level_cli(
         if args.rotate_90:
             kwargs["video_rotate_90"] = True
 
+    platform_class = {
+        TiliquaRevision.R2:    TiliquaR2SC2Platform,
+        TiliquaRevision.R2SC3: TiliquaR2SC3Platform,
+        TiliquaRevision.R3:    TiliquaR3SC3Platform,
+        TiliquaRevision.R4:    TiliquaR4SC3Platform,
+    }[args.hw]
+
     if issubclass(fragment, TiliquaSoc):
         rust_fw_bin  = "firmware.bin"
         rust_fw_root = os.path.join(path, "fw")
@@ -185,6 +197,7 @@ def top_level_cli(
             kwargs["fw_offset"] = int(args.fw_offset, 16)
         kwargs["ui_name"] = args.name
         kwargs["ui_sha"]  = repo.head.object.hexsha[:6]
+        kwargs["platform_class"] = platform_class
 
     if argparse_fragment:
         kwargs = kwargs | argparse_fragment(args)
@@ -198,21 +211,8 @@ def top_level_cli(
         else:
             args.brief = ""
 
-    if args.hw4:
-        # Tiliqua R4 with SoldierCrab R3
-        hw_platform = TiliquaR4SC3Platform()
-    elif args.hw3:
-        # Tiliqua R3 with SoldierCrab R3
-        hw_platform = TiliquaR3SC3Platform()
-    else:
-        if args.sc3:
-            # Tiliqua R2 with SoldierCrab R3
-            hw_platform = TiliquaR2SC3Platform()
-        else:
-            # DEFAULT: Tiliqua R2 with SoldierCrab R2
-            # default for now as this is the only version
-            # that is actually in the wild.
-            hw_platform = TiliquaR2SC2Platform()
+    # Instantiate hardware platform class
+    hw_platform = platform_class()
 
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
@@ -239,7 +239,7 @@ def top_level_cli(
         return manifest
 
     def create_bitstream_archive():
-        archive_name = f"{args.name.lower()}-{repo.head.object.hexsha[:6]}-{hw_platform.brief}.tar.gz"
+        archive_name = f"{args.name.lower()}-{repo.head.object.hexsha[:6]}-{args.hw.value}.tar.gz"
         archive_path = os.path.join(build_path, archive_name)
         bitstream_path = "build/top.bit"
         
