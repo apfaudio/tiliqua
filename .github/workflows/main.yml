@@ -30,25 +30,7 @@ jobs:
             cmd: macro_osc build
           - name: sid
             cmd: sid build
-          - name: usb-audio
-            cmd: usb_audio build
-          - name: usb-host
-            cmd: usb_host build --midi-device arturia-keylab49-mkii
-          - name: dsp-nco
-            cmd: dsp build --dsp-core nco
-          - name: dsp-diffuser
-            cmd: dsp build --dsp-core psram_diffuser
-          - name: dsp-diffuser-sim
-            cmd: dsp sim --dsp-core psram_diffuser
-          - name: dsp-midicv
-            cmd: dsp build --dsp-core midicv
-          - name: vectorscope
-            cmd: vectorscope_no_soc build
-          - name: vectorscope-sim
-            cmd: vectorscope_no_soc sim
-          - name: bootstub
-            cmd: bootstub build --bootaddr 0x100000
-        hw_rev: ["", "--hw3"]
+        hw_rev: ["r4"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
@@ -66,12 +48,12 @@ jobs:
       - name: Install PDM dependencies
         run: pdm install
         working-directory: gateware
-      - name: Build ${{ matrix.config.cmd }} ${{ matrix.hw_rev }}
-        run: pdm ${{ matrix.config.cmd }} ${{ matrix.hw_rev }}
+      - name: Build ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
         working-directory: gateware
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.config.name }}-${{ matrix.hw_rev == '--hw3' && 'r3' || 'r2' }}.zip
+          name: ${{ matrix.config.name }}-${{ matrix.hw_rev }}.zip
           path: gateware/build/*-*-*.tar.gz
           retention-days: 1
 
