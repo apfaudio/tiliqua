@@ -37,7 +37,7 @@ impl OptionTrait for StringOption {
     }
 
     fn percent(&self) -> f32 {
-        0.0f32
+        0.5f32
     }
 
     fn n_unique_values(&self) -> usize {

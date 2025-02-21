@@ -8,6 +8,7 @@ use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
 use heapless::String;
+use micromath::{F32Ext};
 
 use core::str::FromStr;
 
@@ -42,6 +43,7 @@ struct App {
     error_n: [Option<String<32>>; N_MANIFESTS],
     time_since_reboot_requested: u32,
     manifests: [Option<BitstreamManifest>; N_MANIFESTS],
+    animation_elapsed_ms: u32,
 }
 
 impl App {
@@ -58,6 +60,7 @@ impl App {
             error_n: [const { None }; N_MANIFESTS],
             time_since_reboot_requested: 0u32,
             manifests,
+            animation_elapsed_ms: 0u32,
         }
     }
 }
@@ -135,7 +138,28 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         // Update UI and options
         //
 
-        app.ui.update();
+        let animation_end_ms = 500u32;
+        if app.animation_elapsed_ms < animation_end_ms {
+            use tiliqua_hal::pca9635::Pca9635;
+            let tau = 6.2832f32;
+            let lerp1: f32 = app.animation_elapsed_ms as f32 / animation_end_ms as f32;
+            for n in 0..8 {
+                let lerp2: f32 = n as f32 / 7.0f32;
+                app.ui.pmod.led_set_manual(n,
+                    (100.0f32*f32::sin(tau*(lerp1+lerp2).clamp(0.0f32, tau))*
+                        f32::sin(tau*lerp1*0.5f32)) as i8);
+            }
+            for n in 0..16 {
+                let lerp2: f32 = n as f32 / 15.0f32;
+                app.ui.pca9635.leds[n] =
+                    ((100.0f32*f32::sin(tau*(lerp1+lerp2).clamp(0.0f32, tau*0.5f32))*
+                        f32::sin(tau*lerp1*0.5f32)) as u8);
+            }
+            app.ui.pca9635.push().ok();
+            app.animation_elapsed_ms += TIMER0_ISR_PERIOD_MS;
+        } else {
+            app.ui.update();
+        }
 
         if app.ui.opts.tracker.modify {
             if let Some(n) = app.ui.opts.tracker.selected {
