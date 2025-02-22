@@ -31,9 +31,7 @@ pub enum UsbHost {
 }
 
 int_params!(PageNumParams<u16>    { step: 1, min: 0, max: 0 });
-int_params!(DriveParams<u16>      { step: 2048, min: 0, max: 32768 });
-int_params!(ResoParams<u16>       { step: 2048, min: 8192, max: 32768 });
-int_params!(DiffuseParams<u16>    { step: 2048, min: 0, max: 32768 });
+float_params!(PercentParams<f32>  { step: 0.05, min: 0.0, max: 1.0, format: FloatFormat::Percent(0) });
 int_params!(PersistParams<u16>    { step: 256, min: 256, max: 32768 });
 int_params!(DecayParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
@@ -53,12 +51,12 @@ pub struct HelpOpts {
 pub struct PolyOpts {
     #[option]
     pub touch_control: EnumOption<TouchControl>,
-    #[option(16384)]
-    pub drive: IntOption<DriveParams>,
-    #[option(16384)]
-    pub reso: IntOption<ResoParams>,
-    #[option(12288)]
-    pub diffuse: IntOption<DiffuseParams>,
+    #[option(0.5)]
+    pub drive: FloatOption<PercentParams>,
+    #[option(0.5)]
+    pub reso: FloatOption<PercentParams>,
+    #[option(0.5)]
+    pub diffuse: FloatOption<PercentParams>,
 }
 
 #[derive(OptionPage, Clone)]

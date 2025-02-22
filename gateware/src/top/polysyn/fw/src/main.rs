@@ -57,13 +57,13 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         let opts = app.ui.opts.clone();
 
-        let drive_smooth = app.drive_smoother.proc_u16(opts.poly.drive.value);
+        let drive_smooth = app.drive_smoother.proc_f32_to_u16(opts.poly.drive.value);
         app.synth.set_drive(drive_smooth);
 
-        let reso_smooth = app.reso_smoother.proc_u16(opts.poly.reso.value);
+        let reso_smooth = app.reso_smoother.proc_f32_to_u16((1.0f32 - opts.poly.reso.value).clamp(0.2f32, 1.0f32));
         app.synth.set_reso(reso_smooth);
 
-        let diffuse_smooth = app.diffusion_smoother.proc_u16(opts.poly.diffuse.value);
+        let diffuse_smooth = app.diffusion_smoother.proc_f32_to_u16(opts.poly.diffuse.value);
         let coeff_dry: i32 = (32768 - diffuse_smooth) as i32;
         let coeff_wet: i32 = diffuse_smooth as i32;
 

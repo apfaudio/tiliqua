@@ -26,4 +26,8 @@ impl OnePoleSmoother {
     pub fn proc_u16(&mut self, x_k: u16) -> u16 {
         self.proc(Fix::from_bits(x_k as i32)).to_bits() as u16
     }
+
+    pub fn proc_f32_to_u16(&mut self, x_k: f32) -> u16 {
+        self.proc(Fix::from_num(x_k)).to_bits() as u16
+    }
 }
