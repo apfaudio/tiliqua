@@ -29,7 +29,7 @@ from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 
-from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay
+from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua.cli              import top_level_cli
 from tiliqua.delay_line       import DelayLine
@@ -803,13 +803,14 @@ class CoreTop(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
-
+        clocks_hz = tiliqua_pll.expected_clocks(
+                platform.precise_audio_clocks, audio_192=False, pixclk_pll=None)
         m.submodules.pmod0 = pmod0 = self.pmod0
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator()
             m.submodules.provider = provider = eurorack_pmod.FFCProvider()
             wiring.connect(m, pmod0.pins, provider.pins)
-            m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
+            m.submodules.reboot = reboot = RebootProvider(clocks_hz.sync)
             m.submodules.btn = FFSynchronizer(
                     platform.request("encoder").s.i, reboot.button)
             m.d.comb += pmod0.codec_mute.eq(reboot.mute)

@@ -224,18 +224,25 @@ def top_level_cli(
     manifest_path = os.path.join(build_path, "manifest.json")
 
     def write_manifest(regions):
+        if hw_platform.version_major >= 4:
+            # TODO: pixclk_pll / refactor
+            clocks_hz = tiliqua_pll.expected_clocks(
+                    hw_platform.precise_audio_clocks, audio_192=False, pixclk_pll=None)
+            external_pll_config = ExternalPLLConfig(
+                    clk0_hz=clocks_hz.audio, clk1_hz=clocks_hz.dvi, spread_spectrum=0.01),
+        else:
+            external_pll_config = None
         manifest = BitstreamManifest(
             name=args.name,
             version=BITSTREAM_MANIFEST_VERSION,
             sha=repo.head.object.hexsha[:6],
             brief=args.brief,
             video=args.resolution if hasattr(args, 'resolution') else "<none>",
+            external_pll_config=external_pll_config,
             regions=regions
         )
-        
         with open(manifest_path, "w") as f:
             f.write(manifest.to_json())
-            
         return manifest
 
     def create_bitstream_archive():

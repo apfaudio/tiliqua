@@ -33,10 +33,18 @@ class MemoryRegion:
 
 @dataclass_json
 @dataclass
+class ExternalPLLConfig:
+    clk0_hz: int
+    clk1_hz: int
+    spread_spectrum: Optional[float]
+
+@dataclass_json
+@dataclass
 class BitstreamManifest:
     name: str
     version: int
     sha: str
     brief: str
     video: str
+    external_pll_config: Optional[ExternalPLLConfig]
     regions: List[MemoryRegion]

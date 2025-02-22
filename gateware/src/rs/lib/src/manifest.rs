@@ -13,12 +13,20 @@ pub struct MemoryRegion {
 }
 
 #[derive(Deserialize, Clone)]
+pub struct ExternalPLLConfig {
+    pub clk0_hz: u32,
+    pub clk1_hz: u32,
+    pub spread_spectrum: Option<f32>,
+}
+
+#[derive(Deserialize, Clone)]
 pub struct BitstreamManifest {
     pub name: OptionString,
     pub version: u32,
     pub sha: String<8>,
     pub brief: String<128>,
     pub video: String<64>,
+    pub external_pll_config: Option<ExternalPLLConfig>,
     pub regions: Vec<MemoryRegion, 3>,
 }
 
@@ -31,8 +39,15 @@ impl BitstreamManifest {
         info!("\tsha:     '{}'",   self.sha);
         info!("\tbrief:   '{}'", self.brief);
         info!("\tvideo:   '{}'", self.video);
-        for region in &self.regions {
-            info!("\tMemoryRegion {{");
+        if let Some(clocks) = &self.external_pll_config {
+            info!("\texternal_pll_config = {{");
+            info!("\t\tclk0_hz: {}", clocks.clk0_hz);
+            info!("\t\tclk1_hz: {}", clocks.clk1_hz);
+            info!("\t\tspread_spectrum: {:?}", clocks.spread_spectrum);
+            info!("\t}}");
+        }
+        for (i, region) in self.regions.iter().enumerate() {
+            info!("\tmemory_region[{}] = {{", i);
             info!("\t\tfilename:     '{}'", region.filename);
             info!("\t\tspiflash_src: {:#x}", region.spiflash_src);
             if let Some(psram_dst) = region.psram_dst {
