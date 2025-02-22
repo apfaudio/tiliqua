@@ -134,7 +134,7 @@ class VideoPeripheral(wiring.Component):
         return m
 
 class TiliquaSoc(Component):
-    def __init__(self, *, firmware_bin_path, dvi_timings, ui_name, ui_sha, platform_class, audio_192=False,
+    def __init__(self, *, firmware_bin_path, dvi_timings, ui_name, ui_sha, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
                  mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im"):
 
@@ -147,13 +147,11 @@ class TiliquaSoc(Component):
 
         self.firmware_bin_path = firmware_bin_path
         self.touch = touch
-        self.audio_192 = audio_192
+        self.clock_settings = clock_settings
         self.dvi_timings = dvi_timings
         self.video_rotate_90 = video_rotate_90
 
         self.platform_class = platform_class
-        self.clocks_hz = tiliqua_pll.expected_clocks(
-                platform_class.precise_audio_clocks, audio_192=audio_192, pixclk_pll=dvi_timings.pll)
 
         self.mainram_base         = 0x00000000
         self.mainram_size         = mainram_size
@@ -224,7 +222,7 @@ class TiliquaSoc(Component):
 
         # uart0
         uart_baud_rate = 115200
-        divisor = int(self.clocks_hz.sync // uart_baud_rate)
+        divisor = int(self.clock_settings.frequencies.sync // uart_baud_rate)
         self.uart0 = uart.Peripheral(divisor=divisor)
         self.csr_decoder.add(self.uart0.bus, addr=self.uart0_base, name="uart0")
 
@@ -270,9 +268,7 @@ class TiliquaSoc(Component):
 
         # pmod periph / audio interface (can be simulated)
         self.pmod0 = eurorack_pmod.EurorackPmod(
-                hardware_r33=True,
-                touch_enabled=self.touch,
-                audio_192=self.audio_192)
+                self.clock_settings.audio_clock)
         self.pmod0_periph = eurorack_pmod_peripheral.Peripheral(
                 pmod=self.pmod0, poke_outputs=poke_outputs)
         self.csr_decoder.add(self.pmod0_periph.bus, addr=self.pmod0_periph_base, name="pmod0_periph")
@@ -311,8 +307,6 @@ class TiliquaSoc(Component):
         self.extra_rust_constants.append(line)
 
     def elaborate(self, platform):
-
-        print(self.clocks_hz)
 
         m = Module()
 
@@ -401,14 +395,13 @@ class TiliquaSoc(Component):
             m.submodules.dtr0 = self.dtr0
 
             # generate our domain clocks/resets
-            m.submodules.car = car = platform.clock_domain_generator(audio_192=self.audio_192,
-                                                                     pixclk_pll=self.dvi_timings.pll)
+            m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
 
             # Enable LED driver on motherboard
             m.d.comb += platform.request("mobo_leds_oe").o.eq(1),
 
             # Connect encoder button to RebootProvider
-            m.submodules.reboot = reboot = RebootProvider(self.clocks_hz.sync)
+            m.submodules.reboot = reboot = RebootProvider(self.clock_settings.frequencies.sync)
             m.d.comb += reboot.button.eq(self.encoder0._button.f.button.r_data)
             m.d.comb += self.pmod0_periph.mute.eq(reboot.mute)
         else:
@@ -487,10 +480,10 @@ class TiliquaSoc(Component):
             f.write(f"pub const UI_NAME: &str            = \"{self.ui_name}\";\n")
             f.write(f"pub const UI_SHA: &str             = \"{self.ui_sha}\";\n")
             f.write(f"pub const HW_REV_MAJOR: usize      = {self.platform_class.version_major};\n")
-            f.write(f"pub const CLOCK_SYNC_HZ: u32       = {self.clocks_hz.sync};\n")
-            f.write(f"pub const CLOCK_FAST_HZ: u32       = {self.clocks_hz.fast};\n")
-            f.write(f"pub const CLOCK_DVI_HZ: u32        = {self.clocks_hz.dvi};\n")
-            f.write(f"pub const CLOCK_AUDIO_HZ: u32      = {self.clocks_hz.audio};\n")
+            f.write(f"pub const CLOCK_SYNC_HZ: u32       = {self.clock_settings.frequencies.sync};\n")
+            f.write(f"pub const CLOCK_FAST_HZ: u32       = {self.clock_settings.frequencies.fast};\n")
+            f.write(f"pub const CLOCK_DVI_HZ: u32        = {self.clock_settings.frequencies.dvi};\n")
+            f.write(f"pub const CLOCK_AUDIO_HZ: u32      = {self.clock_settings.frequencies.audio};\n")
             f.write(f"pub const PSRAM_BASE: usize        = 0x{self.psram_base:x};\n")
             f.write(f"pub const PSRAM_SZ_BYTES: usize    = 0x{self.psram_size:x};\n")
             f.write(f"pub const PSRAM_SZ_WORDS: usize    = PSRAM_SZ_BYTES / 4;\n")

@@ -787,14 +787,11 @@ class PSRAMMultiDiffuser(wiring.Component):
 
 class CoreTop(Elaboratable):
 
-    def __init__(self, dsp_core, enable_touch):
+    def __init__(self, dsp_core, enable_touch, clock_settings):
         self.core = dsp_core()
         self.touch = enable_touch
-
-        self.pmod0 = eurorack_pmod.EurorackPmod(
-            hardware_r33=True,
-            touch_enabled=self.touch)
-
+        self.clock_settings = clock_settings
+        self.pmod0 = eurorack_pmod.EurorackPmod(clock_settings.audio_clock)
         # Only if this core uses PSRAM
         if hasattr(self.core, "bus"):
             self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
@@ -803,14 +800,14 @@ class CoreTop(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
-        clocks_hz = tiliqua_pll.expected_clocks(
-                platform.precise_audio_clocks, audio_192=False, pixclk_pll=None)
         m.submodules.pmod0 = pmod0 = self.pmod0
         if sim.is_hw(platform):
-            m.submodules.car = car = platform.clock_domain_generator()
+            m.submodules.car = car = platform.clock_domain_generator(
+                    self.clock_settings)
             m.submodules.provider = provider = eurorack_pmod.FFCProvider()
             wiring.connect(m, pmod0.pins, provider.pins)
-            m.submodules.reboot = reboot = RebootProvider(clocks_hz.sync)
+            m.submodules.reboot = reboot = RebootProvider(
+                    self.clock_settings.frequencies.sync)
             m.submodules.btn = FFSynchronizer(
                     platform.request("encoder").s.i, reboot.button)
             m.d.comb += pmod0.codec_mute.eq(reboot.mute)

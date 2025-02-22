@@ -64,7 +64,7 @@ def top_level_cli(
     sim_ports=None,         # project has a list of simulation port names
     sim_harness=None,       # project has a .cpp simulation harness at this path
     argparse_callback=None, # project needs extra CLI flags before argparse.parse()
-    argparse_fragment=None  # project needs to check args.<custom_flag> after argparse.parse()
+    argparse_fragment=None # project needs to check args.<custom_flag> after argparse.parse()
     ):
 
     # Get some repository properties
@@ -78,6 +78,8 @@ def top_level_cli(
 
     parser.add_argument('--flash', action='store_true',
                         help="Flash bitstream (and firmware if needed) after building it.")
+    parser.add_argument('--fs-192khz', action='store_true',
+                        help="Force usage of maximum CODEC sample rate (192kHz).")
 
     if video_core:
         parser.add_argument('--resolution', type=str, default="1280x720p60",
@@ -178,6 +180,11 @@ def top_level_cli(
         TiliquaRevision.R4:    TiliquaR4SC3Platform,
     }[args.hw]
 
+    audio_clock = platform_class.default_audio_clock
+    kwargs["clock_settings"] = tiliqua_pll.clock_settings(
+        audio_clock.to_192khz() if args.fs_192khz else audio_clock,
+        video_timings=dvi_timings if video_core else None)
+
     if issubclass(fragment, TiliquaSoc):
         rust_fw_bin  = "firmware.bin"
         rust_fw_root = os.path.join(path, "fw")
@@ -225,11 +232,11 @@ def top_level_cli(
 
     def write_manifest(regions):
         if hw_platform.version_major >= 4:
-            # TODO: pixclk_pll / refactor
-            clocks_hz = tiliqua_pll.expected_clocks(
-                    hw_platform.precise_audio_clocks, audio_192=False, pixclk_pll=None)
+            settings = kwargs["clock_settings"]
             external_pll_config = ExternalPLLConfig(
-                    clk0_hz=clocks_hz.audio, clk1_hz=clocks_hz.dvi, spread_spectrum=0.01),
+                    clk0_hz=settings.frequencies.audio,
+                    clk1_hz=settings.frequencies.dvi,
+                    spread_spectrum=0.01),
         else:
             external_pll_config = None
         manifest = BitstreamManifest(

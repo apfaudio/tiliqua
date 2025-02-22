@@ -8,6 +8,7 @@ from amaranth         import *
 from amaranth.lib.cdc import FFSynchronizer
 from amaranth.lib     import wiring
 from tiliqua          import video
+from tiliqua.types    import *
 from dataclasses      import dataclass
 
 @dataclass
@@ -18,27 +19,34 @@ class ClockFrequencies:
     dvi:   int # Video pixel clock
     dvi5x: int # Video 5x pixel clock (DDR TMDS clock)
 
-def expected_clocks(audio_precise: bool, audio_192: bool, pixclk_pll: video.DVIPLL):
+@dataclass
+class ClockSettings:
+    audio_clock: AudioClock
+    video_timings: Optional[video.DVITimings]
+    frequencies: ClockFrequencies
+
+def clock_settings(audio_clock: AudioClock, video_timings: video.DVITimings) -> ClockSettings:
     """
     Calculate frequency of all clocks used by Tiliqua gateware given an intended PLL configuration.
-    This does not drive the PLL configuration itself, but it should match what the PLLs
-    end up generating, as these constants are used in downstream logic.
+    It should match what the PLLs end up generating, as these constants are used in downstream logic.
     """
-    clocks = ClockFrequencies(
+    frequencies = ClockFrequencies(
         sync=60_000_000,
         fast=120_000_000,
         audio=None,
         dvi=None,
         dvi5x=None
     )
-    if audio_precise:
-        clocks.audio = 49_152_000 if audio_192 else 12_288_000
-    else:
-        clocks.audio = 50_000_000 if audio_192 else 12_500_000
-    if isinstance(pixclk_pll, video.DVIPLL):
-        clocks.dvi = int(pixclk_pll.pixel_clk_mhz*1_000_000)
-        clocks.dvi5x = 5*int(pixclk_pll.pixel_clk_mhz*1_000_000)
-    return clocks
+    frequencies.audio = audio_clock.mclk()
+    if video_timings is not None:
+        frequencies.dvi = int(video_timings.pixel_clk_mhz*1_000_000)
+        frequencies.dvi5x = 5*int(video_timings.pixel_clk_mhz*1_000_000)
+    settings = ClockSettings(
+        audio_clock=audio_clock,
+        video_timings=video_timings,
+        frequencies=frequencies
+    )
+    return settings
 
 def create_dvi_pll(pll_settings: video.DVIPLL, clk48, reset, feedback, locked):
     """
@@ -213,10 +221,9 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
 
     """
 
-    def __init__(self, *, pixclk_pll=None, audio_192=False, clock_frequencies=None, clock_signal_name=None):
+    def __init__(self, settings: ClockSettings):
         super().__init__()
-        self.pixclk_pll = pixclk_pll
-        self.audio_192  = audio_192
+        self.settings = settings
 
     def elaborate(self, platform):
         m = Module()
@@ -317,7 +324,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
         )
 
         # Video PLL and derived signals
-        if self.pixclk_pll is not None:
+        if self.settings.video_timings is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
@@ -359,10 +366,9 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
 
     """
 
-    def __init__(self, *, pixclk_pll=None, audio_192=False):
+    def __init__(self, settings: ClockSettings):
         super().__init__()
-        self.pixclk_pll = pixclk_pll
-        self.audio_192  = audio_192
+        self.settings = settings
 
     def elaborate(self, platform):
         m = Module()
@@ -383,6 +389,13 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
         m.d.comb += [
             ClockSignal("raw48").eq(clk48),
         ]
+
+        clkos2_dividers = {
+            AudioClock.COARSE_48KHZ:  48,
+            AudioClock.COARSE_192KHZ: 12,
+        }
+        # With 2 PLLs only coarse audio clocks are supported.
+        assert self.settings.audio_clock in clkos2_dividers.keys()
 
         feedback60 = Signal()
         locked60   = Signal()
@@ -418,7 +431,7 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
                 p_CLKOS_CPHASE=4,
                 p_CLKOS_FPHASE=0,
                 p_CLKOS2_ENABLE="ENABLED",
-                p_CLKOS2_DIV=12 if self.audio_192 else 48, # 50.0MHz (~195kHz) or 12.0MHz (~47kHz)
+                p_CLKOS2_DIV=clkos2_dividers[self.settings.audio_clock],
                 p_CLKOS2_CPHASE=4,
                 p_CLKOS2_FPHASE=0,
                 p_FEEDBK_PATH="CLKOP",
@@ -449,14 +462,15 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
         )
 
         # Video PLL and derived signals
-        if self.pixclk_pll is not None:
+        if self.settings.video_timings is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
 
             feedback_dvi = Signal()
             locked_dvi   = Signal()
-            m.submodules.pll_dvi = create_dvi_pll(self.pixclk_pll, clk48, reset, feedback_dvi, locked_dvi)
+            m.submodules.pll_dvi = create_dvi_pll(self.settings.video_timings.pll, clk48,
+                                                  reset, feedback_dvi, locked_dvi)
 
             m.d.comb += [
                 ResetSignal("dvi")  .eq(~locked_dvi),
@@ -487,10 +501,9 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
     dvi/dvi5x: video clocks, depend on resolution passed with `--resolution` flag.
     """
 
-    def __init__(self, *, pixclk_pll=None, audio_192=False):
+    def __init__(self, settings: ClockSettings):
         super().__init__()
-        self.pixclk_pll = pixclk_pll
-        self.audio_192  = audio_192
+        self.settings = settings
 
     def elaborate(self, platform):
         m = Module()
@@ -569,14 +582,15 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
         )
 
         # Video PLL and derived signals
-        if self.pixclk_pll is not None:
+        if self.settings.video_timings is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
 
             feedback_dvi = Signal()
             locked_dvi   = Signal()
-            m.submodules.pll_dvi = create_dvi_pll(self.pixclk_pll, clk48, reset, feedback_dvi, locked_dvi)
+            m.submodules.pll_dvi = create_dvi_pll(self.settings.video_timings.pll, clk48,
+                                                  reset, feedback_dvi, locked_dvi)
 
             m.d.comb += [
                 ResetSignal("dvi")  .eq(~locked_dvi),
@@ -587,7 +601,7 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
         # the audio domains.
         feedback_audio  = Signal()
         locked_audio    = Signal()
-        if self.audio_192:
+        if self.settings.audio_clock == AudioClock.FINE_192KHZ:
             # 49.152MHz for 256*Fs Audio domain (192KHz Fs)
             # ecppll -i 48 --clkout0 49.152 --highres --reset -f pll2.v
             m.submodules.audio_pll = Instance("EHXPLLL",
@@ -632,15 +646,12 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
                     # Generated clock outputs.
                     o_CLKOP=feedback_audio,
                     o_CLKOS=ClockSignal("audio"),
-                    # Synthesis attributes.
-                    a_FREQUENCY_PIN_CLKI="48",
-                    a_FREQUENCY_PIN_CLKOS="12.288",
                     a_ICP_CURRENT="12",
                     a_LPF_RESISTOR="8",
                     a_MFG_ENABLE_FILTEROPAMP="1",
                     a_MFG_GMCREF_SEL="2"
             )
-        else:
+        elif self.settings.audio_clock == AudioClock.FINE_48KHZ:
             # 12.288MHz for 256*Fs Audio domain (48KHz Fs)
             # ecppll -i 48 --clkout0 12.288 --highres --reset -f pll2.v
             m.submodules.audio_pll = Instance("EHXPLLL",
@@ -685,14 +696,13 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
                     # Generated clock outputs.
                     o_CLKOP=feedback_audio,
                     o_CLKOS=ClockSignal("audio"),
-                    # Synthesis attributes.
-                    a_FREQUENCY_PIN_CLKI="48",
-                    a_FREQUENCY_PIN_CLKOS="12.288",
                     a_ICP_CURRENT="12",
                     a_LPF_RESISTOR="8",
                     a_MFG_ENABLE_FILTEROPAMP="1",
                     a_MFG_GMCREF_SEL="2"
             )
+        else:
+            raise ValueError("Unsupported audio PLL requested.")
 
         # Derived clocks and resets
         m.d.comb += [

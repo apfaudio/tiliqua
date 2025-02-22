@@ -759,10 +759,10 @@ class EurorackPmod(wiring.Component):
     # If an LED is in manual, this is signed i8 from -green to +red.
     led: In(8).array(8)
 
-    def __init__(self, hardware_r33=True, touch_enabled=True, audio_192=False):
-        self.audio_192 = audio_192
-        self.i2stdm = I2STDM(audio_192=self.audio_192)
-        self.i2c_master = I2CMaster(audio_192=self.audio_192)
+    def __init__(self, audio_clock):
+        is_192 = audio_clock.is_192khz()
+        self.i2stdm = I2STDM(audio_192=is_192)
+        self.i2c_master = I2CMaster(audio_192=is_192)
         self.calibrator = I2SCalibrator()
         super().__init__()
 

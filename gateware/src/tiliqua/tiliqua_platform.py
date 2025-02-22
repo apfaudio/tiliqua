@@ -14,6 +14,7 @@ from amaranth_boards.resources   import *
 from luna.gateware.platform.core import LUNAPlatform
 
 from tiliqua                     import tiliqua_pll
+from tiliqua.types               import *
 
 class _SoldierCrabPlatform(LatticeECP5Platform):
     package      = "BG256"
@@ -373,7 +374,7 @@ class TiliquaR2SC2Platform(SoldierCrabR2Platform, LUNAPlatform):
                               f"({SoldierCrabR2Platform.device}/{SoldierCrabR2Platform.psram_id})")
     version_major          = 2
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator4PLLs
-    precise_audio_clocks   = True
+    default_audio_clock    = AudioClock.FINE_48KHZ
     default_usb_connection = "ulpi"
 
     resources = [
@@ -391,7 +392,7 @@ class TiliquaR2SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
     version_major          = 2
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
-    precise_audio_clocks   = False
+    default_audio_clock    = AudioClock.COARSE_48KHZ
     default_usb_connection = "ulpi"
 
     resources = [
@@ -409,7 +410,7 @@ class TiliquaR3SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
     version_major          = 3
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
-    precise_audio_clocks   = False
+    default_audio_clock    = AudioClock.COARSE_48KHZ
     default_usb_connection = "ulpi"
 
     resources = [
@@ -427,7 +428,7 @@ class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
     version_major          = 4
     clock_domain_generator = tiliqua_pll.TiliquaDomainGeneratorPLLExternal
-    precise_audio_clocks   = True
+    default_audio_clock    = AudioClock.FINE_48KHZ
     default_usb_connection = "ulpi"
 
     resources = [

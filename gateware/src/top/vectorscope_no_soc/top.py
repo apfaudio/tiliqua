@@ -53,10 +53,11 @@ class VectorScopeTop(Elaboratable):
     Top-level Vectorscope design.
     """
 
-    def __init__(self, *, dvi_timings, wishbone_l2_cache, **kwargs):
+    def __init__(self, *, dvi_timings, wishbone_l2_cache, clock_settings):
 
         self.dvi_timings = dvi_timings
         self.wishbone_l2_cache = wishbone_l2_cache
+        self.clock_settings = clock_settings
 
         # One PSRAM with an internal arbiter to support multiple DMA masters.
         self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
@@ -65,9 +66,7 @@ class VectorScopeTop(Elaboratable):
         fb_size = (dvi_timings.h_active, dvi_timings.v_active)
 
         self.pmod0 = eurorack_pmod.EurorackPmod(
-                hardware_r33=True,
-                touch_enabled=False,
-                audio_192=True)
+                audio_192=self.clock_settings.audio_clock.is_192khz())
 
         # All of our DMA masters
         self.video = FramebufferPHY(
@@ -96,8 +95,8 @@ class VectorScopeTop(Elaboratable):
         m.submodules.pmod0 = pmod0 = self.pmod0
 
         if sim.is_hw(platform):
-            m.submodules.car = car = platform.clock_domain_generator(audio_192=True, pixclk_pll=self.dvi_timings.pll)
-            m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
+            m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
+            m.submodules.reboot = reboot = RebootProvider(self.clock_settings.frequencies.sync)
             m.submodules.btn = FFSynchronizer(
                     platform.request("encoder").s.i, reboot.button)
             m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
@@ -233,5 +232,5 @@ if __name__ == "__main__":
         sim_ports=simulation_ports,
         sim_harness="../../src/top/vectorscope_no_soc/sim/sim.cpp",
         argparse_callback=argparse_callback,
-        argparse_fragment=argparse_fragment
+        argparse_fragment=argparse_fragment,
     )
