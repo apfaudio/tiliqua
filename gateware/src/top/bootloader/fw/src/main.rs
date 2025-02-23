@@ -18,6 +18,7 @@ use tiliqua_fw::*;
 use tiliqua_lib::manifest::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::video::Video;
+use tiliqua_hal::si5351::*;
 use opts::OptionString;
 
 use embedded_graphics::{
@@ -39,6 +40,7 @@ pub const N_MANIFESTS: usize = 8;
 
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    pll: Option<Si5351Device<I2c0>>,
     reboot_n: Option<usize>,
     error_n: [Option<String<32>>; N_MANIFESTS],
     time_since_reboot_requested: u32,
@@ -47,7 +49,8 @@ struct App {
 }
 
 impl App {
-    pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS]) -> Self {
+    pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
+               pll: Option<Si5351Device<I2c0>>) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -56,6 +59,7 @@ impl App {
         Self {
             ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
                             encoder, pca9635, pmod),
+            pll,
             reboot_n: None,
             error_n: [const { None }; N_MANIFESTS],
             time_since_reboot_requested: 0u32,
@@ -222,11 +226,45 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             }
                         }
                     }
+                    if !bad_crc {
+                        if let Some(pll_config) = manifest.external_pll_config.clone() {
+                            if let Some(ref mut pll) = app.pll {
+                                pll.init_adafruit_module().unwrap();
+                                match pll_config.clk1_hz {
+                                    Some(clk1_hz) => {
+                                        info!("Configure external PLL: clk0={}Hz, clk1={}Hz.", pll_config.clk0_hz, clk1_hz);
+                                        pll.set_frequencies(
+                                            PLL::A,
+                                            &[
+                                                ClockOutput::Clk0,
+                                                ClockOutput::Clk1,
+                                            ],
+                                            &[
+                                                pll_config.clk0_hz,
+                                                clk1_hz,
+                                            ],
+                                            pll_config.spread_spectrum).unwrap();
+                                    }
+                                    _ => {
+                                        info!("Configure external PLL: clk0={}Hz.", pll_config.clk0_hz);
+                                        pll.set_frequencies(
+                                            PLL::A,
+                                            &[
+                                                ClockOutput::Clk0,
+                                            ],
+                                            &[
+                                                pll_config.clk0_hz,
+                                            ],
+                                            pll_config.spread_spectrum).unwrap();
+                                    }
+                                }
+                            }
+                        }
+                        info!("BITSTREAM{}\n\r", n);
+                        loop {}
+                    }
                 }
-                if !bad_crc {
-                    info!("BITSTREAM{}\n\r", n);
-                    loop {}
-                } else {
+                if bad_crc {
                     // Bad CRC: cancel reboot, draw an error.
                     app.ui.opts.tracker.modify = false;
                     app.reboot_n = None;
@@ -251,9 +289,9 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua bootloader!");
 
+    let mut maybe_si5351: Option<Si5351Device<I2c0>> = None;
     if HW_REV_MAJOR >= 4 {
         // Configure external PLL
-        use hal::si5351::*;
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         let info = si5351drv.init_adafruit_module();
@@ -270,6 +308,7 @@ fn main() -> ! {
                 ],
                 Some(0.01)); // 1% spread spectrum
         info!("si5351_set: {:?}", set);
+        maybe_si5351 = Some(si5351drv);
     }
 
     let mut manifests: [Option<manifest::BitstreamManifest>; 8] = [const { None }; 8];
@@ -302,7 +341,7 @@ fn main() -> ! {
     opts.boot.slot6.value = names[6].clone();
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
-    let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone())));
+    let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone(), maybe_si5351)));
 
     handler!(timer0 = || timer0_handler(&app));
 
