@@ -22,6 +22,33 @@ class FirmwareLocation(str, enum.Enum):
     SPIFlash  = "spiflash"
     PSRAM     = "psram"
 
+@dataclass_json
+@dataclass
+class MemoryRegion:
+    filename: str
+    spiflash_src: int
+    psram_dst: Optional[int]
+    size: int
+    crc: int
+
+@dataclass_json
+@dataclass
+class ExternalPLLConfig:
+    clk0_hz: int
+    clk1_hz: int
+    spread_spectrum: Optional[float]
+
+@dataclass_json
+@dataclass
+class BitstreamManifest:
+    name: str
+    version: int
+    sha: str
+    brief: str
+    video: str
+    external_pll_config: Optional[ExternalPLLConfig]
+    regions: List[MemoryRegion]
+
 class AudioClock(str, enum.Enum):
     FINE_48KHZ  = "fine_48khz"
     FINE_192KHZ = "fine_192khz"
@@ -50,30 +77,3 @@ class AudioClock(str, enum.Enum):
             self.FINE_192KHZ,
             self.COARSE_192KHZ,
         ]
-
-@dataclass_json
-@dataclass
-class MemoryRegion:
-    filename: str
-    spiflash_src: int
-    psram_dst: Optional[int]
-    size: int
-    crc: int
-
-@dataclass_json
-@dataclass
-class ExternalPLLConfig:
-    clk0_hz: int
-    clk1_hz: int
-    spread_spectrum: Optional[float]
-
-@dataclass_json
-@dataclass
-class BitstreamManifest:
-    name: str
-    version: int
-    sha: str
-    brief: str
-    video: str
-    external_pll_config: Optional[ExternalPLLConfig]
-    regions: List[MemoryRegion]

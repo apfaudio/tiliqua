@@ -94,7 +94,7 @@ def soc_simulation_ports(fragment):
         "dvi_b":          (fragment.video.phy_b,                         None),
     }
 
-def simulate(fragment, ports, harness, hw_platform, tracing=False):
+def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=False):
 
     build_dst = "build"
     dst = f"{build_dst}/tiliqua_soc.v"
@@ -119,8 +119,7 @@ def simulate(fragment, ports, harness, hw_platform, tracing=False):
     tracing_flags = ["--trace-fst", "--trace-structs"] if tracing else []
 
     if hasattr(fragment, "video"):
-        # TODO: warn if this is far from the PLL output?
-        dvi_clk_hz = int(fragment.video.dvi_tgen.timings.pll.pixel_clk_mhz * 1e6)
+        dvi_clk_hz = clock_settings.frequencies.dvi
         dvi_h_active = fragment.video.dvi_tgen.timings.h_active
         dvi_v_active = fragment.video.dvi_tgen.timings.v_active
         video_cflags = [
@@ -153,9 +152,9 @@ def simulate(fragment, ports, harness, hw_platform, tracing=False):
                     "-CFLAGS", f"-DSPIFLASH_FW_OFFSET={hex(fragment.fw_base - fragment.spiflash_base)}",
                 ]
 
-    clock_sync_hz = 60000000
-    audio_clk_hz = 12288000
-    fast_clk_hz = 120000000
+    clock_sync_hz = clock_settings.frequencies.sync
+    audio_clk_hz = clock_settings.frequencies.audio
+    fast_clk_hz = clock_settings.frequencies.fast
 
     verilator_dst = "build/obj_dir"
     shutil.rmtree(verilator_dst, ignore_errors=True)

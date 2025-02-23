@@ -79,7 +79,7 @@ def top_level_cli(
     parser.add_argument('--flash', action='store_true',
                         help="Flash bitstream (and firmware if needed) after building it.")
     parser.add_argument('--fs-192khz', action='store_true',
-                        help="Force usage of maximum CODEC sample rate (192kHz).")
+                        help="Force usage of maximum CODEC sample rate (192kHz, default is 48kHz).")
 
     if video_core:
         parser.add_argument('--resolution', type=str, default="1280x720p60",
@@ -231,7 +231,7 @@ def top_level_cli(
     manifest_path = os.path.join(build_path, "manifest.json")
 
     def write_manifest(regions):
-        if hw_platform.version_major >= 4:
+        if hw_platform.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal:
             settings = kwargs["clock_settings"]
             external_pll_config = ExternalPLLConfig(
                     clk0_hz=settings.frequencies.audio,
@@ -256,20 +256,17 @@ def top_level_cli(
         archive_name = f"{args.name.lower()}-{repo.head.object.hexsha[:6]}-{args.hw.value}.tar.gz"
         archive_path = os.path.join(build_path, archive_name)
         bitstream_path = "build/top.bit"
-        
         # Check if we have a bitstream
         has_bitstream = os.path.exists(bitstream_path)
         if not has_bitstream:
             print("\nWARNING: Skipping archive creation - bitstream has not been built")
             return
-            
         print(f"\nCreating bitstream archive {archive_name}...")
         with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(bitstream_path, arcname="top.bit")
             tar.add(manifest_path, arcname="manifest.json")
             if isinstance(fragment, TiliquaSoc):
                 tar.add(kwargs["firmware_bin_path"], arcname="firmware.bin")
-        
         # Print archive contents and size
         print(f"\nContents:")
         with tarfile.open(archive_path, "r:gz") as tar:
@@ -282,7 +279,6 @@ def top_level_cli(
         with open(manifest_path) as f:
             manifest = json.load(f)
         print(f"\nManifest contents:\n{json.dumps(manifest, indent=2)}")
-            
 
     def validate_existing_bitstream(args, manifest_path="build/manifest.json"):
         """
@@ -293,7 +289,6 @@ def top_level_cli(
             print("\nERROR: No existing bitstream found at build/top.bit")
             print("You must build the full project at least once before using --fw-only")
             return False
-        
         if not os.path.exists(manifest_path):
             print("\nERROR: No manifest found at build/manifest.json")
             print("You must build the full project at least once before using --fw-only") 
@@ -367,7 +362,7 @@ def top_level_cli(
 
     if args.action == CliAction.Simulate:
         sim.simulate(fragment, sim_ports(fragment), sim_harness,
-                     hw_platform, args.trace_fst)
+                     hw_platform, kwargs["clock_settings"], args.trace_fst)
         sys.exit(0)
 
     if ila_supported and args.ila:
