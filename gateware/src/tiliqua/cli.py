@@ -126,17 +126,11 @@ def top_level_cli(
                         help="Bitstream name to display in bootloader and bottom of screen.")
     parser.add_argument('--brief', type=str, default=None,
                         help="Brief description to display in bootloader.")
-    hw_revision_default = TiliquaRevision.R2.value
     parser.add_argument("--hw",
                         type=TiliquaRevision,
-                        default=hw_revision_default,
-                        choices=[
-                            TiliquaRevision.R2.value,
-                            TiliquaRevision.R2SC3.value,
-                            TiliquaRevision.R3.value,
-                            TiliquaRevision.R4.value,
-                        ],
-                        help=(f"Tiliqua hardware revision (default={hw_revision_default})"))
+                        default=TiliquaRevision.default(),
+                        choices=[r.value for r in TiliquaRevision.all()],
+                        help=(f"Tiliqua hardware revision (default={TiliquaRevision.default()})"))
     parser.add_argument('--bootaddr', type=str, default="0x0",
                         help="'bootaddr' argument of ecppack (default: 0x0).")
     parser.add_argument('--verbose', action='store_true',
@@ -236,20 +230,30 @@ def top_level_cli(
             external_pll_config = ExternalPLLConfig(
                     clk0_hz=settings.frequencies.audio,
                     clk1_hz=settings.frequencies.dvi,
-                    spread_spectrum=0.01),
+                    spread_spectrum=0.01)
         else:
             external_pll_config = None
         manifest = BitstreamManifest(
+            magic=BITSTREAM_MANIFEST_MAGIC,
             name=args.name,
-            version=BITSTREAM_MANIFEST_VERSION,
+            hw_rev=hw_platform.version_major,
             sha=repo.head.object.hexsha[:6],
             brief=args.brief,
             video=args.resolution if hasattr(args, 'resolution') else "<none>",
             external_pll_config=external_pll_config,
             regions=regions
         )
+        def cleandict(d):
+            """Remove all k, v pairs where v == None."""
+            if isinstance(d, dict):
+                return {k: cleandict(v) for k, v in d.items() if v is not None}
+            elif isinstance(d, list):
+                return [cleandict(v) for v in d]
+            else:
+                return d
         with open(manifest_path, "w") as f:
-            f.write(manifest.to_json())
+            # Drop all keys with None values (optional fields)
+            f.write(json.dumps(cleandict(manifest.to_dict())))
         return manifest
 
     def create_bitstream_archive():

@@ -173,7 +173,7 @@ def flash_archive(archive_path, slot=None, noconfirm=False):
                     if "filename" not in region:
                         continue
                     if region.get("psram_dst") is not None:
-                        assert region["spiflash_src"] is None
+                        assert "spiflash_src" not in region or region["spiflash_src"] is None
                         region["spiflash_src"] = firmware_base
                         print(f"manifest: region {region['filename']}: spiflash_src set to 0x{firmware_base:x}")
                         regions_to_check.append({

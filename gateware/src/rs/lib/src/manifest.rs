@@ -15,14 +15,15 @@ pub struct MemoryRegion {
 #[derive(Deserialize, Clone)]
 pub struct ExternalPLLConfig {
     pub clk0_hz: u32,
-    pub clk1_hz: u32,
+    pub clk1_hz: Option<u32>,
     pub spread_spectrum: Option<f32>,
 }
 
 #[derive(Deserialize, Clone)]
 pub struct BitstreamManifest {
+    pub magic: u32,
+    pub hw_rev: u32,
     pub name: OptionString,
-    pub version: u32,
     pub sha: String<8>,
     pub brief: String<128>,
     pub video: String<64>,
@@ -34,15 +35,16 @@ impl BitstreamManifest {
 
     pub fn print(&self) {
         info!("BitstreamManifest {{");
-        info!("\tname:    '{}'",  self.name);
-        info!("\tversion: {}", self.version);
+        info!("\tmagic:    {:#x}", self.magic);
+        info!("\thw_rev:   {}",    self.hw_rev);
+        info!("\tname:    '{}'",   self.name);
         info!("\tsha:     '{}'",   self.sha);
-        info!("\tbrief:   '{}'", self.brief);
-        info!("\tvideo:   '{}'", self.video);
+        info!("\tbrief:   '{}'",   self.brief);
+        info!("\tvideo:   '{}'",   self.video);
         if let Some(clocks) = &self.external_pll_config {
             info!("\texternal_pll_config = {{");
             info!("\t\tclk0_hz: {}", clocks.clk0_hz);
-            info!("\t\tclk1_hz: {}", clocks.clk1_hz);
+            info!("\t\tclk1_hz: {:?}", clocks.clk1_hz);
             info!("\t\tspread_spectrum: {:?}", clocks.spread_spectrum);
             info!("\t}}");
         }

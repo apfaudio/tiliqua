@@ -9,13 +9,24 @@ from typing import List, Optional
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 
-BITSTREAM_MANIFEST_VERSION = 0
+BITSTREAM_MANIFEST_MAGIC = 0xFEEDBEEF
 
 class TiliquaRevision(str, enum.Enum):
     R2    = "r2"
     R2SC3 = "r2sc3"
     R3    = "r3"
     R4    = "r4"
+
+    def default():
+        return TiliquaRevision.R2
+
+    def all():
+        return [
+            TiliquaRevision.R2,
+            TiliquaRevision.R2SC3,
+            TiliquaRevision.R3,
+            TiliquaRevision.R4,
+        ]
 
 class FirmwareLocation(str, enum.Enum):
     BRAM      = "bram"
@@ -35,14 +46,15 @@ class MemoryRegion:
 @dataclass
 class ExternalPLLConfig:
     clk0_hz: int
-    clk1_hz: int
+    clk1_hz: Optional[int]
     spread_spectrum: Optional[float]
 
 @dataclass_json
 @dataclass
 class BitstreamManifest:
+    magic: int
+    hw_rev: int
     name: str
-    version: int
     sha: str
     brief: str
     video: str
