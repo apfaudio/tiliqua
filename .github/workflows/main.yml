@@ -23,13 +23,31 @@ jobs:
           - name: selftest
             cmd: selftest build
           - name: xbeam
-            cmd: xbeam build
+            cmd: xbeam build --fs-192khz
           - name: polysyn
             cmd: polysyn build
           - name: macro-osc
             cmd: macro_osc build
           - name: sid
             cmd: sid build
+          - name: usb-audio
+            cmd: usb_audio build
+          - name: usb-host
+            cmd: usb_host build --midi-device arturia-keylab49-mkii
+          - name: dsp-nco
+            cmd: dsp build --dsp-core nco
+          - name: dsp-diffuser
+            cmd: dsp build --dsp-core psram_diffuser
+          - name: dsp-diffuser-sim
+            cmd: dsp sim --dsp-core psram_diffuser
+          - name: dsp-midicv
+            cmd: dsp build --dsp-core midicv
+          - name: vectorscope
+            cmd: vectorscope_no_soc build --fs-192khz
+          - name: vectorscope-sim
+            cmd: vectorscope_no_soc sim --fs-192khz
+          - name: bootstub
+            cmd: bootstub build --bootaddr 0x100000
         hw_rev: ["r4"]
     steps:
       - uses: actions/checkout@v4

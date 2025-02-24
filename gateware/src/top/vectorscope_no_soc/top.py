@@ -65,8 +65,7 @@ class VectorScopeTop(Elaboratable):
         fb_base = 0x0
         fb_size = (dvi_timings.h_active, dvi_timings.v_active)
 
-        self.pmod0 = eurorack_pmod.EurorackPmod(
-                audio_192=self.clock_settings.audio_clock.is_192khz())
+        self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
         # All of our DMA masters
         self.video = FramebufferPHY(
