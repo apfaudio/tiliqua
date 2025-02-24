@@ -16,10 +16,10 @@ use core::str::FromStr;
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
 use tiliqua_fw::*;
-use tiliqua_lib::manifest::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::video::Video;
 use tiliqua_hal::si5351::*;
+use tiliqua_manifest::*;
 use opts::OptionString;
 
 use embedded_graphics::{
@@ -37,7 +37,6 @@ hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
                        VIDEO_ROTATE_90);
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
-pub const N_MANIFESTS: usize = 8;
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
@@ -362,13 +361,13 @@ fn main() -> ! {
         None
     };
 
-    let mut manifests: [Option<manifest::BitstreamManifest>; 8] = [const { None }; 8];
+    let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
     for n in 0usize..N_MANIFESTS {
-        let size: usize = 1024usize;
-        let manifest_first = SPIFLASH_BASE + 0x100000usize;
-        let addr: usize = manifest_first + (n+1)*0x100000usize - size;
+        let size: usize = MANIFEST_SIZE;
+        let manifest_first = SPIFLASH_BASE + SLOT_BITSTREAM_BASE;
+        let addr: usize = manifest_first + (n+1)*SLOT_SIZE - size;
         info!("(entry {}) look for manifest from {:#x} to {:#x}", n, addr, addr+size);
-        manifests[n] = manifest::BitstreamManifest::from_addr(addr, size);
+        manifests[n] = BitstreamManifest::from_addr(addr, size);
     }
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);

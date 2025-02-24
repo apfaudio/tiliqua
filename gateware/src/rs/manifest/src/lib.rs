@@ -1,7 +1,27 @@
+// Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
+//
+// SPDX-License-Identifier: CERN-OHL-S-2.0
+
+#![cfg_attr(not(test), no_std)]
+
+// WARNING: Make sure this schema matches `lib.py`!
+//
+// Rust representation of 'Bitstream Manifests', describing each bitstream
+// flashed to the Tiliqua, alongside any memory regions and settings required
+// for it to start up correctly (these are set up by the bootloader).
+//
+// This representation is used manifest parsing in the bootloader.
+
 use heapless::{String, Vec};
 use serde::{Deserialize};
 use log::info;
-use opts::OptionString;
+
+pub const MANIFEST_MAGIC: u32        = 0xFEEDBEEF;
+pub const N_MANIFESTS: usize         = 8;
+pub const SLOT_BITSTREAM_BASE: usize = 0x100000; // First user slot starts here
+pub const SLOT_SIZE: usize           = 0x100000; // Spacing between user slots
+pub const MANIFEST_SIZE: usize       = 1024;     // Each manifest starts at:
+                                                 // SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
 
 #[derive(Deserialize, Clone)]
 pub struct MemoryRegion {
@@ -21,14 +41,14 @@ pub struct ExternalPLLConfig {
 
 #[derive(Deserialize, Clone)]
 pub struct BitstreamManifest {
-    pub magic: u32,
     pub hw_rev: u32,
-    pub name: OptionString,
+    pub name: String<32>,
     pub sha: String<8>,
     pub brief: String<128>,
     pub video: String<64>,
     pub external_pll_config: Option<ExternalPLLConfig>,
     pub regions: Vec<MemoryRegion, 3>,
+    pub magic: u32,
 }
 
 impl BitstreamManifest {

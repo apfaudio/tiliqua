@@ -14,13 +14,17 @@ import sys
 import tarfile
 import tempfile
 
+# Flash memory map constants shared with the bootloader
+from rs.manifest.src.lib import (
+    N_MANIFESTS,
+    SLOT_BITSTREAM_BASE,
+    SLOT_SIZE,
+    MANIFEST_SIZE,
+)
+
 # Flash memory map constants
 BOOTLOADER_BITSTREAM_ADDR = 0x000000
-SLOT_BITSTREAM_BASE      = 0x100000  # First user slot starts here
-SLOT_SIZE                = 0x100000
-MANIFEST_SIZE            = 1024
 FIRMWARE_BASE_SLOT0      = 0x1B0000
-MAX_SLOTS                = 8
 FLASH_PAGE_SIZE          = 1024 # 1KB
 
 def flash_file(file_path, offset, file_type="auto", dry_run=True):
@@ -290,7 +294,7 @@ def flash_status():
     """Display the status of flashed bitstreams in each manifest slot."""
 
     segments = []
-    for n in range(0, MAX_SLOTS):
+    for n in range(0, N_MANIFESTS):
         segments.append(
             {"offset": SLOT_BITSTREAM_BASE+(n+1)*SLOT_SIZE-MANIFEST_SIZE, "size": 512,
              "name": f"Slot {n} manifest", "data": None})
@@ -298,7 +302,7 @@ def flash_status():
     for (n, segment) in enumerate(segments):
         print(f"\nReading {segment['name']} at {hex(segment['offset'])}:")
         try:
-            segment["data"] = read_flash_segment(segment['offset'], segment['size'], reset=(n==MAX_SLOTS-1))
+            segment["data"] = read_flash_segment(segment['offset'], segment['size'], reset=(n==N_MANIFESTS-1))
         except subprocess.CalledProcessError as e:
             print(f"  Error reading flash: {e}")
 
@@ -341,8 +345,8 @@ def main():
         if not os.path.exists(args.archive_path):
             print(f"Error: Archive not found: {args.archive_path}")
             sys.exit(1)
-        if args.slot is not None and not 0 <= args.slot < MAX_SLOTS:
-            print(f"Error: Slot must be between 0 and {MAX_SLOTS-1}")
+        if args.slot is not None and not 0 <= args.slot < N_MANIFESTS:
+            print(f"Error: Slot must be between 0 and {N_MANIFESTS-1}")
             sys.exit(1)
         flash_archive(args.archive_path, args.slot, args.noconfirm)
     elif args.command == 'status':

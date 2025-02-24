@@ -4,12 +4,10 @@
 
 import enum
 
-from typing import List, Optional
-
-from dataclasses import dataclass
-from dataclasses_json import dataclass_json
-
-BITSTREAM_MANIFEST_MAGIC = 0xFEEDBEEF
+# Re-export `tiliqua-manifest` types.
+from rs.manifest.src.lib import BitstreamManifest as BitstreamManifest
+from rs.manifest.src.lib import MemoryRegion as MemoryRegion
+from rs.manifest.src.lib import ExternalPLLConfig as ExternalPLLConfig
 
 class TiliquaRevision(str, enum.Enum):
     R2    = "r2"
@@ -33,33 +31,6 @@ class FirmwareLocation(str, enum.Enum):
     SPIFlash  = "spiflash"
     PSRAM     = "psram"
 
-@dataclass_json
-@dataclass
-class MemoryRegion:
-    filename: str
-    spiflash_src: int
-    psram_dst: Optional[int]
-    size: int
-    crc: int
-
-@dataclass_json
-@dataclass
-class ExternalPLLConfig:
-    clk0_hz: int
-    clk1_hz: Optional[int]
-    spread_spectrum: Optional[float]
-
-@dataclass_json
-@dataclass
-class BitstreamManifest:
-    magic: int
-    hw_rev: int
-    name: str
-    sha: str
-    brief: str
-    video: str
-    external_pll_config: Optional[ExternalPLLConfig]
-    regions: List[MemoryRegion]
 
 class AudioClock(str, enum.Enum):
     FINE_48KHZ  = "fine_48khz"

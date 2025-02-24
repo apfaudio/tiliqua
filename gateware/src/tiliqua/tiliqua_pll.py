@@ -10,6 +10,7 @@ from amaranth.lib     import wiring
 from tiliqua          import video
 from tiliqua.types    import *
 from dataclasses      import dataclass
+from typing           import List, Optional
 
 @dataclass
 class ClockFrequencies:

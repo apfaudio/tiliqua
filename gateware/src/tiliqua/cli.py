@@ -234,7 +234,6 @@ def top_level_cli(
         else:
             external_pll_config = None
         manifest = BitstreamManifest(
-            magic=BITSTREAM_MANIFEST_MAGIC,
             name=args.name,
             hw_rev=hw_platform.version_major,
             sha=repo.head.object.hexsha[:6],

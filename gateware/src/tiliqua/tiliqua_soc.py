@@ -479,7 +479,6 @@ class TiliquaSoc(Component):
         with open(dst, "w") as f:
             f.write(f"pub const UI_NAME: &str            = \"{self.ui_name}\";\n")
             f.write(f"pub const UI_SHA: &str             = \"{self.ui_sha}\";\n")
-            f.write(f"pub const MANIFEST_MAGIC: u32      = 0x{BITSTREAM_MANIFEST_MAGIC:x};\n")
             f.write(f"pub const HW_REV_MAJOR: u32        = {self.platform_class.version_major};\n")
             f.write(f"pub const CLOCK_SYNC_HZ: u32       = {self.clock_settings.frequencies.sync};\n")
             f.write(f"pub const CLOCK_FAST_HZ: u32       = {self.clock_settings.frequencies.fast};\n")

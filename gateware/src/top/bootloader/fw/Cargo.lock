@@ -409,6 +409,7 @@ dependencies = [
  "strum_macros 0.26.4",
  "tiliqua-hal",
  "tiliqua-lib",
+ "tiliqua-manifest",
  "tiliqua-pac",
 ]
 
@@ -437,11 +438,23 @@ dependencies = [
  "micromath",
  "midi-types",
  "opts",
+ "strum",
+ "strum_macros 0.26.4",
+ "tiliqua-hal",
+]
+
+[[package]]
+name = "tiliqua-manifest"
+version = "0.1.0"
+dependencies = [
+ "fixed",
+ "heapless",
+ "log",
+ "micromath",
  "serde",
  "serde-json-core",
  "strum",
  "strum_macros 0.26.4",
- "tiliqua-hal",
 ]
 
 [[package]]
