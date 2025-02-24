@@ -9,6 +9,7 @@ use irq::handler;
 use core::cell::RefCell;
 use heapless::String;
 use micromath::{F32Ext};
+use strum_macros::{EnumIter, IntoStaticStr};
 
 use core::str::FromStr;
 
@@ -37,6 +38,16 @@ hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 pub const N_MANIFESTS: usize = 8;
+
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
+pub enum BitstreamError {
+    InvalidManifest,
+    HwVersionMismatch,
+    SpiflashCrcError,
+    PllBadConfigError,
+    PllI2cError,
+}
 
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
@@ -109,53 +120,152 @@ where
     .draw(d).ok();
 }
 
-fn draw_summary<D>(d: &mut D, bitstream: &BitstreamManifest, or: i32, ot: i32, hue: u8)
+fn draw_summary<D>(d: &mut D,
+                   bitstream_manifest: &Option<BitstreamManifest>,
+                   error: &Option<String<32>>,
+                   or: i32, ot: i32, hue: u8)
 where
     D: DrawTarget<Color = Gray8>,
 {
-    let norm = MonoTextStyle::new(&FONT_9X15,      Gray8::new(0xB0 + hue));
-    Text::with_alignment(
-        "brief:".into(),
-        Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
-        norm,
-        Alignment::Right,
-    )
-    .draw(d).ok();
-    Text::with_alignment(
-        &bitstream.brief,
-        Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
-        norm,
-        Alignment::Left,
-    )
-    .draw(d).ok();
-    Text::with_alignment(
-        "video:".into(),
-        Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
-        norm,
-        Alignment::Right,
-    )
-    .draw(d).ok();
-    Text::with_alignment(
-        &bitstream.video,
-        Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
-        norm,
-        Alignment::Left,
-    )
-    .draw(d).ok();
-    Text::with_alignment(
-        "sha:".into(),
-        Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
-        norm,
-        Alignment::Right,
-    )
-    .draw(d).ok();
-    Text::with_alignment(
-        &bitstream.sha,
-        Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
-        norm,
-        Alignment::Left,
-    )
-    .draw(d).ok();
+    if let Some(bitstream) = bitstream_manifest {
+        let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
+        Text::with_alignment(
+            "brief:".into(),
+            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
+            norm,
+            Alignment::Right,
+        )
+        .draw(d).ok();
+        Text::with_alignment(
+            &bitstream.brief,
+            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
+            norm,
+            Alignment::Left,
+        )
+        .draw(d).ok();
+        Text::with_alignment(
+            "video:".into(),
+            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
+            norm,
+            Alignment::Right,
+        )
+        .draw(d).ok();
+        Text::with_alignment(
+            &bitstream.video,
+            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
+            norm,
+            Alignment::Left,
+        )
+        .draw(d).ok();
+        Text::with_alignment(
+            "sha:".into(),
+            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
+            norm,
+            Alignment::Right,
+        )
+        .draw(d).ok();
+        Text::with_alignment(
+            &bitstream.sha,
+            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
+            norm,
+            Alignment::Left,
+        )
+        .draw(d).ok();
+    }
+    if let Some(error_string) = &error {
+        let hl = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
+        Text::with_alignment(
+            "error:".into(),
+            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
+            hl,
+            Alignment::Right,
+        )
+        .draw(d).ok();
+        Text::with_alignment(
+            &error_string,
+            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
+            hl,
+            Alignment::Left,
+        )
+        .draw(d).ok();
+    }
+}
+
+fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device<I2c0>)
+    -> Result<(), tiliqua_hal::si5351::Error> {
+    pll.init_adafruit_module()?;
+    match pll_config.clk1_hz {
+        Some(clk1_hz) => {
+            info!("Configure external PLL: clk0={}Hz, clk1={}Hz.", pll_config.clk0_hz, clk1_hz);
+            pll.set_frequencies(
+                PLL::A,
+                &[
+                    ClockOutput::Clk0,
+                    ClockOutput::Clk1,
+                ],
+                &[
+                    pll_config.clk0_hz,
+                    clk1_hz,
+                ],
+                pll_config.spread_spectrum)
+        }
+        _ => {
+            info!("Configure external PLL: clk0={}Hz.", pll_config.clk0_hz);
+            pll.set_frequencies(
+                PLL::A,
+                &[
+                    ClockOutput::Clk0,
+                ],
+                &[
+                    pll_config.clk0_hz,
+                ],
+                pll_config.spread_spectrum)
+        }
+    }
+}
+
+fn copy_spiflash_region_to_psram(region: &MemoryRegion) -> Result<(), BitstreamError> {
+    if let Some(psram_dst) = region.psram_dst {
+        let psram_ptr = PSRAM_BASE as *mut u32;
+        let spiflash_ptr = SPIFLASH_BASE as *mut u32;
+        let spiflash_offset_words = region.spiflash_src as isize / 4isize;
+        let psram_offset_words = psram_dst as isize / 4isize;
+        let size_words = region.size as isize / 4isize + 1;
+        info!("Copying {:#x}..{:#x} (spi flash) to {:#x}..{:#x} (psram) ...",
+              SPIFLASH_BASE + region.spiflash_src as usize,
+              SPIFLASH_BASE + (region.spiflash_src + region.size) as usize,
+              PSRAM_BASE + psram_dst as usize,
+              PSRAM_BASE + (psram_dst + region.size) as usize);
+        for i in 0..size_words {
+            unsafe {
+                let d = spiflash_ptr.offset(spiflash_offset_words + i).read_volatile();
+                psram_ptr.offset(psram_offset_words + i).write_volatile(d);
+            }
+        }
+        info!("Verify {} KiB copied correctly ...", (size_words*4) / 1024);
+        let crc_bzip2 = crc::Crc::<u32>::new(&crc::CRC_32_BZIP2);
+        let mut digest = crc_bzip2.digest();
+        for i in 0..size_words {
+            unsafe {
+                let d1 = psram_ptr.offset(psram_offset_words + i).read_volatile();
+                if i != (size_words - 1) {
+                    digest.update(&d1.to_le_bytes());
+                } else {
+                    digest.update(&d1.to_le_bytes()[0..(region.size as usize)%4usize]);
+                }
+            }
+        }
+        let crc_result = digest.finalize();
+        info!("got PSRAM crc: {:#x}, manifest wants: {:#x}", crc_result, region.crc);
+        if crc_result == region.crc {
+            Ok(())
+        } else {
+            Err(BitstreamError::SpiflashCrcError)
+        }
+    } else {
+        info!("skipping XiP memory region ...");
+        Ok(())
+    }
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
@@ -183,93 +293,43 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             // Give codec time to mute and display time to draw 'REBOOTING'
             if app.time_since_reboot_requested > 500 {
                 // Is there a firmware image to copy to PSRAM before we switch bitstreams?
-                let mut bad_crc = false;
-                if let Some(manifest) = &app.manifests[n] {
-                    for region in &manifest.regions {
-                        if let Some(psram_dst) = region.psram_dst {
-                            let psram_ptr = PSRAM_BASE as *mut u32;
-                            let spiflash_ptr = SPIFLASH_BASE as *mut u32;
-                            let spiflash_offset_words = region.spiflash_src as isize / 4isize;
-                            let psram_offset_words = psram_dst as isize / 4isize;
-                            let size_words = region.size as isize / 4isize + 1;
-                            info!("Copying {:#x}..{:#x} (spi flash) to {:#x}..{:#x} (psram) ...",
-                                  SPIFLASH_BASE + region.spiflash_src as usize,
-                                  SPIFLASH_BASE + (region.spiflash_src + region.size) as usize,
-                                  PSRAM_BASE + psram_dst as usize,
-                                  PSRAM_BASE + (psram_dst + region.size) as usize);
-                            for i in 0..size_words {
-                                unsafe {
-                                    let d = spiflash_ptr.offset(spiflash_offset_words + i).read_volatile();
-                                    psram_ptr.offset(psram_offset_words + i).write_volatile(d);
-                                }
-                            }
-                            info!("Verify {} KiB copied correctly ...", (size_words*4) / 1024);
-                            let crc_bzip2 = crc::Crc::<u32>::new(&crc::CRC_32_BZIP2);
-                            let mut digest = crc_bzip2.digest();
-                            for i in 0..size_words {
-                                unsafe {
-                                    let d1 = psram_ptr.offset(psram_offset_words + i).read_volatile();
-                                    if i != (size_words - 1) {
-                                        digest.update(&d1.to_le_bytes());
-                                    } else {
-                                        digest.update(&d1.to_le_bytes()[0..(region.size as usize)%4usize]);
-                                    }
-                                }
-                            }
-                            let crc_result = digest.finalize();
-                            info!("got PSRAM crc: {:#x}, manifest wants: {:#x}", crc_result, region.crc);
-                            if crc_result == region.crc {
-                                info!("CRC OK.");
-                            } else {
-                                info!("CRC NOT OK.");
-                                bad_crc = true;
-                            }
+                let error = if let Some(manifest) = &app.manifests[n].clone() {
+                    || -> Result<(), BitstreamError> {
+                        if manifest.magic != MANIFEST_MAGIC {
+                            Err(BitstreamError::InvalidManifest)?;
                         }
-                    }
-                    if !bad_crc {
+                        if manifest.hw_rev != HW_REV_MAJOR {
+                            Err(BitstreamError::HwVersionMismatch)?;
+                        }
+                        for region in &manifest.regions {
+                            copy_spiflash_region_to_psram(region)?;
+                        }
                         if let Some(pll_config) = manifest.external_pll_config.clone() {
                             if let Some(ref mut pll) = app.pll {
-                                pll.init_adafruit_module().unwrap();
-                                match pll_config.clk1_hz {
-                                    Some(clk1_hz) => {
-                                        info!("Configure external PLL: clk0={}Hz, clk1={}Hz.", pll_config.clk0_hz, clk1_hz);
-                                        pll.set_frequencies(
-                                            PLL::A,
-                                            &[
-                                                ClockOutput::Clk0,
-                                                ClockOutput::Clk1,
-                                            ],
-                                            &[
-                                                pll_config.clk0_hz,
-                                                clk1_hz,
-                                            ],
-                                            pll_config.spread_spectrum).unwrap();
-                                    }
-                                    _ => {
-                                        info!("Configure external PLL: clk0={}Hz.", pll_config.clk0_hz);
-                                        pll.set_frequencies(
-                                            PLL::A,
-                                            &[
-                                                ClockOutput::Clk0,
-                                            ],
-                                            &[
-                                                pll_config.clk0_hz,
-                                            ],
-                                            pll_config.spread_spectrum).unwrap();
-                                    }
-                                }
+                                configure_external_pll(&pll_config, pll).or(
+                                    Err(BitstreamError::PllI2cError))?;
+                            } else {
+                                // External PLL config is in manifest but this bootloader
+                                // didn't set up the PLL (likely hardware / gateware mismatch).
+                                Err(BitstreamError::PllBadConfigError)?;
                             }
                         }
-                        info!("BITSTREAM{}\n\r", n);
-                        loop {}
-                    }
-                }
-                if bad_crc {
-                    // Bad CRC: cancel reboot, draw an error.
+                        Ok(())
+                    }()
+                } else {
+                    Err(BitstreamError::InvalidManifest)
+                };
+                if let Err(bitstream_error) = error {
+                    // Cancel reboot, draw an error.
                     app.ui.opts.tracker.modify = false;
                     app.reboot_n = None;
                     app.time_since_reboot_requested = 0;
-                    app.error_n[n] = Some(String::from_str("ERR: CRC FAIL").unwrap());
+                    app.error_n[n] = Some(String::from_str(bitstream_error.into()).unwrap());
+                    info!("Failed to load bitstream: {:?}", app.error_n[n]);
+                } else {
+                    // Ask RP2040 to perform reboot.
+                    info!("BITSTREAM{}\n\r", n);
+                    loop {}
                 }
             }
         }
@@ -289,27 +349,18 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua bootloader!");
 
-    let mut maybe_si5351: Option<Si5351Device<I2c0>> = None;
-    if HW_REV_MAJOR >= 4 {
-        // Configure external PLL
+    let maybe_external_pll = if HW_REV_MAJOR >= 4 {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
-        let info = si5351drv.init_adafruit_module();
-        info!("si5351_init: {:?}", info);
-        let set = si5351drv.set_frequencies(
-                PLL::A,
-                &[
-                    ClockOutput::Clk0,
-                    ClockOutput::Clk1,
-                ],
-                &[
-                    CLOCK_AUDIO_HZ,
-                    CLOCK_DVI_HZ,
-                ],
-                Some(0.01)); // 1% spread spectrum
-        info!("si5351_set: {:?}", set);
-        maybe_si5351 = Some(si5351drv);
-    }
+        configure_external_pll(&ExternalPLLConfig{
+            clk0_hz: CLOCK_AUDIO_HZ,
+            clk1_hz: Some(CLOCK_DVI_HZ),
+            spread_spectrum: Some(0.01),
+        }, &mut si5351drv).unwrap();
+        Some(si5351drv)
+    } else {
+        None
+    };
 
     let mut manifests: [Option<manifest::BitstreamManifest>; 8] = [const { None }; 8];
     for n in 0usize..N_MANIFESTS {
@@ -341,7 +392,7 @@ fn main() -> ! {
     opts.boot.slot6.value = names[6].clone();
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
-    let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone(), maybe_si5351)));
+    let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone(), maybe_external_pll)));
 
     handler!(timer0 = || timer0_handler(&app));
 
@@ -378,22 +429,12 @@ fn main() -> ! {
             draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
 
             if let Some(n) = opts.tracker.selected {
-                if let Some(manifest) = &manifests[n] {
-                    draw_summary(&mut display, &manifest, -20, -18, 0);
+                draw_summary(&mut display, &manifests[n], &error_n[n], -20, -18, 0);
+                if manifests[n].is_some() {
                     Line::new(Point::new(255, (V_ACTIVE/2 - 55 + (n as u32)*18) as i32),
                               Point::new((H_ACTIVE/2-90) as i32, (V_ACTIVE/2+8) as i32))
                               .into_styled(stroke)
                               .draw(&mut display).ok();
-                }
-                if let Some(error) = &error_n[n] {
-                    let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xF0));
-                    Text::with_alignment(
-                        &error,
-                        Point::new((H_ACTIVE/2) as i32 - 20, (V_ACTIVE/2) as i32 - 20),
-                        norm,
-                        Alignment::Left,
-                    )
-                    .draw(&mut display).ok();
                 }
             }
 

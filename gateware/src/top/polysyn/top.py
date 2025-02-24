@@ -373,8 +373,7 @@ class PolySoc(TiliquaSoc):
     def __init__(self, **kwargs):
 
         # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
-        super().__init__(audio_192=False,
-                         touch=True, finalize_csr_bridge=False, **kwargs)
+        super().__init__(finalize_csr_bridge=False, **kwargs)
 
         fb_size = (self.video.fb_hsize, self.video.fb_vsize)
 
