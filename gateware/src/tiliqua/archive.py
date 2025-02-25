@@ -1,3 +1,16 @@
+# Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+"""
+Utilities for creating 'bitstream archives', a *.tar.gz archive
+containing a bitstream, manifest (describing the contents), as well
+as optional firmware images and other resources.
+
+Such archives are a single shareable file that contains all the resources
+required to flash a project to a Tiliqua slot (assuming the correct
+bootloader and hardware revisions).
+"""
+
 import os
 import tarfile
 import json
@@ -10,22 +23,25 @@ from tiliqua.tiliqua_platform import TiliquaRevision
 
 @dataclass
 class BitstreamArchiver:
-    """Class responsible for creating and managing bitstream archives."""
+
+    """Class for building and writing bitstream archives."""
+
     name: str
     sha: str
     hw_rev: TiliquaRevision
-    build_path: str = "build"
     brief: str = ""
     video: Optional[str] = None
     external_pll_config: Optional[ExternalPLLConfig] = None
-    regions: List[MemoryRegion] = field(default_factory=list)
+
+    _build_path: str = "build"
+    _regions: List[MemoryRegion] = field(default_factory=list)
     _manifest: Optional[BitstreamManifest] = None
     _firmware_bin_path: Optional[str] = None
 
     def __post_init__(self):
         # Ensure build directory exists
-        if not os.path.exists(self.build_path):
-            os.makedirs(self.build_path)
+        if not os.path.exists(self._build_path):
+            os.makedirs(self._build_path)
 
     @property
     def archive_name(self) -> str:
@@ -33,15 +49,15 @@ class BitstreamArchiver:
 
     @property
     def archive_path(self) -> str:
-        return os.path.join(self.build_path, self.archive_name)
+        return os.path.join(self._build_path, self.archive_name)
 
     @property
     def manifest_path(self) -> str:
-        return os.path.join(self.build_path, "manifest.json")
+        return os.path.join(self._build_path, "manifest.json")
 
     @property
     def bitstream_path(self) -> str:
-        return os.path.join(self.build_path, "top.bit")
+        return os.path.join(self._build_path, "top.bit")
 
 
     def add_firmware_region(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> None:
@@ -81,7 +97,7 @@ class BitstreamArchiver:
                 # No offset needed for BRAM
                 pass
 
-        self.regions.append(region)
+        self._regions.append(region)
 
     def write_manifest(self) -> BitstreamManifest:
         """Write serialized manifest file, return the BitstreamManifest object."""
@@ -92,7 +108,7 @@ class BitstreamArchiver:
             brief=self.brief,
             video=self.video if self.video else "<none>",
             external_pll_config=self.external_pll_config,
-            regions=self.regions
+            regions=self._regions
         )
         self._manifest.write_to_path(self.manifest_path)
         return self._manifest

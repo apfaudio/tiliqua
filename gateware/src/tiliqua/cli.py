@@ -26,30 +26,6 @@ class CliAction(str, enum.Enum):
     Build    = "build"
     Simulate = "sim"
 
-def maybe_flash_firmware(args, kwargs, force_flash=False):
-    print()
-    match args.fw_location:
-        case FirmwareLocation.BRAM:
-            print("Note: Firmware is stored in BRAM, it is not possible to flash firmware "
-                  "and bitstream separately. The bitstream contains the firmware.")
-        case FirmwareLocation.SPIFlash:
-            args_flash_firmware = [
-                "sudo", "openFPGALoader", "-c", "dirtyJtag", "-f", "-o", f"{hex(kwargs['fw_offset'])}",
-                "--file-type", "raw", kwargs["firmware_bin_path"]
-            ]
-            print("SoC is configured for XIP, firmware may be flashed directly to SPI flash by passing "
-                  "the bitstream archive to `pdm flash`, or passing `--flash` to build command.")
-            if args.flash or force_flash:
-                subprocess.check_call(args_flash_firmware, env=os.environ)
-        case FirmwareLocation.PSRAM:
-            print("Note: This bitstream expects firmware already copied from SPI flash to PSRAM "
-                  "by a bootloader.\nPass the bitstream archive to `pdm flash` to flash it.")
-            if args.flash:
-                print("ERROR: direct --flash is only supported for --fw-location=spiflash (XIP). "
-                      "Pass the bitstream archive to `pdm flash` instead.")
-                sys.exit(-1)
-
-
 # TODO: these arguments would likely be cleaner encapsulated in a dataclass that
 # has an instance per-project, that may also contain some bootloader metadata.
 def top_level_cli(
@@ -227,6 +203,30 @@ def top_level_cli(
             clk0_hz=kwargs["clock_settings"].frequencies.audio,
             clk1_hz=kwargs["clock_settings"].frequencies.dvi,
             spread_spectrum=0.01)
+
+    def maybe_flash_firmware(args, kwargs, force_flash=False):
+        """Handle `--flash` option where it is supported (at the moment, only XiP)."""
+        print()
+        match args.fw_location:
+            case FirmwareLocation.BRAM:
+                print("Note: Firmware is stored in BRAM, it is not possible to flash firmware "
+                      "and bitstream separately. The bitstream contains the firmware.")
+            case FirmwareLocation.SPIFlash:
+                args_flash_firmware = [
+                    "sudo", "openFPGALoader", "-c", "dirtyJtag", "-f", "-o", f"{hex(kwargs['fw_offset'])}",
+                    "--file-type", "raw", kwargs["firmware_bin_path"]
+                ]
+                print("SoC is configured for XIP, firmware may be flashed directly to SPI flash by passing "
+                      "the bitstream archive to `pdm flash`, or passing `--flash` to build command.")
+                if args.flash or force_flash:
+                    subprocess.check_call(args_flash_firmware, env=os.environ)
+            case FirmwareLocation.PSRAM:
+                print("Note: This bitstream expects firmware already copied from SPI flash to PSRAM "
+                      "by a bootloader.\nPass the bitstream archive to `pdm flash` to flash it.")
+                if args.flash:
+                    print("ERROR: direct --flash is only supported for --fw-location=spiflash (XIP). "
+                          "Pass the bitstream archive to `pdm flash` instead.")
+                    sys.exit(-1)
 
     if isinstance(fragment, TiliquaSoc):
         # Generate SVD
