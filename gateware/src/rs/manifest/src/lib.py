@@ -12,10 +12,11 @@ for it to start up correctly (these are set up by the bootloader).
 This representation is used for manifest generation and flashing.
 """
 
-from typing import List, Optional
+import json
 
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
+from typing import List, Optional
 
 MANIFEST_MAGIC           = 0xFEEDBEEF
 N_MANIFESTS              = 8
@@ -51,3 +52,17 @@ class BitstreamManifest:
     external_pll_config: Optional[ExternalPLLConfig]
     regions: List[MemoryRegion]
     magic: int = MANIFEST_MAGIC
+
+    def write_to_path(self, manifest_path):
+        # Clean up empty keys for improved backwards compatibility of manifests.
+        def cleandict(d):
+            """Remove all k, v pairs where v == None."""
+            if isinstance(d, dict):
+                return {k: cleandict(v) for k, v in d.items() if v is not None}
+            elif isinstance(d, list):
+                return [cleandict(v) for v in d]
+            else:
+                return d
+        with open(manifest_path, "w") as f:
+            # Drop all keys with None values (optional fields)
+            f.write(json.dumps(cleandict(self.to_dict())))

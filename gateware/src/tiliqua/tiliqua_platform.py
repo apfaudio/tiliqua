@@ -441,6 +441,31 @@ class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
         *_TiliquaR4Mobo.connectors
     ]
 
+class TiliquaRevision(str, enum.Enum):
+    R2    = "r2"
+    R2SC3 = "r2sc3"
+    R3    = "r3"
+    R4    = "r4"
+
+    def default():
+        return TiliquaRevision.R2
+
+    def all():
+        return [
+            TiliquaRevision.R2,
+            TiliquaRevision.R2SC3,
+            TiliquaRevision.R3,
+            TiliquaRevision.R4,
+        ]
+
+    def platform_class(self):
+        return {
+            TiliquaRevision.R2:    TiliquaR2SC2Platform,
+            TiliquaRevision.R2SC3: TiliquaR2SC3Platform,
+            TiliquaRevision.R3:    TiliquaR3SC3Platform,
+            TiliquaRevision.R4:    TiliquaR4SC3Platform,
+        }[self]
+
 class RebootProvider(wiring.Component):
 
     """
