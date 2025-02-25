@@ -4,6 +4,8 @@
 
 """ Tiliqua and SoldierCrab PLL configurations. """
 
+import textwrap
+
 from amaranth         import *
 from amaranth.lib.cdc import FFSynchronizer
 from amaranth.lib     import wiring
@@ -222,12 +224,47 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
 
     """
 
+    clock_tree_base = """
+    ┌─────────────[tiliqua-mobo]──────────────────────────────[soldiercrab]─────────────┐
+    │ [48MHz OSC]─┐                            ┊                                        │
+    │             └─────────────────────────────>[ECP5 PLL]───┐                         │
+    │                                          ┊              ├>[sync] {sync:12.4f} MHz │
+    │                                          ┊              ├>[usb]  {sync:12.4f} MHz │
+    │                                          ┊              └>[fast] {fast:12.4f} MHz │
+    │ [25MHz OSC]─┐                            ┊                                        │
+    │             └>[si5351 PLL]─┐             ┊                                        │
+    │                (dynamic)   ├>[expll_clk0]────────────────>[audio]{audio:12.4f} MHz │"""
+    clock_tree_video = """
+    │                            └>[expll_clk1]─>[ECP5 PLL]──┐                          │
+    │                                          ┊             ├─>[dvi]   {dvi:11.4f} MHz │
+    │                                          ┊             └─>[dvi5x] {dvi5x:11.4f} MHz │
+    └───────────────────────────────────────────────────────────────────────────────────┘"""
+    clock_tree_no_video = """
+    │                            └>[expll_clk1]────────────────>[disable]               │
+    └───────────────────────────────────────────────────────────────────────────────────┘"""
+
     def __init__(self, settings: ClockSettings):
         super().__init__()
         self.settings = settings
 
+    def prettyprint(self):
+        print(textwrap.dedent(self.clock_tree_base).format(
+            sync=self.settings.frequencies.sync/1e6,
+            fast=self.settings.frequencies.fast/1e6,
+            audio=self.settings.frequencies.audio/1e6,
+            ))
+        if self.settings.frequencies.dvi is not None:
+            print(textwrap.dedent(self.clock_tree_video[1:]).format(
+                dvi=self.settings.frequencies.dvi/1e6,
+                dvi5x=self.settings.frequencies.dvi5x/1e6,
+                ))
+        else:
+            print(textwrap.dedent(self.clock_tree_no_video[1:]))
+
     def elaborate(self, platform):
         m = Module()
+
+        self.prettyprint()
 
         # Create our domains.
         m.domains.sync       = ClockDomain()
