@@ -20,7 +20,7 @@ jobs:
         config:
           - name: bootloader
             cmd: bootloader build --fw-location=spiflash
-        hw_rev: ["r2", "r3", "r4"]
+        hw_rev: ["r4"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
@@ -37,7 +37,7 @@ jobs:
         run: pdm install
         working-directory: gateware
       - name: Build ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
-        run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }} --resolution 720x720p60 --rotate-90
         working-directory: gateware
       - uses: actions/upload-artifact@v4
         with:
@@ -60,7 +60,7 @@ jobs:
             cmd: macro_osc build
           - name: sid
             cmd: sid build
-        hw_rev: ["r2"]
+        hw_rev: ["r4"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
@@ -77,7 +77,7 @@ jobs:
         run: pdm install
         working-directory: gateware
       - name: Build ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
-        run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }} --resolution 720x720p60 --rotate-90
         working-directory: gateware
       - uses: actions/upload-artifact@v4
         with:
@@ -102,7 +102,7 @@ jobs:
             cmd: vectorscope_no_soc build --fs-192khz
           - name: bootstub
             cmd: bootstub build --bootaddr 0x100000
-        hw_rev: ["r2", "r3", "r4"]
+        hw_rev: ["r4"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
@@ -128,7 +128,7 @@ jobs:
             cmd: dsp sim --dsp-core psram_diffuser
           - name: vectorscope-sim
             cmd: vectorscope_no_soc sim --fs-192khz
-        hw_rev: ["r2", "r3", "r4"]
+        hw_rev: ["r4"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
