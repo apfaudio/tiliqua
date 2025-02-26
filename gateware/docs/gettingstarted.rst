@@ -4,9 +4,6 @@ Getting started
 Building example projects
 -------------------------
 
-.. warning::
-
-    For R3 hardware, you will want to additionally pass ``--hw3`` (for R3 hardware / LFE5U-25) to all build commands. Currently R2 hardware is the default.
 
 Each top-level bitstream has a command-line interface. You can see the options by running (for example):
 
@@ -16,6 +13,10 @@ Each top-level bitstream has a command-line interface. You can see the options b
    pdm dsp
 
 The available options change depending on the top-level project. For example, many projects have video output, and from the CLI you can select the video resolution.
+
+.. warning::
+
+    For prototype Tiliqua hardware, be careful to add an :py:`--hw r4` (or similar) flag specifying your hardware version to all commands below.
 
 A few examples of building top-level bitstreams:
 
@@ -48,7 +49,7 @@ Flashing example projects
 
 .. warning::
 
-    If you have R2/R3 (prototype) hardware, you may need to reflash the RP2040 and bootloader bitstream  per :doc:`bootloader`, before the following instructions will work.
+    For prototype hardware, you may need to reflash the RP2040 and bootloader bitstream  per :doc:`bootloader`, before the following instructions will work.
 
 When you build projects from the command line, it will create a .tar.gz archive containing the bitstream, firmware (if applicable), and a manifest describing the contents. You can flash bitstreams to one of 8 slots, using the built-in flash tool.
 Such archives may be flashed as follows:

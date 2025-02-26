@@ -14,6 +14,7 @@ from amaranth_boards.resources   import *
 from luna.gateware.platform.core import LUNAPlatform
 
 from tiliqua                     import tiliqua_pll
+from tiliqua.types               import *
 
 class _SoldierCrabPlatform(LatticeECP5Platform):
     package      = "BG256"
@@ -290,8 +291,9 @@ class _TiliquaR3Mobo:
 class _TiliquaR4Mobo:
     resources   = [
         # External PLL (SI5351A) clock inputs.
-        Resource("expll_clk0", 0, Pins("44", dir="i"), Attrs(IO_TYPE="LVCMOS33")),
-        Resource("expll_clk1", 0, Pins("40", dir="i"), Attrs(IO_TYPE="LVCMOS33")),
+        # Clock frequencies are dynamic, so set them to the maximum expected settings in each domain.
+        Resource("expll_clk0", 0, Pins("44", dir="i", conn=("m2", 0)), Clock(49.152e6), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("expll_clk1", 0, Pins("40", dir="i", conn=("m2", 0)), Clock(74.250e6), Attrs(IO_TYPE="LVCMOS33")),
 
         # Quadrature rotary encoder and switch. These are already debounced by an RC filter.
         Resource("encoder", 0,
@@ -346,7 +348,7 @@ class _TiliquaR4Mobo:
             Subsignal("pdn_clk", Pins("56", dir="o",  conn=("m2", 0))),
             Subsignal("i2c_sda", Pins("71", dir="io", conn=("m2", 0))),
             Subsignal("i2c_scl", Pins("69", dir="io", conn=("m2", 0))),
-            Attrs(IO_TYPE="LVCMOS33")
+            Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
         ),
 
         # DVI
@@ -370,8 +372,9 @@ class _TiliquaR4Mobo:
 class TiliquaR2SC2Platform(SoldierCrabR2Platform, LUNAPlatform):
     name                   = ("Tiliqua R2 / SoldierCrab R2 "
                               f"({SoldierCrabR2Platform.device}/{SoldierCrabR2Platform.psram_id})")
-    brief                  = "r2"
+    version_major          = 2
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator4PLLs
+    default_audio_clock    = AudioClock.FINE_48KHZ
     default_usb_connection = "ulpi"
 
     resources = [
@@ -387,8 +390,9 @@ class TiliquaR2SC2Platform(SoldierCrabR2Platform, LUNAPlatform):
 class TiliquaR2SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
     name                   = ("Tiliqua R2 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
-    brief                  = "r2sc3"
+    version_major          = 2
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
+    default_audio_clock    = AudioClock.COARSE_48KHZ
     default_usb_connection = "ulpi"
 
     resources = [
@@ -404,8 +408,9 @@ class TiliquaR2SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
 class TiliquaR3SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
     name                   = ("Tiliqua R3 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
-    brief                  = "r3"
+    version_major          = 3
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
+    default_audio_clock    = AudioClock.COARSE_48KHZ
     default_usb_connection = "ulpi"
 
     resources = [
@@ -421,8 +426,9 @@ class TiliquaR3SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
 class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
     name                   = ("Tiliqua R4 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
-    brief                  = "r4"
-    clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
+    version_major          = 4
+    clock_domain_generator = tiliqua_pll.TiliquaDomainGeneratorPLLExternal
+    default_audio_clock    = AudioClock.FINE_48KHZ
     default_usb_connection = "ulpi"
 
     resources = [
@@ -434,6 +440,31 @@ class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
         *SoldierCrabR3Platform.connectors,
         *_TiliquaR4Mobo.connectors
     ]
+
+class TiliquaRevision(str, enum.Enum):
+    R2    = "r2"
+    R2SC3 = "r2sc3"
+    R3    = "r3"
+    R4    = "r4"
+
+    def default():
+        return TiliquaRevision.R2
+
+    def all():
+        return [
+            TiliquaRevision.R2,
+            TiliquaRevision.R2SC3,
+            TiliquaRevision.R3,
+            TiliquaRevision.R4,
+        ]
+
+    def platform_class(self):
+        return {
+            TiliquaRevision.R2:    TiliquaR2SC2Platform,
+            TiliquaRevision.R2SC3: TiliquaR2SC3Platform,
+            TiliquaRevision.R3:    TiliquaR3SC3Platform,
+            TiliquaRevision.R4:    TiliquaR4SC3Platform,
+        }[self]
 
 class RebootProvider(wiring.Component):
 

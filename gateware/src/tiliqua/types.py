@@ -4,33 +4,42 @@
 
 import enum
 
-from typing import List, Optional
-
-from dataclasses import dataclass
-from dataclasses_json import dataclass_json
-
-BITSTREAM_MANIFEST_VERSION = 0
+# Re-export `tiliqua-manifest` types.
+from rs.manifest.src.lib import BitstreamManifest as BitstreamManifest
+from rs.manifest.src.lib import MemoryRegion as MemoryRegion
+from rs.manifest.src.lib import ExternalPLLConfig as ExternalPLLConfig
 
 class FirmwareLocation(str, enum.Enum):
     BRAM      = "bram"
     SPIFlash  = "spiflash"
     PSRAM     = "psram"
 
-@dataclass_json
-@dataclass
-class MemoryRegion:
-    filename: str
-    spiflash_src: int
-    psram_dst: Optional[int]
-    size: int
-    crc: int
 
-@dataclass_json
-@dataclass
-class BitstreamManifest:
-    name: str
-    version: int
-    sha: str
-    brief: str
-    video: str
-    regions: List[MemoryRegion]
+class AudioClock(str, enum.Enum):
+    FINE_48KHZ  = "fine_48khz"
+    FINE_192KHZ = "fine_192khz"
+    COARSE_48KHZ  = "coarse_48khz"
+    COARSE_192KHZ = "coarse_192khz"
+
+    def mclk(self):
+        return {
+            self.FINE_48KHZ: 12_288_000,
+            self.FINE_192KHZ: 49_152_000,
+            self.COARSE_48KHZ: 12_500_000, # These don't need an extra PLL.
+            self.COARSE_192KHZ: 50_000_000,
+        }[self]
+
+    def fs(self):
+        return self.mclk() // 256
+
+    def to_192khz(self):
+        return {
+            self.FINE_48KHZ: self.FINE_192KHZ,
+            self.COARSE_48KHZ: self.COARSE_192KHZ,
+        }[self]
+
+    def is_192khz(self):
+        return self in [
+            self.FINE_192KHZ,
+            self.COARSE_192KHZ,
+        ]

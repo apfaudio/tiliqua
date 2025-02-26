@@ -50,16 +50,17 @@ class USB2HostTest(Elaboratable):
 
     brief = "USB host MIDI to CV conversion (EXPERIMENT)."
 
-    def __init__(self, usb_device_config_id, usb_midi_bulk_endp_id):
+    def __init__(self, clock_settings, usb_device_config_id, usb_midi_bulk_endp_id):
         self.usb_device_config_id = usb_device_config_id
         self.usb_midi_bulk_endp_id = usb_midi_bulk_endp_id
+        self.clock_settings = clock_settings
         super().__init__()
 
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.car = car = platform.clock_domain_generator()
-        m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
+        m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
+        m.submodules.reboot = reboot = RebootProvider(car.settings.frequencies.sync)
         m.submodules.btn = FFSynchronizer(
                 platform.request("encoder").s.i, reboot.button)
 
@@ -76,8 +77,7 @@ class USB2HostTest(Elaboratable):
 
         m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
         m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                hardware_r33=True,
-                touch_enabled=False)
+                car.settings.audio_clock)
         wiring.connect(m, pmod0.pins, pmod0_provider.pins)
         m.d.comb += pmod0.codec_mute.eq(reboot.mute)
 

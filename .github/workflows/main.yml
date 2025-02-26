@@ -13,48 +13,58 @@ jobs:
           pdm test
         working-directory: gateware
 
-  build:
+  build-bootloader:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         config:
           - name: bootloader
             cmd: bootloader build --fw-location=spiflash
+        hw_rev: ["r2", "r3", "r4"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pdm-project/setup-pdm@v4
+      - run: git submodule update --init --recursive
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy, llvm-tools
+          targets: riscv32im-unknown-none-elf
+      - run: |
+          cargo install cargo-binutils form
+          cargo install svd2rust --locked
+      - name: Install PDM dependencies
+        run: pdm install
+        working-directory: gateware
+      - name: Build ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        working-directory: gateware
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.config.name }}-${{ matrix.hw_rev }}.zip
+          path: gateware/build/*-*-*.tar.gz
+          retention-days: 1
+
+  build-soc-bitstream:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
           - name: selftest
             cmd: selftest build
           - name: xbeam
-            cmd: xbeam build
+            cmd: xbeam build --fs-192khz
           - name: polysyn
             cmd: polysyn build
           - name: macro-osc
             cmd: macro_osc build
           - name: sid
             cmd: sid build
-          - name: usb-audio
-            cmd: usb_audio build
-          - name: usb-host
-            cmd: usb_host build --midi-device arturia-keylab49-mkii
-          - name: dsp-nco
-            cmd: dsp build --dsp-core nco
-          - name: dsp-diffuser
-            cmd: dsp build --dsp-core psram_diffuser
-          - name: dsp-diffuser-sim
-            cmd: dsp sim --dsp-core psram_diffuser
-          - name: dsp-midicv
-            cmd: dsp build --dsp-core midicv
-          - name: vectorscope
-            cmd: vectorscope_no_soc build
-          - name: vectorscope-sim
-            cmd: vectorscope_no_soc sim
-          - name: bootstub
-            cmd: bootstub build --bootaddr 0x100000
-        hw_rev: ["", "--hw3"]
+        hw_rev: ["r4"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
-      - uses: YosysHQ/setup-oss-cad-suite@v3
       - run: git submodule update --init --recursive
-      # Setup Rust
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -66,17 +76,73 @@ jobs:
       - name: Install PDM dependencies
         run: pdm install
         working-directory: gateware
-      - name: Build ${{ matrix.config.cmd }} ${{ matrix.hw_rev }}
-        run: pdm ${{ matrix.config.cmd }} ${{ matrix.hw_rev }}
+      - name: Build ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
         working-directory: gateware
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.config.name }}-${{ matrix.hw_rev == '--hw3' && 'r3' || 'r2' }}.zip
+          name: ${{ matrix.config.name }}-${{ matrix.hw_rev }}.zip
           path: gateware/build/*-*-*.tar.gz
           retention-days: 1
 
+  build-bitstream:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - name: usb-audio
+            cmd: usb_audio build
+          - name: usb-host
+            cmd: usb_host build --midi-device arturia-keylab49-mkii
+          - name: dsp-nco
+            cmd: dsp build --dsp-core nco
+          - name: dsp-diffuser
+            cmd: dsp build --dsp-core psram_diffuser
+          - name: vectorscope
+            cmd: vectorscope_no_soc build --fs-192khz
+          - name: bootstub
+            cmd: bootstub build --bootaddr 0x100000
+        hw_rev: ["r2", "r3", "r4"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pdm-project/setup-pdm@v4
+      - run: git submodule update --init --recursive
+      - name: Install PDM dependencies
+        run: pdm install
+        working-directory: gateware
+      - name: Build ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        working-directory: gateware
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.config.name }}-${{ matrix.hw_rev }}.zip
+          path: gateware/build/*-*-*.tar.gz
+          retention-days: 1
+
+  sim-bitstream:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - name: dsp-diffuser-sim
+            cmd: dsp sim --dsp-core psram_diffuser
+          - name: vectorscope-sim
+            cmd: vectorscope_no_soc sim --fs-192khz
+        hw_rev: ["r2", "r3", "r4"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pdm-project/setup-pdm@v4
+      - uses: YosysHQ/setup-oss-cad-suite@v3
+      - run: git submodule update --init --recursive
+      - name: Install PDM dependencies
+        run: pdm install
+        working-directory: gateware
+      - name: Build ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
+        working-directory: gateware
+
   package-artifacts:
-    needs: build
+    needs: [build-bootloader, build-bitstream, build-soc-bitstream]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

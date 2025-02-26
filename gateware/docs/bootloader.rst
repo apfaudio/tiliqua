@@ -28,7 +28,8 @@ First-time setup
 .. code-block:: bash
 
     # Flash bootloader to start of flash, build assuming XIP (execute directly from SPI flash, not PSRAM)
-    pdm bootloader build --fw-location=spiflash --resolution 1280x720p60
+    # Be careful to replace `--hw r4` with your hardware revision!
+    pdm bootloader build --hw r4 --fw-location=spiflash --resolution 1280x720p60
     pdm flash archive build/bootloader-*.tar.gz
 
 3. Build and flash any other bitstreams you want to slots 0..7 (you can also download these archives from CI artifacts):

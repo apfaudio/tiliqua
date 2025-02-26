@@ -14,3 +14,6 @@ rustflags = [
 
 [build]
 target = "riscv32imac-unknown-none-elf"
+
+[alias]
+test_linux = "test --target=x86_64-unknown-linux-gnu --features=log"

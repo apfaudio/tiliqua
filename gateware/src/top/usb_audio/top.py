@@ -62,8 +62,9 @@ class USB2AudioInterface(Elaboratable):
     MAX_PACKET_SIZE = int(224 // 8 * NR_CHANNELS)
     MAX_PACKET_SIZE_MIDI = 64
 
-    def __init__(self, **kwargs):
+    def __init__(self, clock_settings):
         super().__init__()
+        self.clock_settings = clock_settings
 
     def create_descriptors(self):
         """ Creates the descriptors that describe our audio topology. """
@@ -326,8 +327,8 @@ class USB2AudioInterface(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.car = car = platform.clock_domain_generator()
-        m.submodules.reboot = reboot = RebootProvider(car.clocks_hz["sync"])
+        m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
+        m.submodules.reboot = reboot = RebootProvider(car.settings.frequencies.sync)
         m.submodules.btn = FFSynchronizer(
                 platform.request("encoder").s.i, reboot.button)
 
@@ -488,8 +489,7 @@ class USB2AudioInterface(Elaboratable):
         ]
 
         m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
-        m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(
-                hardware_r33=True)
+        m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
         wiring.connect(m, pmod0.pins, pmod0_provider.pins)
         m.d.comb += pmod0.codec_mute.eq(reboot.mute)
 

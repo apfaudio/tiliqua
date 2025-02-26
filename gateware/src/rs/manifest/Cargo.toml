@@ -1,28 +1,24 @@
 [package]
-name = "tiliqua-lib"
+name = "tiliqua-manifest"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "tiliqua_lib"
+name = "tiliqua_manifest"
 path = "src/lib.rs"
 
 [dependencies]
 log = "0.4.17"
-embedded-graphics = "0.8.1"
 heapless = "0.8.0"
 strum_macros = "0.26.4"
 strum = {version = "0.25.0", features = ["derive"], default-features=false}
 micromath = "2.1.0"
 fixed = "1.28.0"
-midi-types = "0.1.7"
-tiliqua-hal = { path="../hal", default-features = false }
-opts = { path="../opts" }
-embedded-hal = "=1.0.0"
+serde-json-core = "0.6.0"
+serde = { version="1.0.214", default-features=false }
 
 [dev-dependencies]
 critical-section = { version = "1.1.2", features = ["std"] }
-image = "0.24.7"
 env_logger = "0.11.6"
 
 [profile.release]
