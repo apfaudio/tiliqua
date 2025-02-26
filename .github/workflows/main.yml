@@ -60,7 +60,7 @@ jobs:
             cmd: macro_osc build
           - name: sid
             cmd: sid build
-        hw_rev: ["r4"]
+        hw_rev: ["r2"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
