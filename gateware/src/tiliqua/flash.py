@@ -7,6 +7,7 @@ See docs/bootloader.rst for implementation details and flash memory layout.
 """
 
 import argparse
+import glob
 import json
 import os
 import subprocess
@@ -339,6 +340,11 @@ def main():
 
     status_parser = subparsers.add_parser('status', help='Display current bitstream status')
 
+    # TODO: Also auto-download package, bootstrap RP2040 with this command?
+    bootstrap_parser = subparsers.add_parser(
+            'bootstrap', help='Bootstrap bootloader and all slots (requires CI package extracted to ./build/ !).')
+    bootstrap_parser.add_argument("--hw", type=str, default="r4", help="Hardware revision suffix {r2, r3, r4}")
+
     args = parser.parse_args()
 
     if args.command == 'archive':
@@ -351,6 +357,25 @@ def main():
         flash_archive(args.archive_path, args.slot, args.noconfirm)
     elif args.command == 'status':
         flash_status()
+    elif args.command == 'bootstrap':
+        path_template = "build/{name}-*-{hw_rev}.tar.gz"
+        bootloader_archive = glob.glob(
+                path_template.format(name="bootloader", hw_rev=args.hw))[0]
+        flash_archive(bootloader_archive, None, True)
+        bootstrap_bitstreams = [
+            "selftest",
+            "polysyn",
+            "xbeam",
+            "macro-osc",
+            "sid",
+            "usb-audio",
+            "dsp-nco",
+            "vectorscope-no-soc",
+        ]
+        for i, bs in enumerate(bootstrap_bitstreams):
+            path_archive = glob.glob(
+                    path_template.format(name=bs, hw_rev=args.hw))[0]
+            flash_archive(path_archive, i, True)
 
 if __name__ == "__main__":
     main()
