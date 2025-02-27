@@ -372,6 +372,7 @@ fn main() -> ! {
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    pmod.mute(true);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let mut opts = Opts::default();
@@ -446,7 +447,6 @@ fn main() -> ! {
             }
 
             if let Some(_) = reboot_n {
-                pmod.mute(true);
                 print_rebooting(&mut display, &mut rng);
             }
         }

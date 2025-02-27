@@ -28,21 +28,16 @@ BOOTLOADER_BITSTREAM_ADDR = 0x000000
 FIRMWARE_BASE_SLOT0      = 0x1B0000
 FLASH_PAGE_SIZE          = 1024 # 1KB
 
-def flash_file(file_path, offset, file_type="auto", dry_run=True):
+def flash_cmd(file_path, offset, file_type="auto"):
     """Flash a file to the specified offset using openFPGALoader."""
     cmd = [
         "sudo", "openFPGALoader", "-c", "dirtyJtag",
-        "-f", "-o", f"{hex(offset)}",
+        "-f", "--skip-reset", "-o", f"{hex(offset)}",
     ]
     if file_type != "auto":
         cmd.extend(["--file-type", file_type])
     cmd.append(file_path)
-    if dry_run:
-        return cmd
-    else:
-        print(f"Flashing to {hex(offset)}:")
-        print("\t$", " ".join(cmd))
-        subprocess.check_call(cmd)
+    return cmd
 
 def check_region_overlaps(regions, slot=None):
     """
@@ -120,10 +115,9 @@ def flash_archive(archive_path, slot=None, noconfirm=False):
                 print("\nPreparing to flash XIP firmware bitstream to bootloader slot...")
                 # Collect commands for bootloader location
                 commands_to_run.append(
-                    flash_file(
+                    flash_cmd(
                         os.path.join(tmpdir, "top.bit"),
                         BOOTLOADER_BITSTREAM_ADDR,
-                        dry_run=True
                     )
                 )
                 # Add bootloader bitstream region
@@ -139,11 +133,10 @@ def flash_archive(archive_path, slot=None, noconfirm=False):
                     if "filename" not in region:
                         continue
                     commands_to_run.append(
-                        flash_file(
+                        flash_cmd(
                             os.path.join(tmpdir, region["filename"]),
                             region["spiflash_src"],
                             "raw",
-                            dry_run=True
                         )
                     )
                     regions_to_check.append({
@@ -197,29 +190,26 @@ def flash_archive(archive_path, slot=None, noconfirm=False):
 
                 # Collect all commands
                 commands_to_run.append(
-                    flash_file(
+                    flash_cmd(
                         os.path.join(tmpdir, "top.bit"),
                         bitstream_addr,
-                        dry_run=True
                     )
                 )
                 commands_to_run.append(
-                    flash_file(
+                    flash_cmd(
                         manifest_path,
                         manifest_addr,
                         "raw",
-                        dry_run=True
                     )
                 )
                 for region in manifest["regions"]:
                     if "filename" not in region or "spiflash_src" not in region:
                         continue
                     commands_to_run.append(
-                        flash_file(
+                        flash_cmd(
                             os.path.join(tmpdir, region["filename"]),
                             region["spiflash_src"],
                             "raw",
-                            dry_run=True
                         )
                     )
 
@@ -236,6 +226,9 @@ def flash_archive(archive_path, slot=None, noconfirm=False):
             if has_overlap:
                 print(f"Error: {error_msg}")
                 sys.exit(1)
+
+            # Issue reset on last command
+            commands_to_run[-1].remove('--skip-reset')
 
             # Show all commands and get confirmation
             print("\nThe following commands will be executed:")
