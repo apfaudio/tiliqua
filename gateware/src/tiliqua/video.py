@@ -338,14 +338,6 @@ class FramebufferPHY(wiring.Component):
         if sim.is_hw(platform):
 
             # DVI PHY (not needed for simulation).
-
-            def add_sv(f):
-                path = os.path.join("src/vendor/dvi", f)
-                platform.add_file(f"build/{f}", open(path))
-
-            add_sv("tmds_encoder_dvi.sv")
-            add_sv("dvi_generator.sv")
-
             dvi_pins = platform.request("dvi")
 
             # Register all DVI timing signals to cut timing path.
