@@ -20,7 +20,7 @@ from amaranth_soc          import wishbone
 
 from dataclasses           import dataclass
 
-from tiliqua               import sim
+from tiliqua               import sim, dvi
 
 @dataclass
 class DVIPLL:
@@ -377,25 +377,24 @@ class FramebufferPHY(wiring.Component):
                 m.d.dvi += s_dvi_vsync.eq(dvi_tgen.vsync),
 
             # Instantiate the DVI PHY itself
-            # TODO: port this to Amaranth as well!
-            m.submodules.dvi_gen = Instance("dvi_generator",
-                i_rst_pix = ResetSignal("dvi"),
-                i_clk_pix = ClockSignal("dvi"),
-                i_clk_pix_5x = ClockSignal("dvi5x"),
-
-                i_de = s_dvi_de,
-                i_data_in_ch0 = s_dvi_b,
-                i_data_in_ch1 = s_dvi_g,
-                i_data_in_ch2 = s_dvi_r,
-                i_ctrl_in_ch0 = Cat(s_dvi_hsync, s_dvi_vsync),
-                i_ctrl_in_ch1 = 0,
-                i_ctrl_in_ch2 = 0,
-
-                o_tmds_clk_serial = dvi_pins.ck.o,
-                o_tmds_ch0_serial = dvi_pins.d0.o,
-                o_tmds_ch1_serial = dvi_pins.d1.o,
-                o_tmds_ch2_serial = dvi_pins.d2.o,
-            )
+            m.submodules.dvi_gen = dvi_gen = dvi.DVIGenerator()
+            m.d.comb += [
+                # Video signals
+                dvi_gen.de.eq(s_dvi_de),
+                # Channel data
+                dvi_gen.data_in_ch0.eq(s_dvi_b),
+                dvi_gen.data_in_ch1.eq(s_dvi_g),
+                dvi_gen.data_in_ch2.eq(s_dvi_r),
+                # Control signals
+                dvi_gen.ctrl_in_ch0.eq(Cat(s_dvi_hsync, s_dvi_vsync)),
+                dvi_gen.ctrl_in_ch1.eq(0),
+                dvi_gen.ctrl_in_ch2.eq(0),
+                # TMDS outputs
+                dvi_pins.ck.o.eq(dvi_gen.tmds_clk_serial),
+                dvi_pins.d0.o.eq(dvi_gen.tmds_ch0_serial),
+                dvi_pins.d1.o.eq(dvi_gen.tmds_ch1_serial),
+                dvi_pins.d2.o.eq(dvi_gen.tmds_ch2_serial)
+            ]
 
         # DMA master bus
         bus = self.bus
