@@ -11,11 +11,15 @@ from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-class TMDSEncoderDVI(wiring.Component):
+from tiliqua import sim
+
+class TMDSEncoder(wiring.Component):
     """
-    TMDS (Transition Minimized Differential Signaling) Encoder for DVI
+    TMDS (Transition Minimized Differential Signaling) Encoder for DVI.
     This component encodes 8-bit color data and 2-bit control data into
     10-bit TMDS symbols according to the DVI specification.
+
+    This component operates in a `dvi` domain running at the pixel clock.
     """
 
     data_in: In(8)    # Color data
@@ -122,20 +126,15 @@ class TMDSEncoderDVI(wiring.Component):
 
         return m
 
-class DVIGenerator(wiring.Component):
+class DVIPHY(wiring.Component):
     """
-    DVI Generator module for ECP5
+    DVI PHY, outputs currently ECP5-specific
 
-    This component generates DVI signals by encoding data using TMDS encoders
-    and serializing it for output.
-
-    Note: Assumes existing clock domains 'dvi' (pixel clock) and 'dvi5x' (5x pixel clock)
+    Note: Assumes clock domains 'dvi' (pixel clock) and 'dvi5x' (5x pixel clock)
     """
-
-    # Video signals
-    de: In(1)          # Data enable (high when drawing)
 
     # Channel data and control inputs
+    de: In(1)          # Data enable (high when drawing)
     data_in_ch0: In(8)  # Channel 0 - data
     data_in_ch1: In(8)  # Channel 1 - data
     data_in_ch2: In(8)  # Channel 2 - data
@@ -143,23 +142,17 @@ class DVIGenerator(wiring.Component):
     ctrl_in_ch1: In(2)  # Channel 1 - control
     ctrl_in_ch2: In(2)  # Channel 2 - control
 
-    # Serial TMDS outputs
-    tmds_ch0_serial: Out(1)  # Channel 0 - serial TMDS
-    tmds_ch1_serial: Out(1)  # Channel 1 - serial TMDS
-    tmds_ch2_serial: Out(1)  # Channel 2 - serial TMDS
-    tmds_clk_serial: Out(1)  # Clock - serial TMDS
-
     def elaborate(self, platform):
         m = Module()
 
-        # TMDS encoded signals
+        # TMDS encoders for each channel
+        m.submodules.encode_ch0 = encode_ch0 = TMDSEncoder()
+        m.submodules.encode_ch1 = encode_ch1 = TMDSEncoder()
+        m.submodules.encode_ch2 = encode_ch2 = TMDSEncoder()
+
         tmds_ch0 = Signal(10)
         tmds_ch1 = Signal(10)
         tmds_ch2 = Signal(10)
-        # Instantiate TMDS encoders for each channel
-        m.submodules.encode_ch0 = encode_ch0 = TMDSEncoderDVI()
-        m.submodules.encode_ch1 = encode_ch1 = TMDSEncoderDVI()
-        m.submodules.encode_ch2 = encode_ch2 = TMDSEncoderDVI()
 
         # Connect TMDS encoder inputs
         m.d.comb += [
@@ -217,31 +210,33 @@ class DVIGenerator(wiring.Component):
                 tmds_ch2_shift.eq(Cat(tmds_ch2_shift[2:10], Const(0, 2)))
             ]
 
-        m.submodules += Instance("ODDRX1F",
-            i_D0=tmds_ch0_shift[0],
-            i_D1=tmds_ch0_shift[1],
-            i_SCLK=ClockSignal("dvi5x"),
-            i_RST=Const(0, 1),
-            o_Q=self.tmds_ch0_serial
-        )
-
-        m.submodules += Instance("ODDRX1F",
-            i_D0=tmds_ch1_shift[0],
-            i_D1=tmds_ch1_shift[1],
-            i_SCLK=ClockSignal("dvi5x"),
-            i_RST=Const(0, 1),
-            o_Q=self.tmds_ch1_serial
-        )
-
-        m.submodules += Instance("ODDRX1F",
-            i_D0=tmds_ch2_shift[0],
-            i_D1=tmds_ch2_shift[1],
-            i_SCLK=ClockSignal("dvi5x"),
-            i_RST=Const(0, 1),
-            o_Q=self.tmds_ch2_serial
-        )
+        if sim.is_hw(platform):
+            dvi_pins = platform.request("dvi")
+            m.submodules += [
+                Instance("ODDRX1F",
+                    i_D0=tmds_ch0_shift[0],
+                    i_D1=tmds_ch0_shift[1],
+                    i_SCLK=ClockSignal("dvi5x"),
+                    i_RST=Const(0, 1),
+                    o_Q=dvi_pins.d0.o
+                ),
+                Instance("ODDRX1F",
+                    i_D0=tmds_ch1_shift[0],
+                    i_D1=tmds_ch1_shift[1],
+                    i_SCLK=ClockSignal("dvi5x"),
+                    i_RST=Const(0, 1),
+                    o_Q=dvi_pins.d1.o
+                ),
+                Instance("ODDRX1F",
+                    i_D0=tmds_ch2_shift[0],
+                    i_D1=tmds_ch2_shift[1],
+                    i_SCLK=ClockSignal("dvi5x"),
+                    i_RST=Const(0, 1),
+                    o_Q=dvi_pins.d2.o
+                ),
+            ]
 
         # Clock output
-        m.d.comb += self.tmds_clk_serial.eq(ClockSignal("dvi"))
+        m.d.comb += dvi_pins.ck.o.eq(ClockSignal("dvi"))
 
         return m
