@@ -337,9 +337,6 @@ class FramebufferPHY(wiring.Component):
 
         if sim.is_hw(platform):
 
-            # DVI PHY (not needed for simulation).
-            dvi_pins = platform.request("dvi")
-
             # Register all DVI timing signals to cut timing path.
             s_dvi_de = Signal()
             s_dvi_b = Signal(unsigned(8))
@@ -369,23 +366,17 @@ class FramebufferPHY(wiring.Component):
                 m.d.dvi += s_dvi_vsync.eq(dvi_tgen.vsync),
 
             # Instantiate the DVI PHY itself
-            m.submodules.dvi_gen = dvi_gen = dvi.DVIGenerator()
+            m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
             m.d.comb += [
-                # Video signals
                 dvi_gen.de.eq(s_dvi_de),
-                # Channel data
+                # RGB -> TMDS
                 dvi_gen.data_in_ch0.eq(s_dvi_b),
                 dvi_gen.data_in_ch1.eq(s_dvi_g),
                 dvi_gen.data_in_ch2.eq(s_dvi_r),
-                # Control signals
+                # VSYNC/HSYNC -> TMDS
                 dvi_gen.ctrl_in_ch0.eq(Cat(s_dvi_hsync, s_dvi_vsync)),
                 dvi_gen.ctrl_in_ch1.eq(0),
                 dvi_gen.ctrl_in_ch2.eq(0),
-                # TMDS outputs
-                dvi_pins.ck.o.eq(dvi_gen.tmds_clk_serial),
-                dvi_pins.d0.o.eq(dvi_gen.tmds_ch0_serial),
-                dvi_pins.d1.o.eq(dvi_gen.tmds_ch1_serial),
-                dvi_pins.d2.o.eq(dvi_gen.tmds_ch2_serial)
             ]
 
         # DMA master bus
