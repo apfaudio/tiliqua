@@ -753,6 +753,7 @@ class EurorackPmod(wiring.Component):
     jack: Out(8)
     touch_err: Out(8) # Roughly proportional to touch IC NACKs (0 is good)
     codec_mute: In(1) # Hold at 1 to soft mute CODEC
+    hard_reset: In(1) # Strobe a 1 to hard reset the CODEC (pops!)
 
     # 1s for automatic audio -> LED control. 0s for manual.
     led_mode: In(8, init=0xff)
@@ -791,10 +792,12 @@ class EurorackPmod(wiring.Component):
         wiring.connect(m, wiring.flipped(self.i_cal), calibrator.i_cal)
 
         #
-        # I2C MASTER CONTROL
+        # I2C MASTER CONTROL (with global reset for CODEC re-init)
         #
 
-        m.submodules.i2c_master = i2c_master = self.i2c_master
+        reset_i2c_master = Signal()
+        m.submodules.i2c_master = i2c_master = ResetInserter(
+                {"sync": reset_i2c_master})(self.i2c_master)
 
         # Hook up I2C master pins
         wiring.connect(m, i2c_master.pins, wiring.flipped(self.pins.i2c))

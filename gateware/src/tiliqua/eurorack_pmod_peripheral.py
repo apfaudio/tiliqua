@@ -39,6 +39,7 @@ class Peripheral(wiring.Component):
 
     class FlagsReg(csr.Register, access="w"):
         mute: csr.Field(csr.action.W, unsigned(1))
+        hard_reset: csr.Field(csr.action.W, unsigned(1))
 
     class CalibrationConstant(csr.Register, access="w"):
         value: csr.Field(csr.action.W, signed(32))
@@ -101,6 +102,10 @@ class Peripheral(wiring.Component):
         m.d.comb += self.pmod.codec_mute.eq(mute_reg | self.mute)
         with m.If(self._flags.f.mute.w_stb):
             m.d.sync += mute_reg.eq(self._flags.f.mute.w_data)
+
+        with m.If(self._flags.f.hard_reset.w_stb & self._flags.f.hard_reset.w_data):
+            # Strobe PMOD hard reset.
+            m.d.comb += self.pmod.hard_reset.eq(1)
 
         with m.If(self._led_mode.f.led.w_stb):
             m.d.sync += self.pmod.led_mode.eq(self._led_mode.f.led.w_data)

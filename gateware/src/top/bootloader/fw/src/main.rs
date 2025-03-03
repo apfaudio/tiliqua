@@ -3,7 +3,7 @@
 
 use critical_section::Mutex;
 use core::convert::TryInto;
-use log::info;
+use log::{info, warn};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -335,6 +335,32 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     });
 }
 
+use embedded_hal::i2c::{I2c, Operation};
+
+// Mitigation for https://github.com/apfaudio/tiliqua/issues/81
+pub fn maybe_restart_codec<CodecI2c, Pmod>(i2cdev: &mut CodecI2c, pmod: &mut Pmod)
+where
+    CodecI2c: I2c,
+    Pmod: EurorackPmod
+{
+    const CODEC_ADDR: u8 = 0x10;
+    let mut rx_bytes = [0u8; 4];
+    let ret = i2cdev.transaction(
+        CODEC_ADDR, &mut [Operation::Write(&[0u8]),
+                          Operation::Read(&mut rx_bytes)]);
+    if ret.is_err() || rx_bytes[0] != 0x37 {
+        warn!("AK4619 needs hard reset. transaction returned: {:?}.", ret);
+        for n in 0usize..4usize {
+            warn!("@{}:0x{:x}", n, rx_bytes[n]);
+        }
+        warn!("Issuing AK4619 reset ...");
+        pmod.hard_reset();
+    } else {
+        info!("AK4619 looks healthy.");
+    }
+
+}
+
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -372,6 +398,7 @@ fn main() -> ! {
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    maybe_restart_codec(&mut i2cdev1, &mut pmod);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let mut opts = Opts::default();
@@ -392,6 +419,7 @@ fn main() -> ! {
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
     let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone(), maybe_external_pll)));
+
 
     handler!(timer0 = || timer0_handler(&app));
 
