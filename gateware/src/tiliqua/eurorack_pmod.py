@@ -605,7 +605,7 @@ class I2CMaster(wiring.Component):
 
             with m.State('STARTUP-DELAY'):
                 if platform is not None:
-                    with m.If(startup_delay == 600_000):
+                    with m.If(startup_delay == 2**22): # ~70ms
                         m.next = init
                     with m.Else():
                         m.d.sync += startup_delay.eq(startup_delay+1)
@@ -832,19 +832,43 @@ class EurorackPmod(wiring.Component):
                 m.d.sync += i2c_master.led[n].eq(self.led[n]),
 
         #
-        # POWER / SOFT MUTE HANDLING
+        # CODEC PDN / FLIP-FLOP CLOCKING
+        #
+        # `eurorack-pmod` PCBA has a 'PDN' pin, which drives the CODEC PDN
+        # pin. Between the ECP5 and the PDN pin is a flip-flop, such that
+        # FPGA bitstream reconfiguration does not imply PDN toggling
+        # (which causes a CODEC hard reset). Instead, for pop-free bitstream
+        # switching (only on mobo R3+), we can sequence the flip-flop inputs
+        # as needed.
+        #
+        # Note: CODEC RSTN must be asserted (held in reset) across the
+        # FPGA reconfiguration. This is performed by `self.codec_mute`.
+        #
+        # TIMING
+        # ------
+        #
+        # PDN_D   : ____________------------
+        # PDN_CLK : ______------______------
+        #           |           |
+        #           ^ hard reset|
+        #                       |
+        #                       ^ soft reset
+        #
+        # hard reset: ensures flip-flop output is driven 0->1
+        # soft reset: if flip-flop output was 1, it stays 1
         #
 
-        # PDN (and clocking for mobo R3+ for pop-free bitstream switching)
-        m.d.comb += self.pins.pdn_d.eq(1),
-        # Drive external flip-flop, ensuring PDN remains high across
-        # FPGA reconfiguration (pdn_clk only exists on mobo R3+).
-        # Codec RSTN must be asserted (held in reset) across the
-        # FPGA reconfiguration. This is performed by `self.codec_mute`.
-        pdn_cnt = Signal(unsigned(16))
-        with m.If(pdn_cnt != 60000): # 1ms
+        # soft reset by default
+        pdn_cnt = Signal(unsigned(32), init=(1<<20))
+        m.d.comb += [
+            self.pins.pdn_clk.eq(pdn_cnt[19]),
+            self.pins.pdn_d  .eq(pdn_cnt[20]), # 2b11 @ ~35msec
+        ]
+        with m.If(~(self.pins.pdn_d & self.pins.pdn_clk)):
             m.d.sync += pdn_cnt.eq(pdn_cnt+1)
-        with m.If(3000 < pdn_cnt):
-            m.d.comb += self.pins.pdn_clk.eq(1)
+        with m.Elif(self.hard_reset):
+            # hard reset only if requested
+            m.d.sync += pdn_cnt.eq(0)
+            m.d.comb += reset_i2c_master.eq(1)
 
         return m
