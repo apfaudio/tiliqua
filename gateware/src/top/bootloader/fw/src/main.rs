@@ -387,6 +387,11 @@ fn main() -> ! {
         None
     };
 
+    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    maybe_restart_codec(&mut i2cdev1, &mut pmod);
+    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+
     let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
     for n in 0usize..N_MANIFESTS {
         let size: usize = MANIFEST_SIZE;
@@ -395,11 +400,6 @@ fn main() -> ! {
         info!("(entry {}) look for manifest from {:#x} to {:#x}", n, addr, addr+size);
         manifests[n] = BitstreamManifest::from_addr(addr, size);
     }
-
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
-    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    maybe_restart_codec(&mut i2cdev1, &mut pmod);
-    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let mut opts = Opts::default();
     // Populate option string values with bitstream names from manifest.
