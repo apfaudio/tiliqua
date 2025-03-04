@@ -9,6 +9,7 @@ pub trait EurorackPmod {
     fn led_all_manual(&mut self);
     fn write_calibration_constant(&mut self, ch: u8, a: i32, b: i32);
     fn mute(&mut self, mute: bool);
+    fn hard_reset(&mut self);
 }
 
 #[macro_export]
@@ -111,6 +112,10 @@ macro_rules! impl_eurorack_pmod {
 
                 fn mute(&mut self, mute: bool) {
                     self.registers.flags().write(|w| w.mute().bit(mute) );
+                }
+
+                fn hard_reset(&mut self) {
+                    self.registers.flags().write(|w| w.hard_reset().bit(true) );
                 }
             }
         )+
