@@ -188,6 +188,39 @@ DVI_TIMINGS = {
     ),
 }
 
+class FramebufferSimulationInterface(wiring.Signature):
+    def __init__(self, coord_width=16):
+        super().__init__({
+            "x": Out(coord_width),
+            "y": Out(coord_width),
+            "r": Out(8),
+            "g": Out(8),
+            "b": Out(8),
+        })
+
+class DVITimingInterface(wiring.Signature):
+    def __init__(self, coord_width=16):
+        super().__init__({
+            "h_active":      Out(coord_width),
+            "h_sync_start":  Out(coord_width),
+            "h_sync_end":    Out(coord_width),
+            "h_total":       Out(coord_width),
+            "h_sync_invert": Out(1),
+            "v_active"       Out(coord_width),
+            "v_sync_start"   Out(coord_width),
+            "v_sync_end"     Out(coord_width),
+            "v_total"        Out(coord_width),
+            "v_sync_invert"  Out(1),
+        })
+
+class DVIControlSignals(wiring.Signature):
+    def __init__(self):
+        super().__init__({
+            "hsync": Out(1),
+            "vsync": Out(1),
+            "de":    Out(1),
+        })
+
 class DVITimingGenerator(wiring.Component):
 
     """
@@ -198,8 +231,24 @@ class DVITimingGenerator(wiring.Component):
     other signals (e.g. framebuffer vsync). Inversion is handled just before the PHY.
     """
 
-    def __init__(self, timings: DVITimings, coord_width=16):
-        self.timings = timings
+    def __init__(self):
+
+        super().__init__({
+            "timings": In(DVITimingInterface()),
+            "x": Out(signed(coord_width), reset=self.h_reset),
+            "y": Out(signed(coord_width), reset=self.v_reset),
+            # Control signals without inversion applied.
+            # Useful for driving logic external to this core (e.g. do something
+            # based on vsync, without having to worry the display might invert it).
+            "ctrl": Out(DVIControlSignals()),
+            # Control signals with inversion applied.
+            "ctrl_phy": Out(DVIControlSignals()),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        timings = self.timings
 
         # coordinates at which each frame starts
         self.h_reset = timings.h_active - timings.h_total
@@ -211,19 +260,6 @@ class DVITimingGenerator(wiring.Component):
         self.hs_end   = timings.h_sync_end   - timings.h_total
         self.vs_end   = timings.v_sync_end   - timings.v_total
 
-        super().__init__({
-            "x": Out(signed(coord_width), reset=self.h_reset),
-            "y": Out(signed(coord_width), reset=self.v_reset),
-            "hsync": Out(unsigned(1)),
-            "vsync": Out(unsigned(1)),
-            "de": Out(unsigned(1)),
-        })
-
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        timings = self.timings
-
         with m.If(self.x == (timings.h_active-1)):
             m.d.sync += self.x.eq(self.h_reset)
             with m.If(self.y == (timings.v_active-1)):
@@ -233,15 +269,23 @@ class DVITimingGenerator(wiring.Component):
         with m.Else():
             m.d.sync += self.x.eq(self.x+1)
 
-        # Note: sync inversion is not here and must be handled before the PHY.
+        # Generate all control signals based on index.
+        # Sync inversion must be handled before the PHY (see below).
         m.d.comb += [
-            self.hsync.eq((self.x >= self.hs_start) & (self.x < self.hs_end)),
-            self.vsync.eq((self.y > self.vs_start) &
-                          (self.y < self.vs_end) |
-                          ((self.y == self.vs_start) & (self.x >= self.hs_start)) |
-                          ((self.y == self.vs_end)   & (self.x < self.hs_start))),
-            self.de.eq((self.x >= 0) & (self.y >= 0)),
+            self.ctrl.hsync.eq((self.x >= self.hs_start) & (self.x < self.hs_end)),
+            self.ctrl.vsync.eq((self.y > self.vs_start) &
+                               (self.y < self.vs_end) |
+                               ((self.y == self.vs_start) & (self.x >= self.hs_start)) |
+                               ((self.y == self.vs_end)   & (self.x < self.hs_start))),
+            self.ctrl.de.eq((self.x >= 0) & (self.y >= 0)),
 
+        ]
+
+        # Apply inversion where required.
+        m.d.comb += [
+            self.ctrl_phy.de.eq(self.ctrl.de),
+            self.ctrl_phy.hsync.eq(self.ctrl.hsync ^ self.timings.h_sync_invert),
+            self.ctrl_phy.vsync.eq(self.ctrl.vsync ^ self.timings.h_sync_invert),
         ]
 
         return m
@@ -257,43 +301,35 @@ class FramebufferPHY(wiring.Component):
     Pixel storage itself is 8-bits: 4-bit intensity, 4-bit color.
     """
 
-    def __init__(self, *, dvi_timings: DVITimings, fb_base, bus_master,
+    def __init__(self, *, default_timings: DVITimings, fb_base, bus_master,
                  fb_size, fifo_depth=2048, fb_bytes_per_pixel=1):
 
+        self.default_timings = default_timings
         self.fifo_depth = fifo_depth
         self.fb_base = fb_base
-        self.fb_hsize, self.fb_vsize = fb_size
         self.fb_bytes_per_pixel = fb_bytes_per_pixel
 
-        # We are a DMA master
-        self.bus = wishbone.Interface(addr_width=bus_master.addr_width, data_width=32, granularity=8,
-                                      features={"cti", "bte"})
-
-        # FIFO to cache pixels from PSRAM.
-        self.fifo = AsyncFIFOBuffered(width=32, depth=fifo_depth, r_domain='dvi', w_domain='sync')
-
-        # Kick this to start the core
-        self.enable = Signal(1, reset=0)
-
-        # Tracking in DVI domain
-        self.dvi_tgen = DomainRenamer("dvi")(DVITimingGenerator(dvi_timings))
-        self.bytecounter = Signal(exact_log2(4//self.fb_bytes_per_pixel))
-        self.last_word   = Signal(32)
-        self.consume_started = Signal(1, reset=0)
-
-        # Current pixel color in DVI domain
-        self.phy_r = Signal(8)
-        self.phy_g = Signal(8)
-        self.phy_b = Signal(8)
+        default_fb_words = (self.fb_bytes_per_pixel * (default_timings.h_active*default_timings.v_active)) // 4
 
         # Color palette tweaking interface
         super().__init__({
+            # We are a DMA master
+            "bus":  Out(wishbone.Interface(addr_width=bus_master.addr_width, data_width=32, granularity=8,
+                                           features={"cti", "bte"})),
+            # Kick this to start the core
+            "enable": In(1),
+            # Must be updated on timing changes
+            "timings": In(DVITimingInterface()),
+            "fb_size_words": In(32, init=default_fb_words),
+            # Palette updates
             "palette_rgb": In(stream.Signature(data.StructLayout({
                 "position": unsigned(8),
                 "red":      unsigned(8),
                 "green":    unsigned(8),
                 "blue":     unsigned(8),
                 }))),
+            # Enough information to plot the output of this core to images
+            "simif": Out(FramebufferSimulationInterface())
         })
 
     @staticmethod
@@ -321,72 +357,23 @@ class FramebufferPHY(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        m.submodules.fifo = self.fifo
-        m.submodules.dvi_tgen = dvi_tgen = self.dvi_tgen
-
-        # 'dvi' domain
-        phy_r = self.phy_r
-        phy_g = self.phy_g
-        phy_b = self.phy_b
+        m.submodules.fifo = fifo = AsyncFIFOBuffered(
+                width=32, depth=self.fifo_depth, r_domain='dvi', w_domain='sync')
+        m.submodules.dvi_tgen = dvi_tgen = DomainRenamer("dvi")(DVITimingGenerator(dvi_timings))
+        # TODO: FFSync needed? (sync -> dvi crossing, but should always be in reset when changed).
+        wiring.connect(m, wiring.flipped(self.timings), dvi_tgen.timings)
 
         # Create a VSync signal in the 'sync' domain.
         # NOTE: this is the same regardless of sync inversion.
         phy_vsync_sync = Signal()
         m.submodules.vsync_ff = FFSynchronizer(
-                i=dvi_tgen.vsync, o=phy_vsync_sync, o_domain="sync")
-
-        if sim.is_hw(platform):
-
-            # Register all DVI timing signals to cut timing path.
-            s_dvi_de = Signal()
-            s_dvi_b = Signal(unsigned(8))
-            s_dvi_g = Signal(unsigned(8))
-            s_dvi_r = Signal(unsigned(8))
-            m.d.dvi += [
-                s_dvi_de.eq(dvi_tgen.de),
-                s_dvi_r.eq(phy_r),
-                s_dvi_g.eq(phy_g),
-                s_dvi_b.eq(phy_b),
-            ]
-
-            # Sync inversion before sending to PHY if required.
-            # Better here than in DVITimingsGenerator itself in case
-            # the sync signal is used by other logic.
-
-            s_dvi_hsync = Signal()
-            if dvi_tgen.timings.h_sync_invert:
-                m.d.dvi += s_dvi_hsync.eq(~dvi_tgen.hsync),
-            else:
-                m.d.dvi += s_dvi_hsync.eq(dvi_tgen.hsync),
-
-            s_dvi_vsync = Signal()
-            if dvi_tgen.timings.v_sync_invert:
-                m.d.dvi += s_dvi_vsync.eq(~dvi_tgen.vsync),
-            else:
-                m.d.dvi += s_dvi_vsync.eq(dvi_tgen.vsync),
-
-            # Instantiate the DVI PHY itself
-            m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
-            m.d.comb += [
-                dvi_gen.de.eq(s_dvi_de),
-                # RGB -> TMDS
-                dvi_gen.data_in_ch0.eq(s_dvi_b),
-                dvi_gen.data_in_ch1.eq(s_dvi_g),
-                dvi_gen.data_in_ch2.eq(s_dvi_r),
-                # VSYNC/HSYNC -> TMDS
-                dvi_gen.ctrl_in_ch0.eq(Cat(s_dvi_hsync, s_dvi_vsync)),
-                dvi_gen.ctrl_in_ch1.eq(0),
-                dvi_gen.ctrl_in_ch2.eq(0),
-            ]
+                i=dvi_tgen.ctrl.vsync, o=phy_vsync_sync, o_domain="sync")
 
         # DMA master bus
         bus = self.bus
 
         # Current offset into the framebuffer
         dma_addr = Signal(32)
-
-        # Length of framebuffer in 32-bit words
-        fb_len_words = (self.fb_bytes_per_pixel * (self.fb_hsize*self.fb_vsize)) // 4
 
         # DMA bus master -> FIFO state machine
         # Burst until FIFO is full, then wait until half empty.
@@ -410,47 +397,49 @@ class FramebufferPHY(wiring.Component):
                     bus.we.eq(0),
                     bus.sel.eq(2**(bus.data_width//8)-1),
                     bus.adr.eq(self.fb_base + dma_addr),
-                    self.fifo.w_en.eq(bus.ack),
-                    self.fifo.w_data.eq(bus.dat_r),
+                    fifo.w_en.eq(bus.ack),
+                    fifo.w_data.eq(bus.dat_r),
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST),
                 ]
-                with m.If(self.fifo.w_level >= (self.fifo_depth-1)):
+                with m.If(fifo.w_level >= (fifo_depth-1)):
                     m.d.comb += bus.cti.eq(
                             wishbone.CycleType.END_OF_BURST)
-                with m.If(bus.stb & bus.ack & self.fifo.w_rdy):
-                    with m.If(dma_addr < (fb_len_words-1)):
+                with m.If(bus.stb & bus.ack & fifo.w_rdy):
+                    with m.If(dma_addr < (self.fb_size_words-1)):
                         m.d.sync += dma_addr.eq(dma_addr + 1)
                     with m.Else():
                         m.d.sync += dma_addr.eq(0)
-                with m.Elif(~self.fifo.w_rdy):
+                with m.Elif(~fifo.w_rdy):
                     m.next = 'WAIT'
             with m.State('WAIT'):
                 with m.If(~phy_vsync_sync):
                     m.d.sync += drained.eq(0)
                 with m.If(phy_vsync_sync & ~drained):
                     m.next = 'VSYNC'
-                with m.Elif(self.fifo.w_level < self.fifo_depth//2):
+                with m.Elif(fifo.w_level < fifo_depth//2):
                     m.next = 'BURST'
             with m.State('VSYNC'):
                 # drain DVI side. We only want to drain once.
                 m.d.comb += drain_fifo.eq(1)
-                with m.If(self.fifo.w_level == 0):
+                with m.If(fifo.w_level == 0):
                     m.d.sync += dma_addr.eq(0)
                     m.d.sync += drained.eq(1)
                     m.next = 'BURST'
 
+        # Tracking in DVI domain
+
         # 'dvi' domain: read FIFO -> DVI PHY (1 fifo word is N pixels)
-        bytecounter = self.bytecounter
-        last_word   = self.last_word
+        bytecounter = Signal(exact_log2(4//self.fb_bytes_per_pixel))
+        last_word   = Signal(32)
         with m.If(drain_fifo_dvi):
             m.d.dvi += bytecounter.eq(0)
-            m.d.comb += self.fifo.r_en.eq(1),
-        with m.Elif(dvi_tgen.de & self.fifo.r_rdy):
-            m.d.comb += self.fifo.r_en.eq(bytecounter == 0),
+            m.d.comb += fifo.r_en.eq(1),
+        with m.Elif(dvi_tgen.ctrl.de & fifo.r_rdy):
+            m.d.comb += fifo.r_en.eq(bytecounter == 0),
             m.d.dvi += bytecounter.eq(bytecounter+1)
             with m.If(bytecounter == 0):
-                m.d.dvi += last_word.eq(self.fifo.r_data)
+                m.d.dvi += last_word.eq(fifo.r_data)
             with m.Else():
                 m.d.dvi += last_word.eq(last_word >> 8)
 
@@ -468,12 +457,29 @@ class FramebufferPHY(wiring.Component):
         m.d.comb += rd_port_g.addr.eq(Cat(last_word[0:4], last_word[4:8]))
         m.d.comb += rd_port_b.addr.eq(Cat(last_word[0:4], last_word[4:8]))
 
-        # hook up to DVI PHY
-        m.d.comb += [
-            phy_r.eq(rd_port_r.data),
-            phy_g.eq(rd_port_g.data),
-            phy_b.eq(rd_port_b.data),
-        ]
+        if sim.is_hw(platform):
+            # Instantiate the DVI PHY itself
+            m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
+            m.d.sync += [
+                dvi_gen.de.eq(dvi_tgen.ctrl_phy.de),
+                # RGB -> TMDS
+                dvi_gen.data_in_ch0.eq(rd_port_r.data),
+                dvi_gen.data_in_ch1.eq(rd_port_g.data),
+                dvi_gen.data_in_ch2.eq(rd_port_b.data),
+                # VSYNC/HSYNC -> TMDS
+                dvi_gen.ctrl_in_ch0.eq(Cat(dvi_tgen.ctrl_phy.hsync, dvi_tgen.ctrl_phy.vsync)),
+                dvi_gen.ctrl_in_ch1.eq(0),
+                dvi_gen.ctrl_in_ch2.eq(0),
+            ]
+        else:
+            # hook up simif
+            m.d.comb += [
+                self.simif.x.eq(dvi_tgen.x),
+                self.simif.y.eq(dvi_tgen.y),
+                self.simif.r.eq(rd_port_r.data),
+                self.simif.g.eq(rd_port_g.data),
+                self.simif.b.eq(rd_port_b.data),
+            ]
 
         # palette write interface (p=position, rgb=value)
         wports = [palette_r.write_port(),
