@@ -20,6 +20,7 @@ from amaranth.build        import *
 from amaranth.lib          import wiring, data, stream
 from amaranth.lib.cdc      import FFSynchronizer
 from amaranth.lib.fifo     import SyncFIFO, AsyncFIFO, SyncFIFOBuffered
+from amaranth.lib.wiring   import In, Out
 
 from luna                import top_level_cli
 from luna.usb2           import (USBDevice,
@@ -44,16 +45,16 @@ from luna.gateware.architecture.car           import PHYResetController
 
 from tiliqua.cli                              import top_level_cli
 from tiliqua                                  import eurorack_pmod
-from tiliqua.tiliqua_platform                 import RebootProvider
-from vendor.ila                               import AsyncSerialILA
-
-from util                   import EdgeToPulse, connect_fifo_to_stream, connect_stream_to_fifo
-from usb_stream_to_channels import USBStreamToChannels
-from channels_to_usb_stream import ChannelsToUSBStream
-from audio_to_channels      import AudioToChannels
+from tiliqua.eurorack_pmod                    import ASQ
 
 
-class USB2AudioInterface(Elaboratable):
+from .util                   import EdgeToPulse, connect_fifo_to_stream, connect_stream_to_fifo
+from .usb_stream_to_channels import USBStreamToChannels
+from .channels_to_usb_stream import ChannelsToUSBStream
+from .audio_to_channels      import AudioToChannels
+
+
+class USB2AudioInterface(wiring.Component):
     """ USB Audio Class v2 interface """
 
     brief = "USB soundcard, 4in + 4out."
@@ -490,121 +491,6 @@ class USB2AudioInterface(Elaboratable):
                 from_usb_stream=usb_to_channel_stream.channel_stream_out)
         wiring.connect(m, wiring.flipped(self.i), audio_to_channels.i)
         wiring.connect(m, audio_to_channels.o, wiring.flipped(self.o))
-
-        jack_period = Signal(32)
-        jack_usb = Signal(8)
-        m.submodules.jack_sync = FFSynchronizer(pmod0.jack, jack_usb, o_domain="usb")
-
-        N_TOUCH_CHANNELS = 8
-        touch_usb = []
-        for n in range(N_TOUCH_CHANNELS):
-            touch_usb.append(Signal(8))
-            setattr(m.submodules, f"touch_usb_synchronizer{n}",
-                    FFSynchronizer(pmod0.touch[n], touch_usb[n], o_domain="usb"))
-
-        touch_ch = Signal(3)
-
-        with m.FSM(domain="usb") as fsm:
-            with m.State("WAIT"):
-                # 100Hz // TODO make this delta
-                with m.If(jack_period == int(60000000 / 40)):
-                    m.d.usb += [
-                        jack_period.eq(0),
-                        touch_ch.eq(0)
-                    ]
-                    m.next = "B0"
-                with m.Else():
-                    m.d.usb += jack_period.eq(jack_period + 1)
-            with m.State("B0"):
-                m.d.comb += [
-                    usb_ep3_in.stream.payload.eq(0x0B),
-                    usb_ep3_in.stream.first.eq(touch_ch == 0),
-                    usb_ep3_in.stream.valid.eq(1),
-                ]
-                with m.If(usb_ep3_in.stream.ready):
-                    m.next = "B1"
-            with m.State("B1"):
-                m.d.comb += [
-                    usb_ep3_in.stream.payload.eq(0xB0),
-                    usb_ep3_in.stream.valid.eq(1),
-                ]
-                with m.If(usb_ep3_in.stream.ready):
-                    m.next = "B2"
-            with m.State("B2"):
-                m.d.comb += [
-                    usb_ep3_in.stream.payload.eq(touch_ch),
-                    usb_ep3_in.stream.valid.eq(1),
-                ]
-                with m.If(usb_ep3_in.stream.ready):
-                    m.next = "B3"
-            with m.State("B3"):
-
-                m.d.comb += [
-                    usb_ep3_in.stream.last.eq(touch_ch == (N_TOUCH_CHANNELS - 1)),
-                    usb_ep3_in.stream.valid.eq(1),
-                ]
-
-                # Infer mux of active channel to payload
-                with m.Switch(touch_ch):
-                    for n in range(N_TOUCH_CHANNELS):
-                        with m.Case(n):
-                            # Shift to get 0-127 as MIDI CC requires
-                            m.d.comb += usb_ep3_in.stream.payload.eq(touch_usb[n] >> 1),
-
-                with m.If(usb_ep3_in.stream.ready):
-                    with m.If(touch_ch == (N_TOUCH_CHANNELS - 1)):
-                        m.next = "WAIT"
-                    with m.Else():
-                        m.d.usb += touch_ch.eq(touch_ch + 1)
-                        m.next = "B0"
-
-        if platform.ila:
-
-            test_signal = Signal(16, reset=0xFEED)
-            pmod_sample_o0 = Signal(16)
-
-            m.d.comb += pmod_sample_o0.eq(pmod0.sample_o[0])
-
-            ila_signals = [
-                test_signal,
-                pmod_sample_o0,
-                pmod0.fs_strobe,
-                m.submodules.audio_to_channels.dac_fifo_level,
-
-                # channel stream
-                #usb_to_channel_stream.channel_stream_out.channel_nr,
-                #usb_to_channel_stream.channel_stream_out.payload,
-                #usb_to_channel_stream.channel_stream_out.valid,
-                #usb_to_channel_stream.garbage_seen_out,
-
-                # interface from IsochronousOutStreamEndpoint
-                #usb_to_channel_stream.usb_stream_in.first,
-                #usb_to_channel_stream.usb_stream_in.valid,
-                #usb_to_channel_stream.usb_stream_in.payload,
-                #usb_to_channel_stream.usb_stream_in.last,
-                #usb_to_channel_stream.usb_stream_in.ready,
-
-                # interface to IsochronousOutStreamEndpoint
-                #ep1_out.interface.rx.next,
-                #ep1_out.interface.rx.valid,
-                #ep1_out.interface.rx.payload,
-
-                usb.sof_detected,
-                sof_counter,
-                feedbackValue,
-                bitPos,
-            ]
-
-            self.ila = AsyncSerialILA(signals=ila_signals,
-                                      sample_depth=8192, divisor=521,
-                                      domain='usb', sample_rate=60e6) # ~115200 baud on USB clock
-            m.submodules += self.ila
-
-            m.d.comb += [
-                self.ila.trigger.eq(pmod0.sample_o[0] > Const(1000)),
-                #self.ila.trigger.eq(usb_audio_in_active),
-                platform.request("uart").tx.o.eq(self.ila.tx), # needs FFSync?
-            ]
 
         return m
 

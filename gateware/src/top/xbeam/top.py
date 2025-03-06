@@ -28,6 +28,8 @@ from tiliqua                                     import eurorack_pmod, dsp, scop
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
+from tiliqua.usb_audio.top import USB2AudioInterface
+
 class XbeamSoc(TiliquaSoc):
 
     brief = "Graphical vectorscope and oscilloscope."
@@ -53,12 +55,16 @@ class XbeamSoc(TiliquaSoc):
             video_rotate_90=self.video_rotate_90)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
 
+        self.usbif = USB2AudioInterface()
+
         # now we can freeze the memory map
         self.finalize_csr_bridge()
 
     def elaborate(self, platform):
 
         m = Module()
+
+        m.submodules += self.usbif
 
         m.submodules += self.vector_periph
 
@@ -70,15 +76,19 @@ class XbeamSoc(TiliquaSoc):
 
         self.scope_periph.source = pmod0.o_cal
 
-        with m.If(self.scope_periph.soc_en):
-            wiring.connect(m, pmod0.o_cal, self.scope_periph.i)
-        with m.Else():
-            wiring.connect(m, pmod0.o_cal, self.vector_periph.i)
+        wiring.connect(m, pmod0.o_cal, self.usbif.i)
+        wiring.connect(m, self.usbif.o, pmod0.i_cal)
 
-        m.d.comb += [
-            pmod0.i_cal.valid.eq(pmod0.o_cal.valid & pmod0.o_cal.ready),
-            pmod0.i_cal.payload.eq(pmod0.o_cal.payload),
-        ]
+        with m.If(self.scope_periph.soc_en):
+            m.d.comb += [
+                self.scope_periph.i.valid.eq(pmod0.i_cal.valid & pmod0.i_cal.ready),
+                self.scope_periph.i.payload.eq(pmod0.i_cal.payload),
+            ]
+        with m.Else():
+            m.d.comb += [
+                self.vector_periph.i.valid.eq(pmod0.i_cal.valid & pmod0.i_cal.ready),
+                self.vector_periph.i.payload.eq(pmod0.i_cal.payload),
+            ]
 
         # Memory controller hangs if we start making requests to it straight away.
         with m.If(self.permit_bus_traffic):
