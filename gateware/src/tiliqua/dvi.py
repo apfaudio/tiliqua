@@ -73,7 +73,7 @@ class DVITimingGen(wiring.Component):
         self.x = Signal(signed(12))
         self.y = Signal(signed(12))
 
-        with m.If(ResetSignal("sync")):
+        with m.If(ResetSignal("dvi")):
             m.d.dvi += [
                 self.x.eq(self.h_reset),
                 self.y.eq(self.v_reset),
