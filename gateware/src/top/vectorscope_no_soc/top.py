@@ -37,12 +37,11 @@ from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, dsp, sim, cache
+from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
 from tiliqua.sim              import FakeTiliquaDomainGenerator
-from tiliqua.video            import DVI_TIMINGS, DMAFramebuffer
 from tiliqua.raster           import Persistance, Stroke
 
 from vendor.ila               import AsyncSerialILA
@@ -53,9 +52,8 @@ class VectorScopeTop(Elaboratable):
     Top-level Vectorscope design.
     """
 
-    def __init__(self, *, dvi_timings, wishbone_l2_cache, clock_settings):
+    def __init__(self, *, default_modeline, wishbone_l2_cache, clock_settings):
 
-        self.dvi_timings = dvi_timings
         self.wishbone_l2_cache = wishbone_l2_cache
         self.clock_settings = clock_settings
 
@@ -67,8 +65,8 @@ class VectorScopeTop(Elaboratable):
 
         fb_base = 0x0
         # All of our DMA masters
-        self.fb = DMAFramebuffer(
-                fb_base=fb_base, fixed_dvi_timings=dvi_timings,
+        self.fb = dma_framebuffer.DMAFramebuffer(
+                fb_base=fb_base, fixed_modeline=default_modeline,
                 bus_master=self.psram_periph.bus)
         self.psram_periph.add_master(self.fb.bus)
 
