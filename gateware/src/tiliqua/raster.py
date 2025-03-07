@@ -7,20 +7,21 @@
 import colorsys
 import os
 
-from amaranth              import *
-from amaranth.build        import *
-from amaranth.lib          import wiring, data, stream
-from amaranth.lib.wiring   import In, Out
-from amaranth.lib.fifo     import SyncFIFOBuffered
-from amaranth.lib.cdc      import FFSynchronizer
+from amaranth                import *
+from amaranth.build          import *
+from amaranth.lib            import wiring, data, stream
+from amaranth.lib.wiring     import In, Out
+from amaranth.lib.fifo       import SyncFIFOBuffered
+from amaranth.lib.cdc        import FFSynchronizer
 
-from amaranth_future       import fixed
+from amaranth_future         import fixed
 
 
-from tiliqua               import dsp, video
-from tiliqua.eurorack_pmod import ASQ
+from tiliqua                 import dsp
+from tiliqua.dma_framebuffer import DMAFramebuffer
+from tiliqua.eurorack_pmod   import ASQ
 
-from amaranth_soc          import wishbone
+from amaranth_soc            import wishbone
 
 class Persistance(wiring.Component):
 
@@ -32,7 +33,7 @@ class Persistance(wiring.Component):
     'holdoff' is used to keep this core from saturating the bus between bursts.
     """
 
-    def __init__(self, *, fb: video.DMAFramebuffer,
+    def __init__(self, *, fb: DMAFramebuffer,
                  fifo_depth=128, holdoff_default=1024):
 
         self.fb = fb
@@ -187,7 +188,7 @@ class Stroke(wiring.Component):
     """
 
 
-    def __init__(self, *, fb: video.DMAFramebuffer, fs=192000, n_upsample=4,
+    def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=4,
                  default_hue=10, default_x=0, default_y=0, video_rotate_90=False):
 
         self.rotate_90 = video_rotate_90

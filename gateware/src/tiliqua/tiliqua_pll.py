@@ -6,13 +6,13 @@
 
 import textwrap
 
-from amaranth         import *
-from amaranth.lib.cdc import FFSynchronizer
-from amaranth.lib     import wiring
-from tiliqua          import video
-from tiliqua.types    import *
-from dataclasses      import dataclass
-from typing           import List, Optional
+from amaranth             import *
+from amaranth.lib.cdc     import FFSynchronizer
+from amaranth.lib         import wiring
+from tiliqua.types        import *
+from tiliqua.dvi_modeline import DVIModeline, DVIPLL
+from dataclasses          import dataclass
+from typing               import List, Optional
 
 @dataclass
 class ClockFrequencies:
@@ -25,10 +25,10 @@ class ClockFrequencies:
 @dataclass
 class ClockSettings:
     audio_clock: AudioClock
-    video_timings: Optional[video.DVITimings]
+    default_modeline: Optional[DVIModeline]
     frequencies: ClockFrequencies
 
-def clock_settings(audio_clock: AudioClock, video_timings: video.DVITimings) -> ClockSettings:
+def clock_settings(audio_clock: AudioClock, default_modeline: DVIModeline) -> ClockSettings:
     """
     Calculate frequency of all clocks used by Tiliqua gateware given an intended PLL configuration.
     It should match what the PLLs end up generating, as these constants are used in downstream logic.
@@ -41,17 +41,17 @@ def clock_settings(audio_clock: AudioClock, video_timings: video.DVITimings) -> 
         dvi5x=None
     )
     frequencies.audio = audio_clock.mclk()
-    if video_timings is not None:
-        frequencies.dvi = int(video_timings.pixel_clk_mhz*1_000_000)
-        frequencies.dvi5x = 5*int(video_timings.pixel_clk_mhz*1_000_000)
+    if default_modeline is not None:
+        frequencies.dvi = int(default_modeline.pixel_clk_mhz*1_000_000)
+        frequencies.dvi5x = 5*int(default_modeline.pixel_clk_mhz*1_000_000)
     settings = ClockSettings(
         audio_clock=audio_clock,
-        video_timings=video_timings,
+        default_modeline=default_modeline,
         frequencies=frequencies
     )
     return settings
 
-def create_dvi_pll(pll_settings: video.DVIPLL, clk48, reset, feedback, locked):
+def create_dvi_pll(pll_settings: DVIPLL, clk48, reset, feedback, locked):
     """
     Create a fixed PLL to generate DVI clocks (depends on resolution selected).
     1x pixel clock and 5x (half DVI TDMS clock, output is DDR).
@@ -240,7 +240,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
     │                                      ┊            └─>[dvi5x]{dvi5x:11.4f} MHz │
     └─────────────────────────────────────────────────────────────────────────────┘"""
     clock_tree_no_video = """
-    │                            └>[expll_clk1]───────────────>[disable]          │
+    │                            └>[clk1]─────────────────>[disable]              │
     └─────────────────────────────────────────────────────────────────────────────┘"""
 
     def __init__(self, settings: ClockSettings):
@@ -362,7 +362,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
         )
 
         # Video PLL and derived signals
-        if self.settings.video_timings is not None:
+        if self.settings.default_modeline is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
@@ -500,14 +500,16 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
         )
 
         # Video PLL and derived signals
-        if self.settings.video_timings is not None:
+        if self.settings.default_modeline is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
 
             feedback_dvi = Signal()
             locked_dvi   = Signal()
-            m.submodules.pll_dvi = create_dvi_pll(self.settings.video_timings.pll, clk48,
+
+            pll_settings = DVIPLL.get(self.settings.default_modeline.pixel_clk_mhz)
+            m.submodules.pll_dvi = create_dvi_pll(pll_settings, clk48,
                                                   reset, feedback_dvi, locked_dvi)
 
             m.d.comb += [
@@ -620,14 +622,15 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
         )
 
         # Video PLL and derived signals
-        if self.settings.video_timings is not None:
+        if self.settings.default_modeline is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
 
             feedback_dvi = Signal()
             locked_dvi   = Signal()
-            m.submodules.pll_dvi = create_dvi_pll(self.settings.video_timings.pll, clk48,
+            pll_settings = DVIPLL.get(self.settings.default_modeline.pixel_clk_mhz)
+            m.submodules.pll_dvi = create_dvi_pll(pll_settings, clk48,
                                                   reset, feedback_dvi, locked_dvi)
 
             m.d.comb += [

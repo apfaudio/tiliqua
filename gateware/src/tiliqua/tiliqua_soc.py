@@ -54,7 +54,7 @@ from tiliqua.tiliqua_platform                    import *
 from tiliqua.raster                              import Persistance
 from tiliqua.types                               import FirmwareLocation
 
-from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, video, eurorack_pmod_peripheral
+from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class VideoPeripheral(wiring.Component):
@@ -133,7 +133,7 @@ class VideoPeripheral(wiring.Component):
         return m
 
 class TiliquaSoc(Component):
-    def __init__(self, *, firmware_bin_path, dvi_timings, ui_name, ui_sha, platform_class, clock_settings,
+    def __init__(self, *, firmware_bin_path, default_modeline, ui_name, ui_sha, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
                  mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im"):
 
@@ -147,7 +147,7 @@ class TiliquaSoc(Component):
         self.firmware_bin_path = firmware_bin_path
         self.touch = touch
         self.clock_settings = clock_settings
-        self.dvi_timings = dvi_timings
+        self.default_modeline = default_modeline
         self.video_rotate_90 = video_rotate_90
 
         self.platform_class = platform_class
@@ -246,8 +246,8 @@ class TiliquaSoc(Component):
 
         # video PHY (DMAs from PSRAM starting at fb_base)
         fb_base = self.psram_base
-        self.fb = video.DMAFramebuffer(
-                fb_base=fb_base, fixed_dvi_timings=dvi_timings,
+        self.fb = dma_framebuffer.DMAFramebuffer(
+                fb_base=fb_base, fixed_modeline=default_modeline,
                 bus_master=self.psram_periph.bus)
         self.psram_periph.add_master(self.fb.bus)
 
@@ -485,8 +485,8 @@ class TiliquaSoc(Component):
             f.write(f"pub const PSRAM_SZ_WORDS: usize    = PSRAM_SZ_BYTES / 4;\n")
             f.write(f"pub const SPIFLASH_BASE: usize     = 0x{self.spiflash_base:x};\n")
             f.write(f"pub const SPIFLASH_SZ_BYTES: usize = 0x{self.spiflash_size:x};\n")
-            f.write(f"pub const H_ACTIVE: u32            = {self.fb.fixed_dvi_timings.h_active};\n")
-            f.write(f"pub const V_ACTIVE: u32            = {self.fb.fixed_dvi_timings.v_active};\n")
+            f.write(f"pub const H_ACTIVE: u32            = {self.fb.fixed_modeline.h_active};\n")
+            f.write(f"pub const V_ACTIVE: u32            = {self.fb.fixed_modeline.v_active};\n")
             f.write(f"pub const VIDEO_ROTATE_90: bool    = {'true' if self.video_rotate_90 else 'false'};\n")
             f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base:x};\n")
             f.write(f"pub const PX_HUE_MAX: i32          = 16;\n")

@@ -15,7 +15,7 @@ import subprocess
 import sys
 import time
 
-from tiliqua                     import sim, video
+from tiliqua                     import sim, dvi_modeline
 from tiliqua.types               import *
 from tiliqua.tiliqua_platform    import *
 from tiliqua.tiliqua_soc         import TiliquaSoc
@@ -134,9 +134,9 @@ def top_level_cli(
     kwargs = {}
 
     if video_core:
-        assert args.resolution in video.DVI_TIMINGS, f"error: video resolution must be one of {video.DVI_TIMINGS.keys()}"
-        dvi_timings = video.DVI_TIMINGS[args.resolution]
-        kwargs["dvi_timings"] = dvi_timings
+        modelines = dvi_modeline.DVIModeline.all_timings()
+        assert args.resolution in modelines, f"error: video resolution must be one of {modelines.keys()}"
+        kwargs["default_modeline"] = default_modeline = modelines[args.resolution]
         if args.rotate_90:
             kwargs["video_rotate_90"] = True
 
@@ -145,7 +145,7 @@ def top_level_cli(
     audio_clock = platform_class.default_audio_clock
     kwargs["clock_settings"] = tiliqua_pll.clock_settings(
         audio_clock.to_192khz() if args.fs_192khz else audio_clock,
-        video_timings=dvi_timings if video_core else None)
+        default_modeline=default_modeline if video_core else None)
 
     if issubclass(fragment, TiliquaSoc):
         rust_fw_bin  = "firmware.bin"
