@@ -375,15 +375,12 @@ class PolySoc(TiliquaSoc):
         # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
         super().__init__(finalize_csr_bridge=False, **kwargs)
 
-        fb_size = (self.video.fb_hsize, self.video.fb_vsize)
-
         # WARN: TiliquaSoc ends at 0x00000900
         self.vector_periph_base = 0x00001000
         self.synth_periph_base  = 0x00001100
 
         self.vector_periph = scope.VectorTracePeripheral(
-            fb_base=self.video.fb_base,
-            fb_size=fb_size,
+            fb=self.fb,
             bus_dma=self.psram_periph,
             fs=48000,
             n_upsample=8,
