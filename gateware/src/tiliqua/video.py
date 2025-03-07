@@ -303,7 +303,7 @@ class DVITimingGenerator(wiring.Component):
         return m
 
 
-class FramebufferPHY(wiring.Component):
+class DMAFramebuffer(wiring.Component):
 
     """
     Read pixels from a framebuffer in PSRAM and send them to the display.
@@ -314,12 +314,12 @@ class FramebufferPHY(wiring.Component):
     """
 
     def __init__(self, *, fb_base, bus_master,
-                 fifo_depth=2048, fb_bytes_per_pixel=1, fixed_dvi_timings: DVITimings = None):
+                 fifo_depth=2048, bytes_per_pixel=1, fixed_dvi_timings: DVITimings = None):
 
         self.fixed_dvi_timings = fixed_dvi_timings
         self.fifo_depth = fifo_depth
         self.fb_base = fb_base
-        self.fb_bytes_per_pixel = fb_bytes_per_pixel
+        self.bytes_per_pixel = bytes_per_pixel
 
         # Color palette tweaking interface
         super().__init__({
@@ -398,7 +398,7 @@ class FramebufferPHY(wiring.Component):
                 i=drain_fifo, o=drain_fifo_dvi, o_domain="dvi")
         drained = Signal()
 
-        fb_size_words = (self.timings.active_pixels * self.fb_bytes_per_pixel) // 4
+        fb_size_words = (self.timings.active_pixels * self.bytes_per_pixel) // 4
 
         # Read to FIFO in sync domain
         with m.FSM() as fsm:
@@ -445,7 +445,7 @@ class FramebufferPHY(wiring.Component):
         # Tracking in DVI domain
 
         # 'dvi' domain: read FIFO -> DVI PHY (1 fifo word is N pixels)
-        bytecounter = Signal(exact_log2(4//self.fb_bytes_per_pixel))
+        bytecounter = Signal(exact_log2(4//self.bytes_per_pixel))
         last_word   = Signal(32)
         with m.If(drain_fifo_dvi):
             m.d.dvi += bytecounter.eq(0)
