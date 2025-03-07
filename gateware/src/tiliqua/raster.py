@@ -17,7 +17,7 @@ from amaranth.lib.cdc      import FFSynchronizer
 from amaranth_future       import fixed
 
 
-from tiliqua               import dsp
+from tiliqua               import dsp, video
 from tiliqua.eurorack_pmod import ASQ
 
 from amaranth_soc          import wishbone
@@ -190,22 +190,16 @@ class Stroke(wiring.Component):
     fractional resampler. This is kind of analogous to sin(x)/x interpolation.
     """
 
-    # x, y, intensity, color
-    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    def __init__(self, *, fb_base, bus_master, fb_size, fb_bytes_per_pixel=1, fs=192000, n_upsample=4,
+    def __init__(self, *, fb_base, bus_master, fb_bytes_per_pixel=1, fs=192000, n_upsample=4,
                  default_hue=10, default_x=0, default_y=0, video_rotate_90=False):
 
         self.rotate_90 = video_rotate_90
 
         self.fb_base = fb_base
-        self.fb_hsize, self.fb_vsize = fb_size
         self.fb_bytes_per_pixel = fb_bytes_per_pixel
         self.fs = fs
         self.n_upsample = n_upsample
-
-        self.bus = wishbone.Interface(addr_width=bus_master.addr_width,
-                                      data_width=32, granularity=8)
 
         self.sample_x = Signal(signed(16))
         self.sample_y = Signal(signed(16))
@@ -222,10 +216,18 @@ class Stroke(wiring.Component):
         self.px_read = Signal(32)
         self.px_sum = Signal(16)
 
-        # Kick this to start the core
-        self.enable = Signal(1, init=0)
-
-        super().__init__()
+        super().__init__({
+            # Point stream to render
+            # 4 channels: x, y, intensity, color
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            # We are a DMA master
+            "bus":  Out(wishbone.Signature(addr_width=bus_master.addr_width, data_width=32, granularity=8,
+                                           features={"cti", "bte"})),
+            # Kick this to start the core
+            "enable": In(1),
+            # Must be updated on timing changes
+            "timings": In(video.DVITimingInterface()),
+        })
 
 
     def elaborate(self, platform) -> Module:
@@ -233,7 +235,8 @@ class Stroke(wiring.Component):
 
         bus = self.bus
 
-        fb_len_words = (self.fb_hsize*self.fb_vsize) // 4
+        fb_len_words = (self.timings.active_pixels * self.fb_bytes_per_pixel) // 4
+        fb_hwords = ((self.timings.h_active*self.fb_bytes_per_pixel)//4)
 
         sample_x = self.sample_x
         sample_y = self.sample_y
@@ -273,7 +276,6 @@ class Stroke(wiring.Component):
         sample_intensity = Signal(4)
 
         # pixel position
-        fb_hwords = ((self.fb_hsize*self.fb_bytes_per_pixel)//4)
         x_offs = Signal(unsigned(16))
         y_offs = Signal(unsigned(16))
         subpix_shift = Signal(unsigned(6))
@@ -285,13 +287,13 @@ class Stroke(wiring.Component):
             m.d.comb += [
                 subpix_shift.eq((-sample_y)[0:2]*8),
                 x_offs.eq((fb_hwords//2) + ((-sample_y)>>2)),
-                y_offs.eq(sample_x + (self.fb_vsize//2)),
+                y_offs.eq(sample_x + (self.timings.v_active>>1)),
             ]
         else:
             m.d.comb += [
                 subpix_shift.eq(sample_x[0:2]*8),
                 x_offs.eq((fb_hwords//2) + (sample_x>>2)),
-                y_offs.eq(sample_y + (self.fb_vsize//2)),
+                y_offs.eq(sample_y + (self.timings.v_active>>1)),
             ]
 
         with m.FSM() as fsm:
@@ -316,7 +318,7 @@ class Stroke(wiring.Component):
 
             with m.State('LATCH1'):
 
-                with m.If((x_offs < fb_hwords) & (y_offs < self.fb_vsize)):
+                with m.If((x_offs < fb_hwords) & (y_offs < self.timings.v_active)):
                     m.d.sync += [
                         bus.sel.eq(0xf),
                         bus.adr.eq(self.fb_base + pixel_offs),

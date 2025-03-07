@@ -73,11 +73,11 @@ class VectorScopeTop(Elaboratable):
         """
         self.persist = Persistance(
                 fb_base=fb_base, bus_master=self.psram_periph.bus)
+        self.psram_periph.add_master(self.persist.bus)
+        """
         self.stroke = Stroke(
                 fb_base=fb_base, bus_master=self.psram_periph.bus)
         self.psram_periph.add_master(self.video.bus)
-        self.psram_periph.add_master(self.persist.bus)
-        """
 
         if self.wishbone_l2_cache:
             self.cache = cache.WishboneL2Cache(
@@ -85,9 +85,8 @@ class VectorScopeTop(Elaboratable):
                     cachesize_words=128)
             self.psram_periph.add_master(self.cache.slave)
         else:
-            """
             self.psram_periph.add_master(self.stroke.bus)
-            """
+
         super().__init__()
 
     def elaborate(self, platform):
@@ -106,23 +105,20 @@ class VectorScopeTop(Elaboratable):
         else:
             m.submodules.car = FakeTiliquaDomainGenerator()
 
-        """
         self.stroke.pmod0 = pmod0
-        """
 
         m.submodules.video = self.video
         """
         m.submodules.persist = self.persist
-        m.submodules.stroke = self.stroke
         """
+        m.submodules.stroke = self.stroke
+        wiring.connect(m, wiring.flipped(self.video.timings), self.stroke.timings)
 
         if self.wishbone_l2_cache:
             m.submodules.cache = self.cache
             wiring.connect(m, self.stroke.bus, self.cache.master)
 
-        """
         wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
-        """
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
@@ -132,8 +128,8 @@ class VectorScopeTop(Elaboratable):
             m.d.sync += self.video.enable.eq(1)
             """
             m.d.sync += self.persist.enable.eq(1)
-            m.d.sync += self.stroke.enable.eq(1)
             """
+            m.d.sync += self.stroke.enable.eq(1)
 
         # Optional ILA, very useful for low-level PSRAM debugging...
         if not platform.ila:
