@@ -87,11 +87,12 @@ def soc_simulation_ports(fragment):
         "idle":           (fragment.psram_periph.simif.idle,             None),
         "spiflash_addr":  (fragment.spiflash_periph.spi_mmap.simif_addr, None),
         "spiflash_data":  (fragment.spiflash_periph.spi_mmap.simif_data, None),
-        "dvi_x":          (fragment.video.dvi_tgen.x,                    None),
-        "dvi_y":          (fragment.video.dvi_tgen.y,                    None),
-        "dvi_r":          (fragment.video.phy_r,                         None),
-        "dvi_g":          (fragment.video.phy_g,                         None),
-        "dvi_b":          (fragment.video.phy_b,                         None),
+        "dvi_de":         (fragment.video.simif.de,                      None),
+        "dvi_vsync":      (fragment.video.simif.vsync,                   None),
+        "dvi_hsync":      (fragment.video.simif.hsync,                   None),
+        "dvi_r":          (fragment.video.simif.r,                       None),
+        "dvi_g":          (fragment.video.simif.g,                       None),
+        "dvi_b":          (fragment.video.simif.b,                       None),
     }
 
 def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=False):
@@ -120,8 +121,8 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
 
     if hasattr(fragment, "video"):
         dvi_clk_hz = clock_settings.frequencies.dvi
-        dvi_h_active = fragment.video.dvi_tgen.timings.h_active
-        dvi_v_active = fragment.video.dvi_tgen.timings.v_active
+        dvi_h_active = fragment.video.fixed_dvi_timings.h_active
+        dvi_v_active = fragment.video.fixed_dvi_timings.v_active
         video_cflags = [
            "-CFLAGS", f"-DDVI_H_ACTIVE={dvi_h_active}",
            "-CFLAGS", f"-DDVI_V_ACTIVE={dvi_v_active}",
