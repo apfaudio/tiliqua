@@ -116,18 +116,18 @@ class VideoPeripheral(wiring.Component):
         with m.If(self._palette.element.w_stb & ~palette_busy):
             m.d.sync += [
                 palette_busy                            .eq(1),
-                self.fb.palette_rgb.valid            .eq(1),
-                self.fb.palette_rgb.payload.position .eq(self._palette.f.position.w_data),
-                self.fb.palette_rgb.payload.red      .eq(self._palette.f.red.w_data),
-                self.fb.palette_rgb.payload.green    .eq(self._palette.f.green.w_data),
-                self.fb.palette_rgb.payload.blue     .eq(self._palette.f.blue.w_data),
+                self.fb.palette.update.valid            .eq(1),
+                self.fb.palette.update.payload.position .eq(self._palette.f.position.w_data),
+                self.fb.palette.update.payload.red      .eq(self._palette.f.red.w_data),
+                self.fb.palette.update.payload.green    .eq(self._palette.f.green.w_data),
+                self.fb.palette.update.payload.blue     .eq(self._palette.f.blue.w_data),
             ]
 
-        with m.If(palette_busy & self.fb.palette_rgb.ready):
+        with m.If(palette_busy & self.fb.palette.update.ready):
             # coefficient has been written
             m.d.sync += [
                 palette_busy.eq(0),
-                self.fb.palette_rgb.valid.eq(0),
+                self.fb.palette.update.valid.eq(0),
             ]
 
         return m
