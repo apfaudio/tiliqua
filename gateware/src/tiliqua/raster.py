@@ -32,12 +32,11 @@ class Persistance(wiring.Component):
     'holdoff' is used to keep this core from saturating the bus between bursts.
     """
 
-    def __init__(self, *, fb_base, bus_master,
-                 fifo_depth=128, holdoff_default=1024, fb_bytes_per_pixel=1):
+    def __init__(self, *, fb: video.DMAFramebuffer,
+                 fifo_depth=128, holdoff_default=1024):
 
-        self.fb_base = fb_base
+        self.fb = fb
         self.fifo_depth = fifo_depth
-        self.fb_bytes_per_pixel = fb_bytes_per_pixel
 
         # FIFO to cache pixels from PSRAM.
         self.fifo = SyncFIFOBuffered(width=32, depth=fifo_depth)
@@ -51,19 +50,16 @@ class Persistance(wiring.Component):
             "holdoff": In(16, init=holdoff_default),
             "decay": In(4, init=1),
             # We are a DMA master
-            "bus":  Out(wishbone.Signature(addr_width=bus_master.addr_width, data_width=32, granularity=8,
-                                           features={"cti", "bte"})),
+            "bus":  Out(fb.bus.signature),
             # Kick this to start the core
             "enable": In(1),
-            # Must be updated on timing changes
-            "timings": In(video.DVITimingInterface()),
         })
 
     def elaborate(self, platform) -> Module:
         m = Module()
 
         # Length of framebuffer in 32-bit words
-        fb_len_words = (self.timings.active_pixels * self.fb_bytes_per_pixel) // 4
+        fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
 
         holdoff_count = Signal(32)
         pnext = Signal(32)
@@ -90,7 +86,7 @@ class Persistance(wiring.Component):
                     bus.cyc.eq(1),
                     bus.we.eq(0),
                     bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.adr.eq(self.fb_base + dma_addr_in),
+                    bus.adr.eq(self.fb.fb_base + dma_addr_in),
                     self.fifo.w_en.eq(bus.ack),
                     self.fifo.w_data.eq(bus.dat_r),
                     bus.cti.eq(
@@ -143,7 +139,7 @@ class Persistance(wiring.Component):
                     bus.we.eq(1),
                     bus.sel.eq(2**(bus.data_width//8)-1),
                     bus.dat_w.eq(pixb),
-                    bus.adr.eq(self.fb_base + dma_addr_out),
+                    bus.adr.eq(self.fb.fb_base + dma_addr_out),
                     wr_source.eq(pnext),
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST)
@@ -153,10 +149,10 @@ class Persistance(wiring.Component):
                     m.d.comb += wr_source.eq(self.fifo.r_data),
                     with m.If(dma_addr_out < (fb_len_words-1)):
                         m.d.sync += dma_addr_out.eq(dma_addr_out + 1)
-                        m.d.comb += bus.adr.eq(self.fb_base + dma_addr_out + 1),
+                        m.d.comb += bus.adr.eq(self.fb.fb_base + dma_addr_out + 1),
                     with m.Else():
                         m.d.sync += dma_addr_out.eq(0)
-                        m.d.comb += bus.adr.eq(self.fb_base + 0),
+                        m.d.comb += bus.adr.eq(self.fb.fb_base + 0),
                 with m.If(~self.fifo.r_rdy):
                     m.d.comb += bus.cti.eq(
                             wishbone.CycleType.END_OF_BURST)
@@ -191,13 +187,12 @@ class Stroke(wiring.Component):
     """
 
 
-    def __init__(self, *, fb_base, bus_master, fb_bytes_per_pixel=1, fs=192000, n_upsample=4,
+    def __init__(self, *, fb: video.DMAFramebuffer, fs=192000, n_upsample=4,
                  default_hue=10, default_x=0, default_y=0, video_rotate_90=False):
 
         self.rotate_90 = video_rotate_90
 
-        self.fb_base = fb_base
-        self.fb_bytes_per_pixel = fb_bytes_per_pixel
+        self.fb = fb
         self.fs = fs
         self.n_upsample = n_upsample
 
@@ -221,12 +216,9 @@ class Stroke(wiring.Component):
             # 4 channels: x, y, intensity, color
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
             # We are a DMA master
-            "bus":  Out(wishbone.Signature(addr_width=bus_master.addr_width, data_width=32, granularity=8,
-                                           features={"cti", "bte"})),
+            "bus":  Out(fb.bus.signature),
             # Kick this to start the core
             "enable": In(1),
-            # Must be updated on timing changes
-            "timings": In(video.DVITimingInterface()),
         })
 
 
@@ -235,8 +227,8 @@ class Stroke(wiring.Component):
 
         bus = self.bus
 
-        fb_len_words = (self.timings.active_pixels * self.fb_bytes_per_pixel) // 4
-        fb_hwords = ((self.timings.h_active*self.fb_bytes_per_pixel)//4)
+        fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
+        fb_hwords = ((self.fb.timings.h_active*self.fb.bytes_per_pixel)//4)
 
         sample_x = self.sample_x
         sample_y = self.sample_y
@@ -287,13 +279,13 @@ class Stroke(wiring.Component):
             m.d.comb += [
                 subpix_shift.eq((-sample_y)[0:2]*8),
                 x_offs.eq((fb_hwords//2) + ((-sample_y)>>2)),
-                y_offs.eq(sample_x + (self.timings.v_active>>1)),
+                y_offs.eq(sample_x + (self.fb.timings.v_active>>1)),
             ]
         else:
             m.d.comb += [
                 subpix_shift.eq(sample_x[0:2]*8),
                 x_offs.eq((fb_hwords//2) + (sample_x>>2)),
-                y_offs.eq(sample_y + (self.timings.v_active>>1)),
+                y_offs.eq(sample_y + (self.fb.timings.v_active>>1)),
             ]
 
         with m.FSM() as fsm:
@@ -318,10 +310,10 @@ class Stroke(wiring.Component):
 
             with m.State('LATCH1'):
 
-                with m.If((x_offs < fb_hwords) & (y_offs < self.timings.v_active)):
+                with m.If((x_offs < fb_hwords) & (y_offs < self.fb.timings.v_active)):
                     m.d.sync += [
                         bus.sel.eq(0xf),
-                        bus.adr.eq(self.fb_base + pixel_offs),
+                        bus.adr.eq(self.fb.fb_base + pixel_offs),
                     ]
                     m.next = 'READ'
                 with m.Else():

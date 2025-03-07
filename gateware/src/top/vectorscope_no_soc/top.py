@@ -42,7 +42,7 @@ from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
 from tiliqua.sim              import FakeTiliquaDomainGenerator
-from tiliqua.video            import DVI_TIMINGS, FramebufferPHY
+from tiliqua.video            import DVI_TIMINGS, DMAFramebuffer
 from tiliqua.raster           import Persistance, Stroke
 
 from vendor.ila               import AsyncSerialILA
@@ -67,17 +67,15 @@ class VectorScopeTop(Elaboratable):
 
         fb_base = 0x0
         # All of our DMA masters
-        self.video = FramebufferPHY(
+        self.fb = DMAFramebuffer(
                 fb_base=fb_base, fixed_dvi_timings=dvi_timings,
                 bus_master=self.psram_periph.bus)
-        self.psram_periph.add_master(self.video.bus)
+        self.psram_periph.add_master(self.fb.bus)
 
-        self.persist = Persistance(
-                fb_base=fb_base, bus_master=self.psram_periph.bus)
+        self.persist = Persistance(fb=self.fb)
         self.psram_periph.add_master(self.persist.bus)
 
-        self.stroke = Stroke(
-                fb_base=fb_base, bus_master=self.psram_periph.bus)
+        self.stroke = Stroke(fb=self.fb)
         if self.wishbone_l2_cache:
             self.cache = cache.WishboneL2Cache(
                     addr_width=self.psram_periph.bus.addr_width,
@@ -106,11 +104,9 @@ class VectorScopeTop(Elaboratable):
 
         self.stroke.pmod0 = pmod0
 
-        m.submodules.video = self.video
+        m.submodules.fb = self.fb
         m.submodules.persist = self.persist
-        wiring.connect(m, wiring.flipped(self.video.timings), self.persist.timings)
         m.submodules.stroke = self.stroke
-        wiring.connect(m, wiring.flipped(self.video.timings), self.stroke.timings)
 
         if self.wishbone_l2_cache:
             m.submodules.cache = self.cache
@@ -123,7 +119,7 @@ class VectorScopeTop(Elaboratable):
         with m.If(on_delay < 0xFFFF):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
-            m.d.sync += self.video.enable.eq(1)
+            m.d.sync += self.fb.enable.eq(1)
             m.d.sync += self.persist.enable.eq(1)
             m.d.sync += self.stroke.enable.eq(1)
 
@@ -164,14 +160,14 @@ class VectorScopeTop(Elaboratable):
 
 def colors():
     """
-    Render image of intensity/color palette used internally by FramebufferPHY.
+    Render image of intensity/color palette used internally by DMAFramebuffer.
     This is useful for quickly tweaking it.
     """
     import matplotlib
     import matplotlib.pyplot as plt
     from matplotlib import colors
     import numpy as np
-    rs, gs, bs = FramebufferPHY.compute_color_palette()
+    rs, gs, bs = DMAFramebuffer.compute_color_palette()
 
     i_levels = 16
     c_levels = 16
@@ -209,12 +205,12 @@ def simulation_ports(fragment):
         "write_data":     (fragment.psram_periph.simif.write_data,     None),
         "read_ready":     (fragment.psram_periph.simif.read_ready,     None),
         "write_ready":    (fragment.psram_periph.simif.write_ready,    None),
-        "dvi_de":         (fragment.video.simif.de,                    None),
-        "dvi_vsync":      (fragment.video.simif.vsync,                 None),
-        "dvi_hsync":      (fragment.video.simif.vsync,                 None),
-        "dvi_r":          (fragment.video.simif.r,                     None),
-        "dvi_g":          (fragment.video.simif.g,                     None),
-        "dvi_b":          (fragment.video.simif.b,                     None),
+        "dvi_de":         (fragment.fb.simif.de,                    None),
+        "dvi_vsync":      (fragment.fb.simif.vsync,                 None),
+        "dvi_hsync":      (fragment.fb.simif.vsync,                 None),
+        "dvi_r":          (fragment.fb.simif.r,                     None),
+        "dvi_g":          (fragment.fb.simif.g,                     None),
+        "dvi_b":          (fragment.fb.simif.b,                     None),
     }
 
 def argparse_callback(parser):
