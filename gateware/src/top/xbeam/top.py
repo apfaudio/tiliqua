@@ -37,23 +37,18 @@ class XbeamSoc(TiliquaSoc):
         # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
         super().__init__(finalize_csr_bridge=False, **kwargs)
 
-        # scope stroke bridge from audio stream
-        fb_size = (self.video.fb_hsize, self.video.fb_vsize)
-
         # WARN: TiliquaSoc ends at 0x00000900
         self.vector_periph_base = 0x00001000
         self.scope_periph_base  = 0x00001100
 
         self.vector_periph = scope.VectorTracePeripheral(
-            fb_base=self.video.fb_base,
-            fb_size=fb_size,
+            fb=self.fb,
             bus_dma=self.psram_periph,
             video_rotate_90=self.video_rotate_90)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
         self.scope_periph = scope.ScopeTracePeripheral(
-            fb_base=self.video.fb_base,
-            fb_size=fb_size,
+            fb=self.fb,
             bus_dma=self.psram_periph,
             video_rotate_90=self.video_rotate_90)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")

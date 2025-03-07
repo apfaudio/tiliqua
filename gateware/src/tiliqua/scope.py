@@ -31,8 +31,8 @@ class VectorTracePeripheral(wiring.Component):
     class YScaleReg(csr.Register, access="w"):
         yscale: csr.Field(csr.action.W, unsigned(8))
 
-    def __init__(self, fb_base, fb_size, bus_dma, **kwargs):
-        self.stroke = Stroke(fb_base=fb_base, bus_master=bus_dma.bus, fb_size=fb_size, **kwargs)
+    def __init__(self, fb, bus_dma, **kwargs):
+        self.stroke = Stroke(fb=fb, **kwargs)
         bus_dma.add_master(self.stroke.bus)
         self.i = self.stroke.i
         self.en = Signal()
@@ -111,8 +111,8 @@ class ScopeTracePeripheral(wiring.Component):
     class YPosition(csr.Register, access="w"):
         ypos: csr.Field(csr.action.W, unsigned(16))
 
-    def __init__(self, fb_base, fb_size, bus_dma, **kwargs):
-        self.strokes = [Stroke(fb_base=fb_base, bus_master=bus_dma.bus, fb_size=fb_size, n_upsample=None, **kwargs)
+    def __init__(self, fb, bus_dma, **kwargs):
+        self.strokes = [Stroke(fb=fb, n_upsample=None, **kwargs)
                         for _ in range(4)]
 
         self.isplit4 = dsp.Split(4)
