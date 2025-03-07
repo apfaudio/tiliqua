@@ -70,15 +70,14 @@ class VectorScopeTop(Elaboratable):
         self.video = FramebufferPHY(
                 fb_base=fb_base, fixed_dvi_timings=dvi_timings,
                 bus_master=self.psram_periph.bus)
-        """
+        self.psram_periph.add_master(self.video.bus)
+
         self.persist = Persistance(
                 fb_base=fb_base, bus_master=self.psram_periph.bus)
         self.psram_periph.add_master(self.persist.bus)
-        """
+
         self.stroke = Stroke(
                 fb_base=fb_base, bus_master=self.psram_periph.bus)
-        self.psram_periph.add_master(self.video.bus)
-
         if self.wishbone_l2_cache:
             self.cache = cache.WishboneL2Cache(
                     addr_width=self.psram_periph.bus.addr_width,
@@ -108,9 +107,8 @@ class VectorScopeTop(Elaboratable):
         self.stroke.pmod0 = pmod0
 
         m.submodules.video = self.video
-        """
         m.submodules.persist = self.persist
-        """
+        wiring.connect(m, wiring.flipped(self.video.timings), self.persist.timings)
         m.submodules.stroke = self.stroke
         wiring.connect(m, wiring.flipped(self.video.timings), self.stroke.timings)
 
@@ -126,9 +124,7 @@ class VectorScopeTop(Elaboratable):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
             m.d.sync += self.video.enable.eq(1)
-            """
             m.d.sync += self.persist.enable.eq(1)
-            """
             m.d.sync += self.stroke.enable.eq(1)
 
         # Optional ILA, very useful for low-level PSRAM debugging...
