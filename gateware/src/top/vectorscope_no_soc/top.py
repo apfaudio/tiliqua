@@ -62,22 +62,22 @@ class VectorScopeTop(Elaboratable):
         # One PSRAM with an internal arbiter to support multiple DMA masters.
         self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
 
-        fb_base = 0x0
-        fb_size = (dvi_timings.h_active, dvi_timings.v_active)
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
+        fb_base = 0x0
         # All of our DMA masters
         self.video = FramebufferPHY(
-                fb_base=fb_base, dvi_timings=dvi_timings, fb_size=fb_size,
+                fb_base=fb_base, fixed_dvi_timings=dvi_timings,
                 bus_master=self.psram_periph.bus)
+        """
         self.persist = Persistance(
-                fb_base=fb_base, bus_master=self.psram_periph.bus, fb_size=fb_size)
+                fb_base=fb_base, bus_master=self.psram_periph.bus)
         self.stroke = Stroke(
-                fb_base=fb_base, bus_master=self.psram_periph.bus, fb_size=fb_size)
-
+                fb_base=fb_base, bus_master=self.psram_periph.bus)
         self.psram_periph.add_master(self.video.bus)
         self.psram_periph.add_master(self.persist.bus)
+        """
 
         if self.wishbone_l2_cache:
             self.cache = cache.WishboneL2Cache(
@@ -85,7 +85,9 @@ class VectorScopeTop(Elaboratable):
                     cachesize_words=128)
             self.psram_periph.add_master(self.cache.slave)
         else:
+            """
             self.psram_periph.add_master(self.stroke.bus)
+            """
         super().__init__()
 
     def elaborate(self, platform):
@@ -104,17 +106,23 @@ class VectorScopeTop(Elaboratable):
         else:
             m.submodules.car = FakeTiliquaDomainGenerator()
 
+        """
         self.stroke.pmod0 = pmod0
+        """
 
         m.submodules.video = self.video
+        """
         m.submodules.persist = self.persist
         m.submodules.stroke = self.stroke
+        """
 
         if self.wishbone_l2_cache:
             m.submodules.cache = self.cache
             wiring.connect(m, self.stroke.bus, self.cache.master)
 
+        """
         wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
+        """
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
@@ -122,8 +130,10 @@ class VectorScopeTop(Elaboratable):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
             m.d.sync += self.video.enable.eq(1)
+            """
             m.d.sync += self.persist.enable.eq(1)
             m.d.sync += self.stroke.enable.eq(1)
+            """
 
         # Optional ILA, very useful for low-level PSRAM debugging...
         if not platform.ila:
@@ -207,11 +217,12 @@ def simulation_ports(fragment):
         "write_data":     (fragment.psram_periph.simif.write_data,     None),
         "read_ready":     (fragment.psram_periph.simif.read_ready,     None),
         "write_ready":    (fragment.psram_periph.simif.write_ready,    None),
-        "dvi_x":          (fragment.video.dvi_tgen.x,                  None),
-        "dvi_y":          (fragment.video.dvi_tgen.y,                  None),
-        "dvi_r":          (fragment.video.phy_r,                       None),
-        "dvi_g":          (fragment.video.phy_g,                       None),
-        "dvi_b":          (fragment.video.phy_b,                       None),
+        "dvi_de":         (fragment.video.simif.de,                    None),
+        "dvi_vsync":      (fragment.video.simif.vsync,                 None),
+        "dvi_hsync":      (fragment.video.simif.vsync,                 None),
+        "dvi_r":          (fragment.video.simif.r,                     None),
+        "dvi_g":          (fragment.video.simif.g,                     None),
+        "dvi_b":          (fragment.video.simif.b,                     None),
     }
 
 def argparse_callback(parser):
