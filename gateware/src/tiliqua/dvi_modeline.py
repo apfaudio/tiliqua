@@ -2,16 +2,34 @@ from dataclasses import dataclass
 
 @dataclass
 class DVIModeline:
-    h_active:      int
-    h_sync_start:  int
-    h_sync_end:    int
-    h_total:       int
-    h_sync_invert: bool
-    v_active:      int
-    v_sync_start:  int
-    v_sync_end:    int
-    v_total:       int
-    v_sync_invert: bool
+    """
+    Video timing modelines. Values match the semantics used by xrandr, e.g.:
+
+    $ xrandr --verbose
+    ...
+    640x480 (0x80) 25.175MHz -HSync -VSync
+           h: width   640 start  656 end  752 total  800 skew    0 clock  31.47KHz
+           v: height  480 start  490 end  492 total  525           clock  59.94Hz
+
+    The mapping of each field is commented below.
+    """
+
+    h_active:      int  # width
+    h_sync_start:  int  # start
+    h_sync_end:    int  # end
+    h_total:       int  # total
+    h_sync_invert: bool # True for -HSync, False for +HSync
+    v_active:      int  # height
+    v_sync_start:  int  # start
+    v_sync_end:    int  # end
+    v_total:       int  # total
+    v_sync_invert: bool # True for -VSync, False for +VSync
+
+    # Note: when not using an external PLL for video, the correct
+    # settings for a high-res ECP5 PLL must exist in DVIPLL.get()
+    # for the desired frequency. This number is used to lookup
+    # the PLL settings. On R4+, an external PLL is usually used
+    # as it supports dynamic switching. R2/R3 don't have this.
     pixel_clk_mhz: float
 
     @property
