@@ -268,18 +268,18 @@ class DVITimingGenerator(wiring.Component):
         self.y = Signal(signed(COORD_WIDTH))
 
         with m.If(ResetSignal("sync")):
-            m.d.sync += [
+            m.d.dvi += [
                 self.x.eq(self.h_reset),
                 self.y.eq(self.v_reset),
             ]
         with m.Elif(self.x == (timings.h_active-1)):
-            m.d.sync += self.x.eq(self.h_reset)
+            m.d.dvi += self.x.eq(self.h_reset)
             with m.If(self.y == (timings.v_active-1)):
-                m.d.sync += self.y.eq(self.v_reset)
+                m.d.dvi += self.y.eq(self.v_reset)
             with m.Else():
-                m.d.sync += self.y.eq(self.y+1)
+                m.d.dvi += self.y.eq(self.y+1)
         with m.Else():
-            m.d.sync += self.x.eq(self.x+1)
+            m.d.dvi += self.x.eq(self.x+1)
 
         # Generate all control signals based on index.
         # Sync inversion must be handled before the PHY (see below).
@@ -372,7 +372,7 @@ class FramebufferPHY(wiring.Component):
 
         m.submodules.fifo = fifo = AsyncFIFOBuffered(
                 width=32, depth=self.fifo_depth, r_domain='dvi', w_domain='sync')
-        m.submodules.dvi_tgen = dvi_tgen = DomainRenamer("dvi")(DVITimingGenerator())
+        m.submodules.dvi_tgen = dvi_tgen = DVITimingGenerator()
         # TODO: FFSync needed? (sync -> dvi crossing, but should always be in reset when changed).
         wiring.connect(m, wiring.flipped(self.timings), dvi_tgen.timings)
 
