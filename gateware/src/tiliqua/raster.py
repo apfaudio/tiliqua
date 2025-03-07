@@ -22,7 +22,7 @@ from tiliqua.eurorack_pmod import ASQ
 
 from amaranth_soc          import wishbone
 
-class Persistance(Elaboratable):
+class Persistance(wiring.Component):
 
     """
     Read pixels from a framebuffer in PSRAM and apply gradual intensity reduction to simulate oscilloscope glow.
@@ -32,22 +32,12 @@ class Persistance(Elaboratable):
     'holdoff' is used to keep this core from saturating the bus between bursts.
     """
 
-    def __init__(self, *, fb_base, bus_master, fb_size,
+    def __init__(self, *, fb_base, bus_master,
                  fifo_depth=128, holdoff_default=1024, fb_bytes_per_pixel=1):
-        super().__init__()
 
         self.fb_base = fb_base
-        self.fb_hsize, self.fb_vsize = fb_size
         self.fifo_depth = fifo_depth
         self.fb_bytes_per_pixel = fb_bytes_per_pixel
-
-        # Tweakables
-        self.holdoff = Signal(16, init=holdoff_default)
-        self.decay   = Signal(4, init=1)
-
-        # We are a DMA master
-        self.bus = wishbone.Interface(addr_width=bus_master.addr_width, data_width=32, granularity=8,
-                                      features={"cti", "bte"})
 
         # FIFO to cache pixels from PSRAM.
         self.fifo = SyncFIFOBuffered(width=32, depth=fifo_depth)
@@ -56,14 +46,24 @@ class Persistance(Elaboratable):
         self.dma_addr_in = Signal(32, init=0)
         self.dma_addr_out = Signal(32)
 
-        # Kick to start this core.
-        self.enable = Signal(1, init=0)
+        super().__init__({
+            # Tweakables
+            "holdoff": In(16, init=holdoff_default),
+            "decay": In(4, init=1),
+            # We are a DMA master
+            "bus":  Out(wishbone.Signature(addr_width=bus_master.addr_width, data_width=32, granularity=8,
+                                           features={"cti", "bte"})),
+            # Kick this to start the core
+            "enable": In(1),
+            # Must be updated on timing changes
+            "timings": In(video.DVITimingInterface()),
+        })
 
     def elaborate(self, platform) -> Module:
         m = Module()
 
         # Length of framebuffer in 32-bit words
-        fb_len_words = (self.fb_bytes_per_pixel * (self.fb_hsize*self.fb_vsize)) // 4
+        fb_len_words = (self.timings.active_pixels * self.fb_bytes_per_pixel) // 4
 
         holdoff_count = Signal(32)
         pnext = Signal(32)
