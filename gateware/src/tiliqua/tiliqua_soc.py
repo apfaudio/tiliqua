@@ -139,6 +139,7 @@ class TiliquaSoc(Component):
         self.pmod0_periph_base    = 0x00000700
         self.dtr0_base            = 0x00000800
         self.video_periph_base    = 0x00000900
+        self.framebuffer_periph_base       = 0x00000A00
 
         # Some settings depend on whether code is in block RAM or SPI flash
         self.fw_location = fw_location
@@ -250,6 +251,10 @@ class TiliquaSoc(Component):
             bus_dma=self.psram_periph)
         self.csr_decoder.add(self.video_periph.bus, addr=self.video_periph_base, name="video_periph")
 
+        self.framebuffer_periph = dma_framebuffer.Peripheral(fb=self.fb)
+        self.csr_decoder.add(
+                self.framebuffer_periph.bus, addr=self.framebuffer_periph_base, name="framebuffer_periph")
+
         self.permit_bus_traffic = Signal()
 
         self.extra_rust_constants = []
@@ -338,6 +343,7 @@ class TiliquaSoc(Component):
 
         # video PHY
         m.submodules.fb = self.fb
+        m.submodules.framebuffer_periph = self.framebuffer_periph
 
         # video periph / persist
         m.submodules.video_periph = self.video_periph
@@ -381,7 +387,6 @@ class TiliquaSoc(Component):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
             m.d.sync += self.permit_bus_traffic.eq(1)
-            m.d.sync += self.fb.enable.eq(1)
             m.d.sync += self.video_periph.en.eq(1)
 
         return m
