@@ -1,4 +1,19 @@
+pub struct DVIModeline {
+   pub h_active:      u16,
+   pub h_sync_start:  u16,
+   pub h_sync_end:    u16,
+   pub h_total:       u16,
+   pub h_sync_invert: bool,
+   pub v_active:      u16,
+   pub v_sync_start:  u16,
+   pub v_sync_end:    u16,
+   pub v_total:       u16,
+   pub v_sync_invert: bool,
+   pub pixel_clk_mhz: f32,
+}
+
 pub trait DMAFramebuffer {
+    fn set_modeline(&mut self, mode: DVIModeline);
     fn set_palette_rgb(&mut self, intensity: u8, hue: u8, r: u8, g: u8, b: u8);
 }
 
@@ -8,6 +23,8 @@ macro_rules! impl_dma_framebuffer {
         $DMA_FRAMEBUFFERX:ident: $PACFRAMEBUFFERX:ty,
     )+) => {
         $(
+            use tiliqua_hal::dma_display::DVIModeline;
+
             struct $DMA_FRAMEBUFFERX {
                 registers: $PACFRAMEBUFFERX,
                 framebuffer_base: *mut u32,
@@ -17,6 +34,13 @@ macro_rules! impl_dma_framebuffer {
             }
 
             impl hal::dma_display::DMAFramebuffer for $DMA_FRAMEBUFFERX {
+                fn set_modeline(&mut self, mode: DVIModeline) {
+                    self.registers.h_timing().write(|w| unsafe {
+                        w.h_active().bits(mode.h_active);
+                        w.h_sync_start().bits(mode.h_sync_start)
+                    } );
+                }
+
                 fn set_palette_rgb(&mut self, intensity: u8, hue: u8, r: u8, g: u8, b: u8)  {
                     /* wait until last coefficient written */ 
                     while self.registers.palette_busy().read().bits() == 1 { }
