@@ -218,10 +218,8 @@ class SIDSoc(TiliquaSoc):
         self.csr_decoder.add(self.sid_periph.bus, addr=0x1000, name="sid_periph")
 
         # Add scope peripheral 
-        fb_size = (self.video.fb_hsize, self.video.fb_vsize)
         self.scope_periph = scope.ScopeTracePeripheral(
-            fb_base=self.video.fb_base,
-            fb_size=fb_size,
+            fb=self.fb,
             bus_dma=self.psram_periph,
             video_rotate_90=self.video_rotate_90)
         self.csr_decoder.add(self.scope_periph.bus, addr=0x1100, name="scope_periph")
