@@ -2,8 +2,7 @@ from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from vendor  import tmds
-from tiliqua import sim
+from tiliqua import sim, tmds
 
 class DVITimingGen(wiring.Component):
 

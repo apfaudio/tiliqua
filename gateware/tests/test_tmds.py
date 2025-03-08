@@ -5,7 +5,7 @@ from amaranth import *
 from amaranth.sim import *
 from amaranth.lib import wiring
 
-from vendor.tmds import TMDSEncoder  # Replace with your actual import
+from tiliqua.tmds import TMDSEncoder
 
 class TMDSEncoderTests(unittest.TestCase):
     def test_dc_balance(self):
