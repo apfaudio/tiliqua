@@ -63,11 +63,8 @@ class VectorScopeTop(Elaboratable):
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
-        fb_base = 0x0
         # All of our DMA masters
-        self.fb = dma_framebuffer.DMAFramebuffer(
-                fb_base=fb_base, fixed_modeline=default_modeline,
-                bus_master=self.psram_periph.bus)
+        self.fb = dma_framebuffer.DMAFramebuffer(fixed_modeline=default_modeline)
         self.psram_periph.add_master(self.fb.bus)
 
         self.persist = Persistance(fb=self.fb)

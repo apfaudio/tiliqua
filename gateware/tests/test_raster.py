@@ -20,14 +20,10 @@ class RasterTests(unittest.TestCase):
 
     MODELINE = dvi_modeline.DVIModeline.all_timings()["1280x720p60"]
 
-    class FakeBusMaster:
-        addr_width = 30
-
     def test_persist(self):
 
         m = Module()
         fb = dma_framebuffer.DMAFramebuffer(
-            fb_base=0x0, bus_master=self.FakeBusMaster(),
             fixed_modeline=self.MODELINE)
         dut = raster.Persistance(fb=fb)
         m.submodules += [dut, fb]
@@ -64,7 +60,6 @@ class RasterTests(unittest.TestCase):
 
         m = Module()
         fb = dma_framebuffer.DMAFramebuffer(
-            fb_base=0x0, bus_master=self.FakeBusMaster(),
             fixed_modeline=self.MODELINE)
         dut = raster.Stroke(fb=fb)
         m.submodules += [dut, fb]
