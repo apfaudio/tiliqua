@@ -6,13 +6,9 @@
 
 For updates, join the [matrix chatroom](https://matrix.to/#/#apfaudio:matrix.org), subscribe to the [Crowd Supply page](https://www.crowdsupply.com/apfaudio/tiliqua) or my own [mailing list](https://apf.audio/)
 
-<img src="doc/img/tiliqua-front-left.jpg" width="500">
+## see the ⮕[documentation](https://apfaudio.github.io/tiliqua/)⬅
 
-# Documentation
-
-Available at [apfaudio.github.io/tiliqua](https://apfaudio.github.io/tiliqua/) (🚧 under construction)
-
-Documentation is built from source in `gateware/docs`.
+![image](https://github.com/user-attachments/assets/0a5ae000-790a-4a23-9a65-1b69839eef9c)
 
 # Community
 
@@ -20,13 +16,21 @@ Documentation is built from source in `gateware/docs`.
 
 Participants in this project are expected to adhere to the [Berlin Code of Conduct](https://berlincodeofconduct.org/).
 
-## Builds on the following (awesome) open projects
+# Acknowledgements
+
+## Tiliqua builds on the following (awesome) projects:
 
 - The [Amaranth HDL](https://github.com/amaranth-lang/amaranth) and [Amaranth SoC](https://github.com/amaranth-lang/amaranth-soc) projects.
 - Audio interface and gateware from my existing [eurorack-pmod](https://github.com/apfaudio/eurorack-pmod) project.
 - USB interface and gateware based on [LUNA and Cynthion](https://github.com/greatscottgadgets/luna/) projects.
 - USB Audio gateware and descriptors based on [adat-usb2-audio-interface](https://github.com/hansfbaier/adat-usb2-audio-interface).
 - Some gateware is also inherited from the [Glasgow](https://github.com/GlasgowEmbedded/glasgow) project.
+
+## Funding
+
+We would like to acknowledge partial funding of the [Tiliqua project](https://nlnet.nl/project/Tiliqua/) from the [NGI Commons Fund](https://nlnet.nl/commonsfund), a fund established by [NLnet](https://nlnet.nl/) with financial support from the European Commission’s [Next Generation Internet](https://ngi.eu/) program.
+
+![image](https://github.com/user-attachments/assets/e3eeab37-f5b2-4686-8cb4-5dc49f42ba7d)
 
 # License
 
