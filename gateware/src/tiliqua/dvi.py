@@ -1,3 +1,9 @@
+# Copyright (c) 2024 S. Holzapfel <me@sebholzapfel.com>
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+
+"""Utilities for generating DVI video timings, also contains a DVI PHY implementation."""
+
 from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
@@ -108,10 +114,12 @@ class DVITimingGen(wiring.Component):
         return m
 
 class DVIPHY(wiring.Component):
+
     """
     DVI PHY (serializer), DDR outputs currently ECP5-specific.
     Assumes clock domains 'dvi' (pixel clock) and 'dvi5x' (5x pixel clock).
     """
+
     # Channel data and control inputs
     de: In(1)           # Data enable (high when drawing)
     data_in_ch0: In(8)  # Channel 0 - data

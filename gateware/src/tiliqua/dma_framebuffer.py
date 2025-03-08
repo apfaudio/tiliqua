@@ -1,8 +1,8 @@
-# Utilities for synthesizing video timings and a DMA-driven framebuffer.
-#
 # Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
+
+"""Implementation of PSRAM-backed framebuffer with a DVI PHY."""
 
 import colorsys
 import os
