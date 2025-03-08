@@ -226,14 +226,13 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
 
     clock_tree_base = """
     ┌─────────────[tiliqua-mobo]────────────────────────────[soldiercrab]─────────┐
-    │ [48MHz OSC]─┐                        ┊                                      │
-    │             └─────────────────────────>[ECP5 PLL]──┐                        │
+    │                                      ┊┌─[48MHz OSC]                         │
+    │                                      ┊└─>[ECP5 PLL]┐                        │
     │                                      ┊             ├>[sync]{sync:12.4f} MHz │
     │                                      ┊             ├>[usb] {sync:12.4f} MHz │
     │                                      ┊             └>[fast]{fast:12.4f} MHz │
-    │ [25MHz OSC]─┐                        ┊                                      │
-    │             └>[si5351 PLL]─┐         ┊                                      │
-    │                (dynamic)   ├>[clk0]─────────────────>[audio]{audio:11.4f} MHz │"""
+    │ [25MHz OSC]──>[si5351 PLL]─┬>[clk0]─────────────────>[audio]{audio:11.4f} MHz │"""
+
     clock_tree_video = """
     │                            └>[clk1]───>[ECP5 PLL]─┐                         │
     │                                      ┊            ├─>[dvi]  {dvi:11.4f} MHz │
