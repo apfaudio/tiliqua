@@ -118,7 +118,7 @@ class SoldierCrabR3Platform(_SoldierCrabPlatform):
     ulpi_psram_voltage = "1V8"
     psram_id           = "APS256XXN-OBR"
     psram_registers    = [
-        ("REG_MR0","REG_MR4",    0x00, 0x0c),
+        ("REG_MR0","REG_MR4",    0x00, 0x10),
         ("REG_MR4","REG_MR8",    0x04, 0xc0),
         ("REG_MR8","TRAIN_INIT", 0x08, 0x0f),
     ]

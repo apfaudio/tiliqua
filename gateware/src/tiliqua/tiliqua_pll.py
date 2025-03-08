@@ -34,8 +34,8 @@ def clock_settings(audio_clock: AudioClock, video_timings: video.DVITimings) -> 
     It should match what the PLLs end up generating, as these constants are used in downstream logic.
     """
     frequencies = ClockFrequencies(
-        sync=60_000_000,
-        fast=120_000_000,
+        sync=100_000_000,
+        fast=200_000_000,
         audio=None,
         dvi=None,
         dvi5x=None
@@ -312,6 +312,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
                 # Generated clock outputs.
                 o_CLKOP=feedback60,
                 o_CLKOS=ClockSignal("fast"),
+                o_CLKOS2=ClockSignal("sync"),
 
                 # Status.
                 o_LOCK=locked60,
@@ -331,9 +332,13 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
                 p_CLKOP_CPHASE=4,
                 p_CLKOP_FPHASE=0,
                 p_CLKOS_ENABLE="ENABLED",
-                p_CLKOS_DIV=5,
+                p_CLKOS_DIV=3,
                 p_CLKOS_CPHASE=4,
                 p_CLKOS_FPHASE=0,
+                p_CLKOS2_ENABLE="ENABLED",
+                p_CLKOS2_DIV=6,
+                p_CLKOS2_CPHASE=4,
+                p_CLKOS2_FPHASE=0,
                 p_FEEDBK_PATH="CLKOP",
                 p_CLKFB_DIV=5,
 
@@ -382,7 +387,6 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
 
         # Derived clocks and resets
         m.d.comb += [
-            ClockSignal("sync")  .eq(feedback60),
             ClockSignal("usb")   .eq(feedback60),
 
             ResetSignal("sync")  .eq(~locked60),
