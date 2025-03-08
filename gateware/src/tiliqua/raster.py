@@ -16,7 +16,6 @@ from amaranth.lib.cdc        import FFSynchronizer
 
 from amaranth_future         import fixed
 
-
 from tiliqua                 import dsp
 from tiliqua.dma_framebuffer import DMAFramebuffer
 from tiliqua.eurorack_pmod   import ASQ
@@ -216,8 +215,8 @@ class Stroke(wiring.Component):
             # Point stream to render
             # 4 channels: x, y, intensity, color
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
-            # We are a DMA master
-            "bus":  Out(fb.bus.signature),
+            # We are a DMA master (no burst support)
+            "bus":  Out(wishbone.Signature(addr_width=fb.bus.addr_width, data_width=32, granularity=8)),
             # Kick this to start the core
             "enable": In(1),
         })
