@@ -1,3 +1,9 @@
+# Copyright (c) 2024 S. Holzapfel <me@sebholzapfel.com>
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+
+"""Classes for representing DVI timings and video clock/PLL settings."""
+
 from dataclasses import dataclass
 
 @dataclass

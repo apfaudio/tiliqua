@@ -1,11 +1,15 @@
-# DVI TMDS encoder implementation
+# Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
 #
-# This is an Amaranth rewrite of the TMDS encoder from:
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+#
+# This is an Amaranth TMDS encoder was inspired by:
 # "Project F Library - TMDS Encoder for DVI"
 #   - Original attribution:
 #       Copyright Will Green
 #       Open source hardware released under the MIT License
 #       Learn more at https://projectf.io
+
+"""DVI TMDS encoder implementation"""
 
 from amaranth import *
 from amaranth.lib import wiring
