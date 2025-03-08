@@ -244,11 +244,9 @@ class TiliquaSoc(Component):
         self.psram_periph = psram_peripheral.Peripheral(size=self.psram_size)
         self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base, name="psram")
 
-        # video PHY (DMAs from PSRAM starting at fb_base)
-        fb_base = self.psram_base
+        # video PHY (DMAs from PSRAM starting at self.psram_base)
         self.fb = dma_framebuffer.DMAFramebuffer(
-                fb_base=fb_base, fixed_modeline=default_modeline,
-                bus_master=self.psram_periph.bus)
+                fb_base_default=self.psram_base, fixed_modeline=default_modeline)
         self.psram_periph.add_master(self.fb.bus)
 
         # mobo i2c
@@ -488,7 +486,7 @@ class TiliquaSoc(Component):
             f.write(f"pub const H_ACTIVE: u32            = {self.fb.fixed_modeline.h_active};\n")
             f.write(f"pub const V_ACTIVE: u32            = {self.fb.fixed_modeline.v_active};\n")
             f.write(f"pub const VIDEO_ROTATE_90: bool    = {'true' if self.video_rotate_90 else 'false'};\n")
-            f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base:x};\n")
+            f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base.init:x};\n")
             f.write(f"pub const PX_HUE_MAX: i32          = 16;\n")
             f.write(f"pub const PX_INTENSITY_MAX: i32    = 16;\n")
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")

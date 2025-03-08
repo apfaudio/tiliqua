@@ -33,8 +33,7 @@ class DMAFramebuffer(wiring.Component):
 
     class FramebufferSimulationInterface(wiring.Signature):
         """
-        Signals used by simulation harnesses to write images for debugging by
-        inspecting the inner workings of this core.
+        Enough information for simulation to plot the output of this core to bitmaps.
         """
         def __init__(self):
             super().__init__({
@@ -46,20 +45,21 @@ class DMAFramebuffer(wiring.Component):
                 "b": Out(8),
             })
 
-    def __init__(self, *, fb_base, bus_master,
+    def __init__(self, *, fb_base_default=0, addr_width=22,
                  fifo_depth=2048, bytes_per_pixel=1, fixed_modeline: DVIModeline = None):
 
         self.fixed_modeline = fixed_modeline
         self.fifo_depth = fifo_depth
-        self.fb_base = fb_base
         self.bytes_per_pixel = bytes_per_pixel
 
+        # Color palette tweaking interface is presented by this
         self.palette = palette.ColorPalette()
 
-        # Color palette tweaking interface
         super().__init__({
+            # Start of framebuffer
+            "fb_base": In(32, init=fb_base_default),
             # We are a DMA master
-            "bus":  Out(wishbone.Signature(addr_width=bus_master.addr_width, data_width=32, granularity=8,
+            "bus":  Out(wishbone.Signature(addr_width=addr_width, data_width=32, granularity=8,
                                            features={"cti", "bte"})),
             # Kick this to start the core
             "enable": In(1),
@@ -83,8 +83,7 @@ class DMAFramebuffer(wiring.Component):
         # TODO: FFSync needed? (sync -> dvi crossing, but should always be in reset when changed).
         wiring.connect(m, wiring.flipped(self.timings), dvi_tgen.timings)
 
-        # Create a VSync signal in the 'sync' domain.
-        # NOTE: this is the same regardless of sync inversion.
+        # Create a VSync signal in the 'sync' domain. Decoupled from display VSync inversion!
         phy_vsync_sync = Signal()
         m.submodules.vsync_ff = FFSynchronizer(
                 i=dvi_tgen.ctrl.vsync, o=phy_vsync_sync, o_domain="sync")
