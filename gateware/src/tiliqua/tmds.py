@@ -118,12 +118,12 @@ class TMDSEncoder(wiring.Component):
             with m.Elif(((bias > 0) & (balance > 0)) | ((bias < 0) & (balance < 0))):
                 m.d.dvi += [
                     tmds_r.eq(Cat(~enc_qm[0:8], enc_qm[8], Const(1, 1))),
-                    bias.eq(bias + Cat(Const(0, 3), enc_qm[8], Const(0, 1)).as_signed() - balance)
+                    bias.eq(bias + Cat(Const(0, 1), enc_qm[8], Const(0, 3)).as_signed() - balance)
                 ]
             with m.Else():
                 m.d.dvi += [
                     tmds_r.eq(Cat(enc_qm[0:8], enc_qm[8], Const(0, 1))),
-                    bias.eq(bias - Cat(Const(0, 3), ~enc_qm[8], Const(0, 1)).as_signed() + balance)
+                    bias.eq(bias - Cat(Const(0, 1), ~enc_qm[8], Const(0, 3)).as_signed() + balance)
                 ]
 
         return m

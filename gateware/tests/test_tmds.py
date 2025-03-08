@@ -16,7 +16,7 @@ class TMDSEncoderTests(unittest.TestCase):
         m = DomainRenamer({"dvi": "sync"})(m)
 
         # Generate a sequence that would accumulate DC bias
-        test_sequence = [0b11111111] * 5 + [0b00000000] * 5
+        test_sequence = [0b11111111] * 10 + [0b00000000] * 10
 
         async def testbench(ctx):
             # Initialize in control mode to reset bias
@@ -33,17 +33,15 @@ class TMDSEncoderTests(unittest.TestCase):
                 # Analyze output for DC balance
                 result = ctx.get(dut.tmds)
                 # Count ones in output
-                print(bin(result))
                 ones_count = bin(result).count('1')
                 zeros_count = 10 - ones_count
-                print(ones_count, zeros_count)
                 # Update disparity
                 new_disparity = disparity + (ones_count - zeros_count)
                 # Disparity should be controlled (not growing unbounded)
-                #assert abs(new_disparity) <= 8, f"Disparity {new_disparity} exceeded bounds"
+                assert abs(new_disparity) <= 8, f"Disparity {new_disparity} exceeded bounds"
                 disparity = new_disparity
             # After sequence, disparity should be close to balanced
-            # assert abs(disparity) <= 2, f"Final disparity {disparity} is not well balanced"
+            assert abs(disparity) <= 8, f"Final disparity {disparity} is not well balanced"
         sim = Simulator(m)
         sim.add_clock(1e-6)  # 1MHz clock in dvi domain
         sim.add_testbench(testbench)
