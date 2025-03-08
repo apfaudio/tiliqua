@@ -18,13 +18,16 @@ Participants in this project are expected to adhere to the [Berlin Code of Condu
 
 # Acknowledgements
 
-## Tiliqua builds on the following (awesome) projects:
+This project would be nothing without the hard work of many (awesome) open-source projects. An exhaustive list would take pages, here I mention only a crucial subset:
 
-- The [Amaranth HDL](https://github.com/amaranth-lang/amaranth) and [Amaranth SoC](https://github.com/amaranth-lang/amaranth-soc) projects.
-- Audio interface and gateware from my existing [eurorack-pmod](https://github.com/apfaudio/eurorack-pmod) project.
-- USB interface and gateware based on [LUNA and Cynthion](https://github.com/greatscottgadgets/luna/) projects.
-- USB Audio gateware and descriptors based on [adat-usb2-audio-interface](https://github.com/hansfbaier/adat-usb2-audio-interface).
-- Some gateware is also inherited from the [Glasgow](https://github.com/GlasgowEmbedded/glasgow) project.
+- Python-based HDL and SoC framework: The [Amaranth HDL](https://github.com/amaranth-lang/amaranth) and [Amaranth SoC](https://github.com/amaranth-lang/amaranth-soc) projects.
+- USB and SoC gateware: The [LUNA and Cynthion](https://github.com/greatscottgadgets/luna/) projects.
+- RISCV softcore: The [VexRiscv and SpinalHDL projects](https://github.com/SpinalHDL/VexRiscv)
+- USB audio gateware and descriptors: The [adat-usb2-audio-interface](https://github.com/hansfbaier/adat-usb2-audio-interface) project.
+- Some gateware (e.g. I2C state machines) are inherited from the [Glasgow](https://github.com/GlasgowEmbedded/glasgow) project.
+- Audio interface and gateware: my existing [eurorack-pmod](https://github.com/apfaudio/eurorack-pmod) project.
+- SID emulation gateware: [reDIP-SID](https://github.com/daglem/reDIP-SID)
+- The "mi-plaits-dsp-rs" project: [mi-plaits-dsp](https://github.com/sourcebox/mi-plaits-dsp-rs)
 
 ## Funding
 
