@@ -7,22 +7,22 @@
 import colorsys
 import os
 
-from amaranth              import *
-from amaranth.build        import *
-from amaranth.lib          import wiring, data, stream
-from amaranth.lib.wiring   import In, Out
-from amaranth.lib.fifo     import SyncFIFOBuffered
-from amaranth.lib.cdc      import FFSynchronizer
+from amaranth                import *
+from amaranth.build          import *
+from amaranth.lib            import wiring, data, stream
+from amaranth.lib.wiring     import In, Out
+from amaranth.lib.fifo       import SyncFIFOBuffered
+from amaranth.lib.cdc        import FFSynchronizer
 
-from amaranth_future       import fixed
+from amaranth_future         import fixed
 
+from tiliqua                 import dsp
+from tiliqua.dma_framebuffer import DMAFramebuffer
+from tiliqua.eurorack_pmod   import ASQ
 
-from tiliqua               import dsp
-from tiliqua.eurorack_pmod import ASQ
+from amaranth_soc            import wishbone
 
-from amaranth_soc          import wishbone
-
-class Persistance(Elaboratable):
+class Persistance(wiring.Component):
 
     """
     Read pixels from a framebuffer in PSRAM and apply gradual intensity reduction to simulate oscilloscope glow.
@@ -32,22 +32,11 @@ class Persistance(Elaboratable):
     'holdoff' is used to keep this core from saturating the bus between bursts.
     """
 
-    def __init__(self, *, fb_base, bus_master, fb_size,
-                 fifo_depth=128, holdoff_default=1024, fb_bytes_per_pixel=1):
-        super().__init__()
+    def __init__(self, *, fb: DMAFramebuffer,
+                 fifo_depth=128, holdoff_default=1024):
 
-        self.fb_base = fb_base
-        self.fb_hsize, self.fb_vsize = fb_size
+        self.fb = fb
         self.fifo_depth = fifo_depth
-        self.fb_bytes_per_pixel = fb_bytes_per_pixel
-
-        # Tweakables
-        self.holdoff = Signal(16, init=holdoff_default)
-        self.decay   = Signal(4, init=1)
-
-        # We are a DMA master
-        self.bus = wishbone.Interface(addr_width=bus_master.addr_width, data_width=32, granularity=8,
-                                      features={"cti", "bte"})
 
         # FIFO to cache pixels from PSRAM.
         self.fifo = SyncFIFOBuffered(width=32, depth=fifo_depth)
@@ -56,14 +45,21 @@ class Persistance(Elaboratable):
         self.dma_addr_in = Signal(32, init=0)
         self.dma_addr_out = Signal(32)
 
-        # Kick to start this core.
-        self.enable = Signal(1, init=0)
+        super().__init__({
+            # Tweakables
+            "holdoff": In(16, init=holdoff_default),
+            "decay": In(4, init=1),
+            # We are a DMA master
+            "bus":  Out(fb.bus.signature),
+            # Kick this to start the core
+            "enable": In(1),
+        })
 
     def elaborate(self, platform) -> Module:
         m = Module()
 
         # Length of framebuffer in 32-bit words
-        fb_len_words = (self.fb_bytes_per_pixel * (self.fb_hsize*self.fb_vsize)) // 4
+        fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
 
         holdoff_count = Signal(32)
         pnext = Signal(32)
@@ -90,7 +86,7 @@ class Persistance(Elaboratable):
                     bus.cyc.eq(1),
                     bus.we.eq(0),
                     bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.adr.eq(self.fb_base + dma_addr_in),
+                    bus.adr.eq(self.fb.fb_base + dma_addr_in),
                     self.fifo.w_en.eq(bus.ack),
                     self.fifo.w_data.eq(bus.dat_r),
                     bus.cti.eq(
@@ -143,7 +139,7 @@ class Persistance(Elaboratable):
                     bus.we.eq(1),
                     bus.sel.eq(2**(bus.data_width//8)-1),
                     bus.dat_w.eq(pixb),
-                    bus.adr.eq(self.fb_base + dma_addr_out),
+                    bus.adr.eq(self.fb.fb_base + dma_addr_out),
                     wr_source.eq(pnext),
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST)
@@ -153,10 +149,10 @@ class Persistance(Elaboratable):
                     m.d.comb += wr_source.eq(self.fifo.r_data),
                     with m.If(dma_addr_out < (fb_len_words-1)):
                         m.d.sync += dma_addr_out.eq(dma_addr_out + 1)
-                        m.d.comb += bus.adr.eq(self.fb_base + dma_addr_out + 1),
+                        m.d.comb += bus.adr.eq(self.fb.fb_base + dma_addr_out + 1),
                     with m.Else():
                         m.d.sync += dma_addr_out.eq(0)
-                        m.d.comb += bus.adr.eq(self.fb_base + 0),
+                        m.d.comb += bus.adr.eq(self.fb.fb_base + 0),
                 with m.If(~self.fifo.r_rdy):
                     m.d.comb += bus.cti.eq(
                             wishbone.CycleType.END_OF_BURST)
@@ -190,22 +186,15 @@ class Stroke(wiring.Component):
     fractional resampler. This is kind of analogous to sin(x)/x interpolation.
     """
 
-    # x, y, intensity, color
-    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    def __init__(self, *, fb_base, bus_master, fb_size, fb_bytes_per_pixel=1, fs=192000, n_upsample=4,
+    def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=4,
                  default_hue=10, default_x=0, default_y=0, video_rotate_90=False):
 
         self.rotate_90 = video_rotate_90
 
-        self.fb_base = fb_base
-        self.fb_hsize, self.fb_vsize = fb_size
-        self.fb_bytes_per_pixel = fb_bytes_per_pixel
+        self.fb = fb
         self.fs = fs
         self.n_upsample = n_upsample
-
-        self.bus = wishbone.Interface(addr_width=bus_master.addr_width,
-                                      data_width=32, granularity=8)
 
         self.sample_x = Signal(signed(16))
         self.sample_y = Signal(signed(16))
@@ -222,10 +211,15 @@ class Stroke(wiring.Component):
         self.px_read = Signal(32)
         self.px_sum = Signal(16)
 
-        # Kick this to start the core
-        self.enable = Signal(1, init=0)
-
-        super().__init__()
+        super().__init__({
+            # Point stream to render
+            # 4 channels: x, y, intensity, color
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            # We are a DMA master (no burst support)
+            "bus":  Out(wishbone.Signature(addr_width=fb.bus.addr_width, data_width=32, granularity=8)),
+            # Kick this to start the core
+            "enable": In(1),
+        })
 
 
     def elaborate(self, platform) -> Module:
@@ -233,7 +227,8 @@ class Stroke(wiring.Component):
 
         bus = self.bus
 
-        fb_len_words = (self.fb_hsize*self.fb_vsize) // 4
+        fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
+        fb_hwords = ((self.fb.timings.h_active*self.fb.bytes_per_pixel)//4)
 
         sample_x = self.sample_x
         sample_y = self.sample_y
@@ -273,7 +268,6 @@ class Stroke(wiring.Component):
         sample_intensity = Signal(4)
 
         # pixel position
-        fb_hwords = ((self.fb_hsize*self.fb_bytes_per_pixel)//4)
         x_offs = Signal(unsigned(16))
         y_offs = Signal(unsigned(16))
         subpix_shift = Signal(unsigned(6))
@@ -285,13 +279,13 @@ class Stroke(wiring.Component):
             m.d.comb += [
                 subpix_shift.eq((-sample_y)[0:2]*8),
                 x_offs.eq((fb_hwords//2) + ((-sample_y)>>2)),
-                y_offs.eq(sample_x + (self.fb_vsize//2)),
+                y_offs.eq(sample_x + (self.fb.timings.v_active>>1)),
             ]
         else:
             m.d.comb += [
                 subpix_shift.eq(sample_x[0:2]*8),
                 x_offs.eq((fb_hwords//2) + (sample_x>>2)),
-                y_offs.eq(sample_y + (self.fb_vsize//2)),
+                y_offs.eq(sample_y + (self.fb.timings.v_active>>1)),
             ]
 
         with m.FSM() as fsm:
@@ -316,10 +310,10 @@ class Stroke(wiring.Component):
 
             with m.State('LATCH1'):
 
-                with m.If((x_offs < fb_hwords) & (y_offs < self.fb_vsize)):
+                with m.If((x_offs < fb_hwords) & (y_offs < self.fb.timings.v_active)):
                     m.d.sync += [
                         bus.sel.eq(0xf),
-                        bus.adr.eq(self.fb_base + pixel_offs),
+                        bus.adr.eq(self.fb.fb_base + pixel_offs),
                     ]
                     m.next = 'READ'
                 with m.Else():

@@ -54,7 +54,7 @@ from tiliqua.tiliqua_platform                    import *
 from tiliqua.raster                              import Persistance
 from tiliqua.types                               import FirmwareLocation
 
-from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, video, eurorack_pmod_peripheral
+from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class VideoPeripheral(wiring.Component):
@@ -74,11 +74,10 @@ class VideoPeripheral(wiring.Component):
     class PaletteBusyReg(csr.Register, access="r"):
         busy: csr.Field(csr.action.R, unsigned(1))
 
-    def __init__(self, fb_base, fb_size, bus_dma, video):
+    def __init__(self, fb, bus_dma):
         self.en = Signal()
-        self.video = video
-        self.persist = Persistance(
-            fb_base=fb_base, bus_master=bus_dma.bus, fb_size=fb_size)
+        self.fb = fb
+        self.persist = Persistance(fb=self.fb)
         bus_dma.add_master(self.persist.bus)
 
         regs = csr.Builder(addr_width=5, data_width=8)
@@ -117,24 +116,24 @@ class VideoPeripheral(wiring.Component):
         with m.If(self._palette.element.w_stb & ~palette_busy):
             m.d.sync += [
                 palette_busy                            .eq(1),
-                self.video.palette_rgb.valid            .eq(1),
-                self.video.palette_rgb.payload.position .eq(self._palette.f.position.w_data),
-                self.video.palette_rgb.payload.red      .eq(self._palette.f.red.w_data),
-                self.video.palette_rgb.payload.green    .eq(self._palette.f.green.w_data),
-                self.video.palette_rgb.payload.blue     .eq(self._palette.f.blue.w_data),
+                self.fb.palette.update.valid            .eq(1),
+                self.fb.palette.update.payload.position .eq(self._palette.f.position.w_data),
+                self.fb.palette.update.payload.red      .eq(self._palette.f.red.w_data),
+                self.fb.palette.update.payload.green    .eq(self._palette.f.green.w_data),
+                self.fb.palette.update.payload.blue     .eq(self._palette.f.blue.w_data),
             ]
 
-        with m.If(palette_busy & self.video.palette_rgb.ready):
+        with m.If(palette_busy & self.fb.palette.update.ready):
             # coefficient has been written
             m.d.sync += [
                 palette_busy.eq(0),
-                self.video.palette_rgb.valid.eq(0),
+                self.fb.palette.update.valid.eq(0),
             ]
 
         return m
 
 class TiliquaSoc(Component):
-    def __init__(self, *, firmware_bin_path, dvi_timings, ui_name, ui_sha, platform_class, clock_settings,
+    def __init__(self, *, firmware_bin_path, default_modeline, ui_name, ui_sha, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
                  mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im"):
 
@@ -148,7 +147,7 @@ class TiliquaSoc(Component):
         self.firmware_bin_path = firmware_bin_path
         self.touch = touch
         self.clock_settings = clock_settings
-        self.dvi_timings = dvi_timings
+        self.default_modeline = default_modeline
         self.video_rotate_90 = video_rotate_90
 
         self.platform_class = platform_class
@@ -245,13 +244,10 @@ class TiliquaSoc(Component):
         self.psram_periph = psram_peripheral.Peripheral(size=self.psram_size)
         self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base, name="psram")
 
-        # video PHY (DMAs from PSRAM starting at fb_base)
-        fb_base = self.psram_base
-        fb_size = (dvi_timings.h_active, dvi_timings.v_active)
-        self.video = video.FramebufferPHY(
-                fb_base=fb_base, dvi_timings=dvi_timings, fb_size=fb_size,
-                bus_master=self.psram_periph.bus)
-        self.psram_periph.add_master(self.video.bus)
+        # video PHY (DMAs from PSRAM starting at self.psram_base)
+        self.fb = dma_framebuffer.DMAFramebuffer(
+                fb_base_default=self.psram_base, fixed_modeline=default_modeline)
+        self.psram_periph.add_master(self.fb.bus)
 
         # mobo i2c
         self.i2c0 = i2c.Peripheral()
@@ -281,10 +277,8 @@ class TiliquaSoc(Component):
         # this is an interesting alternative to double-buffering that looks
         # kind of like an old CRT with slow-scanning.
         self.video_periph = VideoPeripheral(
-            fb_base=self.video.fb_base,
-            fb_size=fb_size,
-            bus_dma=self.psram_periph,
-            video=self.video)
+            fb=self.fb,
+            bus_dma=self.psram_periph)
         self.csr_decoder.add(self.video_periph.bus, addr=self.video_periph_base, name="video_periph")
 
         self.permit_bus_traffic = Signal()
@@ -374,7 +368,7 @@ class TiliquaSoc(Component):
         m.submodules.spiflash_periph = self.spiflash_periph
 
         # video PHY
-        m.submodules.video = self.video
+        m.submodules.fb = self.fb
 
         # video periph / persist
         m.submodules.video_periph = self.video_periph
@@ -418,7 +412,7 @@ class TiliquaSoc(Component):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
             m.d.sync += self.permit_bus_traffic.eq(1)
-            m.d.sync += self.video.enable.eq(1)
+            m.d.sync += self.fb.enable.eq(1)
             m.d.sync += self.video_periph.en.eq(1)
 
         return m
@@ -489,10 +483,10 @@ class TiliquaSoc(Component):
             f.write(f"pub const PSRAM_SZ_WORDS: usize    = PSRAM_SZ_BYTES / 4;\n")
             f.write(f"pub const SPIFLASH_BASE: usize     = 0x{self.spiflash_base:x};\n")
             f.write(f"pub const SPIFLASH_SZ_BYTES: usize = 0x{self.spiflash_size:x};\n")
-            f.write(f"pub const H_ACTIVE: u32            = {self.video.fb_hsize};\n")
-            f.write(f"pub const V_ACTIVE: u32            = {self.video.fb_vsize};\n")
+            f.write(f"pub const H_ACTIVE: u32            = {self.fb.fixed_modeline.h_active};\n")
+            f.write(f"pub const V_ACTIVE: u32            = {self.fb.fixed_modeline.v_active};\n")
             f.write(f"pub const VIDEO_ROTATE_90: bool    = {'true' if self.video_rotate_90 else 'false'};\n")
-            f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.video.fb_base:x};\n")
+            f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base.init:x};\n")
             f.write(f"pub const PX_HUE_MAX: i32          = 16;\n")
             f.write(f"pub const PX_INTENSITY_MAX: i32    = 16;\n")
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")

@@ -9,7 +9,7 @@ import unittest
 from amaranth              import *
 from amaranth.sim          import *
 from amaranth.lib          import wiring
-from tiliqua               import raster, test_util, eurorack_pmod
+from tiliqua               import raster, test_util, eurorack_pmod, dma_framebuffer, dvi_modeline
 
 from amaranth_soc          import csr
 from amaranth_soc.csr      import wishbone
@@ -18,16 +18,17 @@ from amaranth_future       import fixed
 
 class RasterTests(unittest.TestCase):
 
+    MODELINE = dvi_modeline.DVIModeline.all_timings()["1280x720p60"]
+
     def test_persist(self):
 
-        class FakeBusMaster:
-            addr_width = 30
+        m = Module()
+        fb = dma_framebuffer.DMAFramebuffer(
+            fixed_modeline=self.MODELINE)
+        dut = raster.Persistance(fb=fb)
+        m.submodules += [dut, fb]
 
-        dut = raster.Persistance(
-            fb_base=0x0,
-            bus_master=FakeBusMaster(),
-            fb_size=(1280, 720)
-        )
+        # No actual FB backing store, just simulating WB transactions
 
         async def testbench(ctx):
             ctx.set(dut.enable, 1)
@@ -49,7 +50,7 @@ class RasterTests(unittest.TestCase):
                     await ctx.tick()
                 ctx.set(dut.bus.ack, 0)
 
-        sim = Simulator(dut)
+        sim = Simulator(m)
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_persist.vcd", "w")):
@@ -57,14 +58,11 @@ class RasterTests(unittest.TestCase):
 
     def test_stroke(self):
 
-        class FakeBusMaster:
-            addr_width = 30
-
-        dut = raster.Stroke(
-            fb_base=0x0,
-            bus_master=FakeBusMaster(),
-            fb_size=(1280, 720)
-        )
+        m = Module()
+        fb = dma_framebuffer.DMAFramebuffer(
+            fixed_modeline=self.MODELINE)
+        dut = raster.Stroke(fb=fb)
+        m.submodules += [dut, fb]
 
         async def stimulus(ctx):
             for n in range(0, sys.maxsize):
@@ -86,7 +84,7 @@ class RasterTests(unittest.TestCase):
                 ctx.set(dut.bus.ack, 0)
                 await ctx.tick()
 
-        sim = Simulator(dut)
+        sim = Simulator(m)
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         sim.add_process(stimulus)

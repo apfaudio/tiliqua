@@ -37,12 +37,11 @@ from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, dsp, sim, cache
+from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
 from tiliqua.sim              import FakeTiliquaDomainGenerator
-from tiliqua.video            import DVI_TIMINGS, FramebufferPHY
 from tiliqua.raster           import Persistance, Stroke
 
 from vendor.ila               import AsyncSerialILA
@@ -53,32 +52,25 @@ class VectorScopeTop(Elaboratable):
     Top-level Vectorscope design.
     """
 
-    def __init__(self, *, dvi_timings, wishbone_l2_cache, clock_settings):
+    def __init__(self, *, default_modeline, wishbone_l2_cache, clock_settings):
 
-        self.dvi_timings = dvi_timings
         self.wishbone_l2_cache = wishbone_l2_cache
         self.clock_settings = clock_settings
 
         # One PSRAM with an internal arbiter to support multiple DMA masters.
         self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
 
-        fb_base = 0x0
-        fb_size = (dvi_timings.h_active, dvi_timings.v_active)
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
         # All of our DMA masters
-        self.video = FramebufferPHY(
-                fb_base=fb_base, dvi_timings=dvi_timings, fb_size=fb_size,
-                bus_master=self.psram_periph.bus)
-        self.persist = Persistance(
-                fb_base=fb_base, bus_master=self.psram_periph.bus, fb_size=fb_size)
-        self.stroke = Stroke(
-                fb_base=fb_base, bus_master=self.psram_periph.bus, fb_size=fb_size)
+        self.fb = dma_framebuffer.DMAFramebuffer(fixed_modeline=default_modeline)
+        self.psram_periph.add_master(self.fb.bus)
 
-        self.psram_periph.add_master(self.video.bus)
+        self.persist = Persistance(fb=self.fb)
         self.psram_periph.add_master(self.persist.bus)
 
+        self.stroke = Stroke(fb=self.fb)
         if self.wishbone_l2_cache:
             self.cache = cache.WishboneL2Cache(
                     addr_width=self.psram_periph.bus.addr_width,
@@ -86,6 +78,7 @@ class VectorScopeTop(Elaboratable):
             self.psram_periph.add_master(self.cache.slave)
         else:
             self.psram_periph.add_master(self.stroke.bus)
+
         super().__init__()
 
     def elaborate(self, platform):
@@ -106,7 +99,7 @@ class VectorScopeTop(Elaboratable):
 
         self.stroke.pmod0 = pmod0
 
-        m.submodules.video = self.video
+        m.submodules.fb = self.fb
         m.submodules.persist = self.persist
         m.submodules.stroke = self.stroke
 
@@ -121,7 +114,7 @@ class VectorScopeTop(Elaboratable):
         with m.If(on_delay < 0xFFFF):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
-            m.d.sync += self.video.enable.eq(1)
+            m.d.sync += self.fb.enable.eq(1)
             m.d.sync += self.persist.enable.eq(1)
             m.d.sync += self.stroke.enable.eq(1)
 
@@ -162,14 +155,14 @@ class VectorScopeTop(Elaboratable):
 
 def colors():
     """
-    Render image of intensity/color palette used internally by FramebufferPHY.
+    Render image of intensity/color palette used internally by DMAFramebuffer.
     This is useful for quickly tweaking it.
     """
     import matplotlib
     import matplotlib.pyplot as plt
     from matplotlib import colors
     import numpy as np
-    rs, gs, bs = FramebufferPHY.compute_color_palette()
+    rs, gs, bs = DMAFramebuffer.compute_color_palette()
 
     i_levels = 16
     c_levels = 16
@@ -207,11 +200,12 @@ def simulation_ports(fragment):
         "write_data":     (fragment.psram_periph.simif.write_data,     None),
         "read_ready":     (fragment.psram_periph.simif.read_ready,     None),
         "write_ready":    (fragment.psram_periph.simif.write_ready,    None),
-        "dvi_x":          (fragment.video.dvi_tgen.x,                  None),
-        "dvi_y":          (fragment.video.dvi_tgen.y,                  None),
-        "dvi_r":          (fragment.video.phy_r,                       None),
-        "dvi_g":          (fragment.video.phy_g,                       None),
-        "dvi_b":          (fragment.video.phy_b,                       None),
+        "dvi_de":         (fragment.fb.simif.de,                    None),
+        "dvi_vsync":      (fragment.fb.simif.vsync,                 None),
+        "dvi_hsync":      (fragment.fb.simif.hsync,                 None),
+        "dvi_r":          (fragment.fb.simif.r,                     None),
+        "dvi_g":          (fragment.fb.simif.g,                     None),
+        "dvi_b":          (fragment.fb.simif.b,                     None),
     }
 
 def argparse_callback(parser):
