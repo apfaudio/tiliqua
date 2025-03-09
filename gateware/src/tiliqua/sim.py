@@ -89,7 +89,7 @@ def soc_simulation_ports(fragment):
         "spiflash_data":  (fragment.spiflash_periph.spi_mmap.simif_data, None),
         "dvi_de":         (fragment.fb.simif.de,                    None),
         "dvi_vsync":      (fragment.fb.simif.vsync,                 None),
-        "dvi_hsync":      (fragment.fb.simif.vsync,                 None),
+        "dvi_hsync":      (fragment.fb.simif.hsync,                 None),
         "dvi_r":          (fragment.fb.simif.r,                     None),
         "dvi_g":          (fragment.fb.simif.g,                     None),
         "dvi_b":          (fragment.fb.simif.b,                     None),
