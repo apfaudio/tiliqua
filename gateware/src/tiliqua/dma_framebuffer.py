@@ -26,7 +26,8 @@ class DMAFramebuffer(wiring.Component):
 
     """
     Interpret a PSRAM region as a framebuffer, effectively DMAing it to the display.
-    - 'sync' domain: Pixels are DMA'd from PSRAM as a wishbone master in bursts of 'fifo_depth // 2'.
+    - 'sync' domain: Pixels are DMA'd from PSRAM as a wishbone master in bursts,
+       whenever 'burst_threshold_words' space is available in the FIFO.
     - 'dvi' domain: FIFO is drained to the display as required by DVI timings.
     Framebuffer storage: currently fixed at 1byte/pix: 4-bit intensity, 4-bit color.
     """
@@ -46,11 +47,13 @@ class DMAFramebuffer(wiring.Component):
             })
 
     def __init__(self, *, fb_base_default=0, addr_width=22,
-                 fifo_depth=2048, bytes_per_pixel=1, fixed_modeline: DVIModeline = None):
+                 fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128,
+                 fixed_modeline: DVIModeline = None):
 
         self.fixed_modeline = fixed_modeline
         self.fifo_depth = fifo_depth
         self.bytes_per_pixel = bytes_per_pixel
+        self.burst_threshold_words = burst_threshold_words
 
         # Color palette tweaking interface is presented by this
         self.palette = palette.ColorPalette()
@@ -138,7 +141,7 @@ class DMAFramebuffer(wiring.Component):
                     m.d.sync += drained.eq(0)
                 with m.If(phy_vsync_sync & ~drained):
                     m.next = 'VSYNC'
-                with m.Elif(fifo.w_level < self.fifo_depth//2):
+                with m.Elif(fifo.w_level < self.fifo_depth-self.burst_threshold_words):
                     m.next = 'BURST'
             with m.State('VSYNC'):
                 # drain DVI side. We only want to drain once.
