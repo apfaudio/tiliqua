@@ -61,21 +61,23 @@ class TMDSEncoderTests(unittest.TestCase):
                 ctx.set(dut.de, 0)
                 ctx.set(dut.ctrl_in, 0b00)
                 await ctx.tick()
-                assert ctx.get(dut.tmds) == 0b1101010100, "Initial control signal incorrect"
                 # Switch to data mode
                 ctx.set(dut.de, 1)
                 ctx.set(dut.data_in, 0b10101010)
                 await ctx.tick()
+                # 1 pipeline cycle later
+                assert ctx.get(dut.tmds) == 0b1101010100, "Initial control signal incorrect"
                 # Store data mode output
-                data_output = ctx.get(dut.tmds)
                 # Back to control mode - should reset bias
                 ctx.set(dut.de, 0)
                 ctx.set(dut.ctrl_in, 0b01)
                 await ctx.tick()
-                assert ctx.get(dut.tmds) == 0b0010101011, "Return to control mode failed"
+                data_output = ctx.get(dut.tmds)
                 # Back to data with same input - should get same output after reset
                 ctx.set(dut.de, 1)
                 ctx.set(dut.data_in, 0b10101010)
+                await ctx.tick()
+                assert ctx.get(dut.tmds) == 0b0010101011, "Return to control mode failed"
                 await ctx.tick()
                 assert ctx.get(dut.tmds) == data_output, "Bias was not properly reset"
 

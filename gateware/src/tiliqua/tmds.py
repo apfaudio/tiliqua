@@ -2,14 +2,16 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 #
-# This is an Amaranth TMDS encoder was inspired by:
+# This is Amaranth TMDS encoder was inspired by the following verilog encoder:
 # "Project F Library - TMDS Encoder for DVI"
 #   - Original attribution:
 #       Copyright Will Green
 #       Open source hardware released under the MIT License
 #       Learn more at https://projectf.io
+#
+# This implementation has an additional pipeline stage, for ~double Fmax.
 
-"""DVI TMDS encoder implementation"""
+"""DVI TMDS encoder implementation."""
 
 from amaranth import *
 from amaranth.lib import wiring
@@ -69,6 +71,19 @@ class TMDSEncoder(wiring.Component):
         # Set indicator bit
         m.d.comb += enc_qm[8].eq(~use_xnor)
 
+        # ========== PIPELINE STAGE ==========
+
+        enc_qm_r = Signal(9)
+        data_in_r = Signal(8)
+        ctrl_in_r = Signal(2)
+        de_r = Signal()
+        m.d.dvi += [
+            enc_qm_r.eq(enc_qm),
+            data_in_r.eq(self.data_in),
+            ctrl_in_r.eq(self.ctrl_in),
+            de_r.eq(self.de)
+        ]
+
         # Calculate disparity for DC balancing
         ones = Signal(signed(5))
         zeros = Signal(signed(5))
@@ -76,8 +91,8 @@ class TMDSEncoder(wiring.Component):
 
         # Count ones in encoded data
         m.d.comb += ones.eq(
-            enc_qm[0] + enc_qm[1] + enc_qm[2] + enc_qm[3] +
-            enc_qm[4] + enc_qm[5] + enc_qm[6] + enc_qm[7]
+            enc_qm_r[0] + enc_qm_r[1] + enc_qm_r[2] + enc_qm_r[3] +
+            enc_qm_r[4] + enc_qm_r[5] + enc_qm_r[6] + enc_qm_r[7]
         )
 
         # Calculate zeros and balance
@@ -87,9 +102,9 @@ class TMDSEncoder(wiring.Component):
         ]
 
         # Main TMDS encoding process
-        with m.If(~self.de):
+        with m.If(~de_r):
             # Control data during blanking interval
-            with m.Switch(self.ctrl_in):
+            with m.Switch(ctrl_in_r):
                 with m.Case(0b00):
                     m.d.dvi += tmds_r.eq(0b1101010100)
                 with m.Case(0b01):
@@ -105,25 +120,25 @@ class TMDSEncoder(wiring.Component):
             # Pixel color data logic
             with m.If((bias == 0) | (balance == 0)):
                 # No prior bias or disparity
-                with m.If(enc_qm[8] == 0):
+                with m.If(enc_qm_r[8] == 0):
                     m.d.dvi += [
-                        tmds_r.eq(Cat(~enc_qm[0:8], Const(0b10, 2))),
+                        tmds_r.eq(Cat(~enc_qm_r[0:8], Const(0b10, 2))),
                         bias.eq(bias - balance)
                     ]
                 with m.Else():
                     m.d.dvi += [
-                        tmds_r.eq(Cat(enc_qm[0:8], Const(0b01, 2))),
+                        tmds_r.eq(Cat(enc_qm_r[0:8], Const(0b01, 2))),
                         bias.eq(bias + balance)
                     ]
             with m.Elif(((bias > 0) & (balance > 0)) | ((bias < 0) & (balance < 0))):
                 m.d.dvi += [
-                    tmds_r.eq(Cat(~enc_qm[0:8], enc_qm[8], Const(1, 1))),
-                    bias.eq(bias + Cat(Const(0, 1), enc_qm[8], Const(0, 3)).as_signed() - balance)
+                    tmds_r.eq(Cat(~enc_qm_r[0:8], enc_qm_r[8], Const(1, 1))),
+                    bias.eq(bias + Cat(Const(0, 1), enc_qm_r[8], Const(0, 3)).as_signed() - balance)
                 ]
             with m.Else():
                 m.d.dvi += [
-                    tmds_r.eq(Cat(enc_qm[0:8], enc_qm[8], Const(0, 1))),
-                    bias.eq(bias - Cat(Const(0, 1), ~enc_qm[8], Const(0, 3)).as_signed() + balance)
+                    tmds_r.eq(Cat(enc_qm_r[0:8], enc_qm_r[8], Const(0, 1))),
+                    bias.eq(bias - Cat(Const(0, 1), ~enc_qm_r[8], Const(0, 3)).as_signed() + balance)
                 ]
 
         return m

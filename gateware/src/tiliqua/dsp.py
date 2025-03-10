@@ -452,6 +452,8 @@ class WaveShaper(wiring.Component):
 
         x = Signal(ltype)
         y = Signal(ASQ)
+        read0 = Signal(ASQ)
+        read1 = Signal(ASQ)
 
         trunc = Signal()
 
@@ -462,9 +464,9 @@ class WaveShaper(wiring.Component):
                 with m.If(self.i.valid):
                     m.d.sync += x.eq(self.i.payload << ltype.i_width)
                     m.d.sync += y.eq(0)
-                    m.next = 'READ0'
+                    m.next = 'ADDR0'
 
-            with m.State('READ0'):
+            with m.State('ADDR0'):
                 m.d.comb += [
                     rport.en.eq(1),
                 ]
@@ -478,26 +480,33 @@ class WaveShaper(wiring.Component):
                         m.d.comb += rport.addr.eq(x.truncate())
                     with m.Else():
                         m.d.comb += rport.addr.eq(x.truncate()+1)
+                m.next = 'READ0'
+
+            with m.State('READ0'):
+                m.d.sync += read0.eq(fixed.Value(ASQ, rport.data))
+                m.d.comb += [
+                    rport.addr.eq(x.truncate()),
+                    rport.en.eq(1),
+                ]
+                m.next = 'READ1'
+
+            with m.State('READ1'):
+                m.d.sync += read1.eq(fixed.Value(ASQ, rport.data))
                 m.next = 'MAC0'
 
             with m.State('MAC0'):
-                with mp.Multiply(m, a=fixed.Value(ASQ, rport.data), b=x-x.truncate()):
+                with mp.Multiply(m, a=read0, b=x-x.truncate()):
                     m.d.sync += y.eq(mp.z)
-                    m.d.comb += [
-                        rport.addr.eq(x.truncate()),
-                        rport.en.eq(1),
-                    ]
                     m.next = 'MAC1'
 
             with m.State('MAC1'):
-                with mp.Multiply(m, a=fixed.Value(ASQ, rport.data), b=(x.truncate()-x+1)):
-                    m.d.sync += y.eq(y + mp.z)
+                with mp.Multiply(m, a=read1, b=(x.truncate()-x+1)):
+                    m.d.sync += self.o.payload.eq(y + mp.z)
                     m.next = 'WAIT-READY'
 
             with m.State('WAIT-READY'):
                 m.d.comb += [
                     self.o.valid.eq(1),
-                    self.o.payload.eq(y),
                 ]
                 with m.If(self.o.ready):
                     m.next = 'WAIT-VALID'
@@ -813,6 +822,8 @@ class MatrixMix(wiring.Component):
             rport.addr.eq(Cat(o_ch, i_ch)),
         ]
 
+        read0 = Signal(self.ctype)
+
         # coefficient update logic
 
         with m.If(self.c.ready):
@@ -844,7 +855,7 @@ class MatrixMix(wiring.Component):
                     ]
                     m.next = 'NEXT'
             with m.State('NEXT'):
-                m.next = 'MAC'
+                m.next = 'READ'
                 m.d.sync += [
                     o_ch_l.eq(o_ch),
                     l_i_ch.eq(i_ch),
@@ -857,23 +868,28 @@ class MatrixMix(wiring.Component):
                         m.d.sync += i_ch.eq(i_ch+1)
                 with m.Else():
                     m.d.sync += o_ch.eq(o_ch+1)
+            with m.State('READ'):
+                m.d.sync += read0.eq(fixed.Value(self.ctype, rport.data))
+                m.next = 'MAC'
             with m.State('MAC'):
                 m.next = 'NEXT'
                 m.d.sync += [
                     o_accum[o_ch_l].eq(o_accum[o_ch_l] +
-                                       (fixed.Value(self.ctype, rport.data) *
+                                       (read0 *
                                         i_latch[l_i_ch]))
                 ]
                 with m.If(done):
-                    m.next = 'WAIT-READY'
+                    m.next = 'LATCH'
+            with m.State('LATCH'):
+                m.d.sync += [
+                    self.o.payload[n].eq(o_accum[n])
+                    for n in range(self.o_channels)
+                ]
+                m.next = 'WAIT-READY'
             with m.State('WAIT-READY'):
                 m.d.comb += self.c.ready.eq(1), # permit coefficient updates
                 m.d.comb += [
                     self.o.valid.eq(1),
-                ]
-                m.d.comb += [
-                    self.o.payload[n].eq(o_accum[n])
-                    for n in range(self.o_channels)
                 ]
                 with m.If(self.o.ready):
                     m.next = 'WAIT-VALID'

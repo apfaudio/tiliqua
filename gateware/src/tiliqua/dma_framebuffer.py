@@ -47,7 +47,7 @@ class DMAFramebuffer(wiring.Component):
             })
 
     def __init__(self, *, fb_base_default=0, addr_width=22,
-                 fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128,
+                 fifo_depth=1024, bytes_per_pixel=1, burst_threshold_words=128,
                  fixed_modeline: DVIModeline = None):
 
         self.fixed_modeline = fixed_modeline
