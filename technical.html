@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hardware details &mdash; Tiliqua Project  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/platformpicker.css" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="_static/platformpicker.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Prerequisites" href="install.html" />
+    <link rel="prev" title="Connecting Hardware" href="hardware.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="cover.html" class="icon icon-home">
+            Tiliqua Project
+              <img src="_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Tiliqua Manual</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="hardware.html">Connecting Hardware</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Hardware details</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#schematics-and-pcbas">Schematics and PCBAs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#motherboard-and-front-panel">Motherboard (and front panel)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#embedded-fpga-som-soldiercrab">Embedded FPGA SoM (<cite>soldiercrab</cite>)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#audio-interface">Audio Interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#hardware-revisions">Hardware Revisions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#hardware-changelist">Hardware Changelist</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="install.html">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gettingstarted.html">Getting started</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calibration.html">Calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bootloader.html">Bootloader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dsp.html">Tiliqua DSP Library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="soc.html">Tiliqua SoC designs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="top.html">Example projects</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/apfaudio/tiliqua">(external) GitHub</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://www.crowdsupply.com/apfaudio/tiliqua">(external) CrowdSupply</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://apf.audio/">(external) apf.audio</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="cover.html">Tiliqua Project</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="cover.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Tiliqua Manual</a></li>
+      <li class="breadcrumb-item active">Hardware details</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/technical.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="hardware-details">
+<h1>Hardware details<a class="headerlink" href="#hardware-details" title="Link to this heading"></a></h1>
+<a class="reference internal image-reference" href="_images/tiliqua_disassembled.png"><img alt="_images/tiliqua_disassembled.png" src="_images/tiliqua_disassembled.png" style="width: 800px;" /></a>
+<section id="schematics-and-pcbas">
+<h2>Schematics and PCBAs<a class="headerlink" href="#schematics-and-pcbas" title="Link to this heading"></a></h2>
+<p><strong>Schematics for all Tiliqua revisions in the wild can be found :</strong> <a class="reference external" href="https://github.com/apfaudio/tiliqua/tree/main/hardware/schematics">here</a></p>
+<p>Tiliqua consists of 3 main PCBAs. All of these are open-hardware designs built in KiCAD and stored in separate repositories.</p>
+</section>
+<section id="motherboard-and-front-panel">
+<h2>Motherboard (and front panel)<a class="headerlink" href="#motherboard-and-front-panel" title="Link to this heading"></a></h2>
+<p><strong>Repository:</strong> <a class="reference external" href="https://github.com/apfaudio/tiliqua/tree/main/hardware">tiliqua-motherboard</a></p>
+<ul class="simple">
+<li><p>Switched rotary encoder with bar graph display.</p></li>
+<li><dl class="simple">
+<dt>Dual USB ports:</dt><dd><ul>
+<li><p><cite>dbg</cite>: Included RP2040-based JTAG debugger supported by <cite>openFPGAloader</cite></p></li>
+<li><p><cite>usb2</cite>: USB PHY connected directly to FPGA for high-speed USB Audio support</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Display output for video synthesis (maximum resolution 720/60P)</p></li>
+<li><p>2x expansion ports for up to 24 simultaneous audio channels (PMOD-compatible)</p></li>
+<li><p>MIDI-In jack (TRS-A standard)</p></li>
+</ul>
+</section>
+<section id="embedded-fpga-som-soldiercrab">
+<h2>Embedded FPGA SoM (<cite>soldiercrab</cite>)<a class="headerlink" href="#embedded-fpga-som-soldiercrab" title="Link to this heading"></a></h2>
+<p><strong>Repository:</strong> <a class="reference external" href="https://github.com/apfaudio/soldiercrab">soldiercrab</a></p>
+<ul class="simple">
+<li><p>Lattice ECP5 FPGA, supported by open-source FPGA toolchains</p></li>
+<li><p>256 Mbit (32 MByte) HyperRAM / oSPI RAM (for long audio buffers or video framebuffers)</p></li>
+<li><p>128 Mbit (16 MByte) SPI flash for user bitstreams</p></li>
+<li><p>High-speed USB HS PHY (ULPI)</p></li>
+</ul>
+</section>
+<section id="audio-interface">
+<h2>Audio Interface<a class="headerlink" href="#audio-interface" title="Link to this heading"></a></h2>
+<p><strong>Repository:</strong> <a class="reference external" href="https://github.com/apfaudio/eurorack-pmod/tree/master/hardware">eurorack-pmod</a></p>
+<ul class="simple">
+<li><p>8 (4 in + 4 out) DC-coupled audio channels, 192 KHz / 24-bit sampling supported</p></li>
+<li><p>Touch and proximity sensing on all 8 audio jacks (if unused)</p></li>
+<li><p>PWM-controlled, user-programmable red/green LEDs on each audio channel</p></li>
+<li><p>Jack insertion detection on all 8 jacks</p></li>
+</ul>
+</section>
+<section id="hardware-revisions">
+<h2>Hardware Revisions<a class="headerlink" href="#hardware-revisions" title="Link to this heading"></a></h2>
+<p>There are a few Tiliqua hardware variants in existence:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt><strong>Tiliqua R2</strong></dt><dd><ul>
+<li><p><strong>SoldierCrab R2</strong> FPGA SoM (LFE5U-45F, 3.3V 16MByte HyperRAM)</p></li>
+<li><p><strong>Tiliqua R2</strong> motherboard and front panel.</p></li>
+<li><p><strong>eurorack-pmod R3.3</strong> audio interface.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Tiliqua R3</strong></dt><dd><ul>
+<li><p><strong>SoldierCrab R3</strong> FPGA SoM (LFE5U-25F, 1.8V 32MByte oSPIRAM)</p></li>
+<li><p><strong>Tiliqua R3</strong> motherboard and front panel.</p></li>
+<li><p><strong>eurorack-pmod R3.3</strong> audio interface.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p><strong>Tiliqua R4</strong> (unreleased)</p></li>
+</ul>
+<section id="hardware-changelist">
+<h3>Hardware Changelist<a class="headerlink" href="#hardware-changelist" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><dl class="simple">
+<dt>From <strong>Tiliqua R2</strong> to <strong>Tiliqua R3</strong>:</dt><dd><ul>
+<li><p>Pinswap all DVI pins to true ECP5 complementary pairs.</p></li>
+<li><p>Swap all tantalums for ceramics, clean up PSU routing, swap LDO for TPS7A91, add choke input capacitors</p></li>
+<li><p>Delete unused LEDs (MIDI bottom-side)</p></li>
+<li><p>Fix EDID +5V I2C bridge schematic and enable.</p></li>
+<li><p>Adjust fuses: +12V ingress 200mA-&gt;350mA fuse, GPDI +5V NONE-&gt;50mA fuse (so USB host doesn’t pop the fuse!)</p></li>
+<li><p>Move encoder footprint 0.4mm in, midi 0.1mm out for 0.5mm shim washer on encoder</p></li>
+<li><p>Pinswap ex0 / ex1 / ffc connectors for improved routing and SI.</p></li>
+<li><p>Update LED current limiting resistors s/120R/220R</p></li>
+<li><p>Swap rp2040 xtal to ABM8/15pF/1K (improve yield)</p></li>
+<li><p>New M2.5 standoff footprint</p></li>
+<li><p>Move 12V ingress connector in 1.5mm so we can better fit in skiffs.</p></li>
+<li><p>Switch from 1.6mm to 1.2mm PCBA stackup for mechanical reasons (and improve usb2 connector yield)</p></li>
+<li><p>(panel) fix DVI connector cutout</p></li>
+<li><p>Add 2x spare pins for RP2040/ECP5 I2C (no pullups)</p></li>
+<li><p>Layerswap In1 / In2 (move GND closer to SMPS)</p></li>
+<li><p>Add flip-flop on CODEC PDN pin (allows for soft-mute when swapping bitstreams)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>From <strong>Tiliqua R3</strong> to <strong>Tiliqua R4</strong>:</dt><dd><ul>
+<li><p>Add external PLL SI5351 and route 2x clocks to ECP5 (useful for EMC as it supports spread-spectrum, also for runtime clock/resolution switching).</p></li>
+<li><p>Add series 27R/33R on all FFC lines to reduce radiated emissions.</p></li>
+<li><dl class="simple">
+<dt>Pinswaps to ensure external PLL is routed to true ECP5 clock input pins:</dt><dd><ul>
+<li><p>FFC_SDIN1: 44 -&gt; 42</p></li>
+<li><p>ENC_B: 40 -&gt; 12</p></li>
+<li><p>ENC_A: 42 -&gt; 8</p></li>
+<li><p>PLL_CLK1 -&gt; 40 (removed: spare FPGA to RP2040 line)</p></li>
+<li><p>PLL_CLK0 -&gt; 44 (removed: spare FPGA to RP2040 line)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Route 4 new ex0/ex1 pins to RP2040 spare pins (shared with expansion connectors)</p></li>
+<li><p>Swap RP2040 SPI flash for 128MBit part</p></li>
+<li><p>Put spare RP2040 I2C pins on main tiliqua-mobo I2C bus.</p></li>
+<li><p>Switch from 4L stackup to 6L stackup to improve SI/EMC.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="hardware.html" class="btn btn-neutral float-left" title="Connecting Hardware" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="install.html" class="btn btn-neutral float-right" title="Prerequisites" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024—2025, S. Holzapfel and Tiliqua contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
