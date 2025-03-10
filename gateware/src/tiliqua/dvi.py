@@ -142,7 +142,7 @@ class DVIPHY(wiring.Component):
         tmds_ch2 = Signal(10)
 
         # Connect TMDS encoder inputs
-        m.d.comb += [
+        m.d.dvi += [
             # Channel 0
             encode_ch0.data_in.eq(self.data_in_ch0),
             encode_ch0.ctrl_in.eq(self.ctrl_in_ch0),
