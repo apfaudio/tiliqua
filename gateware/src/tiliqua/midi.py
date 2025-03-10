@@ -344,7 +344,8 @@ class MidiVoiceTracker(wiring.Component):
                 # pitch bend factor
                 pb_factor = fixed.Const(0.1225, shape=ASQ)
                 pb_scaled = Signal(shape=ASQ)
-                m.d.comb += pb_scaled.eq(pb_factor * last_pb)
+                # TODO: pipeline this multiply through properly!
+                m.d.sync += pb_scaled.eq(pb_factor * last_pb)
 
                 # linearized frequency from LUT * pitch bend
                 calculated_freq = Signal(ASQ)
