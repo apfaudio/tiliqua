@@ -56,7 +56,7 @@ class Region:
                 f"  end:   0x{self.addr + self.aligned_size - 1:x}")
 
 
-def flash_file(file_path: str, offset: int, file_type: str = "auto", dry_run: bool = True) -> List[str]:
+def flash_file(file_path: str, offset: int, file_type: str = "auto", skip_reset: bool = False, dry_run: bool = True) -> List[str]:
     """
     Generate or execute the openFPGALoader command to flash a file to the specified offset.
     
@@ -64,6 +64,7 @@ def flash_file(file_path: str, offset: int, file_type: str = "auto", dry_run: bo
         file_path: Path to the file to flash
         offset: Flash memory offset
         file_type: File type for openFPGALoader
+        skip_reset: Whether to skip resetting the device after flashing
         dry_run: If True, return command instead of executing it
         
     Returns:
@@ -75,6 +76,8 @@ def flash_file(file_path: str, offset: int, file_type: str = "auto", dry_run: bo
     ]
     if file_type != "auto":
         cmd.extend(["--file-type", file_type])
+    if skip_reset:
+        cmd.append("--skip-reset")
     cmd.append(file_path)
     
     if dry_run:
@@ -127,7 +130,6 @@ def flash_archive(archive_path: str, slot: Optional[int] = None, noconfirm: bool
         slot: Slot number for bootloader-managed bitstreams
         noconfirm: Skip confirmation prompt if True
     """
-    commands_to_run = []
     regions = []
 
     # Extract archive to temporary location
@@ -162,6 +164,8 @@ def flash_archive(archive_path: str, slot: Optional[int] = None, noconfirm: bool
             tar.extractall(tmpdir)
             tmpdir_path = Path(tmpdir)
             
+            # Prepare flashing commands and regions
+            commands_to_run = []
             if has_xip_firmware:
                 handle_xip_firmware(tmpdir_path, manifest, commands_to_run, regions)
             else:
@@ -178,6 +182,12 @@ def flash_archive(archive_path: str, slot: Optional[int] = None, noconfirm: bool
                 print(f"Error: {error_msg}")
                 sys.exit(1)
 
+            # Add skip-reset flag to all but the last command
+            if len(commands_to_run) > 1:
+                for cmd in commands_to_run[:-1]:
+                    if "--skip-reset" not in cmd:
+                        cmd.insert(-1, "--skip-reset")
+
             # Show all commands and get confirmation
             print("\nThe following commands will be executed:")
             for cmd in commands_to_run:
@@ -189,7 +199,7 @@ def flash_archive(archive_path: str, slot: Optional[int] = None, noconfirm: bool
 
             # Execute all commands
             print("\nExecuting flash commands...")
-            for cmd in commands_to_run:
+            for i, cmd in enumerate(commands_to_run):
                 subprocess.check_call(cmd)
 
             print("\nFlashing completed successfully")
@@ -306,7 +316,7 @@ def handle_slotted_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: L
         commands.append(flash_file(
             str(region_path),
             region_info["spiflash_src"],
-            "raw",
+            "raw", 
             dry_run=True
         ))
 
