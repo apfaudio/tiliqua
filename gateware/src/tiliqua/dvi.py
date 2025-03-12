@@ -108,7 +108,7 @@ class DVITimingGen(wiring.Component):
         m.d.comb += [
             self.ctrl_phy.de.eq(self.ctrl.de),
             self.ctrl_phy.hsync.eq(self.ctrl.hsync ^ self.timings.h_sync_invert),
-            self.ctrl_phy.vsync.eq(self.ctrl.vsync ^ self.timings.h_sync_invert),
+            self.ctrl_phy.vsync.eq(self.ctrl.vsync ^ self.timings.v_sync_invert),
         ]
 
         return m
