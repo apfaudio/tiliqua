@@ -61,6 +61,10 @@ Such archives may be flashed as follows:
    pdm flash archive build/xbeam-*.tar.gz --slot 2
    pdm flash status # check what is on the Tiliqua
 
+.. note::
+
+    If you want to avoid audio pops while flashing, it is best to flash from the bootloader bitstream, as the audio CODEC is always muted in that bitstream.
+
 If you are running an SoC, you can monitor serial output like so:
 
 .. code-block:: bash
