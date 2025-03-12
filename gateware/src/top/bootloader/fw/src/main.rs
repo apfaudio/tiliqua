@@ -446,6 +446,9 @@ fn main() -> ! {
 
         loop {
 
+            // Always mute the CODEC to stop pops on flashing while in the bootloader.
+            pmod.mute(true);
+
             let (opts, reboot_n, error_n) = critical_section::with(|cs| {
                 (app.borrow_ref(cs).ui.opts.clone(),
                  app.borrow_ref(cs).reboot_n.clone(),
@@ -474,7 +477,6 @@ fn main() -> ! {
             }
 
             if let Some(_) = reboot_n {
-                pmod.mute(true);
                 print_rebooting(&mut display, &mut rng);
             }
         }
