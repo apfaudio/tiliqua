@@ -63,11 +63,60 @@ Bitstream Archives and Flash Memory Layout
 Each bitstream archive contains:
 
 - Bitstream file (top.bit)
-- Firmware binary (if applicable) 
+- Firmware binary (if applicable)
 - Any extra resources to be loaded into PSRAM (if applicable)
 - Manifest file describing the contents
 
-The flash tool manages the following memory layout on the FPGA's 16MByte SPI flash:
+The flash tool manages the following memory layout on the SoldierCrab's 128Mbit SPI flash:
+
+.. code-block:: text
+
+    ┌────────────────────────────┐  0x000000
+    │                            │
+    │    Bootloader Bitstream    │
+    │                            │
+    ├────────────────────────────┤
+    │          (padding)         │
+    ├────────────────────────────┤  0x0B0000
+    │                            │
+    │    Bootloader FW (XiP)     │
+    │                            │
+    ├────────────────────────────┤
+    │          (padding)         │
+    ╞════════════════════════════╡  0x100000
+    │                            │
+    │      Slot 0 Bitstream      │
+    │                            │
+    ├────────────────────────────┤
+    │          (padding)         │
+    ├────────────────────────────┤  0x1B0000
+    │                            │
+    │        Slot 0 FW           │
+    │  NOT XiP, copied to PSRAM  │
+    │                            │
+    ├────────────────────────────┤  (any additional slot 0 resources appended here)
+    │          (padding)         │
+    ├────────────────────────────┤  0x1FFC00
+    │      Slot 0 Manifest       │
+    ╞════════════════════════════╡  0x200000 (End of Slot 0, start of Slot 1)
+    │                            │
+    │      Slot 1 Bitstream      │
+    │                            │
+    ├────────────────────────────┤
+    │          (padding)         │
+    ├────────────────────────────┤  0x2B0000
+    │                            │
+    │        Slot 1 FW           │
+    │  NOT XiP, copied to PSRAM  │
+    │                            │
+    ├────────────────────────────┤ (any additional slot 1 resources appended here)
+    │          (padding)         │
+    ├────────────────────────────┤  0x2FFC00
+    │       Slot 1 Manifest      │
+    ╞════════════════════════════╡  0x300000 (End of Slot 1, start of Slot 2)
+    │                            │
+
+    ... continued up to Slot 7
 
 - Bootloader bitstream: 0x000000
 - User bitstream slots: 0x100000, 0x200000, etc (1MB spacing)
@@ -77,7 +126,7 @@ The flash tool manages the following memory layout on the FPGA's 16MByte SPI fla
 The manifest includes metadata like the bitstream name and version, as well as information about where firmware should be loaded in PSRAM.
 
 If an image requires firmware loaded to PSRAM, the SPI flash source address (in the manifest) is set to the true firmware base address by the flash tool when it is flashed.
-That is, the value of spiflash_src is not preserved by the flash tool and instead depends on the slot number.
+That is, the value of ``spiflash_src`` is not preserved by the flash tool and instead depends on the slot number.
 This allows a bitstream that requires firmware to be loaded to PSRAM to be flashed to any slot, and the bootloader will load the firmware from the correct address.
 
 Implementation details: ECP5
