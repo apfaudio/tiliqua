@@ -4,6 +4,19 @@
 Flash tool for Tiliqua bitstream archives.
 See docs/gettingstarted.rst for usage.
 See docs/bootloader.rst for implementation details and flash memory layout.
+
+This tool unpacks a 'bitstream archive' containing a bitstream image,
+firmware images and manifest describing the contents, and issues
+`openFPGALoader` commands required for the Tiliqua bootloader to
+correctly enter these bitstreams.
+
+We must distinguish between XiP (bootloader) and non-XiP (psram, user)
+bitstreams, as for user bitstreams the bootloader is responsible for
+copying the firmware from SPIFlash to a desired region of PSRAM before
+the user bitstream is started.
+
+This should have zero code dependencies from this repository besides some
+constants, as it will be re-used for the WebUSB flasher.
 """
 
 import argparse
@@ -24,9 +37,13 @@ from rs.manifest.src.lib import (
     MANIFEST_SIZE,
 )
 
-# Flash memory map constants
+# Where the XiP bootloader bitstream should be flashed.
 BOOTLOADER_BITSTREAM_ADDR = 0x000000
+# Used to determine where non-XiP firmware is stored
+# (it is copied from SPIFLASH -> PSRAM before the CPU is
+# reset in the new bitstream and starts executing)
 FIRMWARE_BASE_SLOT0 = 0x1B0000
+# Used to detect region collisions
 FLASH_PAGE_SIZE = 1024  # 1KB
 
 class Region:
@@ -40,35 +57,25 @@ class Region:
     def aligned_size(self) -> int:
         """Return size aligned up to page boundary."""
         return (self.size + FLASH_PAGE_SIZE - 1) & ~(FLASH_PAGE_SIZE - 1)
-        
+
     @property
     def end_addr(self) -> int:
         """Return end address (exclusive)."""
         return self.addr + self.aligned_size
-        
+
     def __lt__(self, other):
         """Enable sorting regions by address."""
         return self.addr < other.addr
-        
+
     def __str__(self) -> str:
         return (f"{self.name}:\n"
-                f"  start: 0x{self.addr:x}\n"
-                f"  end:   0x{self.addr + self.aligned_size - 1:x}")
+                f"    start: 0x{self.addr:x}\n"
+                f"    end:   0x{self.addr + self.aligned_size - 1:x}")
 
 
-def flash_file(file_path: str, offset: int, file_type: str = "auto", skip_reset: bool = False, dry_run: bool = True) -> List[str]:
+def flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str]:
     """
-    Generate or execute the openFPGALoader command to flash a file to the specified offset.
-    
-    Args:
-        file_path: Path to the file to flash
-        offset: Flash memory offset
-        file_type: File type for openFPGALoader
-        skip_reset: Whether to skip resetting the device after flashing
-        dry_run: If True, return command instead of executing it
-        
-    Returns:
-        Command list if dry_run is True, otherwise None after executing the command
+    Generate an openFPGALoader command to flash a file to the specified offset.
     """
     cmd = [
         "sudo", "openFPGALoader", "-c", "dirtyJtag",
@@ -76,27 +83,18 @@ def flash_file(file_path: str, offset: int, file_type: str = "auto", skip_reset:
     ]
     if file_type != "auto":
         cmd.extend(["--file-type", file_type])
-    if skip_reset:
-        cmd.append("--skip-reset")
     cmd.append(file_path)
-    
-    if dry_run:
-        return cmd
-    
-    print(f"Flashing to {hex(offset)}:")
-    print(f"\t$ {' '.join(cmd)}")
-    subprocess.check_call(cmd)
-    return None
+    return cmd
 
 
 def check_region_overlaps(regions: List[Region], slot: Optional[int] = None) -> Tuple[bool, str]:
     """
     Check for overlapping regions in flash commands and slot boundaries.
-    
+
     Args:
         regions: List of Region objects to check
         slot: Slot number for checking slot boundary constraints
-        
+
     Returns:
         Tuple of (has_overlap, error_message)
     """
@@ -117,14 +115,14 @@ def check_region_overlaps(regions: List[Region], slot: Optional[int] = None) -> 
         if curr_end > next_start:
             return (True, f"Overlap detected between '{sorted_regions[i].name}' (ends at 0x{curr_end:x}) "
                           f"and '{sorted_regions[i+1].name}' (starts at 0x{next_start:x})")
-                          
+
     return (False, "")
 
 
 def flash_archive(archive_path: str, slot: Optional[int] = None, noconfirm: bool = False) -> None:
     """
     Flash a bitstream archive to the specified slot.
-    
+
     Args:
         archive_path: Path to the bitstream archive
         slot: Slot number for bootloader-managed bitstreams
@@ -163,13 +161,13 @@ def flash_archive(archive_path: str, slot: Optional[int] = None, noconfirm: bool
         with tempfile.TemporaryDirectory() as tmpdir:
             tar.extractall(tmpdir)
             tmpdir_path = Path(tmpdir)
-            
+
             # Prepare flashing commands and regions
             commands_to_run = []
             if has_xip_firmware:
                 handle_xip_firmware(tmpdir_path, manifest, commands_to_run, regions)
             else:
-                handle_slotted_firmware(tmpdir_path, manifest, slot, commands_to_run, regions)
+                handle_psram_firmware(tmpdir_path, manifest, slot, commands_to_run, regions)
 
             # Print all regions
             print("\nRegions to be flashed:")
@@ -208,7 +206,7 @@ def flash_archive(archive_path: str, slot: Optional[int] = None, noconfirm: bool
 def handle_xip_firmware(tmpdir: Path, manifest: Dict, commands: List, regions: List) -> None:
     """
     Handle XIP firmware bitstream flashing preparation.
-    
+
     Args:
         tmpdir: Temporary directory with extracted files
         manifest: Parsed manifest.json
@@ -216,14 +214,14 @@ def handle_xip_firmware(tmpdir: Path, manifest: Dict, commands: List, regions: L
         regions: List to append regions to
     """
     print("\nPreparing to flash XIP firmware bitstream to bootloader slot...")
-    
+
     # Prepare bootloader bitstream
     bitstream_path = tmpdir / "top.bit"
     bitstream_size = os.path.getsize(bitstream_path)
-    
+
     # Collect commands for bootloader location
-    commands.append(flash_file(str(bitstream_path), BOOTLOADER_BITSTREAM_ADDR, dry_run=True))
-    
+    commands.append(flash_file(str(bitstream_path), BOOTLOADER_BITSTREAM_ADDR))
+
     # Add bootloader bitstream region
     regions.append(Region(BOOTLOADER_BITSTREAM_ADDR, bitstream_size, 'bootloader bitstream'))
 
@@ -231,17 +229,16 @@ def handle_xip_firmware(tmpdir: Path, manifest: Dict, commands: List, regions: L
     for region_info in manifest.get("regions", []):
         if "filename" not in region_info:
             continue
-            
+
         region_path = tmpdir / region_info["filename"]
         region_addr = region_info["spiflash_src"]
-        
+
         commands.append(flash_file(
             str(region_path),
             region_addr,
             "raw",
-            dry_run=True
         ))
-        
+
         regions.append(Region(
             region_addr,
             region_info["size"],
@@ -249,10 +246,10 @@ def handle_xip_firmware(tmpdir: Path, manifest: Dict, commands: List, regions: L
         ))
 
 
-def handle_slotted_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: List, regions: List) -> None:
+def handle_psram_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: List, regions: List) -> None:
     """
-    Handle slotted firmware bitstream flashing preparation.
-    
+    Handle psram (user) firmware bitstream flashing preparation.
+
     Args:
         tmpdir: Temporary directory with extracted files
         manifest: Parsed manifest.json
@@ -261,7 +258,7 @@ def handle_slotted_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: L
         regions: List to append regions to
     """
     print(f"\nPreparing to flash bitstream to slot {slot}...")
-    
+
     # Calculate addresses for this slot
     slot_base = SLOT_BITSTREAM_BASE + (slot * SLOT_SIZE)
     bitstream_addr = slot_base
@@ -280,20 +277,20 @@ def handle_slotted_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: L
     for region_info in manifest.get("regions", []):
         if "filename" not in region_info:
             continue
-            
+
         if region_info.get("psram_dst") is not None:
             if region_info.get("spiflash_src") is not None:
                 assert region_info["spiflash_src"] is None, "Both psram_dst and spiflash_src set"
-                
+
             region_info["spiflash_src"] = firmware_base
             print(f"manifest: region {region_info['filename']}: spiflash_src set to 0x{firmware_base:x}")
-            
+
             regions.append(Region(
                 firmware_base,
                 region_info["size"],
                 region_info['filename']
             ))
-            
+
             # Align firmware base to next 4KB boundary (0x1000)
             firmware_base += region_info["size"]
             firmware_base = (firmware_base + 0xFFF) & ~0xFFF
@@ -305,57 +302,53 @@ def handle_slotted_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: L
         json.dump(manifest, f)
 
     # Collect all commands
-    commands.append(flash_file(str(bitstream_path), bitstream_addr, dry_run=True))
-    commands.append(flash_file(str(manifest_path), manifest_addr, "raw", dry_run=True))
-    
+    commands.append(flash_file(str(bitstream_path), bitstream_addr))
+    commands.append(flash_file(str(manifest_path), manifest_addr, "raw"))
+
     for region_info in manifest.get("regions", []):
         if "filename" not in region_info or "spiflash_src" not in region_info:
             continue
-            
+
         region_path = tmpdir / region_info["filename"]
         commands.append(flash_file(
             str(region_path),
             region_info["spiflash_src"],
-            "raw", 
-            dry_run=True
+            "raw",
         ))
 
 
 def read_flash_segment(offset: int, size: int, reset: bool = False) -> bytes:
     """
     Read a segment of flash memory to a temporary file and return its contents.
-    
+
     Args:
         offset: Flash memory offset
         size: Number of bytes to read
         reset: Whether to reset the device after reading
-        
+
     Returns:
         Binary data read from flash
     """
-    with tempfile.NamedTemporaryFile(suffix='.bin', delete=False) as tmp_file:
+    with tempfile.NamedTemporaryFile(suffix='.bin', delete=True) as tmp_file:
         temp_file_name = tmp_file.name
-        
-    try:
-        cmd = [
-            "sudo", "openFPGALoader", "-c", "dirtyJtag",
-            "--dump-flash", "-o", f"{hex(offset)}",
-            "--file-size", str(size),
-        ]
-        
-        if not reset:
-            cmd.append("--skip-reset")
-            
-        cmd.append(temp_file_name)
-        print(" ".join(cmd))
-        subprocess.check_call(cmd)
-        
-        with open(temp_file_name, 'rb') as f:
-            data = f.read()
-            
-        return data
-    finally:
-        os.unlink(temp_file_name)
+
+    cmd = [
+        "sudo", "openFPGALoader", "-c", "dirtyJtag",
+        "--dump-flash", "-o", f"{hex(offset)}",
+        "--file-size", str(size),
+    ]
+
+    if not reset:
+        cmd.append("--skip-reset")
+
+    cmd.append(temp_file_name)
+    print(" ".join(cmd))
+    subprocess.check_call(cmd)
+
+    with open(temp_file_name, 'rb') as f:
+        data = f.read()
+
+    return data
 
 
 def is_empty_flash(data: bytes) -> bool:
@@ -366,10 +359,10 @@ def is_empty_flash(data: bytes) -> bool:
 def parse_json_from_flash(data: bytes) -> Optional[Dict]:
     """
     Try to parse JSON data from a flash segment.
-    
+
     Args:
         data: Binary data to parse
-        
+
     Returns:
         Parsed JSON object or None if parsing failed
     """
@@ -381,7 +374,7 @@ def parse_json_from_flash(data: bytes) -> Optional[Dict]:
                 break
         else:
             end_idx = len(data)
-            
+
         json_bytes = data[:end_idx]
         return json.loads(json_bytes)
     except json.JSONDecodeError:
@@ -392,12 +385,12 @@ def flash_status() -> None:
     """Display the status of flashed bitstreams in each manifest slot."""
     print("Reading manifests from flash...")
     manifest_data = []
-    
+
     # Read all manifests
     for slot in range(N_MANIFESTS):
         offset = SLOT_BITSTREAM_BASE + (slot + 1) * SLOT_SIZE - MANIFEST_SIZE
         is_last = (slot == N_MANIFESTS - 1)
-        
+
         print(f"\nReading Slot {slot} manifest at {hex(offset)}:")
         try:
             data = read_flash_segment(offset, 512, reset=is_last)
@@ -406,29 +399,28 @@ def flash_status() -> None:
             print(f"  Error reading flash: {e}")
 
     # Print manifest statuses
-    print("\nManifests:")
+    print("\nMANIFESTS:")
     print("-" * 40)
-    
+
     for slot, offset, data in manifest_data:
         print(f"\nSlot {slot} manifest at {hex(offset)}:")
-        
+
         try:
             if is_empty_flash(data):
                 print("  status: empty (all 0xFF)")
                 continue
-                
+
             json_data = parse_json_from_flash(data)
             if json_data:
                 print("  status: valid manifest")
                 print("  contents:")
-                for key, value in json_data.items():
-                    print(f"    {key}: {value}")
+                print(json.dumps(json_data, indent=2))
             else:
                 print("  status: data is there, but does not look like a manifest")
                 print(f"  first 32 bytes: {data[:32].hex()}")
         except Exception as e:
             print(f"  Error processing data: {e}")
-            
+
     print("\nNote: empty segments are shown as 'empty (all 0xFF)'")
 
 
