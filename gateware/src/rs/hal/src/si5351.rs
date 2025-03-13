@@ -908,69 +908,12 @@ impl<I2C: I2c> Si5351 for Si5351Device<I2C>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use embedded_hal::i2c::{ErrorType, Operation};
-
-    // Mock I2C implementation for testing
-    pub struct MockI2c;
-
-    impl ErrorType for MockI2c {
-        type Error = std::convert::Infallible;
-    }
-
-    impl I2c for MockI2c {
-        fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
-            log::info!("I2c::write(addr=0x{:02X}): {:02X?}", addr, bytes);
-            Ok(())
-        }
-
-        fn write_read(
-            &mut self,
-            address: u8,
-            bytes: &[u8],
-            buffer: &mut [u8],
-        ) -> Result<(), Self::Error> {
-            log::info!("I2c::write_read(addr=0x{:02X}):", address);
-            log::info!("  Write: {:02X?}", bytes);
-            log::info!("  Read buffer size: {}", buffer.len());
-            // Simulate reading device status as ready
-            if bytes[0] == Register::DeviceStatus as u8 {
-                buffer[0] = 0; // Not busy, no errors
-            }
-            Ok(())
-        }
-
-        fn transaction(
-            &mut self,
-            address: u8,
-            operations: &mut [Operation<'_>],
-        ) -> Result<(), Self::Error> {
-            log::info!("I2c::transaction(addr=0x{:02X}):", address);
-            for (i, op) in operations.iter().enumerate() {
-                match op {
-                    Operation::Read(buffer) => {
-                        log::info!("  Op {}: Read {} bytes", i, buffer.len());
-                    }
-                    Operation::Write(bytes) => {
-                        log::info!("  Op {}: Write {:02X?}", i, bytes);
-                    }
-                }
-            }
-            Ok(())
-        }
-    }
-
-    use std::sync::Once;
-
-    static INIT: Once = Once::new();
-
-    fn setup() {
-      INIT.call_once(env_logger::init);
-    }
+    use crate::tests::{setup_logger, MockI2c};
 
     #[test]
     fn test_frequency_calculations() {
 
-        setup();
+        setup_logger();
 
         let mut si = Si5351Device::new(MockI2c, false, 25_000_000);
 
@@ -1038,7 +981,7 @@ mod tests {
     #[test]
     fn test_frequencies() {
 
-        setup();
+        setup_logger();
 
         let mut si = Si5351Device::new(MockI2c, false, 25_000_000);
 
