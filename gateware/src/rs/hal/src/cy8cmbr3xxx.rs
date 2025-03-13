@@ -13,10 +13,11 @@ const CY8CMBR3XXX_CCITT16_DEFAULT_SEED: u16 = 0xffff;
 const CY8CMBR3XXX_CCITT16_POLYNOM: u16 = 0x1021;
 
 // Command register and commands
-const REG_COMMAND: u8        = 0x86;
-const REG_CONFIG_CRC0: u8    = 0x7e;
-const CMD_SAVE_CHECK_CRC: u8 = 0x02;
-const CMD_WRITE_RESET: u8    = 0xFF;
+const REG_COMMAND: u8           = 0x86;
+const REG_CONFIG_CRC0: u8       = 0x7e;
+const REG_TOTAL_WORKING_SNS: u8 = 0x97;
+const CMD_SAVE_CHECK_CRC: u8    = 0x02;
+const CMD_WRITE_RESET: u8       = 0xFF;
 
 /// Default configuration for the CY8CMBR3108
 /// Hand-picked after a lot of fiddling, for Tiliqua.
@@ -190,7 +191,7 @@ impl<I2C: I2c> Cy8cmbr3108Driver<I2C> {
         Ok(())
     }
 
-    fn get_stored_crc(&mut self) -> Result<u16, I2C::Error> {
+    pub fn get_stored_crc(&mut self) -> Result<u16, I2C::Error> {
         let crc0 = self.read_register(REG_CONFIG_CRC0+0)?;
         let crc1 = self.read_register(REG_CONFIG_CRC0+1)?;
         Ok(crc0 as u16 + ((crc1 as u16) << 8))
@@ -206,21 +207,22 @@ impl<I2C: I2c> Cy8cmbr3108Driver<I2C> {
         self.write_register(REG_COMMAND, CMD_SAVE_CHECK_CRC)
     }
 
-    /// Initialize the device with current configuration
-    pub fn initialize(&mut self) -> Result<(), I2C::Error> {
+    pub fn reprogram_nvm_and_reset(&mut self) -> Result<(), I2C::Error> {
         self.write_config_to_sram()?;
         self.commit_config_to_nvm()?;
-        // Wait for command register to be ready
-        // TODO CYCLES!!!
-        self.check_busy()?;
+        let mut timeout = 0;
+        while timeout != 10 {
+            match self.check_busy() {
+                Ok(false) => break,
+                _ => timeout += 1
+            }
+        }
         self.reset()
     }
 
-    fn read_sensor_diff(&mut self, sensor_index: u8) -> Result<u8, I2C::Error> {
-        // Determine register address for the sensor difference count
-        // 0xBA = Sensor 0, each sensor takes 2 bytes, we take MSB only
-        let reg_addr = 0xBA + (sensor_index * 2);
-        self.read_register(reg_addr)
+    pub fn read_n_working_sensors(&mut self) -> Result<u8, I2C::Error> {
+        let total_working_sns = self.read_register(REG_TOTAL_WORKING_SNS)?;
+        Ok(total_working_sns & 0x1f)
     }
 
     fn read_register(&mut self, register: u8) -> Result<u8, I2C::Error> {

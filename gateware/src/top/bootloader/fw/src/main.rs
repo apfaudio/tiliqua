@@ -19,6 +19,7 @@ use tiliqua_fw::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::video::Video;
 use tiliqua_hal::si5351::*;
+use tiliqua_hal::cy8cmbr3xxx::*;
 use tiliqua_manifest::*;
 use opts::OptionString;
 
@@ -361,6 +362,37 @@ where
 
 }
 
+pub fn maybe_reprogram_cy8cmbr3xxx<TouchI2c>(dev: &mut Cy8cmbr3108Driver<TouchI2c>)
+where
+    TouchI2c: I2c,
+{
+    info!("cy8cmbr3xxx: n_working_sensors={:?}", dev.read_n_working_sensors());
+    let stored = dev.get_stored_crc();
+    match stored {
+        Ok(stored) => {
+            let desired = dev.calculate_crc();
+            info!("cy8cmbr3xxx: CRC stored={:#x} (desired={:#x})", stored, desired);
+            if stored == desired {
+                info!("cy8cmbr3xxx: CRC OK");
+                return;
+            } else {
+                warn!("cy8cmbr3xxx: CRC NOT OK, reprogramming ...");
+                match dev.reprogram_nvm_and_reset() {
+                    Ok(_) => {
+                        warn!("cy8cmbr3xxx: reprogramming DONE ...");
+                    },
+                    _ => {
+                        warn!("cy8cmbr3xxx: reprogramming FAILED ...");
+                    }
+                }
+            }
+        },
+        _ => {
+            warn!("cy8cmbr3xxx: NAK error (jack2 connected?) ignoring ...");
+        }
+    }
+}
+
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -391,6 +423,9 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     maybe_restart_codec(&mut i2cdev1, &mut pmod);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+
+    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1);
+    maybe_reprogram_cy8cmbr3xxx(&mut cy8);
 
     let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
     for n in 0usize..N_MANIFESTS {
