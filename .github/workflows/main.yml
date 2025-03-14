@@ -3,7 +3,7 @@ name: build & test
 on: [push]
 
 jobs:
-  unit-tests:
+  unit-tests-amaranth:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,6 +12,23 @@ jobs:
           pdm install
           pdm test
         working-directory: gateware
+
+  unit-tests-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy, llvm-tools
+      - run: | # fake generated SoC constants from lib
+          touch src/generated_constants.rs
+          RUST_LOG=debug cargo test
+        working-directory: gateware/src/rs/lib
+      - run: RUST_LOG=debug cargo test_linux
+        working-directory: gateware/src/rs/hal
+      - run: RUST_LOG=debug cargo test
+        working-directory: gateware/src/rs/opts
 
   build-bootloader:
     runs-on: ubuntu-latest

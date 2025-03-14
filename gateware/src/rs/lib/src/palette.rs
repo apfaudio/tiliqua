@@ -1,9 +1,12 @@
-use crate::generated_constants::*;
 use tiliqua_hal::video::Video;
 
 use strum_macros::{EnumIter, IntoStaticStr};
 
 use micromath::F32Ext;
+
+// TODO: take this dynamically from DMAFramebuffer configuration.
+pub const PX_HUE_MAX: i32 = 16;
+pub const PX_INTENSITY_MAX: i32 = 16;
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
