@@ -12,6 +12,7 @@ use micromath::{F32Ext};
 use strum_macros::{EnumIter, IntoStaticStr};
 
 use core::str::FromStr;
+use core::fmt::Write;
 
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
@@ -19,6 +20,7 @@ use tiliqua_fw::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::video::Video;
 use tiliqua_hal::si5351::*;
+use tiliqua_hal::cy8cmbr3xxx::*;
 use tiliqua_manifest::*;
 use opts::OptionString;
 
@@ -36,7 +38,7 @@ use hal::pca9635::Pca9635Driver;
 hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
                        VIDEO_ROTATE_90);
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
+pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
@@ -122,12 +124,13 @@ where
 fn draw_summary<D>(d: &mut D,
                    bitstream_manifest: &Option<BitstreamManifest>,
                    error: &Option<String<32>>,
+                   startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
     D: DrawTarget<Color = Gray8>,
 {
+    let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
     if let Some(bitstream) = bitstream_manifest {
-        let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
         Text::with_alignment(
             "brief:".into(),
             Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
@@ -172,22 +175,28 @@ where
         .draw(d).ok();
     }
     if let Some(error_string) = &error {
-        let hl = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
         Text::with_alignment(
             "error:".into(),
             Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
-            hl,
+            norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &error_string,
             Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
-            hl,
+            norm,
             Alignment::Left,
         )
         .draw(d).ok();
     }
+    Text::with_alignment(
+        &startup_report,
+        Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2-70) as i32 + ot),
+        norm,
+        Alignment::Center,
+    )
+    .draw(d).ok();
 }
 
 fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device<I2c0>)
@@ -195,7 +204,7 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
     pll.init_adafruit_module()?;
     match pll_config.clk1_hz {
         Some(clk1_hz) => {
-            info!("Configure external PLL: clk0={}Hz, clk1={}Hz.", pll_config.clk0_hz, clk1_hz);
+            info!("si5351/pll: configure for clk0={}Hz, clk1={}Hz", pll_config.clk0_hz, clk1_hz);
             pll.set_frequencies(
                 PLL::A,
                 &[
@@ -209,7 +218,7 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
                 pll_config.spread_spectrum)
         }
         _ => {
-            info!("Configure external PLL: clk0={}Hz.", pll_config.clk0_hz);
+            info!("si5351/pll: configure for clk0={}Hz, clk1=disabled", pll_config.clk0_hz);
             pll.set_frequencies(
                 PLL::A,
                 &[
@@ -335,10 +344,23 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     });
 }
 
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
+pub enum StartupWarning {
+    #[strum(to_string = "ak4619/codec: issued hard reset (to avoid: remove display when unpowered)")]
+    CodecHardReset,
+    #[strum(to_string = "cy8cmbr/touch: NVM reprogrammed (bootloader update?)")]
+    TouchNvmReprogrammed,
+    #[strum(to_string = "cy8cmbr/touch: NVM reprogram FAIL (try rebooting?)")]
+    TouchNvmReprogramFailed,
+    #[strum(to_string = "cy8cmbr/touch: disabled/nak! (try: remove in2 jack and reboot?)")]
+    TouchNak,
+}
+
 use embedded_hal::i2c::{I2c, Operation};
 
 // Mitigation for https://github.com/apfaudio/tiliqua/issues/81
-pub fn maybe_restart_codec<CodecI2c, Pmod>(i2cdev: &mut CodecI2c, pmod: &mut Pmod)
+pub fn maybe_restart_codec<CodecI2c, Pmod>(i2cdev: &mut CodecI2c, pmod: &mut Pmod) -> Result<(), StartupWarning>
 where
     CodecI2c: I2c,
     Pmod: EurorackPmod
@@ -349,16 +371,52 @@ where
         CODEC_ADDR, &mut [Operation::Write(&[0u8]),
                           Operation::Read(&mut rx_bytes)]);
     if ret.is_err() || rx_bytes[0] != 0x37 {
-        warn!("AK4619 needs hard reset. transaction returned: {:?}.", ret);
+        warn!("ak4619/codec: needs hard reset. transaction returned: {:?}.", ret);
         for n in 0usize..4usize {
-            warn!("@{}:0x{:x}", n, rx_bytes[n]);
+            warn!("ak4619: @{}:0x{:x}", n, rx_bytes[n]);
         }
-        warn!("Issuing AK4619 reset ...");
+        warn!("ak4619/codec: issuing hard PDN reset ...");
         pmod.hard_reset();
+        Err(StartupWarning::CodecHardReset)
     } else {
-        info!("AK4619 looks healthy.");
+        info!("ak4619/codec: register config looks healthy.");
+        Ok(())
     }
+}
 
+pub fn maybe_reprogram_cy8cmbr3xxx<TouchI2c>(dev: &mut Cy8cmbr3108Driver<TouchI2c>) -> Result<(), StartupWarning>
+where
+    TouchI2c: I2c,
+{
+    let prefix = "cy8cmbr3xxx/touch: ";
+    info!("{}n_working_sensors={:?}", prefix, dev.read_n_working_sensors());
+    let stored = dev.get_stored_crc();
+    match stored {
+        Ok(stored) => {
+            let desired = dev.calculate_crc();
+            info!("{}CRC stored={:#x} (desired={:#x})", prefix, stored, desired);
+            if stored == desired {
+                info!("{}CRC OK", prefix);
+                return Ok(());
+            } else {
+                warn!("{}CRC NOT OK, reprogramming ...", prefix);
+                match dev.reprogram_nvm_and_reset() {
+                    Ok(_) => {
+                        warn!("{}reprogramming DONE ...", prefix);
+                        Err(StartupWarning::TouchNvmReprogrammed)
+                    },
+                    _ => {
+                        warn!("{}reprogramming FAILED ...", prefix);
+                        Err(StartupWarning::TouchNvmReprogramFailed)
+                    }
+                }
+            }
+        },
+        _ => {
+            warn!("{}NAK error (jack2 connected?) ignoring ...", prefix);
+            Err(StartupWarning::TouchNak)
+        }
+    }
 }
 
 #[entry]
@@ -374,6 +432,22 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua bootloader!");
 
+    let mut startup_report: String<256> = Default::default();
+
+    // Verify/reprogram touch sensing NVM
+
+    {
+        // TODO more sensible bus sharing
+        let i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
+        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1);
+        if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
+            let s: &'static str = e.into();
+            write!(startup_report, "{}\r\n", s).ok();
+        }
+    }
+
+    // Setup external PLL
+
     let maybe_external_pll = if HW_REV_MAJOR >= 4 {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
@@ -387,9 +461,14 @@ fn main() -> ! {
         None
     };
 
+    // Setup CODEC and load audio calibration.
+
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    maybe_restart_codec(&mut i2cdev1, &mut pmod);
+    if let Err(e) = maybe_restart_codec(&mut i2cdev1, &mut pmod) {
+        let s: &'static str = e.into();
+        write!(startup_report, "{}\r\n", s).ok();
+    }
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
@@ -444,6 +523,8 @@ fn main() -> ! {
 
         palette::ColorPalette::default().write_to_hardware(&mut video);
 
+        log::info!("{}", startup_report);
+
         loop {
 
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
@@ -459,7 +540,7 @@ fn main() -> ! {
             draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
 
             if let Some(n) = opts.tracker.selected {
-                draw_summary(&mut display, &manifests[n], &error_n[n], -20, -18, 0);
+                draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
                 if manifests[n].is_some() {
                     Line::new(Point::new(255, (V_ACTIVE/2 - 55 + (n as u32)*18) as i32),
                               Point::new((H_ACTIVE/2-90) as i32, (V_ACTIVE/2+8) as i32))
