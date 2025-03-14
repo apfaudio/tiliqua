@@ -211,7 +211,7 @@ impl<I2C: I2c> Cy8cmbr3108Driver<I2C> {
         self.write_config_to_sram()?;
         self.commit_config_to_nvm()?;
         let mut timeout = 0;
-        while timeout != 10 {
+        while timeout != 100 {
             match self.check_busy() {
                 Ok(false) => break,
                 _ => timeout += 1

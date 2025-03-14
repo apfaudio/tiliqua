@@ -12,6 +12,7 @@ use micromath::{F32Ext};
 use strum_macros::{EnumIter, IntoStaticStr};
 
 use core::str::FromStr;
+use core::fmt::Write;
 
 use tiliqua_lib::*;
 use tiliqua_lib::generated_constants::*;
@@ -196,7 +197,7 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
     pll.init_adafruit_module()?;
     match pll_config.clk1_hz {
         Some(clk1_hz) => {
-            info!("Configure external PLL: clk0={}Hz, clk1={}Hz.", pll_config.clk0_hz, clk1_hz);
+            info!("si5351/pll: configure for clk0={}Hz, clk1={}Hz", pll_config.clk0_hz, clk1_hz);
             pll.set_frequencies(
                 PLL::A,
                 &[
@@ -210,7 +211,7 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
                 pll_config.spread_spectrum)
         }
         _ => {
-            info!("Configure external PLL: clk0={}Hz.", pll_config.clk0_hz);
+            info!("si5351/pll: configure for clk0={}Hz, clk1=disabled", pll_config.clk0_hz);
             pll.set_frequencies(
                 PLL::A,
                 &[
@@ -336,10 +337,19 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     });
 }
 
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
+pub enum StartupWarning {
+    CodecHardReset,
+    TouchNvmReprogrammed,
+    TouchNvmReprogramFailed,
+    TouchJack2MaybeInserted,
+}
+
 use embedded_hal::i2c::{I2c, Operation};
 
 // Mitigation for https://github.com/apfaudio/tiliqua/issues/81
-pub fn maybe_restart_codec<CodecI2c, Pmod>(i2cdev: &mut CodecI2c, pmod: &mut Pmod)
+pub fn maybe_restart_codec<CodecI2c, Pmod>(i2cdev: &mut CodecI2c, pmod: &mut Pmod) -> Result<(), StartupWarning>
 where
     CodecI2c: I2c,
     Pmod: EurorackPmod
@@ -350,45 +360,50 @@ where
         CODEC_ADDR, &mut [Operation::Write(&[0u8]),
                           Operation::Read(&mut rx_bytes)]);
     if ret.is_err() || rx_bytes[0] != 0x37 {
-        warn!("AK4619 needs hard reset. transaction returned: {:?}.", ret);
+        warn!("ak4619/codec: needs hard reset. transaction returned: {:?}.", ret);
         for n in 0usize..4usize {
-            warn!("@{}:0x{:x}", n, rx_bytes[n]);
+            warn!("ak4619: @{}:0x{:x}", n, rx_bytes[n]);
         }
-        warn!("Issuing AK4619 reset ...");
+        warn!("ak4619/codec: issuing hard PDN reset ...");
         pmod.hard_reset();
+        Err(StartupWarning::CodecHardReset)
     } else {
-        info!("AK4619 looks healthy.");
+        info!("ak4619/codec: register config looks healthy.");
+        Ok(())
     }
-
 }
 
-pub fn maybe_reprogram_cy8cmbr3xxx<TouchI2c>(dev: &mut Cy8cmbr3108Driver<TouchI2c>)
+pub fn maybe_reprogram_cy8cmbr3xxx<TouchI2c>(dev: &mut Cy8cmbr3108Driver<TouchI2c>) -> Result<(), StartupWarning>
 where
     TouchI2c: I2c,
 {
-    info!("cy8cmbr3xxx: n_working_sensors={:?}", dev.read_n_working_sensors());
+    let prefix = "cy8cmbr3xxx/touch: ";
+    info!("{}n_working_sensors={:?}", prefix, dev.read_n_working_sensors());
     let stored = dev.get_stored_crc();
     match stored {
         Ok(stored) => {
             let desired = dev.calculate_crc();
-            info!("cy8cmbr3xxx: CRC stored={:#x} (desired={:#x})", stored, desired);
+            info!("{}CRC stored={:#x} (desired={:#x})", prefix, stored, desired);
             if stored == desired {
-                info!("cy8cmbr3xxx: CRC OK");
-                return;
+                info!("{}CRC OK", prefix);
+                return Ok(());
             } else {
-                warn!("cy8cmbr3xxx: CRC NOT OK, reprogramming ...");
+                warn!("{}CRC NOT OK, reprogramming ...", prefix);
                 match dev.reprogram_nvm_and_reset() {
                     Ok(_) => {
-                        warn!("cy8cmbr3xxx: reprogramming DONE ...");
+                        warn!("{}reprogramming DONE ...", prefix);
+                        Err(StartupWarning::TouchNvmReprogrammed)
                     },
                     _ => {
-                        warn!("cy8cmbr3xxx: reprogramming FAILED ...");
+                        warn!("{}reprogramming FAILED ...", prefix);
+                        Err(StartupWarning::TouchNvmReprogramFailed)
                     }
                 }
             }
         },
         _ => {
-            warn!("cy8cmbr3xxx: NAK error (jack2 connected?) ignoring ...");
+            warn!("{}NAK error (jack2 connected?) ignoring ...", prefix);
+            Err(StartupWarning::TouchJack2MaybeInserted)
         }
     }
 }
@@ -406,6 +421,22 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua bootloader!");
 
+    let mut startup_report: String<256> = Default::default();
+
+    // Verify/reprogram touch sensing NVM
+
+    {
+        // TODO more sensible bus sharing
+        let i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
+        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1);
+        if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
+            let s: &'static str = e.into();
+            write!(startup_report, "WARN: {}\r\n", s).ok();
+        }
+    }
+
+    // Setup external PLL
+
     let maybe_external_pll = if HW_REV_MAJOR >= 4 {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
@@ -419,13 +450,15 @@ fn main() -> ! {
         None
     };
 
+    // Setup CODEC and load audio calibration.
+
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    maybe_restart_codec(&mut i2cdev1, &mut pmod);
+    if let Err(e) = maybe_restart_codec(&mut i2cdev1, &mut pmod) {
+        let s: &'static str = e.into();
+        write!(startup_report, "WARN: {}\r\n", s).ok();
+    }
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
-
-    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1);
-    maybe_reprogram_cy8cmbr3xxx(&mut cy8);
 
     let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
     for n in 0usize..N_MANIFESTS {
@@ -478,6 +511,8 @@ fn main() -> ! {
             .build();
 
         palette::ColorPalette::default().write_to_hardware(&mut video);
+
+        log::info!("{}", startup_report);
 
         loop {
 
