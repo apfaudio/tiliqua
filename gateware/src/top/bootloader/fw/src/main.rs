@@ -38,7 +38,7 @@ use hal::pca9635::Pca9635Driver;
 hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
                        VIDEO_ROTATE_90);
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
+pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
@@ -124,12 +124,13 @@ where
 fn draw_summary<D>(d: &mut D,
                    bitstream_manifest: &Option<BitstreamManifest>,
                    error: &Option<String<32>>,
+                   startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
     D: DrawTarget<Color = Gray8>,
 {
+    let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
     if let Some(bitstream) = bitstream_manifest {
-        let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
         Text::with_alignment(
             "brief:".into(),
             Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
@@ -174,22 +175,28 @@ where
         .draw(d).ok();
     }
     if let Some(error_string) = &error {
-        let hl = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
         Text::with_alignment(
             "error:".into(),
             Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
-            hl,
+            norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &error_string,
             Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
-            hl,
+            norm,
             Alignment::Left,
         )
         .draw(d).ok();
     }
+    Text::with_alignment(
+        &startup_report,
+        Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2-70) as i32 + ot),
+        norm,
+        Alignment::Center,
+    )
+    .draw(d).ok();
 }
 
 fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device<I2c0>)
@@ -340,10 +347,14 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum StartupWarning {
+    #[strum(to_string = "ak4619/codec: issued hard reset (to avoid: remove display when unpowered)")]
     CodecHardReset,
+    #[strum(to_string = "cy8cmbr/touch: NVM reprogrammed (bootloader update?)")]
     TouchNvmReprogrammed,
+    #[strum(to_string = "cy8cmbr/touch: NVM reprogram FAIL (try rebooting?)")]
     TouchNvmReprogramFailed,
-    TouchJack2MaybeInserted,
+    #[strum(to_string = "cy8cmbr/touch: disabled/nak! (try: remove in2 jack and reboot?)")]
+    TouchNak,
 }
 
 use embedded_hal::i2c::{I2c, Operation};
@@ -403,7 +414,7 @@ where
         },
         _ => {
             warn!("{}NAK error (jack2 connected?) ignoring ...", prefix);
-            Err(StartupWarning::TouchJack2MaybeInserted)
+            Err(StartupWarning::TouchNak)
         }
     }
 }
@@ -431,7 +442,7 @@ fn main() -> ! {
         let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1);
         if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
             let s: &'static str = e.into();
-            write!(startup_report, "WARN: {}\r\n", s).ok();
+            write!(startup_report, "{}\r\n", s).ok();
         }
     }
 
@@ -456,7 +467,7 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     if let Err(e) = maybe_restart_codec(&mut i2cdev1, &mut pmod) {
         let s: &'static str = e.into();
-        write!(startup_report, "WARN: {}\r\n", s).ok();
+        write!(startup_report, "{}\r\n", s).ok();
     }
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
@@ -529,7 +540,7 @@ fn main() -> ! {
             draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
 
             if let Some(n) = opts.tracker.selected {
-                draw_summary(&mut display, &manifests[n], &error_n[n], -20, -18, 0);
+                draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
                 if manifests[n].is_some() {
                     Line::new(Point::new(255, (V_ACTIVE/2 - 55 + (n as u32)*18) as i32),
                               Point::new((H_ACTIVE/2-90) as i32, (V_ACTIVE/2+8) as i32))
