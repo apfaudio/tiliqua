@@ -487,8 +487,6 @@ class TiliquaSoc(Component):
             f.write(f"pub const V_ACTIVE: u32            = {self.fb.fixed_modeline.v_active};\n")
             f.write(f"pub const VIDEO_ROTATE_90: bool    = {'true' if self.video_rotate_90 else 'false'};\n")
             f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base.init:x};\n")
-            f.write(f"pub const PX_HUE_MAX: i32          = 16;\n")
-            f.write(f"pub const PX_INTENSITY_MAX: i32    = 16;\n")
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")
             f.write(f"pub const MANIFEST_BASE: usize     = SPIFLASH_BASE + SPIFLASH_SZ_BYTES - 4096;\n")
             f.write(f"pub const MANIFEST_SZ_BYTES: usize = 4096;\n")
