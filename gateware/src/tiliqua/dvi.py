@@ -9,6 +9,7 @@ from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
 from tiliqua import sim, tmds
+from tiliqua.dvi_modeline  import DVIModeline
 
 class DVITimingGen(wiring.Component):
 

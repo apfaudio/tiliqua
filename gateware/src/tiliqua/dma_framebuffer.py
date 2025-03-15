@@ -16,7 +16,7 @@ from amaranth.lib.cdc      import FFSynchronizer
 from amaranth.utils        import exact_log2
 from amaranth.lib.memory   import Memory
 
-from amaranth_soc          import wishbone
+from amaranth_soc          import wishbone, csr
 
 from tiliqua               import sim, dvi, palette
 from tiliqua.dvi_modeline  import DVIModeline
@@ -75,9 +75,11 @@ class DMAFramebuffer(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
+        """
         if self.fixed_modeline is not None:
             for member in self.timings.signature.members:
                 m.d.comb += getattr(self.timings, member).eq(getattr(self.fixed_modeline, member))
+        """
 
         m.submodules.palette = self.palette
         m.submodules.fifo = fifo = AsyncFIFOBuffered(
@@ -237,20 +239,23 @@ class Peripheral(wiring.Component):
     class PaletteBusyReg(csr.Register, access="r"):
         busy: csr.Field(csr.action.R, unsigned(1))
 
-    def __init__(self, fb, default_modeline: DVIModeline, **kwargs):
-        self.fb = framebuffer
-        self.default_modeline = default_modeline
+    class FBBaseReg(csr.Register, access="w"):
+        fb_base: csr.Field(csr.action.W, unsigned(32))
 
-        regs = csr.Builder(addr_width=5, data_width=32)
+    def __init__(self, fb):
+        self.fb = fb
+
+        regs = csr.Builder(addr_width=6, data_width=8)
 
         self._h_timing     = regs.add("h_timing",     self.HTimingReg(),     offset=0x00)
         self._h_timing2    = regs.add("h_timing2",    self.HTimingReg2(),    offset=0x04)
         self._v_timing     = regs.add("v_timing",     self.VTimingReg(),     offset=0x08)
         self._v_timing2    = regs.add("v_timing2",    self.VTimingReg2(),    offset=0x0C)
         self._hv_timing    = regs.add("hv_timing",    self.HVTimingReg(),    offset=0x10)
-        self._flags        = regs.add("flags",        self.SyncFlagsReg(),   offset=0x14)
+        self._flags        = regs.add("flags",        self.FlagsReg(),   offset=0x14)
         self._palette      = regs.add("palette",      self.PaletteReg(),     offset=0x18)
         self._palette_busy = regs.add("palette_busy", self.PaletteBusyReg(), offset=0x1C)
+        self._fb_base      = regs.add("fb_base",      self.FBBaseReg(),      offset=0x20)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
@@ -267,59 +272,27 @@ class Peripheral(wiring.Component):
 
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
-        # Timing registers with default initialization from modeline
-        h_active      = Signal(16, reset=self.default_modeline.h_active)
-        h_sync_start  = Signal(16, reset=self.default_modeline.h_sync_start)
-        h_sync_end    = Signal(16, reset=self.default_modeline.h_sync_end)
-        h_total       = Signal(16, reset=self.default_modeline.h_total)
-        v_active      = Signal(16, reset=self.default_modeline.v_active)
-        v_sync_start  = Signal(16, reset=self.default_modeline.v_sync_start)
-        v_sync_end    = Signal(16, reset=self.default_modeline.v_sync_end)
-        v_total       = Signal(16, reset=self.default_modeline.v_total)
-        h_sync_invert = Signal(1, reset=self.default_modeline.h_sync_invert)
-        v_sync_invert = Signal(1, reset=self.default_modeline.v_sync_invert)
-        active_pixels = Signal(30, reset=self.default_modeline.active_pixels)
-        enable        = Signal(1, reset=0)
-
-        with m.If(self._h_timing.f.h_active.w_stb):
-            m.d.sync += h_active.eq(self._h_timing.f.h_active.w_data)
-        with m.If(self._h_timing.f.h_sync_start.w_stb):
-            m.d.sync += h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
-        with m.If(self._h_timing2.f.h_sync_end.w_stb):
-            m.d.sync += h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
-        with m.If(self._h_timing2.f.h_total.w_stb):
-            m.d.sync += h_total.eq(self._h_timing2.f.h_total.w_data)
-        with m.If(self._v_timing.f.v_active.w_stb):
-            m.d.sync += v_active.eq(self._v_timing.f.v_active.w_data)
-        with m.If(self._v_timing.f.v_sync_start.w_stb):
-            m.d.sync += v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
-        with m.If(self._v_timing2.f.v_sync_end.w_stb):
-            m.d.sync += v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
-        with m.If(self._v_timing2.f.v_total.w_stb):
-            m.d.sync += v_total.eq(self._v_timing2.f.v_total.w_data)
-        with m.If(self._hv_timing.f.h_sync_invert.w_stb):
-            m.d.sync += h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
-        with m.If(self._hv_timing.f.v_sync_invert.w_stb):
-            m.d.sync += v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
+        with m.If(self._h_timing.element.w_stb):
+            m.d.sync += self.fb.timings.h_active.eq(self._h_timing.f.h_active.w_data)
+            m.d.sync += self.fb.timings.h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
+        with m.If(self._h_timing2.element.w_stb):
+            m.d.sync += self.fb.timings.h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
+            m.d.sync += self.fb.timings.h_total.eq(self._h_timing2.f.h_total.w_data)
+        with m.If(self._v_timing.element.w_stb):
+            m.d.sync += self.fb.timings.v_active.eq(self._v_timing.f.v_active.w_data)
+            m.d.sync += self.fb.timings.v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
+        with m.If(self._v_timing2.element.w_stb):
+            m.d.sync += self.fb.timings.v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
+            m.d.sync += self.fb.timings.v_total.eq(self._v_timing2.f.v_total.w_data)
+        with m.If(self._hv_timing.element.w_stb):
+            m.d.sync += self.fb.timings.h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
+            m.d.sync += self.fb.timings.v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
         with m.If(self._hv_timing.f.active_pixels.w_stb):
-            m.d.sync += active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
+            m.d.sync += self.fb.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
         with m.If(self._flags.f.enable.w_stb):
-            m.d.sync += enable.eq(self._flags.f.enable.w_data)
-
-        m.d.comb += [
-            self.fb.timings.h_active.eq(h_active),
-            self.fb.timings.h_sync_start.eq(h_sync_start),
-            self.fb.timings.h_sync_end.eq(h_sync_end),
-            self.fb.timings.h_total.eq(h_total),
-            self.fb.timings.h_sync_invert.eq(h_sync_invert),
-            self.fb.timings.v_active.eq(v_active),
-            self.fb.timings.v_sync_start.eq(v_sync_start),
-            self.fb.timings.v_sync_end.eq(v_sync_end),
-            self.fb.timings.v_total.eq(v_total),
-            self.fb.timings.v_sync_invert.eq(v_sync_invert),
-            self.fb.timings.active_pixels.eq(active_pixels),
-            self.fb.enable.eq(enable),
-        ]
+            m.d.sync += self.fb.enable.eq(self._flags.f.enable.w_data)
+        with m.If(self._fb_base.f.fb_base.w_stb):
+            m.d.sync += self.fb.fb_base.eq(self._fb_base.f.fb_base.w_data)
 
         # palette update logic
         palette_busy = Signal()

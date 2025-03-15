@@ -35,8 +35,9 @@ use embedded_graphics::{
 use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;
 
-hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
-                       VIDEO_ROTATE_90);
+tiliqua_hal::impl_dma_framebuffer! {
+    DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
+}
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
@@ -511,8 +512,12 @@ fn main() -> ! {
 
         let mut logo_coord_ix = 0u32;
         let mut rng = fastrand::Rng::with_seed(0);
-        let mut display = DMADisplay {
+        let mut display = DMAFramebuffer0 {
+            registers: peripherals.FRAMEBUFFER_PERIPH,
             framebuffer_base: PSRAM_FB_BASE as *mut u32,
+            h_active: H_ACTIVE,
+            v_active: V_ACTIVE,
+            rotate_90: VIDEO_ROTATE_90,
         };
         video.set_persist(1024);
 
@@ -521,7 +526,7 @@ fn main() -> ! {
             .stroke_width(1)
             .build();
 
-        palette::ColorPalette::default().write_to_hardware(&mut video);
+        palette::ColorPalette::default().write_to_hardware(&mut display);
 
         log::info!("{}", startup_report);
 
