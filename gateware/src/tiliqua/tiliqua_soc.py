@@ -65,15 +65,6 @@ class VideoPeripheral(wiring.Component):
     class DecayReg(csr.Register, access="w"):
         decay: csr.Field(csr.action.W, unsigned(8))
 
-    class PaletteReg(csr.Register, access="w"):
-        position: csr.Field(csr.action.W, unsigned(8))
-        red:      csr.Field(csr.action.W, unsigned(8))
-        green:    csr.Field(csr.action.W, unsigned(8))
-        blue:     csr.Field(csr.action.W, unsigned(8))
-
-    class PaletteBusyReg(csr.Register, access="r"):
-        busy: csr.Field(csr.action.R, unsigned(1))
-
     def __init__(self, fb, bus_dma):
         self.en = Signal()
         self.fb = fb
@@ -84,8 +75,6 @@ class VideoPeripheral(wiring.Component):
 
         self._persist      = regs.add("persist",      self.PersistReg(),     offset=0x0)
         self._decay        = regs.add("decay",        self.DecayReg(),       offset=0x4)
-        self._palette      = regs.add("palette",      self.PaletteReg(),     offset=0x8)
-        self._palette_busy = regs.add("palette_busy", self.PaletteBusyReg(), offset=0xC)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
@@ -109,26 +98,6 @@ class VideoPeripheral(wiring.Component):
         with m.If(self._decay.f.decay.w_stb):
             m.d.sync += self.persist.decay.eq(self._decay.f.decay.w_data)
 
-        # palette update logic
-        palette_busy = Signal()
-        m.d.comb += self._palette_busy.f.busy.r_data.eq(palette_busy)
-
-        with m.If(self._palette.element.w_stb & ~palette_busy):
-            m.d.sync += [
-                palette_busy                            .eq(1),
-                self.fb.palette.update.valid            .eq(1),
-                self.fb.palette.update.payload.position .eq(self._palette.f.position.w_data),
-                self.fb.palette.update.payload.red      .eq(self._palette.f.red.w_data),
-                self.fb.palette.update.payload.green    .eq(self._palette.f.green.w_data),
-                self.fb.palette.update.payload.blue     .eq(self._palette.f.blue.w_data),
-            ]
-
-        with m.If(palette_busy & self.fb.palette.update.ready):
-            # coefficient has been written
-            m.d.sync += [
-                palette_busy.eq(0),
-                self.fb.palette.update.valid.eq(0),
-            ]
 
         return m
 

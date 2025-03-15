@@ -198,3 +198,148 @@ class DMAFramebuffer(wiring.Component):
             ]
 
         return m
+
+class Peripheral(wiring.Component):
+    """
+    CSR peripheral for tweaking framebuffer timing/palette parameters from an SoC.
+    Timing values follow the same format as DVIModeline in dvi_modeline.py.
+    """
+    class HTimingReg(csr.Register, access="w"):
+        h_active:     csr.Field(csr.action.W, unsigned(16))
+        h_sync_start: csr.Field(csr.action.W, unsigned(16))
+
+    class HTimingReg2(csr.Register, access="w"):
+        h_sync_end:   csr.Field(csr.action.W, unsigned(16))
+        h_total:      csr.Field(csr.action.W, unsigned(16))
+
+    class VTimingReg(csr.Register, access="w"):
+        v_active:     csr.Field(csr.action.W, unsigned(16))
+        v_sync_start: csr.Field(csr.action.W, unsigned(16))
+
+    class VTimingReg2(csr.Register, access="w"):
+        v_sync_end:   csr.Field(csr.action.W, unsigned(16))
+        v_total:      csr.Field(csr.action.W, unsigned(16))
+
+    class HVTimingReg(csr.Register, access="w"):
+        h_sync_invert: csr.Field(csr.action.W, unsigned(1))
+        v_sync_invert: csr.Field(csr.action.W, unsigned(1))
+        active_pixels: csr.Field(csr.action.W, unsigned(30))
+
+    class FlagsReg(csr.Register, access="w"):
+        enable:        csr.Field(csr.action.W, unsigned(1))
+
+    class PaletteReg(csr.Register, access="w"):
+        position: csr.Field(csr.action.W, unsigned(8))
+        red:      csr.Field(csr.action.W, unsigned(8))
+        green:    csr.Field(csr.action.W, unsigned(8))
+        blue:     csr.Field(csr.action.W, unsigned(8))
+
+    class PaletteBusyReg(csr.Register, access="r"):
+        busy: csr.Field(csr.action.R, unsigned(1))
+
+    def __init__(self, fb, default_modeline: DVIModeline, **kwargs):
+        self.fb = framebuffer
+        self.default_modeline = default_modeline
+
+        regs = csr.Builder(addr_width=5, data_width=32)
+
+        self._h_timing     = regs.add("h_timing",     self.HTimingReg(),     offset=0x00)
+        self._h_timing2    = regs.add("h_timing2",    self.HTimingReg2(),    offset=0x04)
+        self._v_timing     = regs.add("v_timing",     self.VTimingReg(),     offset=0x08)
+        self._v_timing2    = regs.add("v_timing2",    self.VTimingReg2(),    offset=0x0C)
+        self._hv_timing    = regs.add("hv_timing",    self.HVTimingReg(),    offset=0x10)
+        self._flags        = regs.add("flags",        self.SyncFlagsReg(),   offset=0x14)
+        self._palette      = regs.add("palette",      self.PaletteReg(),     offset=0x18)
+        self._palette_busy = regs.add("palette_busy", self.PaletteBusyReg(), offset=0x1C)
+
+        self._bridge = csr.Bridge(regs.as_memory_map())
+
+        super().__init__({
+            "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+        })
+
+        self.bus.memory_map = self._bridge.bus.memory_map
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.bridge = self._bridge
+
+        wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
+
+        # Timing registers with default initialization from modeline
+        h_active      = Signal(16, reset=self.default_modeline.h_active)
+        h_sync_start  = Signal(16, reset=self.default_modeline.h_sync_start)
+        h_sync_end    = Signal(16, reset=self.default_modeline.h_sync_end)
+        h_total       = Signal(16, reset=self.default_modeline.h_total)
+        v_active      = Signal(16, reset=self.default_modeline.v_active)
+        v_sync_start  = Signal(16, reset=self.default_modeline.v_sync_start)
+        v_sync_end    = Signal(16, reset=self.default_modeline.v_sync_end)
+        v_total       = Signal(16, reset=self.default_modeline.v_total)
+        h_sync_invert = Signal(1, reset=self.default_modeline.h_sync_invert)
+        v_sync_invert = Signal(1, reset=self.default_modeline.v_sync_invert)
+        active_pixels = Signal(30, reset=self.default_modeline.active_pixels)
+        enable        = Signal(1, reset=0)
+
+        with m.If(self._h_timing.f.h_active.w_stb):
+            m.d.sync += h_active.eq(self._h_timing.f.h_active.w_data)
+        with m.If(self._h_timing.f.h_sync_start.w_stb):
+            m.d.sync += h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
+        with m.If(self._h_timing2.f.h_sync_end.w_stb):
+            m.d.sync += h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
+        with m.If(self._h_timing2.f.h_total.w_stb):
+            m.d.sync += h_total.eq(self._h_timing2.f.h_total.w_data)
+        with m.If(self._v_timing.f.v_active.w_stb):
+            m.d.sync += v_active.eq(self._v_timing.f.v_active.w_data)
+        with m.If(self._v_timing.f.v_sync_start.w_stb):
+            m.d.sync += v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
+        with m.If(self._v_timing2.f.v_sync_end.w_stb):
+            m.d.sync += v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
+        with m.If(self._v_timing2.f.v_total.w_stb):
+            m.d.sync += v_total.eq(self._v_timing2.f.v_total.w_data)
+        with m.If(self._hv_timing.f.h_sync_invert.w_stb):
+            m.d.sync += h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
+        with m.If(self._hv_timing.f.v_sync_invert.w_stb):
+            m.d.sync += v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
+        with m.If(self._hv_timing.f.active_pixels.w_stb):
+            m.d.sync += active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
+        with m.If(self._flags.f.enable.w_stb):
+            m.d.sync += enable.eq(self._flags.f.enable.w_data)
+
+        m.d.comb += [
+            self.fb.timings.h_active.eq(h_active),
+            self.fb.timings.h_sync_start.eq(h_sync_start),
+            self.fb.timings.h_sync_end.eq(h_sync_end),
+            self.fb.timings.h_total.eq(h_total),
+            self.fb.timings.h_sync_invert.eq(h_sync_invert),
+            self.fb.timings.v_active.eq(v_active),
+            self.fb.timings.v_sync_start.eq(v_sync_start),
+            self.fb.timings.v_sync_end.eq(v_sync_end),
+            self.fb.timings.v_total.eq(v_total),
+            self.fb.timings.v_sync_invert.eq(v_sync_invert),
+            self.fb.timings.active_pixels.eq(active_pixels),
+            self.fb.enable.eq(enable),
+        ]
+
+        # palette update logic
+        palette_busy = Signal()
+        m.d.comb += self._palette_busy.f.busy.r_data.eq(palette_busy)
+
+        with m.If(self._palette.element.w_stb & ~palette_busy):
+            m.d.sync += [
+                palette_busy                            .eq(1),
+                self.fb.palette.update.valid            .eq(1),
+                self.fb.palette.update.payload.position .eq(self._palette.f.position.w_data),
+                self.fb.palette.update.payload.red      .eq(self._palette.f.red.w_data),
+                self.fb.palette.update.payload.green    .eq(self._palette.f.green.w_data),
+                self.fb.palette.update.payload.blue     .eq(self._palette.f.blue.w_data),
+            ]
+
+        with m.If(palette_busy & self.fb.palette.update.ready):
+            # coefficient has been written
+            m.d.sync += [
+                palette_busy.eq(0),
+                self.fb.palette.update.valid.eq(0),
+            ]
+
+        return m
