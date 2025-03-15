@@ -420,6 +420,23 @@ where
     }
 }
 
+fn edid_test(i2cdev: &mut I2c0) -> u8 {
+    info!("Read EDID...");
+    let mut edid: [u8; 8] = [0; 8];
+    const EDID_ADDR: u8 = 0x50;
+    let mut mfg: u8 = 0;
+    for i in 0..16 {
+        let _ = i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
+                                                    Operation::Read(&mut edid)]);
+        info!("{:x} {:x} {:x} {:x} {:x} {:x} {:x} {:x}",
+              edid[0], edid[1], edid[2], edid[3], edid[4], edid[5], edid[6], edid[7]);
+        if i == 1 {
+            mfg = edid[2];
+        }
+    }
+    mfg
+}
+
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -434,6 +451,43 @@ fn main() -> ! {
     info!("Hello from Tiliqua bootloader!");
 
     let mut startup_report: String<256> = Default::default();
+
+    // Determine display modeline
+    let mut mfg: u8 = 0;
+    {
+        let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
+        mfg = edid_test(&mut i2cdev0);
+    }
+
+    let modeline = if mfg == 0x32 {
+        DVIModeline {
+            h_active      : 720,
+            h_sync_start  : 760,
+            h_sync_end    : 780,
+            h_total       : 820,
+            h_sync_invert : false,
+            v_active      : 720,
+            v_sync_start  : 744,
+            v_sync_end    : 748,
+            v_total       : 760,
+            v_sync_invert : false,
+            pixel_clk_mhz : 37.40,
+        }
+    } else {
+        DVIModeline {
+            h_active      : 1280,
+            h_sync_start  : 1390,
+            h_sync_end    : 1430,
+            h_total       : 1650,
+            h_sync_invert : false,
+            v_active      : 720,
+            v_sync_start  : 725,
+            v_sync_end    : 730,
+            v_total       : 750,
+            v_sync_invert : false,
+            pixel_clk_mhz : 74.25,
+        }
+    };
 
     // Verify/reprogram touch sensing NVM
 
@@ -454,7 +508,7 @@ fn main() -> ! {
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         configure_external_pll(&ExternalPLLConfig{
             clk0_hz: CLOCK_AUDIO_HZ,
-            clk1_hz: Some(CLOCK_DVI_HZ),
+            clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
             spread_spectrum: Some(0.01),
         }, &mut si5351drv).unwrap();
         Some(si5351drv)
@@ -516,19 +570,7 @@ fn main() -> ! {
         let mut display = DMAFramebuffer0::new(
             peripherals.FRAMEBUFFER_PERIPH,
             PSRAM_FB_BASE,
-            DVIModeline {
-                h_active      : 1280,
-                h_sync_start  : 1390,
-                h_sync_end    : 1430,
-                h_total       : 1650,
-                h_sync_invert : false,
-                v_active      : 720,
-                v_sync_start  : 725,
-                v_sync_end    : 730,
-                v_total       : 750,
-                v_sync_invert : false,
-                pixel_clk_mhz : 74.25,
-            },
+            modeline,
             VIDEO_ROTATE_90,
         );
 
