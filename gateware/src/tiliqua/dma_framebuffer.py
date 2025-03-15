@@ -111,12 +111,16 @@ class DMAFramebuffer(wiring.Component):
 
         fb_size_words = (self.timings.active_pixels * self.bytes_per_pixel) // 4
 
+
+        tgen_en = Signal()
+        m.submodules.en_ff = FFSynchronizer(
+                i=tgen_en, o=dvi_tgen.enable, o_domain="dvi")
         # Read to FIFO in sync domain
         with m.FSM() as fsm:
             with m.State('OFF'):
                 with m.If(self.enable):
                     # TODO FFsync
-                    m.d.dvi += dvi_tgen.enable.eq(1)
+                    m.d.sync += tgen_en.eq(1)
                     m.next = 'BURST'
             with m.State('BURST'):
                 m.d.comb += [
