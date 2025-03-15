@@ -532,6 +532,9 @@ fn main() -> ! {
 
         loop {
 
+            let h_active = display.h_active.clone();
+            let v_active = display.v_active.clone();
+
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
 
@@ -541,14 +544,14 @@ fn main() -> ! {
                  app.borrow_ref(cs).error_n.clone())
             });
 
-            draw::draw_options(&mut display, &opts, 100, V_ACTIVE/2-50, 0).ok();
-            draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
+            draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
+            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA).ok();
 
             if let Some(n) = opts.tracker.selected {
                 draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
                 if manifests[n].is_some() {
-                    Line::new(Point::new(255, (V_ACTIVE/2 - 55 + (n as u32)*18) as i32),
-                              Point::new((H_ACTIVE/2-90) as i32, (V_ACTIVE/2+8) as i32))
+                    Line::new(Point::new(255, (v_active/2 - 55 + (n as u32)*18) as i32),
+                              Point::new((h_active/2-90) as i32, (v_active/2+8) as i32))
                               .into_styled(stroke)
                               .draw(&mut display).ok();
                 }
@@ -556,7 +559,7 @@ fn main() -> ! {
 
             for _ in 0..5 {
                 let _ = draw::draw_boot_logo(&mut display,
-                                             (H_ACTIVE/2) as i32,
+                                             (h_active/2) as i32,
                                              150 as i32,
                                              logo_coord_ix);
                 logo_coord_ix += 1;
