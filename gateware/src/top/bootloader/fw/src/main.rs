@@ -35,8 +35,9 @@ use embedded_graphics::{
 use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;
 
-hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
-                       VIDEO_ROTATE_90);
+tiliqua_hal::impl_dma_framebuffer! {
+    DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
+}
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
@@ -419,6 +420,23 @@ where
     }
 }
 
+fn edid_test(i2cdev: &mut I2c0) -> u8 {
+    info!("Read EDID...");
+    let mut edid: [u8; 8] = [0; 8];
+    const EDID_ADDR: u8 = 0x50;
+    let mut mfg: u8 = 0;
+    for i in 0..16 {
+        let _ = i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
+                                                    Operation::Read(&mut edid)]);
+        info!("{:x} {:x} {:x} {:x} {:x} {:x} {:x} {:x}",
+              edid[0], edid[1], edid[2], edid[3], edid[4], edid[5], edid[6], edid[7]);
+        if i == 1 {
+            mfg = edid[2];
+        }
+    }
+    mfg
+}
+
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -433,6 +451,43 @@ fn main() -> ! {
     info!("Hello from Tiliqua bootloader!");
 
     let mut startup_report: String<256> = Default::default();
+
+    // Determine display modeline
+    let mut mfg: u8 = 0;
+    {
+        let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
+        mfg = edid_test(&mut i2cdev0);
+    }
+
+    let modeline = if mfg == 0x32 {
+        DVIModeline {
+            h_active      : 720,
+            h_sync_start  : 760,
+            h_sync_end    : 780,
+            h_total       : 820,
+            h_sync_invert : false,
+            v_active      : 720,
+            v_sync_start  : 744,
+            v_sync_end    : 748,
+            v_total       : 760,
+            v_sync_invert : false,
+            pixel_clk_mhz : 37.40,
+        }
+    } else {
+        DVIModeline {
+            h_active      : 1280,
+            h_sync_start  : 1390,
+            h_sync_end    : 1430,
+            h_total       : 1650,
+            h_sync_invert : false,
+            v_active      : 720,
+            v_sync_start  : 725,
+            v_sync_end    : 730,
+            v_total       : 750,
+            v_sync_invert : false,
+            pixel_clk_mhz : 74.25,
+        }
+    };
 
     // Verify/reprogram touch sensing NVM
 
@@ -453,7 +508,7 @@ fn main() -> ! {
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         configure_external_pll(&ExternalPLLConfig{
             clk0_hz: CLOCK_AUDIO_HZ,
-            clk1_hz: Some(CLOCK_DVI_HZ),
+            clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
             spread_spectrum: Some(0.01),
         }, &mut si5351drv).unwrap();
         Some(si5351drv)
@@ -511,9 +566,17 @@ fn main() -> ! {
 
         let mut logo_coord_ix = 0u32;
         let mut rng = fastrand::Rng::with_seed(0);
-        let mut display = DMADisplay {
-            framebuffer_base: PSRAM_FB_BASE as *mut u32,
-        };
+
+        let mut display = DMAFramebuffer0::new(
+            peripherals.FRAMEBUFFER_PERIPH,
+            PSRAM_FB_BASE,
+            modeline,
+            VIDEO_ROTATE_90,
+        );
+
+        info!("display configured for {}x{}",
+              display.size().width, display.size().height);
+
         video.set_persist(1024);
 
         let stroke = PrimitiveStyleBuilder::new()
@@ -521,11 +584,14 @@ fn main() -> ! {
             .stroke_width(1)
             .build();
 
-        palette::ColorPalette::default().write_to_hardware(&mut video);
+        palette::ColorPalette::default().write_to_hardware(&mut display);
 
         log::info!("{}", startup_report);
 
         loop {
+
+            let h_active = display.size().width;
+            let v_active = display.size().height;
 
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
@@ -536,14 +602,14 @@ fn main() -> ! {
                  app.borrow_ref(cs).error_n.clone())
             });
 
-            draw::draw_options(&mut display, &opts, 100, V_ACTIVE/2-50, 0).ok();
-            draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
+            draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
+            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA).ok();
 
             if let Some(n) = opts.tracker.selected {
                 draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
                 if manifests[n].is_some() {
-                    Line::new(Point::new(255, (V_ACTIVE/2 - 55 + (n as u32)*18) as i32),
-                              Point::new((H_ACTIVE/2-90) as i32, (V_ACTIVE/2+8) as i32))
+                    Line::new(Point::new(255, (v_active/2 - 55 + (n as u32)*18) as i32),
+                              Point::new((h_active/2-90) as i32, (v_active/2+8) as i32))
                               .into_styled(stroke)
                               .draw(&mut display).ok();
                 }
@@ -551,7 +617,7 @@ fn main() -> ! {
 
             for _ in 0..5 {
                 let _ = draw::draw_boot_logo(&mut display,
-                                             (H_ACTIVE/2) as i32,
+                                             (h_active/2) as i32,
                                              150 as i32,
                                              logo_coord_ix);
                 logo_coord_ix += 1;
