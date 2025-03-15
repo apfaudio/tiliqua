@@ -1,4 +1,4 @@
-use tiliqua_hal::dma_display::DMAFramebuffer;
+use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 
 use strum_macros::{EnumIter, IntoStaticStr};
 
