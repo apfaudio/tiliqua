@@ -1,16 +1,14 @@
 # Tiliqua
 
-<sup>WARN: 🚧 under construction! 🚧 - this module is in active development</sup>
+**Tiliqua is a powerful, open hardware FPGA-based audio multitool for Eurorack.** It looks like this:
 
-**Tiliqua is a powerful, open hardware FPGA-based audio multitool for Eurorack.**
+![image](https://github.com/user-attachments/assets/4a308920-97dc-4b73-aaac-7f735a71eec0)
 
-For updates, join the [matrix chatroom](https://matrix.to/#/#apfaudio:matrix.org), subscribe to the [Crowd Supply page](https://www.crowdsupply.com/apfaudio/tiliqua) or my own [mailing list](https://apf.audio/)
+# ⮕[Documentation](https://apfaudio.github.io/tiliqua/)⬅
 
-## see the ⮕[documentation](https://apfaudio.github.io/tiliqua/)⬅
+# Updates / Community
 
-![image](https://github.com/user-attachments/assets/0a5ae000-790a-4a23-9a65-1b69839eef9c)
-
-# Community
+For updates, subscribe to the [Crowd Supply page](https://www.crowdsupply.com/apfaudio/tiliqua), join the [matrix chatroom](https://matrix.to/#/#apfaudio:matrix.org), or my own [mailing list](https://apf.audio/).
 
 `apfaudio` has a Matrix channel, [#apfaudio:matrix.org](https://matrix.to/#/#apfaudio:matrix.org). Feel free to join to ask questions or discuss ongoing development.
 
@@ -28,6 +26,7 @@ This project would be nothing without the hard work of many (awesome) open-sourc
 - Audio interface and gateware: my existing [eurorack-pmod](https://github.com/apfaudio/eurorack-pmod) project.
 - SID emulation gateware: [reDIP-SID](https://github.com/daglem/reDIP-SID)
 - The "mi-plaits-dsp-rs" project: [mi-plaits-dsp](https://github.com/sourcebox/mi-plaits-dsp-rs)
+- The "pico-dirtyJtag" project forms a big chunk of the RP2040 firmware [pico-dirtyJtag](github.com/phdussud/pico-dirtyJtag)
 
 ## Funding
 
