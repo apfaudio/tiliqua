@@ -90,7 +90,7 @@ class VideoPeripheral(wiring.Component):
 
         connect(m, flipped(self.bus), self._bridge.bus)
 
-        m.d.comb += self.persist.enable.eq(self.en)
+        m.d.comb += self.persist.enable.eq(self.fb.enable)
 
         with m.If(self._persist.f.persist.w_stb):
             m.d.sync += self.persist.holdoff.eq(self._persist.f.persist.w_data)
@@ -382,12 +382,10 @@ class TiliquaSoc(Component):
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
         with m.If(on_delay < 0xFF):
-            m.d.comb += self.cpu.ext_reset.eq(1)
-        with m.If(on_delay < 0xFFFF):
             m.d.sync += on_delay.eq(on_delay+1)
+            m.d.comb += self.cpu.ext_reset.eq(1)
         with m.Else():
-            m.d.sync += self.permit_bus_traffic.eq(1)
-            m.d.sync += self.video_periph.en.eq(1)
+            m.d.comb += self.cpu.ext_reset.eq(0)
 
         return m
 

@@ -51,6 +51,7 @@ class DVITimingGen(wiring.Component):
 
     def __init__(self):
         super().__init__({
+            "enable": In(1),
             "timings": In(self.TimingProperties()),
             # Control signals without inversion applied.
             # Useful for driving logic external to this core (e.g. do something
@@ -79,7 +80,7 @@ class DVITimingGen(wiring.Component):
         self.x = Signal(signed(12))
         self.y = Signal(signed(12))
 
-        with m.If(ResetSignal("dvi")):
+        with m.If(ResetSignal("dvi") | ~self.enable):
             m.d.dvi += [
                 self.x.eq(self.h_reset),
                 self.y.eq(self.v_reset),

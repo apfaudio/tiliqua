@@ -7,7 +7,7 @@
 extern crate std;
 
 // modules
-pub mod dma_display;
+pub mod dma_framebuffer;
 pub mod encoder;
 pub mod i2c;
 pub mod pca9635;

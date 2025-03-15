@@ -13,7 +13,7 @@ pub struct DVIModeline {
 }
 
 pub trait DMAFramebuffer {
-    fn set_modeline(&mut self, mode: DVIModeline);
+    fn update_fb_base(&mut self, fb_base: u32);
     fn set_palette_rgb(&mut self, intensity: u8, hue: u8, r: u8, g: u8, b: u8);
 }
 
@@ -23,22 +23,65 @@ macro_rules! impl_dma_framebuffer {
         $DMA_FRAMEBUFFERX:ident: $PACFRAMEBUFFERX:ty,
     )+) => {
         $(
-            use tiliqua_hal::dma_display::DVIModeline;
+            use tiliqua_hal::dma_framebuffer::DVIModeline;
 
             struct $DMA_FRAMEBUFFERX {
                 registers: $PACFRAMEBUFFERX,
+                mode: DVIModeline,
                 framebuffer_base: *mut u32,
-                h_active: u32,
-                v_active: u32,
                 rotate_90: bool,
             }
 
-            impl hal::dma_display::DMAFramebuffer for $DMA_FRAMEBUFFERX {
-                fn set_modeline(&mut self, mode: DVIModeline) {
-                    self.registers.h_timing().write(|w| unsafe {
+            impl $DMA_FRAMEBUFFERX {
+                fn new(registers: $PACFRAMEBUFFERX, fb_base: usize,
+                       mode: DVIModeline, rotate_90: bool) -> Self {
+                    registers.flags().write(|w| unsafe {
+                        w.enable().bit(false)
+                    });
+                    registers.fb_base().write(|w| unsafe {
+                        w.fb_base().bits(fb_base as u32)
+                    });
+                    registers.h_timing().write(|w| unsafe {
                         w.h_active().bits(mode.h_active);
                         w.h_sync_start().bits(mode.h_sync_start)
                     } );
+                    registers.h_timing2().write(|w| unsafe {
+                        w.h_sync_end().bits(mode.h_sync_end);
+                        w.h_total().bits(mode.h_total)
+                    } );
+                    registers.v_timing().write(|w| unsafe {
+                        w.v_active().bits(mode.v_active);
+                        w.v_sync_start().bits(mode.v_sync_start)
+                    } );
+                    registers.v_timing2().write(|w| unsafe {
+                        w.v_sync_end().bits(mode.v_sync_end);
+                        w.v_total().bits(mode.v_total)
+                    } );
+                    registers.hv_timing().write(|w| unsafe {
+                        w.h_sync_invert().bit(mode.h_sync_invert);
+                        w.v_sync_invert().bit(mode.h_sync_invert);
+                        w.active_pixels().bits(
+                            mode.h_active as u32 * mode.v_active as u32)
+                    } );
+                    registers.flags().write(|w| unsafe {
+                        w.enable().bit(true)
+                    });
+                    Self {
+                        registers,
+                        mode,
+                        framebuffer_base: fb_base as *mut u32,
+                        rotate_90
+                    }
+                }
+
+            }
+
+            impl hal::dma_framebuffer::DMAFramebuffer for $DMA_FRAMEBUFFERX {
+                fn update_fb_base(&mut self, fb_base: u32) {
+                    self.registers.fb_base().write(|w| unsafe {
+                        w.fb_base().bits(fb_base)
+                    });
+                    self.framebuffer_base = fb_base as *mut u32
                 }
 
                 fn set_palette_rgb(&mut self, intensity: u8, hue: u8, r: u8, g: u8, b: u8)  {
@@ -55,7 +98,8 @@ macro_rules! impl_dma_framebuffer {
 
             impl OriginDimensions for $DMA_FRAMEBUFFERX {
                 fn size(&self) -> Size {
-                    Size::new(self.h_active, self.v_active)
+                    Size::new(self.mode.h_active as u32,
+                              self.mode.v_active as u32)
                 }
             }
 
@@ -66,13 +110,15 @@ macro_rules! impl_dma_framebuffer {
                 where
                     I: IntoIterator<Item = Pixel<Self::Color>>,
                 {
+                    let h_active = self.size().width;
+                    let v_active = self.size().height;
                     for Pixel(coord, color) in pixels.into_iter() {
                         if let Ok((x, y)) = coord.try_into() {
-                            if x >= 0 && x < self.h_active && y >= 0 && y < self.v_active {
-                                let xf: u32 = if self.rotate_90 {self.v_active - y} else {x};
+                            if x >= 0 && x < h_active && y >= 0 && y < v_active {
+                                let xf: u32 = if self.rotate_90 {v_active - y} else {x};
                                 let yf: u32 = if self.rotate_90 {x}             else {y};
                                 // Calculate the index in the framebuffer.
-                                let index: u32 = (xf + yf * self.h_active) / 4;
+                                let index: u32 = (xf + yf * h_active) / 4;
                                 unsafe {
                                     // TODO: support anything other than Gray8
                                     let mut px = self.framebuffer_base.offset(

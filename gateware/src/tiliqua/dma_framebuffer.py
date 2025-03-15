@@ -115,6 +115,8 @@ class DMAFramebuffer(wiring.Component):
         with m.FSM() as fsm:
             with m.State('OFF'):
                 with m.If(self.enable):
+                    # TODO FFsync
+                    m.d.dvi += dvi_tgen.enable.eq(1)
                     m.next = 'BURST'
             with m.State('BURST'):
                 m.d.comb += [
@@ -287,7 +289,6 @@ class Peripheral(wiring.Component):
         with m.If(self._hv_timing.element.w_stb):
             m.d.sync += self.fb.timings.h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
             m.d.sync += self.fb.timings.v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
-        with m.If(self._hv_timing.f.active_pixels.w_stb):
             m.d.sync += self.fb.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
         with m.If(self._flags.f.enable.w_stb):
             m.d.sync += self.fb.enable.eq(self._flags.f.enable.w_data)

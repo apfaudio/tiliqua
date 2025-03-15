@@ -512,13 +512,29 @@ fn main() -> ! {
 
         let mut logo_coord_ix = 0u32;
         let mut rng = fastrand::Rng::with_seed(0);
-        let mut display = DMAFramebuffer0 {
-            registers: peripherals.FRAMEBUFFER_PERIPH,
-            framebuffer_base: PSRAM_FB_BASE as *mut u32,
-            h_active: H_ACTIVE,
-            v_active: V_ACTIVE,
-            rotate_90: VIDEO_ROTATE_90,
-        };
+
+        let mut display = DMAFramebuffer0::new(
+            peripherals.FRAMEBUFFER_PERIPH,
+            PSRAM_FB_BASE,
+            DVIModeline {
+                h_active      : 1280,
+                h_sync_start  : 1390,
+                h_sync_end    : 1430,
+                h_total       : 1650,
+                h_sync_invert : false,
+                v_active      : 720,
+                v_sync_start  : 725,
+                v_sync_end    : 730,
+                v_total       : 750,
+                v_sync_invert : false,
+                pixel_clk_mhz : 74.25,
+            },
+            VIDEO_ROTATE_90,
+        );
+
+        info!("display configured for {}x{}",
+              display.size().width, display.size().height);
+
         video.set_persist(1024);
 
         let stroke = PrimitiveStyleBuilder::new()
@@ -532,8 +548,8 @@ fn main() -> ! {
 
         loop {
 
-            let h_active = display.h_active.clone();
-            let v_active = display.v_active.clone();
+            let h_active = display.size().width;
+            let v_active = display.size().height;
 
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
