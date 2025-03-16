@@ -452,12 +452,25 @@ fn main() -> ! {
 
     let mut startup_report: String<256> = Default::default();
 
-    // Determine display modeline
-    let mut mfg: u8 = 0;
+    // Verify/reprogram touch sensing NVM
+
     {
-        let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
-        mfg = edid_test(&mut i2cdev0);
+        // TODO more sensible bus sharing
+        let i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
+        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1);
+        if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
+            let s: &'static str = e.into();
+            write!(startup_report, "{}\r\n", s).ok();
+        }
     }
+
+    // Determine display modeline
+    let mfg: u8 = {
+        let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
+        use embedded_hal::delay::DelayNs;
+        timer.delay_ms(10);
+        edid_test(&mut i2cdev0)
+    };
 
     let modeline = if mfg == 0x32 {
         DVIModeline {
@@ -488,18 +501,6 @@ fn main() -> ! {
             pixel_clk_mhz : 74.25,
         }
     };
-
-    // Verify/reprogram touch sensing NVM
-
-    {
-        // TODO more sensible bus sharing
-        let i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
-        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1);
-        if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
-            let s: &'static str = e.into();
-            write!(startup_report, "{}\r\n", s).ok();
-        }
-    }
 
     // Setup external PLL
 
@@ -574,8 +575,8 @@ fn main() -> ! {
             VIDEO_ROTATE_90,
         );
 
-        info!("display configured for {}x{}",
-              display.size().width, display.size().height);
+        write!(startup_report, "display: {}x{}\r\n",
+               display.size().width, display.size().height);
 
         video.set_persist(1024);
 
