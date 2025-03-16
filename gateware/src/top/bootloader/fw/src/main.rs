@@ -425,21 +425,15 @@ where
     }
 }
 
-fn edid_test(i2cdev: &mut I2c0) -> u8 {
+fn edid_test(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
     info!("Read EDID...");
-    let mut edid: [u8; 8] = [0; 8];
+    let mut edid: [u8; 128] = [0; 128];
     const EDID_ADDR: u8 = 0x50;
-    let mut mfg: u8 = 0;
     for i in 0..16 {
-        let _ = i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
-                                                    Operation::Read(&mut edid)]);
-        info!("{:x} {:x} {:x} {:x} {:x} {:x} {:x} {:x}",
-              edid[0], edid[1], edid[2], edid[3], edid[4], edid[5], edid[6], edid[7]);
-        if i == 1 {
-            mfg = edid[2];
-        }
+        i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
+                                            Operation::Read(&mut edid[i*8..i*8+8])]).ok();
     }
-    mfg
+    edid::Edid::parse(&edid)
 }
 
 #[entry]
@@ -470,44 +464,50 @@ fn main() -> ! {
     }
 
     // Determine display modeline
-    let mfg: u8 = {
+    let edid = {
         let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
         use embedded_hal::delay::DelayNs;
         timer.delay_ms(10);
         edid_test(&mut i2cdev0)
     };
 
+    info!("edid: {:?}", edid);
+
+    // Default rotation and modeline
     let mut video_rotate_90 = false;
-    let modeline = if mfg == 0x32 {
-        video_rotate_90 = true;
-        DVIModeline {
-            h_active      : 720,
-            h_sync_start  : 760,
-            h_sync_end    : 780,
-            h_total       : 820,
-            h_sync_invert : false,
-            v_active      : 720,
-            v_sync_start  : 744,
-            v_sync_end    : 748,
-            v_total       : 760,
-            v_sync_invert : false,
-            pixel_clk_mhz : 37.40,
-        }
-    } else {
-        DVIModeline {
-            h_active      : 1280,
-            h_sync_start  : 1390,
-            h_sync_end    : 1430,
-            h_total       : 1650,
-            h_sync_invert : false,
-            v_active      : 720,
-            v_sync_start  : 725,
-            v_sync_end    : 730,
-            v_total       : 750,
-            v_sync_invert : false,
-            pixel_clk_mhz : 74.25,
-        }
+    let mut modeline = DVIModeline {
+        h_active      : 1280,
+        h_sync_start  : 1390,
+        h_sync_end    : 1430,
+        h_total       : 1650,
+        h_sync_invert : false,
+        v_active      : 720,
+        v_sync_start  : 725,
+        v_sync_end    : 730,
+        v_total       : 750,
+        v_sync_invert : false,
+        pixel_clk_mhz : 74.25,
     };
+
+    // If connected to 720x720 screen, use native resolution.
+    if let Ok(edid_parsed) = edid {
+        if edid_parsed.header.product_code == 0x3132 {
+            video_rotate_90 = true;
+            modeline = DVIModeline {
+                h_active      : 720,
+                h_sync_start  : 760,
+                h_sync_end    : 780,
+                h_total       : 820,
+                h_sync_invert : false,
+                v_active      : 720,
+                v_sync_start  : 744,
+                v_sync_end    : 748,
+                v_total       : 760,
+                v_sync_invert : false,
+                pixel_clk_mhz : 37.40,
+            };
+        }
+    }
 
     // Setup external PLL
 
