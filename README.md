@@ -2,7 +2,7 @@
 
 **Tiliqua is a powerful, open hardware FPGA-based audio multitool for Eurorack.** It looks like this:
 
-![image](https://github.com/user-attachments/assets/4a308920-97dc-4b73-aaac-7f735a71eec0)
+![image](https://github.com/user-attachments/assets/1dbe8672-6f8d-4d33-b0d6-634b90801f7d)
 
 # ⮕[Documentation](https://apfaudio.github.io/tiliqua/)⬅
 
@@ -32,7 +32,7 @@ This project would be nothing without the hard work of many (awesome) open-sourc
 
 We would like to acknowledge partial funding of the [Tiliqua project](https://nlnet.nl/project/Tiliqua/) from the [NGI Commons Fund](https://nlnet.nl/commonsfund), a fund established by [NLnet](https://nlnet.nl/) with financial support from the European Commission’s [Next Generation Internet](https://ngi.eu/) program.
 
-![image](https://github.com/user-attachments/assets/e3eeab37-f5b2-4686-8cb4-5dc49f42ba7d)
+![image](https://nlnet.nl/logo/banner-320x120.png)
 
 # License
 
