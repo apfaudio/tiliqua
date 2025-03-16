@@ -30,6 +30,7 @@ use embedded_graphics::{
     prelude::*,
     primitives::{PrimitiveStyleBuilder, Line},
     text::{Alignment, Text},
+    geometry::OriginDimensions,
 };
 
 use tiliqua_fw::options::*;
@@ -110,12 +111,14 @@ impl App {
 
 fn print_rebooting<D>(d: &mut D, rng: &mut fastrand::Rng)
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = Gray8> + OriginDimensions,
 {
     let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
+    let h_active = d.size().width as i32;
+    let v_active = d.size().height as i32;
     Text::with_alignment(
         "REBOOTING",
-        Point::new(rng.i32(0..H_ACTIVE as i32), rng.i32(0..V_ACTIVE as i32)),
+        Point::new(rng.i32(0..h_active), rng.i32(0..v_active)),
         style,
         Alignment::Center,
     )
@@ -128,48 +131,50 @@ fn draw_summary<D>(d: &mut D,
                    startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = Gray8> + OriginDimensions,
 {
+    let h_active = d.size().width as i32;
+    let v_active = d.size().height as i32;
     let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
     if let Some(bitstream) = bitstream_manifest {
         Text::with_alignment(
             "brief:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+20) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.brief,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+20) as i32 + ot),
             norm,
             Alignment::Left,
         )
         .draw(d).ok();
         Text::with_alignment(
             "video:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+40) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.video,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+40) as i32 + ot),
             norm,
             Alignment::Left,
         )
         .draw(d).ok();
         Text::with_alignment(
             "sha:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.sha,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Left,
         )
@@ -178,14 +183,14 @@ where
     if let Some(error_string) = &error {
         Text::with_alignment(
             "error:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+80) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &error_string,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+80) as i32 + ot),
             norm,
             Alignment::Left,
         )
@@ -193,7 +198,7 @@ where
     }
     Text::with_alignment(
         &startup_report,
-        Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2-70) as i32 + ot),
+        Point::new((h_active/2) as i32 + or, (v_active/2-70) as i32 + ot),
         norm,
         Alignment::Center,
     )
@@ -472,7 +477,9 @@ fn main() -> ! {
         edid_test(&mut i2cdev0)
     };
 
+    let mut video_rotate_90 = false;
     let modeline = if mfg == 0x32 {
+        video_rotate_90 = true;
         DVIModeline {
             h_active      : 720,
             h_sync_start  : 760,
@@ -572,7 +579,7 @@ fn main() -> ! {
             peripherals.FRAMEBUFFER_PERIPH,
             PSRAM_FB_BASE,
             modeline,
-            VIDEO_ROTATE_90,
+            video_rotate_90,
         );
 
         write!(startup_report, "display: {}x{}\r\n",
