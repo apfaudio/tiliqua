@@ -123,6 +123,11 @@ class Peripheral(wiring.Component):
             psram.perform_write          .eq(0),
         ]
 
+        m.d.comb += [
+            psram.write_data              .eq(self.shared_bus.dat_w),
+            psram.write_mask              .eq(~self.shared_bus.sel),
+        ]
+
         with m.FSM() as fsm:
 
             # Initialize memory registers (read/write timings) before
@@ -166,10 +171,6 @@ class Peripheral(wiring.Component):
                 m.next = "TRAIN_INIT"
 
             # Training complete, now we can accept transactions.
-            m.d.comb += [
-                psram.write_data              .eq(self.shared_bus.dat_w),
-                psram.write_mask              .eq(~self.shared_bus.sel),
-            ]
             with m.State('IDLE'):
                 with m.If(self.shared_bus.cyc & self.shared_bus.stb & psram.idle):
                     m.d.sync += [
