@@ -386,10 +386,8 @@ fn main() -> ! {
 
         s.register(handlers::Interrupt::TIMER0, timer0);
 
-        /*
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
                               pac::Interrupt::TIMER0);
-        */
 
         loop {
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
