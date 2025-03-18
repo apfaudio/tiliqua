@@ -138,11 +138,13 @@ class Persistance(wiring.Component):
                     bus.cyc.eq(1),
                     bus.we.eq(1),
                     bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.dat_w.eq(pixb),
                     bus.adr.eq(self.fb.fb_base + dma_addr_out),
                     wr_source.eq(pnext),
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST)
+                ]
+                m.d.sync += [
+                    bus.dat_w.eq(pixb)
                 ]
                 with m.If(bus.stb & bus.ack):
                     m.d.comb += self.fifo.r_en.eq(1)
