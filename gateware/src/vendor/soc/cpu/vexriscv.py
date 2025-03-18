@@ -16,7 +16,7 @@ import logging
 # Variants --------------------------------------------------------------------
 
 CPU_VARIANTS = {
-    "tiliqua_rv32im":  "vexriscv_tiliqua",
+    "tiliqua_rv32im":  "VexiiRiscv",
     "tiliqua_rv32imafc": "vexriscv_tiliqua_fpu",
 }
 
@@ -30,7 +30,7 @@ class VexRiscv(Component):
     #byteorder  = "little"
     #data_width = 32
 
-    def __init__(self, variant="tiliqua", reset_addr=0x00000000):
+    def __init__(self, variant="tiliqua", reset_addr=0x20000000):
         self._variant    = variant
         self._reset_addr = reset_addr
 
@@ -111,43 +111,42 @@ class VexRiscv(Component):
         # instantiate VexRiscv
         platform.add_file(self._source_file, self._source_verilog)
         self._cpu = Instance(
-            "VexRiscv",
+            "VexiiRiscv",
 
             # clock and reset
             i_clk                    = ClockSignal("sync"),
             i_reset                  = ResetSignal("sync") | self.ext_reset,
-            i_externalResetVector    = Const(self._reset_addr, unsigned(32)),
 
             # interrupts
-            i_externalInterruptArray = self.irq_external,
-            i_timerInterrupt         = self.irq_timer,
-            i_softwareInterrupt      = self.irq_software,
+            i_PrivilegedPlugin_logic_harts_0_int_m_software = self.irq_external,
+            i_PrivilegedPlugin_logic_harts_0_int_m_timer         = self.irq_timer,
+            i_PrivilegedPlugin_logic_harts_0_int_m_external      = self.irq_software,
 
             # instruction bus
-            o_iBusWishbone_ADR       = self.ibus.adr,
-            o_iBusWishbone_DAT_MOSI  = self.ibus.dat_w,
-            o_iBusWishbone_SEL       = self.ibus.sel,
-            o_iBusWishbone_CYC       = self.ibus.cyc,
-            o_iBusWishbone_STB       = self.ibus.stb,
-            o_iBusWishbone_WE        = self.ibus.we,
-            o_iBusWishbone_CTI       = self.ibus.cti,
-            o_iBusWishbone_BTE       = self.ibus.bte,
-            i_iBusWishbone_DAT_MISO  = self.ibus.dat_r,
-            i_iBusWishbone_ACK       = self.ibus.ack,
-            i_iBusWishbone_ERR       = self.ibus.err,
+            o_FetchCachelessWishbonePlugin_logic_bridge_bus_ADR       = self.ibus.adr,
+            o_FetchCachelessWishbonePlugin_logic_bridge_bus_DAT_MOSI  = self.ibus.dat_w,
+            o_FetchCachelessWishbonePlugin_logic_bridge_bus_SEL       = self.ibus.sel,
+            o_FetchCachelessWishbonePlugin_logic_bridge_bus_CYC       = self.ibus.cyc,
+            o_FetchCachelessWishbonePlugin_logic_bridge_bus_STB       = self.ibus.stb,
+            o_FetchCachelessWishbonePlugin_logic_bridge_bus_WE        = self.ibus.we,
+            o_FetchCachelessWishbonePlugin_logic_bridge_bus_CTI       = self.ibus.cti,
+            o_FetchCachelessWishbonePlugin_logic_bridge_bus_BTE       = self.ibus.bte,
+            i_FetchCachelessWishbonePlugin_logic_bridge_bus_DAT_MISO  = self.ibus.dat_r,
+            i_FetchCachelessWishbonePlugin_logic_bridge_bus_ACK       = self.ibus.ack,
+            i_FetchCachelessWishbonePlugin_logic_bridge_bus_ERR       = self.ibus.err,
 
             # data bus
-            o_dBusWishbone_ADR       = self.dbus.adr,
-            o_dBusWishbone_DAT_MOSI  = self.dbus.dat_w,
-            o_dBusWishbone_SEL       = self.dbus.sel,
-            o_dBusWishbone_CYC       = self.dbus.cyc,
-            o_dBusWishbone_STB       = self.dbus.stb,
-            o_dBusWishbone_WE        = self.dbus.we,
-            o_dBusWishbone_CTI       = self.dbus.cti,
-            o_dBusWishbone_BTE       = self.dbus.bte,
-            i_dBusWishbone_DAT_MISO  = self.dbus.dat_r,
-            i_dBusWishbone_ACK       = self.dbus.ack,
-            i_dBusWishbone_ERR       = self.dbus.err,
+            o_LsuCachelessWishbonePlugin_logic_bridge_down_ADR       = self.dbus.adr,
+            o_LsuCachelessWishbonePlugin_logic_bridge_down_DAT_MOSI  = self.dbus.dat_w,
+            o_LsuCachelessWishbonePlugin_logic_bridge_down_SEL       = self.dbus.sel,
+            o_LsuCachelessWishbonePlugin_logic_bridge_down_CYC       = self.dbus.cyc,
+            o_LsuCachelessWishbonePlugin_logic_bridge_down_STB       = self.dbus.stb,
+            o_LsuCachelessWishbonePlugin_logic_bridge_down_WE        = self.dbus.we,
+            o_LsuCachelessWishbonePlugin_logic_bridge_down_CTI       = self.dbus.cti,
+            o_LsuCachelessWishbonePlugin_logic_bridge_down_BTE       = self.dbus.bte,
+            i_LsuCachelessWishbonePlugin_logic_bridge_down_DAT_MISO  = self.dbus.dat_r,
+            i_LsuCachelessWishbonePlugin_logic_bridge_down_ACK       = self.dbus.ack,
+            i_LsuCachelessWishbonePlugin_logic_bridge_down_ERR       = self.dbus.err,
 
             # optional signals
             **optional_signals,

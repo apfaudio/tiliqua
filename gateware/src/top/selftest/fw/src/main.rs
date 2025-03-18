@@ -116,8 +116,6 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
         }
     }
 
-    pac::cpu::vexriscv::flush_dcache();
-
     let endwrite = timer.counter();
 
     let mut psram_fl = false;
