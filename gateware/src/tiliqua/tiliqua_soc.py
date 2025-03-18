@@ -318,6 +318,7 @@ class TiliquaSoc(Component):
         m.submodules.cpu = self.cpu
         self.wb_arbiter.add(self.cpu.ibus)
         self.wb_arbiter.add(self.cpu.dbus)
+        self.wb_arbiter.add(self.cpu.pbus)
 
         # interrupt controller
         m.submodules.interrupt_controller = self.interrupt_controller

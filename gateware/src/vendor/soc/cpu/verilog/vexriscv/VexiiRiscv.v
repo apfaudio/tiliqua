@@ -9,6 +9,17 @@ module VexiiRiscv (
   input  wire          PrivilegedPlugin_logic_harts_0_int_m_timer /* verilator public */ ,
   input  wire          PrivilegedPlugin_logic_harts_0_int_m_software /* verilator public */ ,
   input  wire          PrivilegedPlugin_logic_harts_0_int_m_external /* verilator public */ ,
+  output wire          LsuL1WishbonePlugin_logic_bus_CYC,
+  output wire          LsuL1WishbonePlugin_logic_bus_STB,
+  input  wire          LsuL1WishbonePlugin_logic_bus_ACK,
+  output wire          LsuL1WishbonePlugin_logic_bus_WE,
+  output wire [29:0]   LsuL1WishbonePlugin_logic_bus_ADR,
+  input  wire [31:0]   LsuL1WishbonePlugin_logic_bus_DAT_MISO,
+  output wire [31:0]   LsuL1WishbonePlugin_logic_bus_DAT_MOSI,
+  output wire [3:0]    LsuL1WishbonePlugin_logic_bus_SEL,
+  input  wire          LsuL1WishbonePlugin_logic_bus_ERR,
+  output wire [2:0]    LsuL1WishbonePlugin_logic_bus_CTI,
+  output wire [1:0]    LsuL1WishbonePlugin_logic_bus_BTE,
   output reg           FetchL1WishbonePlugin_logic_bus_CYC,
   output reg           FetchL1WishbonePlugin_logic_bus_STB,
   input  wire          FetchL1WishbonePlugin_logic_bus_ACK,
@@ -47,6 +58,14 @@ module VexiiRiscv (
   localparam IntAluPlugin_AluBitwiseCtrlEnum_OR_1 = 2'd1;
   localparam IntAluPlugin_AluBitwiseCtrlEnum_AND_1 = 2'd2;
   localparam IntAluPlugin_AluBitwiseCtrlEnum_ZERO = 2'd3;
+  localparam LsuL1CmdOpcode_LSU = 3'd0;
+  localparam LsuL1CmdOpcode_ACCESS_1 = 3'd1;
+  localparam LsuL1CmdOpcode_STORE_BUFFER = 3'd2;
+  localparam LsuL1CmdOpcode_FLUSH = 3'd3;
+  localparam LsuL1CmdOpcode_PREFETCH = 3'd4;
+  localparam LsuPlugin_logic_flusher_IDLE = 2'd0;
+  localparam LsuPlugin_logic_flusher_CMD = 2'd1;
+  localparam LsuPlugin_logic_flusher_COMPLETION = 2'd2;
   localparam TrapPlugin_logic_harts_0_trap_fsm_RESET = 4'd0;
   localparam TrapPlugin_logic_harts_0_trap_fsm_RUNNING = 4'd1;
   localparam TrapPlugin_logic_harts_0_trap_fsm_PROCESS_1 = 4'd2;
@@ -57,16 +76,24 @@ module VexiiRiscv (
   localparam TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC = 4'd7;
   localparam TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY = 4'd8;
   localparam TrapPlugin_logic_harts_0_trap_fsm_JUMP = 4'd9;
-  localparam TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH = 4'd10;
+  localparam TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH = 4'd10;
+  localparam TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH = 4'd11;
   localparam CsrAccessPlugin_logic_fsm_IDLE = 2'd0;
   localparam CsrAccessPlugin_logic_fsm_READ = 2'd1;
   localparam CsrAccessPlugin_logic_fsm_WRITE = 2'd2;
   localparam CsrAccessPlugin_logic_fsm_COMPLETION = 2'd3;
 
   wire                early0_DivPlugin_logic_processing_div_io_cmd_valid;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_ready;
+  reg                 LsuPlugin_logic_flusher_arbiter_io_output_ready;
+  wire                LsuPlugin_logic_onAddress0_arbiter_io_output_ready;
   reg                 integer_RegFilePlugin_logic_regfile_fpga_io_writes_0_valid;
   reg        [4:0]    integer_RegFilePlugin_logic_regfile_fpga_io_writes_0_address;
   reg        [31:0]   integer_RegFilePlugin_logic_regfile_fpga_io_writes_0_data;
+  reg        [31:0]   LsuL1Plugin_logic_banks_0_mem_spinal_port1;
+  reg        [21:0]   LsuL1Plugin_logic_ways_0_mem_spinal_port1;
+  reg        [0:0]    LsuL1Plugin_logic_shared_mem_spinal_port1;
+  reg        [31:0]   LsuL1Plugin_logic_writeback_victimBuffer_spinal_port1;
   reg        [31:0]   FetchL1Plugin_logic_banks_0_mem_spinal_port1;
   reg        [21:0]   FetchL1Plugin_logic_ways_0_mem_spinal_port1;
   reg        [31:0]   CsrRamPlugin_logic_mem_spinal_port1;
@@ -74,18 +101,41 @@ module VexiiRiscv (
   wire                early0_DivPlugin_logic_processing_div_io_rsp_valid;
   wire       [31:0]   early0_DivPlugin_logic_processing_div_io_rsp_payload_result;
   wire       [31:0]   early0_DivPlugin_logic_processing_div_io_rsp_payload_remain;
-  wire                streamArbiter_1_io_inputs_0_ready;
-  wire                streamArbiter_1_io_output_valid;
-  wire       [31:0]   streamArbiter_1_io_output_payload_pcOnLastSlice;
-  wire       [31:0]   streamArbiter_1_io_output_payload_pcTarget;
-  wire                streamArbiter_1_io_output_payload_taken;
-  wire                streamArbiter_1_io_output_payload_isBranch;
-  wire                streamArbiter_1_io_output_payload_isPush;
-  wire                streamArbiter_1_io_output_payload_isPop;
-  wire                streamArbiter_1_io_output_payload_wasWrong;
-  wire                streamArbiter_1_io_output_payload_badPredictedTarget;
-  wire       [15:0]   streamArbiter_1_io_output_payload_uopId;
-  wire       [0:0]    streamArbiter_1_io_chosenOH;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_inputs_0_ready;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_inputs_1_ready;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_valid;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_payload_last;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_payload_fragment_write;
+  wire       [31:0]   LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_payload_fragment_address;
+  wire       [0:0]    LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_chosen;
+  wire       [1:0]    LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_chosenOH;
+  wire                LsuPlugin_logic_flusher_arbiter_io_inputs_0_ready;
+  wire                LsuPlugin_logic_flusher_arbiter_io_output_valid;
+  wire       [0:0]    LsuPlugin_logic_flusher_arbiter_io_chosenOH;
+  wire                LsuPlugin_logic_onAddress0_arbiter_io_inputs_0_ready;
+  wire                LsuPlugin_logic_onAddress0_arbiter_io_inputs_1_ready;
+  wire                LsuPlugin_logic_onAddress0_arbiter_io_output_valid;
+  wire       [2:0]    LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op;
+  wire       [31:0]   LsuPlugin_logic_onAddress0_arbiter_io_output_payload_address;
+  wire       [1:0]    LsuPlugin_logic_onAddress0_arbiter_io_output_payload_size;
+  wire                LsuPlugin_logic_onAddress0_arbiter_io_output_payload_load;
+  wire                LsuPlugin_logic_onAddress0_arbiter_io_output_payload_store;
+  wire                LsuPlugin_logic_onAddress0_arbiter_io_output_payload_atomic;
+  wire       [11:0]   LsuPlugin_logic_onAddress0_arbiter_io_output_payload_storeId;
+  wire       [0:0]    LsuPlugin_logic_onAddress0_arbiter_io_chosen;
+  wire       [1:0]    LsuPlugin_logic_onAddress0_arbiter_io_chosenOH;
+  wire                streamArbiter_4_io_inputs_0_ready;
+  wire                streamArbiter_4_io_output_valid;
+  wire       [31:0]   streamArbiter_4_io_output_payload_pcOnLastSlice;
+  wire       [31:0]   streamArbiter_4_io_output_payload_pcTarget;
+  wire                streamArbiter_4_io_output_payload_taken;
+  wire                streamArbiter_4_io_output_payload_isBranch;
+  wire                streamArbiter_4_io_output_payload_isPush;
+  wire                streamArbiter_4_io_output_payload_isPop;
+  wire                streamArbiter_4_io_output_payload_wasWrong;
+  wire                streamArbiter_4_io_output_payload_badPredictedTarget;
+  wire       [15:0]   streamArbiter_4_io_output_payload_uopId;
+  wire       [0:0]    streamArbiter_4_io_chosenOH;
   wire       [31:0]   integer_RegFilePlugin_logic_regfile_fpga_io_reads_0_data;
   wire       [31:0]   integer_RegFilePlugin_logic_regfile_fpga_io_reads_1_data;
   wire       [31:0]   _zz_early0_IntAluPlugin_logic_alu_result;
@@ -111,6 +161,21 @@ module VexiiRiscv (
   wire                _zz_early0_BarrelShifterPlugin_logic_shift_patched_4;
   wire       [0:0]    _zz_early0_BarrelShifterPlugin_logic_shift_patched_5;
   wire       [9:0]    _zz_early0_BarrelShifterPlugin_logic_shift_patched_6;
+  wire       [21:0]   _zz_LsuL1Plugin_logic_ways_0_mem_port;
+  wire                _zz_LsuL1Plugin_logic_ways_0_mem_port_1;
+  wire       [3:0]    _zz_LsuL1Plugin_logic_writeback_read_wordIndex;
+  wire       [0:0]    _zz_LsuL1Plugin_logic_writeback_read_wordIndex_1;
+  wire       [3:0]    _zz_LsuL1Plugin_logic_writeback_victimBuffer_port;
+  wire       [3:0]    _zz_LsuL1Plugin_logic_writeback_write_wordIndex;
+  wire       [0:0]    _zz_LsuL1Plugin_logic_writeback_write_wordIndex_1;
+  wire       [0:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback;
+  wire       [0:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_doWrite;
+  reg        [0:0]    _zz_20;
+  wire       [0:0]    _zz_21;
+  reg        [1:0]    _zz_22;
+  wire       [2:0]    _zz_23;
+  wire       [0:0]    _zz_when;
+  wire       [0:0]    _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty;
   wire       [32:0]   _zz_execute_ctrl2_down_MUL_SRC1_lane0;
   wire       [32:0]   _zz_execute_ctrl2_down_MUL_SRC2_lane0;
   wire       [46:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
@@ -152,12 +217,25 @@ module VexiiRiscv (
   wire       [1:0]    _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0_1;
   wire       [21:0]   _zz_FetchL1Plugin_logic_ways_0_mem_port;
   wire                _zz_FetchL1Plugin_logic_ways_0_mem_port_1;
-  wire                _zz_when;
+  wire                _zz_when_1;
   wire       [0:0]    _zz_FetchL1Plugin_logic_ctrl_dataAccessFault;
+  wire       [11:0]   _zz_LsuPlugin_logic_onAddress0_ls_storeId;
+  wire       [0:0]    _zz_LsuPlugin_logic_onAddress0_ls_storeId_1;
+  wire       [12:0]   _zz_LsuPlugin_logic_onAddress0_flush_port_payload_address;
+  reg        [7:0]    _zz_LsuPlugin_logic_onCtrl_loadData_shited;
+  wire       [1:0]    _zz_LsuPlugin_logic_onCtrl_loadData_shited_1;
+  reg        [7:0]    _zz_LsuPlugin_logic_onCtrl_loadData_shited_2;
+  wire       [0:0]    _zz_LsuPlugin_logic_onCtrl_loadData_shited_3;
+  wire       [2:0]    _zz_LsuPlugin_logic_trapPort_payload_code;
+  wire       [5:0]    _zz_LsuPlugin_logic_flusher_cmdCounter;
   wire       [63:0]   _zz_WhiteboxerPlugin_logic_decodes_0_pc;
   wire       [0:0]    _zz_FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit;
   wire       [0:0]    _zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io_1;
   wire       [25:0]   _zz_FetchL1WishbonePlugin_logic_bus_ADR;
+  wire       [0:0]    _zz_LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit;
+  wire       [0:0]    _zz_LsuPlugin_logic_onPma_cached_rsp_io_1;
+  wire       [0:0]    _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit;
+  wire       [0:0]    _zz_LsuPlugin_logic_onPma_io_rsp_io;
   wire       [11:0]   _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
   wire       [11:0]   _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0_1;
   wire       [31:0]   _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
@@ -191,16 +269,6 @@ module VexiiRiscv (
   wire                _zz_decode_ctrls_1_down_Decode_LEGAL_0_15;
   wire       [0:0]    _zz_decode_ctrls_1_down_Decode_LEGAL_0_16;
   wire       [1:0]    _zz_decode_ctrls_1_down_Decode_LEGAL_0_17;
-  wire       [2:0]    _zz_LsuCachelessPlugin_logic_trapPort_payload_code;
-  reg                 _zz_LsuCachelessPlugin_logic_onJoin_readerValid;
-  reg                 _zz_LsuCachelessPlugin_logic_onJoin_rspPayload_error;
-  reg        [31:0]   _zz_LsuCachelessPlugin_logic_onJoin_rspPayload_data;
-  reg        [7:0]    _zz_LsuCachelessPlugin_logic_onWb_rspShifted;
-  wire       [1:0]    _zz_LsuCachelessPlugin_logic_onWb_rspShifted_1;
-  wire       [1:0]    _zz_LsuCachelessPlugin_logic_onWb_rspShifted_2;
-  reg        [7:0]    _zz_LsuCachelessPlugin_logic_onWb_rspShifted_3;
-  wire       [0:0]    _zz_LsuCachelessPlugin_logic_onWb_rspShifted_4;
-  wire       [0:0]    _zz_LsuCachelessPlugin_logic_onWb_rspShifted_5;
   wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard;
   wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_1;
   wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_2;
@@ -213,8 +281,6 @@ module VexiiRiscv (
   wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_3;
   wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_4;
   wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_5;
-  wire       [0:0]    _zz_LsuCachelessPlugin_pmaBuilder_onTransfers_0_addressHit;
-  wire       [0:0]    _zz_LsuCachelessPlugin_logic_onPma_port_rsp_io;
   wire       [0:0]    _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0;
@@ -225,38 +291,30 @@ module VexiiRiscv (
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_2;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0_1;
-  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_2;
-  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_3;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0_1;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_2;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_3;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_2;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_2;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_3;
-  wire       [0:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_4;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_5;
-  wire       [0:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_6;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_7;
-  wire       [0:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_8;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_9;
-  wire       [1:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_10;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_11;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_12;
-  wire       [0:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_13;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_14;
-  wire       [1:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_15;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_16;
-  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_17;
-  wire       [32:0]   _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_1;
-  wire       [32:0]   _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_2;
-  wire       [32:0]   _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_3;
-  wire       [32:0]   _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_4;
-  wire       [0:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception;
-  wire       [0:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_1;
+  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception;
+  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1;
+  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_2;
+  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_3;
+  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_4;
+  wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_5;
+  wire       [0:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1_1;
+  wire       [0:0]    _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1_2;
+  wire       [32:0]   _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception;
+  wire       [32:0]   _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_1;
+  wire       [32:0]   _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_2;
+  wire       [32:0]   _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_3;
   wire       [31:0]   _zz_TrapPlugin_logic_harts_0_trap_fsm_jumpTarget;
   wire       [2:0]    _zz_TrapPlugin_logic_harts_0_trap_fsm_jumpTarget_1;
   wire       [31:0]   _zz_PcPlugin_logic_harts_0_self_pc;
@@ -316,25 +374,22 @@ module VexiiRiscv (
   wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_SEL_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0;
+  wire       [0:0]    _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_2;
-  wire       [31:0]   _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_3;
-  wire       [31:0]   _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_4;
-  wire       [31:0]   _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_5;
   wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_6;
+  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_7;
   wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3;
+  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_4;
+  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3;
   wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_5;
   wire       [0:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_2;
   wire       [0:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0;
@@ -353,6 +408,10 @@ module VexiiRiscv (
   wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_3_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0;
+  wire       [0:0]    _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0;
+  wire       [0:0]    _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_1;
@@ -373,21 +432,20 @@ module VexiiRiscv (
   wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0_2;
   wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_2;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_2;
   wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_STORE_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_STORE_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0_1;
   wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0;
   wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+  wire       [0:0]    _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0_1;
   wire                _zz_when_ExecuteLanePlugin_l307_2;
   wire                _zz_when_ExecuteLanePlugin_l307_2_1;
   wire                _zz_when_ExecuteLanePlugin_l307_2_2;
   wire                _zz_when_ExecuteLanePlugin_l307_2_3;
-  wire                _zz_when_ExecuteLanePlugin_l307_2_4;
-  wire                _zz_when_ExecuteLanePlugin_l307_2_5;
-  wire                _zz_when_ExecuteLanePlugin_l307_2_6;
   wire       [31:0]   _zz_WhiteboxerPlugin_logic_csr_access_payload_address;
   reg        [0:0]    _zz_WhiteboxerPlugin_logic_perf_candidatesCount;
   wire       [0:0]    _zz_WhiteboxerPlugin_logic_perf_candidatesCount_1;
@@ -407,14 +465,12 @@ module VexiiRiscv (
   wire       [0:0]    _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1_1_1;
   wire                fetch_logic_ctrls_0_up_isReady;
   wire                fetch_logic_ctrls_0_up_isValid;
-  wire                execute_ctrl4_down_RD_ENABLE_lane0;
   reg        [31:0]   execute_ctrl5_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
   reg                 execute_ctrl5_up_COMMIT_lane0;
   reg        [4:0]    execute_ctrl5_up_RD_PHYS_lane0;
-  wire                execute_ctrl3_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault;
-  wire                execute_ctrl3_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
-  wire       [31:0]   execute_ctrl3_down_MMU_TRANSLATED_lane0;
-  wire       [31:0]   execute_ctrl3_down_early0_SrcPlugin_ADD_SUB_lane0;
+  wire       [11:0]   execute_ctrl3_down_Decode_STORE_ID_lane0;
+  wire                execute_ctrl3_down_LsuL1_PREFETCH_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
   wire                execute_ctrl3_down_AguPlugin_FLOAT_lane0;
   wire                execute_ctrl3_down_AguPlugin_ATOMIC_lane0;
   wire                execute_ctrl3_down_AguPlugin_LOAD_lane0;
@@ -426,22 +482,52 @@ module VexiiRiscv (
   wire                execute_ctrl3_down_COMPLETION_AT_4_lane0;
   wire                execute_ctrl3_down_lane0_integer_WriteBackPlugin_SEL_lane0;
   wire                execute_ctrl3_down_early0_MulPlugin_SEL_lane0;
+  wire       [31:0]   execute_ctrl3_down_integer_RS2_lane0;
   wire       [1:0]    execute_ctrl3_down_AguPlugin_SIZE_lane0;
   wire       [4:0]    execute_ctrl3_down_RD_PHYS_lane0;
-  wire                execute_ctrl3_down_RD_ENABLE_lane0;
   wire       [31:0]   execute_ctrl3_down_PC_lane0;
   wire       [31:0]   execute_ctrl3_down_Decode_UOP_lane0;
-  reg        [31:0]   execute_ctrl4_up_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0;
-  reg                 execute_ctrl4_up_LsuCachelessPlugin_logic_onJoin_SC_MISS_lane0;
+  reg                 execute_ctrl4_up_MMU_BYPASS_TRANSLATION_lane0;
+  reg                 execute_ctrl4_up_MMU_HAZARD_lane0;
+  reg                 execute_ctrl4_up_MMU_REFILL_lane0;
+  reg                 execute_ctrl4_up_MMU_ACCESS_FAULT_lane0;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_MMU_FAILURE_lane0;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_IO_lane0;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
+  reg        [31:0]   execute_ctrl4_up_MMU_TRANSLATED_lane0;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_onTrigger_HIT_lane0;
   reg        [4:0]    execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_1_lane0;
   reg        [62:0]   execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_0_lane0;
-  reg                 execute_ctrl4_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault;
-  reg                 execute_ctrl4_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
-  reg        [31:0]   execute_ctrl4_up_MMU_TRANSLATED_lane0;
-  reg        [31:0]   execute_ctrl4_up_early0_SrcPlugin_ADD_SUB_lane0;
-  reg                 execute_ctrl4_up_COMMIT_lane0;
+  reg        [0:0]    execute_ctrl4_up_LsuL1Plugin_logic_WAYS_HITS_lane0;
+  reg                 execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
+  reg        [19:0]   execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+  reg                 execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+  reg        [31:0]   execute_ctrl4_up_LsuL1_PHYSICAL_ADDRESS_lane0;
+  reg        [1:0]    execute_ctrl4_up_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
+  reg        [31:0]   execute_ctrl4_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
+  reg        [0:0]    execute_ctrl4_up_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+  reg        [0:0]    execute_ctrl4_up_LsuL1Plugin_logic_SHARED_lane0_dirty;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_FROM_LSU_lane0;
+  reg        [11:0]   execute_ctrl4_up_Decode_STORE_ID_lane0;
+  reg                 execute_ctrl4_up_LsuL1_FLUSH_lane0;
+  reg                 execute_ctrl4_up_LsuL1_PREFETCH_lane0;
+  reg                 execute_ctrl4_up_LsuL1_STORE_lane0;
+  reg                 execute_ctrl4_up_LsuL1_ATOMIC_lane0;
+  reg                 execute_ctrl4_up_LsuL1_LOAD_lane0;
+  reg        [1:0]    execute_ctrl4_up_LsuL1_SIZE_lane0;
+  reg        [3:0]    execute_ctrl4_up_LsuL1_MASK_lane0;
+  reg        [31:0]   execute_ctrl4_up_LsuL1_MIXED_ADDRESS_lane0;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
   reg                 execute_ctrl4_up_AguPlugin_FLOAT_lane0;
   reg                 execute_ctrl4_up_AguPlugin_ATOMIC_lane0;
+  reg                 execute_ctrl4_up_AguPlugin_STORE_lane0;
   reg                 execute_ctrl4_up_AguPlugin_LOAD_lane0;
   reg                 execute_ctrl4_up_MulPlugin_HIGH_lane0;
   reg                 execute_ctrl4_up_BYPASSED_AT_4_lane0;
@@ -450,13 +536,14 @@ module VexiiRiscv (
   reg                 execute_ctrl4_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
   reg                 execute_ctrl4_up_COMPLETION_AT_4_lane0;
   reg                 execute_ctrl4_up_lane0_integer_WriteBackPlugin_SEL_lane0;
+  reg                 execute_ctrl4_up_LsuPlugin_logic_FENCE_lane0;
   reg                 execute_ctrl4_up_AguPlugin_SEL_lane0;
   reg                 execute_ctrl4_up_early0_MulPlugin_SEL_lane0;
   reg        [1:0]    execute_ctrl4_up_AguPlugin_SIZE_lane0;
   reg        [15:0]   execute_ctrl4_up_Decode_UOP_ID_lane0;
-  reg                 execute_ctrl4_up_TRAP_lane0;
   reg        [31:0]   execute_ctrl4_up_PC_lane0;
   reg        [31:0]   execute_ctrl4_up_Decode_UOP_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
   wire                execute_ctrl2_down_AguPlugin_FLOAT_lane0;
   wire                execute_ctrl2_down_MulPlugin_HIGH_lane0;
   wire                execute_ctrl2_down_BYPASSED_AT_4_lane0;
@@ -468,17 +555,35 @@ module VexiiRiscv (
   wire                execute_ctrl2_down_COMPLETION_AT_3_lane0;
   wire                execute_ctrl2_down_COMPLETION_AT_4_lane0;
   wire                execute_ctrl2_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_FENCE_lane0;
   wire                execute_ctrl2_down_early0_MulPlugin_SEL_lane0;
-  reg                 execute_ctrl3_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault;
-  reg                 execute_ctrl3_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
-  reg        [31:0]   execute_ctrl3_up_MMU_TRANSLATED_lane0;
+  wire       [31:0]   execute_ctrl2_down_integer_RS2_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_FROM_LSU_lane0;
+  reg        [11:0]   execute_ctrl3_up_Decode_STORE_ID_lane0;
+  reg                 execute_ctrl3_up_LsuL1_FLUSH_lane0;
+  reg                 execute_ctrl3_up_LsuL1_PREFETCH_lane0;
+  reg                 execute_ctrl3_up_LsuL1_STORE_lane0;
+  reg                 execute_ctrl3_up_LsuL1_ATOMIC_lane0;
+  reg                 execute_ctrl3_up_LsuL1_LOAD_lane0;
+  reg        [1:0]    execute_ctrl3_up_LsuL1_SIZE_lane0;
+  reg        [3:0]    execute_ctrl3_up_LsuL1_MASK_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_FROM_ACCESS_lane0;
   reg        [31:0]   execute_ctrl3_up_DivPlugin_DIV_RESULT_lane0;
   reg        [29:0]   execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_3_lane0;
   reg        [46:0]   execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_2_lane0;
   reg        [46:0]   execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_1_lane0;
   reg        [33:0]   execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_0_lane0;
+  reg        [0:0]    execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+  reg                 execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
+  reg        [3:0]    execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
+  reg        [31:0]   execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
+  reg                 execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
+  reg        [0:0]    execute_ctrl3_up_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  reg        [31:0]   execute_ctrl3_up_LsuL1_MIXED_ADDRESS_lane0;
   reg        [31:0]   execute_ctrl3_up_early0_SrcPlugin_ADD_SUB_lane0;
   reg                 execute_ctrl3_up_COMMIT_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
   reg                 execute_ctrl3_up_AguPlugin_FLOAT_lane0;
   reg                 execute_ctrl3_up_AguPlugin_ATOMIC_lane0;
   reg                 execute_ctrl3_up_AguPlugin_STORE_lane0;
@@ -493,12 +598,15 @@ module VexiiRiscv (
   reg                 execute_ctrl3_up_COMPLETION_AT_3_lane0;
   reg                 execute_ctrl3_up_COMPLETION_AT_4_lane0;
   reg                 execute_ctrl3_up_lane0_integer_WriteBackPlugin_SEL_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_FENCE_lane0;
   reg                 execute_ctrl3_up_AguPlugin_SEL_lane0;
   reg                 execute_ctrl3_up_CsrAccessPlugin_SEL_lane0;
   reg                 execute_ctrl3_up_early0_DivPlugin_SEL_lane0;
   reg                 execute_ctrl3_up_early0_MulPlugin_SEL_lane0;
+  reg        [31:0]   execute_ctrl3_up_integer_RS2_lane0;
   reg        [1:0]    execute_ctrl3_up_AguPlugin_SIZE_lane0;
   reg        [15:0]   execute_ctrl3_up_Decode_UOP_ID_lane0;
+  reg                 execute_ctrl3_up_TRAP_lane0;
   reg        [31:0]   execute_ctrl3_up_PC_lane0;
   reg        [31:0]   execute_ctrl3_up_Decode_UOP_lane0;
   wire       [1:0]    execute_ctrl1_down_AguPlugin_SIZE_lane0;
@@ -507,6 +615,7 @@ module VexiiRiscv (
   wire       [15:0]   execute_ctrl1_down_Decode_UOP_ID_lane0;
   wire                execute_ctrl1_down_isReady;
   reg        [2:0]    execute_ctrl2_up_early0_EnvPlugin_OP_lane0;
+  reg                 execute_ctrl2_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
   reg                 execute_ctrl2_up_AguPlugin_FLOAT_lane0;
   reg                 execute_ctrl2_up_AguPlugin_ATOMIC_lane0;
   reg                 execute_ctrl2_up_AguPlugin_STORE_lane0;
@@ -539,7 +648,7 @@ module VexiiRiscv (
   reg                 execute_ctrl2_up_COMPLETION_AT_4_lane0;
   reg                 execute_ctrl2_up_COMPLETION_AT_2_lane0;
   reg                 execute_ctrl2_up_lane0_integer_WriteBackPlugin_SEL_lane0;
-  reg                 execute_ctrl2_up_LsuCachelessPlugin_FENCE_lane0;
+  reg                 execute_ctrl2_up_LsuPlugin_logic_FENCE_lane0;
   reg                 execute_ctrl2_up_AguPlugin_SEL_lane0;
   reg                 execute_ctrl2_up_CsrAccessPlugin_SEL_lane0;
   reg                 execute_ctrl2_up_early0_EnvPlugin_SEL_lane0;
@@ -548,6 +657,7 @@ module VexiiRiscv (
   reg                 execute_ctrl2_up_early0_BranchPlugin_SEL_lane0;
   reg                 execute_ctrl2_up_early0_BarrelShifterPlugin_SEL_lane0;
   reg                 execute_ctrl2_up_early0_IntAluPlugin_SEL_lane0;
+  reg                 execute_ctrl2_up_MAY_FLUSH_PRECISE_3_lane0;
   reg        [31:0]   execute_ctrl2_up_early0_SrcPlugin_SRC2_lane0;
   reg        [31:0]   execute_ctrl2_up_early0_SrcPlugin_SRC1_lane0;
   reg        [1:0]    execute_ctrl2_up_AguPlugin_SIZE_lane0;
@@ -631,14 +741,19 @@ module VexiiRiscv (
   wire                fetch_logic_ctrls_2_up_ready;
   wire                fetch_logic_ctrls_2_up_cancel;
   wire                execute_ctrl5_down_ready;
-  wire                execute_ctrl4_down_LsuCachelessPlugin_logic_onJoin_SC_MISS_lane0;
   wire                execute_ctrl4_down_AguPlugin_ATOMIC_lane0;
+  wire       [11:0]   execute_ctrl4_down_Decode_STORE_ID_lane0;
   wire       [31:0]   execute_ctrl4_down_MMU_TRANSLATED_lane0;
   wire       [1:0]    execute_ctrl4_down_AguPlugin_SIZE_lane0;
-  wire                execute_ctrl4_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault;
-  wire                execute_ctrl4_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
+  wire                execute_ctrl4_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
   wire                execute_ctrl4_down_AguPlugin_LOAD_lane0;
   wire       [31:0]   execute_ctrl4_down_Decode_UOP_lane0;
+  wire                execute_ctrl4_down_RD_ENABLE_lane0;
+  reg                 execute_ctrl4_RD_ENABLE_lane0_bypass;
+  reg                 execute_ctrl4_LANE_SEL_lane0_bypass;
+  wire                execute_ctrl3_down_RD_ENABLE_lane0;
+  reg                 execute_ctrl3_RD_ENABLE_lane0_bypass;
+  reg                 execute_ctrl3_LANE_SEL_lane0_bypass;
   wire                execute_ctrl2_down_RD_ENABLE_lane0;
   reg                 execute_ctrl2_RD_ENABLE_lane0_bypass;
   reg                 execute_ctrl2_LANE_SEL_lane0_bypass;
@@ -651,6 +766,7 @@ module VexiiRiscv (
   reg                 execute_ctrl0_LANE_SEL_lane0_bypass;
   wire                execute_ctrl1_down_TRAP_lane0;
   wire       [2:0]    execute_ctrl1_down_early0_EnvPlugin_OP_lane0;
+  wire                execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
   wire                execute_ctrl1_down_AguPlugin_FLOAT_lane0;
   wire                execute_ctrl1_down_AguPlugin_ATOMIC_lane0;
   wire                execute_ctrl1_down_AguPlugin_STORE_lane0;
@@ -683,7 +799,7 @@ module VexiiRiscv (
   reg                 execute_ctrl1_down_COMPLETION_AT_4_lane0;
   reg                 execute_ctrl1_down_COMPLETION_AT_2_lane0;
   reg                 execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-  reg                 execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0;
+  reg                 execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0;
   reg                 execute_ctrl1_down_AguPlugin_SEL_lane0;
   reg                 execute_ctrl1_down_CsrAccessPlugin_SEL_lane0;
   reg                 execute_ctrl1_down_early0_EnvPlugin_SEL_lane0;
@@ -705,8 +821,8 @@ module VexiiRiscv (
   reg                 execute_ctrl5_up_LANE_SEL_lane0;
   wire       [4:0]    execute_ctrl0_down_RS1_PHYS_lane0;
   reg                 _zz_1;
-  wire                execute_ctrl2_down_MMU_BYPASS_TRANSLATION_lane0;
-  wire                execute_ctrl2_down_MMU_ALLOW_EXECUTE_lane0;
+  wire                execute_ctrl3_down_MMU_BYPASS_TRANSLATION_lane0;
+  wire                execute_ctrl3_down_MMU_ALLOW_EXECUTE_lane0;
   wire                fetch_logic_ctrls_1_down_MMU_BYPASS_TRANSLATION;
   wire                fetch_logic_ctrls_1_down_MMU_ACCESS_FAULT;
   wire                fetch_logic_ctrls_1_down_MMU_PAGE_FAULT;
@@ -727,8 +843,6 @@ module VexiiRiscv (
   wire       [31:0]   fetch_logic_ctrls_0_up_Fetch_WORD_PC;
   reg                 fetch_logic_ctrls_0_up_ready;
   wire                fetch_logic_ctrls_0_up_valid;
-  wire       [31:0]   execute_ctrl4_down_PC_lane0;
-  wire                execute_ctrl4_down_TRAP_lane0;
   wire                execute_ctrl5_down_COMMIT_lane0;
   wire                execute_ctrl5_down_isReady;
   wire                execute_ctrl5_down_LANE_SEL_lane0;
@@ -748,14 +862,8 @@ module VexiiRiscv (
   wire       [9:0]    decode_ctrls_1_down_Decode_DOP_ID_0;
   wire                decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0;
   wire                decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0;
-  wire                execute_ctrl2_down_LsuCachelessPlugin_logic_pmpPort_logic_NEED_HIT_lane0;
-  wire                fetch_logic_ctrls_0_down_FetchL1Plugin_logic_pmpPort_logic_NEED_HIT;
   wire       [4:0]    execute_ctrl4_down_RD_PHYS_lane0;
   wire                execute_ctrl4_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-  wire       [15:0]   execute_ctrl4_down_Decode_UOP_ID_lane0;
-  wire                execute_ctrl4_down_COMMIT_lane0;
-  wire                execute_ctrl4_down_isReady;
-  wire                execute_ctrl4_down_LANE_SEL_lane0;
   wire       [31:0]   execute_ctrl4_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
   wire       [31:0]   execute_ctrl4_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass;
   reg        [31:0]   execute_ctrl4_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
@@ -781,6 +889,8 @@ module VexiiRiscv (
   wire       [15:0]   execute_ctrl0_up_Decode_UOP_ID_lane0;
   wire                execute_ctrl0_up_TRAP_lane0;
   wire       [31:0]   execute_ctrl0_up_PC_lane0;
+  wire                execute_ctrl0_up_DONT_FLUSH_PRECISE_4_lane0;
+  wire                execute_ctrl0_up_DONT_FLUSH_PRECISE_3_lane0;
   wire                execute_ctrl0_up_DispatchPlugin_DONT_FLUSH_FROM_LANES_lane0;
   wire                execute_ctrl0_up_DispatchPlugin_DONT_FLUSH_lane0;
   reg                 execute_ctrl0_up_DispatchPlugin_MAY_FLUSH_lane0;
@@ -790,6 +900,8 @@ module VexiiRiscv (
   wire                decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0;
   wire                decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0;
   wire       [31:0]   decode_ctrls_1_down_PC_0;
+  wire                decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0;
+  wire                decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0;
   wire                decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0;
   wire                decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0;
   wire                decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0;
@@ -797,6 +909,9 @@ module VexiiRiscv (
   wire                decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0;
   wire                decode_ctrls_1_up_isValid;
   reg                 decode_ctrls_1_down_ready;
+  wire                execute_ctrl2_down_MAY_FLUSH_PRECISE_3_lane0;
+  wire                execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0;
+  wire                execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0;
   wire                execute_ctrl4_down_BYPASSED_AT_4_lane0;
   reg        [4:0]    execute_ctrl4_up_RD_PHYS_lane0;
   reg                 execute_ctrl4_up_RD_ENABLE_lane0;
@@ -809,26 +924,6 @@ module VexiiRiscv (
   wire                execute_ctrl1_down_BYPASSED_AT_1_lane0;
   reg        [4:0]    execute_ctrl1_up_RD_PHYS_lane0;
   reg                 execute_ctrl1_up_RD_ENABLE_lane0;
-  wire                execute_ctrl4_down_AguPlugin_FLOAT_lane0;
-  wire                execute_ctrl4_down_AguPlugin_SEL_lane0;
-  wire       [31:0]   execute_ctrl4_down_early0_SrcPlugin_ADD_SUB_lane0;
-  wire       [31:0]   execute_ctrl4_down_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0;
-  wire                execute_ctrl3_up_LsuCachelessPlugin_WITH_ACCESS_lane0;
-  reg                 execute_ctrl3_up_LsuCachelessPlugin_WITH_RSP_lane0;
-  reg                 execute_ctrl3_up_TRAP_lane0;
-  wire                execute_ctrl3_down_AguPlugin_STORE_lane0;
-  wire                execute_ctrl3_down_AguPlugin_SEL_lane0;
-  wire       [31:0]   execute_ctrl3_down_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0;
-  wire                execute_ctrl3_down_LsuCachelessPlugin_logic_onJoin_SC_MISS_lane0;
-  wire                execute_ctrl3_down_LsuCachelessPlugin_WITH_RSP_lane0;
-  wire                execute_ctrl2_down_LsuCachelessPlugin_WITH_RSP_lane0;
-  wire                execute_ctrl2_down_MMU_HAZARD_lane0;
-  wire                execute_ctrl2_down_MMU_REFILL_lane0;
-  wire                execute_ctrl2_down_MMU_ALLOW_READ_lane0;
-  wire                execute_ctrl2_down_MMU_ALLOW_WRITE_lane0;
-  wire                execute_ctrl2_down_MMU_PAGE_FAULT_lane0;
-  wire                execute_ctrl2_down_LsuCachelessPlugin_logic_pmpPort_ACCESS_FAULT_lane0;
-  wire                execute_ctrl2_down_MMU_ACCESS_FAULT_lane0;
   wire                execute_ctrl3_down_COMPLETION_AT_3_lane0;
   reg                 execute_ctrl3_up_COMPLETED_lane0;
   wire                execute_ctrl3_down_COMPLETED_lane0;
@@ -864,10 +959,8 @@ module VexiiRiscv (
   reg                 decode_ctrls_1_up_valid;
   wire                decode_ctrls_1_up_isMoving;
   wire                execute_ctrl2_down_early0_EnvPlugin_SEL_lane0;
-  reg                 execute_ctrl3_up_LANE_SEL_lane0;
   wire       [1:0]    execute_ctrl4_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
   wire                execute_ctrl4_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-  reg                 execute_ctrl4_up_LANE_SEL_lane0;
   wire                execute_ctrl2_down_SrcStageables_UNSIGNED_lane0;
   wire                execute_ctrl2_down_SrcStageables_ZERO_lane0;
   wire                execute_ctrl2_down_SrcStageables_REVERT_lane0;
@@ -879,6 +972,8 @@ module VexiiRiscv (
   wire       [0:0]    execute_ctrl1_down_early0_SrcPlugin_logic_SRC1_CTRL_lane0;
   wire       [31:0]   execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
   wire       [31:0]   execute_ctrl1_down_Decode_UOP_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_pmpPort_logic_NEED_HIT_lane0;
+  wire                fetch_logic_ctrls_0_down_FetchL1Plugin_logic_pmpPort_logic_NEED_HIT;
   wire       [2:0]    execute_ctrl2_down_early0_EnvPlugin_OP_lane0;
   wire                execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0;
   wire                execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_IS_JAL_lane0;
@@ -889,6 +984,7 @@ module VexiiRiscv (
   wire                execute_ctrl2_down_TRAP_lane0;
   reg                 execute_ctrl2_TRAP_lane0_bypass;
   wire                execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0;
+  wire       [15:0]   execute_ctrl2_down_Decode_UOP_ID_lane0;
   wire                execute_ctrl2_down_early0_BranchPlugin_SEL_lane0;
   wire                execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0;
   wire                execute_ctrl2_down_early0_BranchPlugin_logic_alu_MSB_FAILED_lane0;
@@ -898,20 +994,97 @@ module VexiiRiscv (
   wire       [9:0]    decode_ctrls_0_down_Fetch_ID_0;
   wire       [31:0]   decode_ctrls_0_down_PC_0;
   wire       [9:0]    fetch_logic_ctrls_0_down_Fetch_ID;
-  wire       [15:0]   execute_ctrl2_down_Decode_UOP_ID_lane0;
-  wire                execute_ctrl2_down_LsuCachelessPlugin_FENCE_lane0;
+  wire                execute_ctrl4_down_AguPlugin_FLOAT_lane0;
+  wire       [31:0]   execute_ctrl4_down_PC_lane0;
+  wire                execute_ctrl4_down_isReady;
+  wire                execute_ctrl4_down_LANE_SEL_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_MMU_FAILURE_lane0;
+  reg                 execute_ctrl4_up_COMMIT_lane0;
+  wire                execute_ctrl4_down_COMMIT_lane0;
+  reg                 execute_ctrl4_COMMIT_lane0_bypass;
+  reg                 execute_ctrl4_up_TRAP_lane0;
+  wire                execute_ctrl4_down_TRAP_lane0;
+  reg                 execute_ctrl4_TRAP_lane0_bypass;
+  wire                execute_ctrl4_down_AguPlugin_SEL_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
+  wire                execute_ctrl4_down_MMU_BYPASS_TRANSLATION_lane0;
+  wire                execute_ctrl4_down_AguPlugin_STORE_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
+  wire                execute_ctrl4_down_MMU_HAZARD_lane0;
+  wire                execute_ctrl4_down_MMU_REFILL_lane0;
+  wire                execute_ctrl4_down_MMU_ACCESS_FAULT_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+  wire                execute_ctrl4_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
+  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
+  wire                execute_ctrl4_down_LsuPlugin_logic_onCtrl_SC_MISS_lane0;
+  wire       [31:0]   execute_ctrl4_down_LsuPlugin_logic_onCtrl_loadData_RESULT_lane0;
+  wire       [15:0]   execute_ctrl4_down_Decode_UOP_ID_lane0;
+  wire       [1:0]    execute_ctrl4_down_LsuL1_SIZE_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0;
+  reg        [31:0]   execute_ctrl4_up_integer_RS2_lane0;
+  wire                execute_ctrl3_down_MMU_HAZARD_lane0;
+  wire                execute_ctrl3_down_MMU_REFILL_lane0;
+  wire                execute_ctrl3_down_MMU_ACCESS_FAULT_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0;
+  wire                execute_ctrl3_down_MMU_ALLOW_READ_lane0;
+  wire                execute_ctrl3_down_MMU_ALLOW_WRITE_lane0;
+  wire                execute_ctrl3_down_AguPlugin_STORE_lane0;
+  wire                execute_ctrl3_down_MMU_PAGE_FAULT_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
+  wire       [31:0]   execute_ctrl3_down_early0_SrcPlugin_ADD_SUB_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_FROM_ACCESS_lane0;
+  reg                 execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
+  wire                execute_ctrl3_down_LsuPlugin_logic_preCtrl_IS_AMO_lane0;
+  wire                execute_ctrl3_down_LsuL1_ATOMIC_lane0;
+  wire                execute_ctrl3_down_AguPlugin_SEL_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
+  reg                 execute_ctrl4_LsuL1_SEL_lane0_bypass;
+  reg                 execute_ctrl4_up_LANE_SEL_lane0;
+  wire                execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0;
+  reg                 execute_ctrl4_up_LsuL1_SEL_lane0;
+  reg                 execute_ctrl3_LsuL1_SEL_lane0_bypass;
+  reg                 execute_ctrl3_up_LANE_SEL_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0;
+  reg                 execute_ctrl3_up_LsuL1_SEL_lane0;
+  wire       [31:0]   execute_ctrl3_down_MMU_TRANSLATED_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_FROM_LSU_lane0;
+  wire       [11:0]   execute_ctrl2_down_Decode_STORE_ID_lane0;
+  wire                execute_ctrl2_down_LsuL1_FLUSH_lane0;
+  wire                execute_ctrl2_down_LsuL1_PREFETCH_lane0;
+  wire                execute_ctrl2_down_LsuL1_STORE_lane0;
+  wire                execute_ctrl2_down_LsuL1_ATOMIC_lane0;
+  wire                execute_ctrl2_down_LsuL1_LOAD_lane0;
+  wire       [1:0]    execute_ctrl2_down_LsuL1_SIZE_lane0;
+  wire       [3:0]    execute_ctrl2_down_LsuL1_MASK_lane0;
+  wire                execute_ctrl2_down_LsuL1_SEL_lane0;
   wire                execute_ctrl2_down_AguPlugin_ATOMIC_lane0;
-  wire                execute_ctrl2_down_AguPlugin_SEL_lane0;
-  wire                execute_ctrl2_down_LsuCachelessPlugin_logic_onTrigger_HIT_lane0;
-  wire                execute_ctrl2_down_AguPlugin_LOAD_lane0;
-  wire                execute_ctrl2_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault;
-  wire                execute_ctrl2_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
   wire                execute_ctrl2_down_AguPlugin_STORE_lane0;
-  wire       [31:0]   execute_ctrl2_down_MMU_TRANSLATED_lane0;
-  wire                execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_MISS_ALIGNED_lane0;
+  wire                execute_ctrl2_down_AguPlugin_LOAD_lane0;
   wire       [1:0]    execute_ctrl2_down_AguPlugin_SIZE_lane0;
-  wire       [31:0]   execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_RAW_ADDRESS_lane0;
-  reg        [31:0]   execute_ctrl2_down_LsuCachelessPlugin_logic_onFirst_WRITE_DATA_lane0;
+  wire                execute_ctrl2_down_AguPlugin_SEL_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_FROM_WB_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_FORCE_PHYSICAL_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0;
+  wire       [1:0]    execute_ctrl3_down_LsuL1_SIZE_lane0;
+  wire                execute_ctrl3_down_LsuL1_STORE_lane0;
+  wire                execute_ctrl3_down_LsuL1_LOAD_lane0;
+  wire                execute_ctrl3_down_LsuL1_FLUSH_lane0;
+  wire                execute_ctrl3_down_LsuL1_SEL_lane0;
   wire       [31:0]   execute_ctrl0_down_Decode_UOP_lane0;
   wire       [1:0]    execute_ctrl0_down_AguPlugin_SIZE_lane0;
   wire                fetch_logic_ctrls_2_up_isCanceling;
@@ -1017,6 +1190,71 @@ module VexiiRiscv (
   wire       [32:0]   execute_ctrl2_down_MUL_SRC1_lane0;
   reg        [31:0]   execute_ctrl2_up_integer_RS2_lane0;
   reg        [31:0]   execute_ctrl2_up_integer_RS1_lane0;
+  wire       [31:0]   execute_ctrl4_down_LsuL1_READ_DATA_lane0;
+  wire       [31:0]   execute_ctrl4_down_LsuL1Plugin_logic_BYPASSED_DATA_lane0;
+  wire       [31:0]   execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_DATA_lane0;
+  wire                execute_ctrl4_down_LsuL1_FLUSH_HIT_lane0;
+  wire       [3:0]    execute_ctrl4_down_LsuL1_MASK_lane0;
+  wire       [31:0]   execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
+  wire       [31:0]   execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0;
+  wire                execute_ctrl4_down_LsuL1_ABORD_lane0;
+  wire       [0:0]    execute_ctrl4_down_LsuL1_WAIT_WRITEBACK_lane0;
+  wire       [0:0]    execute_ctrl4_down_LsuL1_WAIT_REFILL_lane0;
+  wire                execute_ctrl4_down_LsuL1_SKIP_WRITE_lane0;
+  wire                execute_ctrl4_down_LsuL1_SEL_lane0;
+  wire                execute_ctrl4_down_LsuL1_REFILL_HIT_lane0;
+  wire                execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0;
+  wire                execute_ctrl4_down_LsuL1_FAULT_lane0;
+  wire                execute_ctrl4_down_LsuL1_MISS_lane0;
+  wire                execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0;
+  wire                execute_ctrl4_down_LsuL1_HAZARD_lane0;
+  wire                execute_ctrl4_down_LsuL1Plugin_logic_HAZARD_FORCED_lane0;
+  wire                execute_ctrl4_down_LsuL1_FLUSH_lane0;
+  wire                execute_ctrl4_down_LsuL1_PREFETCH_lane0;
+  wire                execute_ctrl4_down_LsuL1_LOAD_lane0;
+  wire       [0:0]    execute_ctrl4_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+  wire       [1:0]    execute_ctrl4_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
+  wire       [31:0]   execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  wire                execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
+  wire       [19:0]   execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+  wire                execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+  wire       [0:0]    execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty;
+  wire                execute_ctrl4_down_LsuL1_ATOMIC_lane0;
+  wire                execute_ctrl4_down_LsuL1_STORE_lane0;
+  wire                execute_ctrl4_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0;
+  wire                execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0;
+  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0;
+  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty;
+  wire       [0:0]    execute_ctrl3_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty;
+  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+  wire                execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
+  wire                execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
+  wire       [19:0]   execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+  wire                execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+  reg        [0:0]    execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty;
+  wire       [0:0]    execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+  wire                execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
+  wire       [3:0]    execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
+  wire                execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
+  wire       [3:0]    execute_ctrl3_down_LsuL1_MASK_lane0;
+  wire       [3:0]    execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  wire       [31:0]   execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
+  wire                execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
+  reg        [1:0]    execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
+  wire       [31:0]   execute_ctrl4_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
+  wire       [0:0]    execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0;
+  wire       [31:0]   execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
+  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0;
+  wire       [0:0]    execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  wire       [31:0]   execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0;
+  reg                 _zz_3;
+  reg                 _zz_4;
   wire                execute_ctrl2_down_early0_BarrelShifterPlugin_SEL_lane0;
   wire       [31:0]   execute_ctrl2_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
   wire                execute_ctrl2_down_BarrelShifterPlugin_SIGNED_lane0;
@@ -1033,7 +1271,7 @@ module VexiiRiscv (
   wire                AlignerPlugin_api_singleFetch;
   wire                AlignerPlugin_api_downMoving;
   wire                AlignerPlugin_api_haltIt;
-  wire                DispatchPlugin_api_haltDispatch;
+  reg                 DispatchPlugin_api_haltDispatch;
   wire                execute_freeze_valid;
   wire       [0:0]    execute_lane0_api_hartsInflight;
   wire                execute_lane0_ctrls_2_upIsCancel;
@@ -1088,21 +1326,225 @@ module VexiiRiscv (
   wire       [31:0]   early0_BranchPlugin_logic_pcPort_payload_pc;
   wire                PcPlugin_logic_harts_0_aggregator_sortedByPriority_1_laneValid;
   wire                early0_BranchPlugin_logic_flushPort_valid;
-  reg                 LsuCachelessPlugin_logic_trapPort_valid;
-  reg                 LsuCachelessPlugin_logic_trapPort_payload_exception;
-  wire       [31:0]   LsuCachelessPlugin_logic_trapPort_payload_tval;
-  wire                early0_MulPlugin_logic_formatBus_valid;
-  wire       [31:0]   early0_MulPlugin_logic_formatBus_payload;
+  reg                 LsuPlugin_logic_trapPort_valid;
+  reg                 LsuPlugin_logic_trapPort_payload_exception;
+  wire       [31:0]   LsuPlugin_logic_trapPort_payload_tval;
+  wire                LsuL1_lockPort_valid;
+  wire       [31:0]   LsuL1_lockPort_address;
+  reg                 LsuL1_ackUnlock;
+  wire                LsuL1Plugin_logic_bus_read_cmd_valid;
+  wire                LsuL1Plugin_logic_bus_read_cmd_ready;
+  wire       [31:0]   LsuL1Plugin_logic_bus_read_cmd_payload_address;
+  wire                LsuL1Plugin_logic_bus_read_rsp_valid;
+  wire                LsuL1Plugin_logic_bus_read_rsp_ready;
+  wire       [31:0]   LsuL1Plugin_logic_bus_read_rsp_payload_data;
+  wire                LsuL1Plugin_logic_bus_read_rsp_payload_error;
+  wire                LsuL1Plugin_logic_bus_write_cmd_valid;
+  wire                LsuL1Plugin_logic_bus_write_cmd_ready;
+  wire                LsuL1Plugin_logic_bus_write_cmd_payload_last;
+  wire       [31:0]   LsuL1Plugin_logic_bus_write_cmd_payload_fragment_address;
+  wire       [31:0]   LsuL1Plugin_logic_bus_write_cmd_payload_fragment_data;
+  wire                LsuL1Plugin_logic_bus_write_rsp_valid;
+  wire                LsuL1Plugin_logic_bus_write_rsp_payload_error;
+  reg        [0:0]    LsuL1Plugin_logic_refillCompletions;
+  wire                LsuL1Plugin_logic_writebackBusy;
+  reg        [0:0]    LsuL1Plugin_logic_banksWrite_mask;
+  reg        [9:0]    LsuL1Plugin_logic_banksWrite_address;
+  reg        [31:0]   LsuL1Plugin_logic_banksWrite_writeData;
+  reg        [3:0]    LsuL1Plugin_logic_banksWrite_writeMask;
+  reg        [0:0]    LsuL1Plugin_logic_waysWrite_mask;
+  reg        [5:0]    LsuL1Plugin_logic_waysWrite_address;
+  reg                 LsuL1Plugin_logic_waysWrite_tag_loaded;
+  reg        [19:0]   LsuL1Plugin_logic_waysWrite_tag_address;
+  reg                 LsuL1Plugin_logic_waysWrite_tag_fault;
+  wire                LsuL1Plugin_logic_waysWrite_valid;
+  wire                LsuL1Plugin_logic_banks_0_usedByWriteback;
+  wire                LsuL1Plugin_logic_banks_0_write_valid;
+  wire       [9:0]    LsuL1Plugin_logic_banks_0_write_payload_address;
+  wire       [31:0]   LsuL1Plugin_logic_banks_0_write_payload_data;
+  wire       [3:0]    LsuL1Plugin_logic_banks_0_write_payload_mask;
+  reg                 LsuL1Plugin_logic_banks_0_read_cmd_valid;
+  reg        [9:0]    LsuL1Plugin_logic_banks_0_read_cmd_payload;
+  (* keep , syn_keep *) wire       [31:0]   LsuL1Plugin_logic_banks_0_read_rsp /* synthesis syn_keep = 1 */ ;
+  wire                LsuL1Plugin_logic_ways_0_lsuRead_cmd_valid;
+  wire       [5:0]    LsuL1Plugin_logic_ways_0_lsuRead_cmd_payload;
+  (* keep , syn_keep *) wire                LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire       [19:0]   LsuL1Plugin_logic_ways_0_lsuRead_rsp_address /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire                LsuL1Plugin_logic_ways_0_lsuRead_rsp_fault /* synthesis syn_keep = 1 */ ;
+  wire       [21:0]   _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded;
+  reg                 LsuL1Plugin_logic_shared_write_valid;
+  reg        [5:0]    LsuL1Plugin_logic_shared_write_payload_address;
+  reg        [0:0]    LsuL1Plugin_logic_shared_write_payload_data_dirty;
+  wire                LsuL1Plugin_logic_shared_lsuRead_cmd_valid;
+  wire       [5:0]    LsuL1Plugin_logic_shared_lsuRead_cmd_payload;
+  (* keep , syn_keep *) wire       [0:0]    LsuL1Plugin_logic_shared_lsuRead_rsp_dirty /* synthesis syn_keep = 1 */ ;
+  reg                 LsuL1Plugin_logic_refill_slots_0_valid;
+  reg                 LsuL1Plugin_logic_refill_slots_0_dirty;
+  reg        [31:0]   LsuL1Plugin_logic_refill_slots_0_address;
+  reg                 LsuL1Plugin_logic_refill_slots_0_cmdSent;
+  reg                 LsuL1Plugin_logic_refill_slots_0_loadedSet;
+  reg                 LsuL1Plugin_logic_refill_slots_0_loaded;
+  reg        [0:0]    LsuL1Plugin_logic_refill_slots_0_loadedCounter;
+  wire                LsuL1Plugin_logic_refill_slots_0_loadedDone;
+  wire                LsuL1Plugin_logic_refill_slots_0_free;
+  wire                LsuL1Plugin_logic_refill_slots_0_fire;
+  reg        [0:0]    LsuL1Plugin_logic_refill_slots_0_victim;
+  wire       [0:0]    LsuL1Plugin_logic_refill_free;
+  wire                LsuL1Plugin_logic_refill_full;
+  reg                 LsuL1Plugin_logic_refill_push_valid;
+  wire       [31:0]   LsuL1Plugin_logic_refill_push_payload_address;
+  reg        [0:0]    LsuL1Plugin_logic_refill_push_payload_victim;
+  wire                LsuL1Plugin_logic_refill_push_payload_dirty;
+  wire                LsuL1Plugin_logic_refill_push_payload_unique;
+  wire                LsuL1Plugin_logic_refill_push_payload_data;
+  reg        [31:0]   LsuL1Plugin_logic_refill_pushCounter;
+  wire                when_LsuL1Plugin_l377;
+  wire                when_LsuL1Plugin_l381;
+  wire                LsuL1Plugin_logic_refill_read_arbiter_slotsWithId_0_0;
+  wire       [0:0]    LsuL1Plugin_logic_refill_read_arbiter_hits;
+  wire                LsuL1Plugin_logic_refill_read_arbiter_hit;
+  reg        [0:0]    LsuL1Plugin_logic_refill_read_arbiter_oh;
+  reg        [0:0]    LsuL1Plugin_logic_refill_read_arbiter_lock;
+  wire                when_LsuL1Plugin_l301;
+  wire                LsuL1Plugin_logic_bus_read_cmd_fire;
+  wire       [31:0]   LsuL1Plugin_logic_refill_read_cmdAddress;
+  wire       [31:0]   LsuL1Plugin_logic_refill_read_rspAddress;
+  wire                LsuL1Plugin_logic_refill_read_dirty;
+  (* keep , syn_keep *) reg        [3:0]    LsuL1Plugin_logic_refill_read_wordIndex /* synthesis syn_keep = 1 */ ;
+  wire                LsuL1Plugin_logic_refill_read_rspWithData;
+  wire       [0:0]    LsuL1Plugin_logic_refill_read_bankWriteNotif;
+  wire                LsuL1Plugin_logic_refill_read_writeReservation_win;
+  reg                 LsuL1Plugin_logic_refill_read_writeReservation_take;
+  reg                 LsuL1Plugin_logic_refill_read_hadError;
+  wire                when_LsuL1Plugin_l450;
+  reg                 LsuL1Plugin_logic_refill_read_fire;
+  wire                LsuL1Plugin_logic_refill_read_reservation_win;
+  reg                 LsuL1Plugin_logic_refill_read_reservation_take;
+  wire                LsuL1Plugin_logic_refill_read_faulty;
+  wire                when_LsuL1Plugin_l463;
+  wire       [0:0]    LsuL1_REFILL_BUSY;
+  reg                 LsuL1Plugin_logic_writeback_slots_0_fire;
+  reg                 LsuL1Plugin_logic_writeback_slots_0_valid;
+  reg                 LsuL1Plugin_logic_writeback_slots_0_busy;
+  reg        [31:0]   LsuL1Plugin_logic_writeback_slots_0_address;
+  reg                 LsuL1Plugin_logic_writeback_slots_0_readCmdDone;
+  reg                 LsuL1Plugin_logic_writeback_slots_0_readRspDone;
+  reg                 LsuL1Plugin_logic_writeback_slots_0_victimBufferReady;
+  reg                 LsuL1Plugin_logic_writeback_slots_0_writeCmdDone;
+  reg        [0:0]    LsuL1Plugin_logic_writeback_slots_0_timer_counter;
+  wire                LsuL1Plugin_logic_writeback_slots_0_timer_done;
+  wire                when_LsuL1Plugin_l530;
+  wire                LsuL1Plugin_logic_writeback_slots_0_free;
+  wire       [0:0]    LsuL1_WRITEBACK_BUSY;
+  wire       [0:0]    LsuL1Plugin_logic_writeback_free;
+  wire                LsuL1Plugin_logic_writeback_full;
+  reg                 LsuL1Plugin_logic_writeback_push_valid;
+  reg        [31:0]   LsuL1Plugin_logic_writeback_push_payload_address;
+  wire                when_LsuL1Plugin_l556;
+  wire                when_LsuL1Plugin_l561;
+  wire                LsuL1Plugin_logic_writeback_read_arbiter_slotsWithId_0_0;
+  wire       [0:0]    LsuL1Plugin_logic_writeback_read_arbiter_hits;
+  wire                LsuL1Plugin_logic_writeback_read_arbiter_hit;
+  reg        [0:0]    LsuL1Plugin_logic_writeback_read_arbiter_oh;
+  reg        [0:0]    LsuL1Plugin_logic_writeback_read_arbiter_lock;
+  wire                when_LsuL1Plugin_l301_1;
+  wire       [31:0]   LsuL1Plugin_logic_writeback_read_address;
+  (* keep , syn_keep *) reg        [3:0]    LsuL1Plugin_logic_writeback_read_wordIndex /* synthesis syn_keep = 1 */ ;
+  wire                LsuL1Plugin_logic_writeback_read_slotRead_valid;
+  wire                LsuL1Plugin_logic_writeback_read_slotRead_payload_last;
+  wire       [3:0]    LsuL1Plugin_logic_writeback_read_slotRead_payload_wordIndex;
+  wire                when_LsuL1Plugin_l605;
+  reg                 LsuL1Plugin_logic_writeback_read_slotReadLast_valid;
+  reg                 LsuL1Plugin_logic_writeback_read_slotReadLast_payload_last;
+  reg        [3:0]    LsuL1Plugin_logic_writeback_read_slotReadLast_payload_wordIndex;
+  wire       [31:0]   LsuL1Plugin_logic_writeback_read_readedData;
+  wire                LsuL1Plugin_logic_writeback_write_arbiter_slotsWithId_0_0;
+  wire       [0:0]    LsuL1Plugin_logic_writeback_write_arbiter_hits;
+  wire                LsuL1Plugin_logic_writeback_write_arbiter_hit;
+  reg        [0:0]    LsuL1Plugin_logic_writeback_write_arbiter_oh;
+  reg        [0:0]    LsuL1Plugin_logic_writeback_write_arbiter_lock;
+  wire                when_LsuL1Plugin_l301_2;
+  (* keep , syn_keep *) reg        [3:0]    LsuL1Plugin_logic_writeback_write_wordIndex /* synthesis syn_keep = 1 */ ;
+  wire                LsuL1Plugin_logic_writeback_write_last;
+  wire                LsuL1Plugin_logic_writeback_write_bufferRead_valid;
+  reg                 LsuL1Plugin_logic_writeback_write_bufferRead_ready;
+  wire       [31:0]   LsuL1Plugin_logic_writeback_write_bufferRead_payload_address;
+  wire                LsuL1Plugin_logic_writeback_write_bufferRead_payload_last;
+  wire                LsuL1Plugin_logic_writeback_write_bufferRead_fire;
+  wire                when_LsuL1Plugin_l676;
+  wire                LsuL1Plugin_logic_writeback_write_cmd_valid;
+  wire                LsuL1Plugin_logic_writeback_write_cmd_ready;
+  wire       [31:0]   LsuL1Plugin_logic_writeback_write_cmd_payload_address;
+  wire                LsuL1Plugin_logic_writeback_write_cmd_payload_last;
+  reg                 LsuL1Plugin_logic_writeback_write_bufferRead_rValid;
+  reg        [31:0]   LsuL1Plugin_logic_writeback_write_bufferRead_rData_address;
+  reg                 LsuL1Plugin_logic_writeback_write_bufferRead_rData_last;
+  wire                when_Stream_l399;
+  wire       [3:0]    _zz_LsuL1Plugin_logic_writeback_write_word;
+  wire       [31:0]   LsuL1Plugin_logic_writeback_write_word;
+  wire       [9:0]    LsuL1Plugin_logic_lsu_rb0_readAddress;
+  wire                when_LsuL1Plugin_l718;
+  wire                when_LsuL1Plugin_l719;
   wire                execute_lane0_ctrls_3_upIsCancel;
   wire                execute_lane0_ctrls_3_downIsCancel;
+  reg                 LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg;
+  wire                when_LsuL1Plugin_l735;
+  wire                execute_lane0_ctrls_4_upIsCancel;
+  wire                execute_lane0_ctrls_4_downIsCancel;
+  wire                _zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
+  wire                LsuL1Plugin_logic_lsu_sharedBypassers_0_hit;
+  wire                LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win;
+  reg                 LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_take;
+  wire                LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win;
+  wire                LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_take;
+  wire                LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_refillHazards;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_writebackHazards;
+  wire                LsuL1Plugin_logic_lsu_ctrl_refillHazard;
+  wire                LsuL1Plugin_logic_lsu_ctrl_writebackHazard;
+  wire                LsuL1Plugin_logic_lsu_ctrl_wasDirty;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_loadedDirties;
+  wire                LsuL1Plugin_logic_lsu_ctrl_refillWayWasDirty;
+  wire                LsuL1Plugin_logic_lsu_ctrl_writeToReadHazard;
+  wire                LsuL1Plugin_logic_lsu_ctrl_bankNotRead;
+  wire                LsuL1Plugin_logic_lsu_ctrl_loadHazard;
+  wire                LsuL1Plugin_logic_lsu_ctrl_storeHazard;
+  wire                LsuL1Plugin_logic_lsu_ctrl_flushHazard;
+  wire                LsuL1Plugin_logic_lsu_ctrl_coherencyHazard;
+  reg                 LsuL1Plugin_logic_lsu_ctrl_hazardReg;
+  reg                 LsuL1Plugin_logic_lsu_ctrl_flushHazardReg;
+  wire                LsuL1Plugin_logic_lsu_ctrl_canRefill;
+  wire                LsuL1Plugin_logic_lsu_ctrl_canFlush;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_needFlushs;
+  wire                LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0;
+  wire       [0:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushOh;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_needFlushOh;
+  wire                LsuL1Plugin_logic_lsu_ctrl_isAccess;
+  wire                LsuL1Plugin_logic_lsu_ctrl_askRefill;
+  wire                LsuL1Plugin_logic_lsu_ctrl_askUpgrade;
+  wire                LsuL1Plugin_logic_lsu_ctrl_askFlush;
+  wire                LsuL1Plugin_logic_lsu_ctrl_doRefill;
+  wire                LsuL1Plugin_logic_lsu_ctrl_doUpgrade;
+  wire                LsuL1Plugin_logic_lsu_ctrl_doFlush;
+  wire                LsuL1Plugin_logic_lsu_ctrl_doWrite;
+  wire                LsuL1Plugin_logic_lsu_ctrl_doRefillPush;
+  wire                when_LsuL1Plugin_l912;
+  wire       [2:0]    _zz_13;
+  wire                when_LsuL1Plugin_l926;
+  wire       [19:0]   _zz_LsuL1Plugin_logic_waysWrite_tag_address;
+  wire                when_LsuL1Plugin_l991;
+  wire                LsuL1Plugin_logic_lsu_ctrl_preventSideEffects;
+  reg        [6:0]    LsuL1Plugin_logic_initializer_counter;
+  wire                LsuL1Plugin_logic_initializer_done;
+  wire                when_LsuL1Plugin_l1192;
+  wire                early0_MulPlugin_logic_formatBus_valid;
+  wire       [31:0]   early0_MulPlugin_logic_formatBus_payload;
   reg        [60:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
   reg        [60:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_1;
   reg        [60:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_2;
   reg        [2:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
   reg        [2:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_1;
   reg        [2:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_2;
-  wire                execute_lane0_ctrls_4_upIsCancel;
-  wire                execute_lane0_ctrls_4_downIsCancel;
   reg        [65:0]   _zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0;
   reg        [65:0]   _zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0_1;
   wire                early0_DivPlugin_logic_formatBus_valid;
@@ -1152,6 +1594,8 @@ module VexiiRiscv (
   wire                _zz_when_TrapPlugin_l207_2;
   reg                 TrapPlugin_logic_fetchL1Invalidate_0_cmd_valid;
   reg                 TrapPlugin_logic_fetchL1Invalidate_0_cmd_ready;
+  reg                 TrapPlugin_logic_lsuL1Invalidate_0_cmd_valid;
+  wire                TrapPlugin_logic_lsuL1Invalidate_0_cmd_ready;
   reg                 early0_EnvPlugin_logic_trapPort_valid;
   reg                 early0_EnvPlugin_logic_trapPort_payload_exception;
   wire       [31:0]   early0_EnvPlugin_logic_trapPort_payload_tval;
@@ -1199,6 +1643,36 @@ module VexiiRiscv (
   reg        [0:0]    AlignerPlugin_logic_nobuffer_mask;
   wire       [0:0]    AlignerPlugin_logic_nobuffer_remaningMask;
   wire                when_AlignerPlugin_l292;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_valid;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_ready;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_last;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_fragment_write;
+  wire       [31:0]   LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_fragment_address;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_valid;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_ready;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_payload_last;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_payload_fragment_write;
+  wire       [31:0]   LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_payload_fragment_address;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_valid;
+  reg                 LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_ready;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_last;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_write;
+  reg        [31:0]   LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_address;
+  wire       [31:0]   LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_data;
+  reg        [3:0]    LsuL1Plugin_logic_bus_toWishbone_arbiter_counter;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_fire;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_valid;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_ready;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_last;
+  wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_write;
+  wire       [31:0]   LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_address;
+  wire       [31:0]   LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_data;
+  reg                 LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rValid;
+  reg                 LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_last;
+  reg                 LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_write;
+  reg        [31:0]   LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_address;
+  reg        [31:0]   LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_data;
+  wire                when_Stream_l399_1;
   reg        [3:0]    CsrAccessPlugin_bus_decode_trapCode;
   wire                CsrAccessPlugin_bus_read_valid;
   wire                CsrAccessPlugin_bus_read_moving;
@@ -1292,69 +1766,128 @@ module VexiiRiscv (
   reg                 FetchL1Plugin_logic_ctrl_firstCycle;
   wire                when_FetchL1Plugin_l541;
   wire                when_FetchL1Plugin_l558;
-  reg        [3:0]    LsuCachelessPlugin_logic_trapPort_payload_code;
-  reg        [1:0]    LsuCachelessPlugin_logic_trapPort_payload_arg;
-  reg                 LsuCachelessPlugin_logic_flushPort_valid;
-  wire       [15:0]   LsuCachelessPlugin_logic_flushPort_payload_uopId;
-  wire                LsuCachelessPlugin_logic_flushPort_payload_self;
-  wire                LsuCachelessPlugin_logic_iwb_valid;
-  wire       [31:0]   LsuCachelessPlugin_logic_iwb_payload;
+  reg        [3:0]    LsuPlugin_logic_trapPort_payload_code;
+  reg        [1:0]    LsuPlugin_logic_trapPort_payload_arg;
+  reg                 LsuPlugin_logic_flushPort_valid;
+  wire       [15:0]   LsuPlugin_logic_flushPort_payload_uopId;
+  wire                LsuPlugin_logic_flushPort_payload_self;
+  wire                LsuPlugin_logic_commitProbe_valid;
+  wire       [31:0]   LsuPlugin_logic_commitProbe_payload_pc;
+  wire       [31:0]   LsuPlugin_logic_commitProbe_payload_address;
+  wire                LsuPlugin_logic_commitProbe_payload_load;
+  wire                LsuPlugin_logic_commitProbe_payload_store;
+  wire                LsuPlugin_logic_commitProbe_payload_trap;
+  wire                LsuPlugin_logic_commitProbe_payload_io;
+  wire                LsuPlugin_logic_commitProbe_payload_prefetchFailed;
+  wire                LsuPlugin_logic_commitProbe_payload_miss;
+  wire                LsuPlugin_logic_iwb_valid;
+  wire       [31:0]   LsuPlugin_logic_iwb_payload;
   wire                execute_lane0_ctrls_0_upIsCancel;
   wire                execute_lane0_ctrls_0_downIsCancel;
-  wire                LsuCachelessPlugin_logic_bus_cmd_valid;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_ready;
-  wire       [0:0]    LsuCachelessPlugin_logic_bus_cmd_payload_id;
-  wire                LsuCachelessPlugin_logic_bus_cmd_payload_write;
-  wire       [31:0]   LsuCachelessPlugin_logic_bus_cmd_payload_address;
-  wire       [31:0]   LsuCachelessPlugin_logic_bus_cmd_payload_data;
-  wire       [1:0]    LsuCachelessPlugin_logic_bus_cmd_payload_size;
-  wire       [3:0]    LsuCachelessPlugin_logic_bus_cmd_payload_mask;
-  wire                LsuCachelessPlugin_logic_bus_cmd_payload_io;
-  wire                LsuCachelessPlugin_logic_bus_cmd_payload_fromHart;
-  wire       [15:0]   LsuCachelessPlugin_logic_bus_cmd_payload_uopId;
-  wire                LsuCachelessPlugin_logic_bus_rsp_valid;
-  wire       [0:0]    LsuCachelessPlugin_logic_bus_rsp_payload_id;
-  wire                LsuCachelessPlugin_logic_bus_rsp_payload_error;
-  wire       [31:0]   LsuCachelessPlugin_logic_bus_rsp_payload_data;
-  wire       [31:0]   LsuCachelessPlugin_logic_onPma_port_cmd_address;
-  wire       [1:0]    LsuCachelessPlugin_logic_onPma_port_cmd_size;
-  wire       [0:0]    LsuCachelessPlugin_logic_onPma_port_cmd_op;
-  wire                LsuCachelessPlugin_logic_onPma_port_rsp_fault;
-  wire                LsuCachelessPlugin_logic_onPma_port_rsp_io;
-  wire                LsuCachelessPlugin_logic_cmdInflights;
-  reg                 LsuCachelessPlugin_logic_onFork_skip;
-  wire                when_LsuCachelessPlugin_l215;
-  reg                 LsuCachelessPlugin_logic_onFork_askFenceReg;
-  wire                LsuCachelessPlugin_logic_onFork_askFence;
-  wire                LsuCachelessPlugin_logic_onFork_doFence;
-  wire                LsuCachelessPlugin_logic_bus_cmd_fire;
-  reg                 LsuCachelessPlugin_logic_onFork_cmdCounter_willIncrement;
-  wire                LsuCachelessPlugin_logic_onFork_cmdCounter_willClear;
-  reg        [0:0]    LsuCachelessPlugin_logic_onFork_cmdCounter_valueNext;
-  reg        [0:0]    LsuCachelessPlugin_logic_onFork_cmdCounter_value;
-  wire                LsuCachelessPlugin_logic_onFork_cmdCounter_willOverflowIfInc;
-  wire                LsuCachelessPlugin_logic_onFork_cmdCounter_willOverflow;
-  reg                 LsuCachelessPlugin_logic_onFork_cmdSent;
-  wire                when_LsuCachelessPlugin_l220;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_valid_regNext;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_ready_regNext;
-  wire                LsuCachelessPlugin_logic_bus_cmd_isStall;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_isStall_regNext;
-  reg        [0:0]    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_id;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_payload_regNext_write;
-  reg        [31:0]   LsuCachelessPlugin_logic_bus_cmd_payload_regNext_address;
-  reg        [31:0]   LsuCachelessPlugin_logic_bus_cmd_payload_regNext_data;
-  reg        [1:0]    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_size;
-  reg        [3:0]    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_mask;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_payload_regNext_io;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_payload_regNext_fromHart;
-  reg        [15:0]   LsuCachelessPlugin_logic_bus_cmd_payload_regNext_uopId;
-  wire       [31:0]   LsuCachelessPlugin_logic_onFork_mapping_0_1;
-  wire       [31:0]   LsuCachelessPlugin_logic_onFork_mapping_1_1;
-  wire       [31:0]   LsuCachelessPlugin_logic_onFork_mapping_2_1;
-  reg        [31:0]   _zz_LsuCachelessPlugin_logic_bus_cmd_payload_data;
-  reg        [3:0]    _zz_LsuCachelessPlugin_logic_bus_cmd_payload_mask;
-  wire                LsuCachelessPlugin_logic_onFork_freezeIt;
+  wire                LsuPlugin_logic_bus_cmd_valid;
+  reg                 LsuPlugin_logic_bus_cmd_ready;
+  wire                LsuPlugin_logic_bus_cmd_payload_write;
+  wire       [31:0]   LsuPlugin_logic_bus_cmd_payload_address;
+  wire       [31:0]   LsuPlugin_logic_bus_cmd_payload_data;
+  wire       [1:0]    LsuPlugin_logic_bus_cmd_payload_size;
+  wire       [3:0]    LsuPlugin_logic_bus_cmd_payload_mask;
+  wire                LsuPlugin_logic_bus_cmd_payload_io;
+  wire                LsuPlugin_logic_bus_cmd_payload_fromHart;
+  wire       [15:0]   LsuPlugin_logic_bus_cmd_payload_uopId;
+  wire                LsuPlugin_logic_bus_rsp_valid;
+  wire                LsuPlugin_logic_bus_rsp_payload_error;
+  wire       [31:0]   LsuPlugin_logic_bus_rsp_payload_data;
+  wire                LsuPlugin_logic_flusher_wantExit;
+  reg                 LsuPlugin_logic_flusher_wantStart;
+  wire                LsuPlugin_logic_flusher_wantKill;
+  reg        [6:0]    LsuPlugin_logic_flusher_cmdCounter;
+  wire                LsuPlugin_logic_flusher_inflight;
+  reg        [0:0]    LsuPlugin_logic_flusher_waiter;
+  wire       [4:0]    LsuPlugin_logic_onAddress0_ls_prefetchOp;
+  wire                LsuPlugin_logic_onAddress0_ls_port_valid;
+  wire                LsuPlugin_logic_onAddress0_ls_port_ready;
+  wire       [2:0]    LsuPlugin_logic_onAddress0_ls_port_payload_op;
+  wire       [31:0]   LsuPlugin_logic_onAddress0_ls_port_payload_address;
+  wire       [1:0]    LsuPlugin_logic_onAddress0_ls_port_payload_size;
+  wire                LsuPlugin_logic_onAddress0_ls_port_payload_load;
+  wire                LsuPlugin_logic_onAddress0_ls_port_payload_store;
+  wire                LsuPlugin_logic_onAddress0_ls_port_payload_atomic;
+  wire       [11:0]   LsuPlugin_logic_onAddress0_ls_port_payload_storeId;
+  reg        [11:0]   LsuPlugin_logic_onAddress0_ls_storeId;
+  wire                LsuPlugin_logic_onAddress0_ls_port_fire;
+  wire                LsuPlugin_logic_onAddress0_flush_port_valid;
+  wire                LsuPlugin_logic_onAddress0_flush_port_ready;
+  wire       [2:0]    LsuPlugin_logic_onAddress0_flush_port_payload_op;
+  wire       [31:0]   LsuPlugin_logic_onAddress0_flush_port_payload_address;
+  wire       [1:0]    LsuPlugin_logic_onAddress0_flush_port_payload_size;
+  wire                LsuPlugin_logic_onAddress0_flush_port_payload_load;
+  wire                LsuPlugin_logic_onAddress0_flush_port_payload_store;
+  wire                LsuPlugin_logic_onAddress0_flush_port_payload_atomic;
+  wire       [11:0]   LsuPlugin_logic_onAddress0_flush_port_payload_storeId;
+  wire                LsuPlugin_logic_onAddress0_flush_port_fire;
+  reg        [3:0]    _zz_execute_ctrl2_down_LsuL1_MASK_lane0;
+  wire                when_LsuPlugin_l497;
+  wire                when_LsuPlugin_l497_1;
+  wire       [31:0]   LsuPlugin_logic_onPma_cached_cmd_address;
+  wire       [0:0]    LsuPlugin_logic_onPma_cached_cmd_op;
+  wire                LsuPlugin_logic_onPma_cached_rsp_fault;
+  wire                LsuPlugin_logic_onPma_cached_rsp_io;
+  wire       [31:0]   LsuPlugin_logic_onPma_io_cmd_address;
+  wire       [1:0]    LsuPlugin_logic_onPma_io_cmd_size;
+  wire       [0:0]    LsuPlugin_logic_onPma_io_cmd_op;
+  wire                LsuPlugin_logic_onPma_io_rsp_fault;
+  wire                LsuPlugin_logic_onPma_io_rsp_io;
+  wire                when_LsuPlugin_l519;
+  wire                LsuPlugin_logic_onPma_addressExtension;
+  reg                 LsuPlugin_logic_onCtrl_lsuTrap;
+  reg        [31:0]   LsuPlugin_logic_onCtrl_writeData;
+  wire                LsuPlugin_logic_onCtrl_scMiss;
+  reg                 LsuPlugin_logic_onCtrl_io_tooEarly;
+  reg                 LsuPlugin_logic_onCtrl_io_allowIt;
+  wire                when_LsuPlugin_l545;
+  wire                LsuPlugin_logic_onCtrl_io_doIt;
+  reg                 LsuPlugin_logic_onCtrl_io_doItReg;
+  reg                 LsuPlugin_logic_onCtrl_io_cmdSent;
+  wire                LsuPlugin_logic_bus_cmd_fire;
+  wire                when_LsuPlugin_l549;
+  wire                LsuPlugin_logic_bus_rsp_toStream_valid;
+  wire                LsuPlugin_logic_bus_rsp_toStream_ready;
+  wire                LsuPlugin_logic_bus_rsp_toStream_payload_error;
+  wire       [31:0]   LsuPlugin_logic_bus_rsp_toStream_payload_data;
+  wire                LsuPlugin_logic_onCtrl_io_rsp_valid;
+  wire                LsuPlugin_logic_onCtrl_io_rsp_ready;
+  wire                LsuPlugin_logic_onCtrl_io_rsp_payload_error;
+  wire       [31:0]   LsuPlugin_logic_onCtrl_io_rsp_payload_data;
+  reg                 LsuPlugin_logic_bus_rsp_toStream_rValid;
+  wire                LsuPlugin_logic_onCtrl_io_rsp_fire;
+  reg                 LsuPlugin_logic_bus_rsp_toStream_rData_error;
+  reg        [31:0]   LsuPlugin_logic_bus_rsp_toStream_rData_data;
+  wire                LsuPlugin_logic_onCtrl_io_freezeIt;
+  wire       [31:0]   LsuPlugin_logic_onCtrl_loadData_input;
+  wire       [7:0]    LsuPlugin_logic_onCtrl_loadData_splited_0;
+  wire       [7:0]    LsuPlugin_logic_onCtrl_loadData_splited_1;
+  wire       [7:0]    LsuPlugin_logic_onCtrl_loadData_splited_2;
+  wire       [7:0]    LsuPlugin_logic_onCtrl_loadData_splited_3;
+  reg        [31:0]   LsuPlugin_logic_onCtrl_loadData_shited;
+  wire       [31:0]   LsuPlugin_logic_onCtrl_storeData_mapping_0_1;
+  wire       [31:0]   LsuPlugin_logic_onCtrl_storeData_mapping_1_1;
+  wire       [31:0]   LsuPlugin_logic_onCtrl_storeData_mapping_2_1;
+  reg        [31:0]   _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
+  wire                LsuPlugin_logic_onCtrl_traps_accessFault;
+  wire                LsuPlugin_logic_onCtrl_traps_l1Failed;
+  wire                LsuPlugin_logic_onCtrl_traps_pmaFault;
+  wire                when_LsuPlugin_l747;
+  wire                when_LsuPlugin_l774;
+  wire                when_LsuPlugin_l788;
+  wire                LsuPlugin_logic_onCtrl_mmuNeeded;
+  wire                when_LsuPlugin_l827;
+  reg        [0:0]    LsuPlugin_logic_onCtrl_hartRegulation_refill;
+  reg                 LsuPlugin_logic_onCtrl_hartRegulation_valid;
+  wire                when_LsuPlugin_l222;
+  wire                when_LsuPlugin_l871;
+  wire                when_LsuPlugin_l226;
+  wire                LsuPlugin_logic_onWb_storeFire;
+  wire                LsuPlugin_logic_onWb_storeBroadcast;
   wire       [9:0]    WhiteboxerPlugin_logic_fetch_fetchId;
   wire                WhiteboxerPlugin_logic_decodes_0_fire;
   reg                 decode_ctrls_0_up_LANE_SEL_0_regNext;
@@ -1403,6 +1936,13 @@ module VexiiRiscv (
   wire       [1:0]    PrivilegedPlugin_logic_defaultTrap_csrPrivilege;
   wire                PrivilegedPlugin_logic_defaultTrap_csrReadOnly;
   wire                when_PrivilegedPlugin_l689;
+  wire                PmpPlugin_logic_isMachine;
+  wire                PmpPlugin_logic_checkInstruction;
+  wire                PmpPlugin_logic_checkData;
+  wire                FetchL1Plugin_logic_pmpPort_logic_portCheckData;
+  wire       [19:0]   FetchL1Plugin_logic_pmpPort_logic_torCmpAddress;
+  wire                LsuPlugin_logic_pmpPort_logic_portCheckData;
+  wire       [19:0]   LsuPlugin_logic_pmpPort_logic_torCmpAddress;
   wire       [31:0]   FetchL1Plugin_pmaBuilder_addressBits;
   wire                _zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io;
   wire                FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit;
@@ -1416,6 +1956,38 @@ module VexiiRiscv (
   reg                 _zz_FetchL1Plugin_logic_bus_rsp_valid;
   reg        [31:0]   FetchL1WishbonePlugin_logic_bus_DAT_MISO_regNext;
   reg                 FetchL1WishbonePlugin_logic_bus_ERR_regNext;
+  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid;
+  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_ready;
+  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_write;
+  wire       [31:0]   LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_address;
+  wire       [31:0]   LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_data;
+  wire       [1:0]    LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_size;
+  wire       [3:0]    LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_mask;
+  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_io;
+  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_fromHart;
+  wire       [15:0]   LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_uopId;
+  reg                 LsuPlugin_logic_bus_cmd_rValid;
+  reg                 LsuPlugin_logic_bus_cmd_rData_write;
+  reg        [31:0]   LsuPlugin_logic_bus_cmd_rData_address;
+  reg        [31:0]   LsuPlugin_logic_bus_cmd_rData_data;
+  reg        [1:0]    LsuPlugin_logic_bus_cmd_rData_size;
+  reg        [3:0]    LsuPlugin_logic_bus_cmd_rData_mask;
+  reg                 LsuPlugin_logic_bus_cmd_rData_io;
+  reg                 LsuPlugin_logic_bus_cmd_rData_fromHart;
+  reg        [15:0]   LsuPlugin_logic_bus_cmd_rData_uopId;
+  wire                when_Stream_l399_2;
+  wire       [31:0]   LsuPlugin_pmaBuilder_l1_addressBits;
+  wire       [0:0]    LsuPlugin_pmaBuilder_l1_argsBits;
+  wire                _zz_LsuPlugin_logic_onPma_cached_rsp_io;
+  wire                LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit;
+  wire                LsuPlugin_pmaBuilder_l1_onTransfers_0_argsHit;
+  wire                LsuPlugin_pmaBuilder_l1_onTransfers_0_hit;
+  wire       [31:0]   LsuPlugin_pmaBuilder_io_addressBits;
+  wire       [2:0]    LsuPlugin_pmaBuilder_io_argsBits;
+  wire                LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit;
+  wire                LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit;
+  wire                LsuPlugin_pmaBuilder_io_onTransfers_0_hit;
+  wire                _zz_LsuPlugin_logic_onPma_io_rsp_fault;
   wire                execute_lane0_ctrls_1_upIsCancel;
   wire                execute_lane0_ctrls_1_downIsCancel;
   reg        [31:0]   _zz_execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
@@ -1530,37 +2102,6 @@ module VexiiRiscv (
   wire                CsrRamPlugin_csrMapper_write_ready;
   wire       [1:0]    CsrRamPlugin_csrMapper_write_address;
   wire       [31:0]   CsrRamPlugin_csrMapper_write_data;
-  wire                when_LsuCachelessPlugin_l261;
-  wire                when_LsuCachelessPlugin_l267;
-  wire                when_LsuCachelessPlugin_l274;
-  wire                when_LsuCachelessPlugin_l315;
-  reg                 LsuCachelessPlugin_logic_onJoin_buffers_0_valid;
-  reg                 LsuCachelessPlugin_logic_onJoin_buffers_0_inflight;
-  reg                 LsuCachelessPlugin_logic_onJoin_buffers_0_payload_error;
-  reg        [31:0]   LsuCachelessPlugin_logic_onJoin_buffers_0_payload_data;
-  reg                 LsuCachelessPlugin_logic_onJoin_buffers_1_valid;
-  reg                 LsuCachelessPlugin_logic_onJoin_buffers_1_inflight;
-  reg                 LsuCachelessPlugin_logic_onJoin_buffers_1_payload_error;
-  reg        [31:0]   LsuCachelessPlugin_logic_onJoin_buffers_1_payload_data;
-  wire                LsuCachelessPlugin_logic_onJoin_busRspWithoutId_error;
-  wire       [31:0]   LsuCachelessPlugin_logic_onJoin_busRspWithoutId_data;
-  wire                LsuCachelessPlugin_logic_onJoin_pop;
-  reg                 LsuCachelessPlugin_logic_onJoin_rspCounter_willIncrement;
-  wire                LsuCachelessPlugin_logic_onJoin_rspCounter_willClear;
-  reg        [0:0]    LsuCachelessPlugin_logic_onJoin_rspCounter_valueNext;
-  reg        [0:0]    LsuCachelessPlugin_logic_onJoin_rspCounter_value;
-  wire                LsuCachelessPlugin_logic_onJoin_rspCounter_willOverflowIfInc;
-  wire                LsuCachelessPlugin_logic_onJoin_rspCounter_willOverflow;
-  wire                LsuCachelessPlugin_logic_onJoin_readerValid;
-  wire                LsuCachelessPlugin_logic_onJoin_busRspHit;
-  wire                LsuCachelessPlugin_logic_onJoin_rspValid;
-  wire                LsuCachelessPlugin_logic_onJoin_rspPayload_error;
-  wire       [31:0]   LsuCachelessPlugin_logic_onJoin_rspPayload_data;
-  wire       [7:0]    LsuCachelessPlugin_logic_onWb_rspSplits_0;
-  wire       [7:0]    LsuCachelessPlugin_logic_onWb_rspSplits_1;
-  wire       [7:0]    LsuCachelessPlugin_logic_onWb_rspSplits_2;
-  wire       [7:0]    LsuCachelessPlugin_logic_onWb_rspSplits_3;
-  reg        [31:0]   LsuCachelessPlugin_logic_onWb_rspShifted;
   wire                DispatchPlugin_logic_candidates_0_ctx_valid;
   reg        [0:0]    DispatchPlugin_logic_candidates_0_ctx_laneLayerHits;
   wire       [31:0]   DispatchPlugin_logic_candidates_0_ctx_uop;
@@ -1568,6 +2109,8 @@ module VexiiRiscv (
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_MAY_FLUSH;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH_FROM_LANES;
+  wire                DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3;
+  wire                DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_4;
   wire       [31:0]   DispatchPlugin_logic_candidates_0_ctx_hm_PC;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_TRAP;
   wire       [15:0]   DispatchPlugin_logic_candidates_0_ctx_hm_Decode_UOP_ID;
@@ -1589,6 +2132,8 @@ module VexiiRiscv (
   wire                DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard;
   wire                DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard;
   wire                DispatchPlugin_logic_reservationChecker_0_onLl_0_hit;
+  wire                DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_0;
+  wire                DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_1;
   wire                DispatchPlugin_logic_flushChecker_0_oldersHazard;
   wire       [0:0]    DispatchPlugin_logic_fenceChecker_olderInflights;
   wire                DispatchPlugin_logic_feeds_0_sending;
@@ -1639,44 +2184,9 @@ module VexiiRiscv (
   reg                 CsrRamPlugin_csrMapper_fired;
   wire                when_CsrRamPlugin_l92;
   wire                when_CsrRamPlugin_l96;
-  wire                PmpPlugin_logic_isMachine;
-  wire                PmpPlugin_logic_checkInstruction;
-  wire                PmpPlugin_logic_checkData;
-  wire                FetchL1Plugin_logic_pmpPort_logic_portCheckData;
-  wire       [19:0]   FetchL1Plugin_logic_pmpPort_logic_torCmpAddress;
-  wire                LsuCachelessPlugin_logic_pmpPort_logic_portCheckData;
-  wire       [19:0]   LsuCachelessPlugin_logic_pmpPort_logic_torCmpAddress;
-  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid;
-  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_ready;
-  wire       [0:0]    LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_id;
-  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_write;
-  wire       [31:0]   LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_address;
-  wire       [31:0]   LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_data;
-  wire       [1:0]    LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_size;
-  wire       [3:0]    LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_mask;
-  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_io;
-  wire                LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_fromHart;
-  wire       [15:0]   LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_uopId;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_rValid;
-  reg        [0:0]    LsuCachelessPlugin_logic_bus_cmd_rData_id;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_rData_write;
-  reg        [31:0]   LsuCachelessPlugin_logic_bus_cmd_rData_address;
-  reg        [31:0]   LsuCachelessPlugin_logic_bus_cmd_rData_data;
-  reg        [1:0]    LsuCachelessPlugin_logic_bus_cmd_rData_size;
-  reg        [3:0]    LsuCachelessPlugin_logic_bus_cmd_rData_mask;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_rData_io;
-  reg                 LsuCachelessPlugin_logic_bus_cmd_rData_fromHart;
-  reg        [15:0]   LsuCachelessPlugin_logic_bus_cmd_rData_uopId;
-  wire                when_Stream_l399;
-  wire       [31:0]   LsuCachelessPlugin_pmaBuilder_addressBits;
-  wire       [2:0]    LsuCachelessPlugin_pmaBuilder_argsBits;
-  wire                LsuCachelessPlugin_pmaBuilder_onTransfers_0_addressHit;
-  wire                LsuCachelessPlugin_pmaBuilder_onTransfers_0_argsHit;
-  wire                LsuCachelessPlugin_pmaBuilder_onTransfers_0_hit;
-  wire                _zz_LsuCachelessPlugin_logic_onPma_port_rsp_fault;
   wire                _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0;
-  wire                _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0;
-  wire                _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1;
+  wire                _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0;
+  wire                _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1;
   wire                TrapPlugin_logic_initHold;
   reg                 decode_ctrls_1_up_LANE_SEL_0_regNext_1;
   wire                when_CtrlLaneApi_l50_2;
@@ -1721,34 +2231,40 @@ module VexiiRiscv (
   reg                 TrapPlugin_logic_harts_0_interrupt_validBuffer;
   wire                TrapPlugin_logic_harts_0_interrupt_pendingInterrupt;
   wire                when_TrapPlugin_l226;
-  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid;
-  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid;
-  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1;
-  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_2;
-  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_3;
   wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid;
+  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_valid;
+  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid;
+  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1;
+  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2;
+  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception;
   wire       [31:0]   TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_tval;
   wire       [3:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_code;
   wire       [1:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_arg;
-  wire       [3:0]    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception;
-  wire       [38:0]   _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception;
   wire       [31:0]   TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_tval;
   wire       [3:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_code;
   wire       [1:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_arg;
+  wire       [2:0]    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception;
+  wire       [38:0]   _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_exception;
   wire       [31:0]   TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_tval;
   wire       [3:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_code;
   wire       [1:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_arg;
-  wire       [2:0]    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh;
+  wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_valid;
+  wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_exception;
+  wire       [31:0]   TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_tval;
+  wire       [3:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_code;
+  wire       [1:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_arg;
+  wire       [3:0]    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh;
   wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_1;
   wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_2;
-  reg        [2:0]    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_3;
-  wire       [2:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_oh;
+  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_3;
+  reg        [3:0]    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_4;
+  wire       [3:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_oh;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_down_valid;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception;
   wire       [31:0]   TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_tval;
@@ -1974,18 +2490,20 @@ module VexiiRiscv (
   wire                execute_lane0_logic_completions_onCtrl_2_port_payload_commit;
   wire       [31:0]   execute_lane0_logic_decoding_decodingBits;
   wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
   wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
   wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1;
   wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2;
-  wire                _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1;
+  wire                _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0;
   wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1;
   wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2;
   wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3;
-  wire                _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3;
+  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4;
+  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5;
+  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2;
   wire                _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
+  wire                _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
   wire                _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0;
   wire                _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0;
   wire       [1:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
@@ -2002,6 +2520,8 @@ module VexiiRiscv (
   wire                when_ExecuteLanePlugin_l307;
   wire                when_ExecuteLanePlugin_l307_1;
   wire                when_ExecuteLanePlugin_l307_2;
+  wire                when_ExecuteLanePlugin_l307_3;
+  wire                when_ExecuteLanePlugin_l307_4;
   wire                WhiteboxerPlugin_logic_csr_port_valid;
   wire       [15:0]   WhiteboxerPlugin_logic_csr_port_payload_uopId;
   wire       [11:0]   WhiteboxerPlugin_logic_csr_port_payload_address;
@@ -2143,6 +2663,16 @@ module VexiiRiscv (
   wire                when_CtrlLink_l157;
   wire                when_StageLink_l67;
   wire                when_DecodePipelinePlugin_l70;
+  reg        [1:0]    LsuPlugin_logic_flusher_stateReg;
+  reg        [1:0]    LsuPlugin_logic_flusher_stateNext;
+  wire                when_LsuPlugin_l326;
+  wire                when_LsuPlugin_l334;
+  wire                LsuPlugin_logic_flusher_onExit_IDLE;
+  wire                LsuPlugin_logic_flusher_onExit_CMD;
+  wire                LsuPlugin_logic_flusher_onExit_COMPLETION;
+  wire                LsuPlugin_logic_flusher_onEntry_IDLE;
+  wire                LsuPlugin_logic_flusher_onEntry_CMD;
+  wire                LsuPlugin_logic_flusher_onEntry_COMPLETION;
   reg        [3:0]    TrapPlugin_logic_harts_0_trap_fsm_stateReg;
   reg        [3:0]    TrapPlugin_logic_harts_0_trap_fsm_stateNext;
   wire                when_TrapPlugin_l409;
@@ -2159,6 +2689,7 @@ module VexiiRiscv (
   wire                TrapPlugin_logic_harts_0_trap_fsm_onExit_XRET_EPC;
   wire                TrapPlugin_logic_harts_0_trap_fsm_onExit_XRET_APPLY;
   wire                TrapPlugin_logic_harts_0_trap_fsm_onExit_JUMP;
+  wire                TrapPlugin_logic_harts_0_trap_fsm_onExit_LSU_FLUSH;
   wire                TrapPlugin_logic_harts_0_trap_fsm_onExit_FETCH_FLUSH;
   wire                TrapPlugin_logic_harts_0_trap_fsm_onEntry_RESET;
   wire                TrapPlugin_logic_harts_0_trap_fsm_onEntry_RUNNING;
@@ -2170,6 +2701,7 @@ module VexiiRiscv (
   wire                TrapPlugin_logic_harts_0_trap_fsm_onEntry_XRET_EPC;
   wire                TrapPlugin_logic_harts_0_trap_fsm_onEntry_XRET_APPLY;
   wire                TrapPlugin_logic_harts_0_trap_fsm_onEntry_JUMP;
+  wire                TrapPlugin_logic_harts_0_trap_fsm_onEntry_LSU_FLUSH;
   wire                TrapPlugin_logic_harts_0_trap_fsm_onEntry_FETCH_FLUSH;
   reg        [1:0]    CsrAccessPlugin_logic_fsm_stateReg;
   reg        [1:0]    CsrAccessPlugin_logic_fsm_stateNext;
@@ -2194,6 +2726,8 @@ module VexiiRiscv (
   reg [79:0] execute_ctrl2_down_early0_EnvPlugin_OP_lane0_string;
   reg [31:0] execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string;
   reg [39:0] execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [95:0] LsuPlugin_logic_onAddress0_ls_port_payload_op_string;
+  reg [95:0] LsuPlugin_logic_onAddress0_flush_port_payload_op_string;
   reg [39:0] _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
   reg [39:0] _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string;
   reg [39:0] _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string;
@@ -2203,12 +2737,25 @@ module VexiiRiscv (
   reg [79:0] _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1_string;
   reg [79:0] _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2_string;
   reg [79:0] _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3_string;
+  reg [79:0] LsuPlugin_logic_flusher_stateReg_string;
+  reg [79:0] LsuPlugin_logic_flusher_stateNext_string;
   reg [87:0] TrapPlugin_logic_harts_0_trap_fsm_stateReg_string;
   reg [87:0] TrapPlugin_logic_harts_0_trap_fsm_stateNext_string;
   reg [79:0] CsrAccessPlugin_logic_fsm_stateReg_string;
   reg [79:0] CsrAccessPlugin_logic_fsm_stateNext_string;
   `endif
 
+  reg [7:0] LsuL1Plugin_logic_banks_0_mem_symbol0 [0:1023];
+  reg [7:0] LsuL1Plugin_logic_banks_0_mem_symbol1 [0:1023];
+  reg [7:0] LsuL1Plugin_logic_banks_0_mem_symbol2 [0:1023];
+  reg [7:0] LsuL1Plugin_logic_banks_0_mem_symbol3 [0:1023];
+  reg [7:0] _zz_LsuL1Plugin_logic_banks_0_memsymbol_read;
+  reg [7:0] _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_1;
+  reg [7:0] _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_2;
+  reg [7:0] _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_3;
+  reg [21:0] LsuL1Plugin_logic_ways_0_mem [0:63];
+  reg [0:0] LsuL1Plugin_logic_shared_mem [0:63];
+  reg [31:0] LsuL1Plugin_logic_writeback_victimBuffer [0:15];
   reg [31:0] FetchL1Plugin_logic_banks_0_mem [0:1023];
   reg [21:0] FetchL1Plugin_logic_ways_0_mem [0:63];
   reg [31:0] CsrRamPlugin_logic_mem [0:3];
@@ -2218,9 +2765,9 @@ module VexiiRiscv (
       zz_FetchL1Plugin_logic_trapPort_payload_arg[1 : 0] = 2'b10;
     end
   endfunction
-  wire [1:0] _zz_9;
+  wire [1:0] _zz_24;
 
-  assign _zz_when = (! FetchL1Plugin_logic_refill_slots_0_valid);
+  assign _zz_when_1 = (! FetchL1Plugin_logic_refill_slots_0_valid);
   assign _zz_early0_IntAluPlugin_logic_alu_result = (early0_IntAluPlugin_logic_alu_bitwise | _zz_early0_IntAluPlugin_logic_alu_result_1);
   assign _zz_early0_IntAluPlugin_logic_alu_result_1 = (execute_ctrl2_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 ? execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0 : 32'h0);
   assign _zz_early0_IntAluPlugin_logic_alu_result_2 = (execute_ctrl2_down_early0_IntAluPlugin_ALU_SLTX_lane0 ? _zz_early0_IntAluPlugin_logic_alu_result_3 : 32'h0);
@@ -2232,6 +2779,14 @@ module VexiiRiscv (
   assign _zz_early0_BarrelShifterPlugin_logic_shift_shifted = ($signed(_zz_early0_BarrelShifterPlugin_logic_shift_shifted_1) >>> early0_BarrelShifterPlugin_logic_shift_amplitude);
   assign _zz_early0_BarrelShifterPlugin_logic_shift_shifted_1 = {(execute_ctrl2_down_BarrelShifterPlugin_SIGNED_lane0 && execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[31]),early0_BarrelShifterPlugin_logic_shift_reversed};
   assign _zz_early0_BarrelShifterPlugin_logic_shift_patched = {early0_BarrelShifterPlugin_logic_shift_shifted[0],{early0_BarrelShifterPlugin_logic_shift_shifted[1],{early0_BarrelShifterPlugin_logic_shift_shifted[2],{early0_BarrelShifterPlugin_logic_shift_shifted[3],{early0_BarrelShifterPlugin_logic_shift_shifted[4],{early0_BarrelShifterPlugin_logic_shift_shifted[5],{early0_BarrelShifterPlugin_logic_shift_shifted[6],{early0_BarrelShifterPlugin_logic_shift_shifted[7],{early0_BarrelShifterPlugin_logic_shift_shifted[8],{_zz_early0_BarrelShifterPlugin_logic_shift_patched_1,{_zz_early0_BarrelShifterPlugin_logic_shift_patched_2,_zz_early0_BarrelShifterPlugin_logic_shift_patched_3}}}}}}}}}}};
+  assign _zz_LsuL1Plugin_logic_writeback_read_wordIndex_1 = LsuL1Plugin_logic_writeback_read_slotRead_valid;
+  assign _zz_LsuL1Plugin_logic_writeback_read_wordIndex = {3'd0, _zz_LsuL1Plugin_logic_writeback_read_wordIndex_1};
+  assign _zz_LsuL1Plugin_logic_writeback_write_wordIndex_1 = (LsuL1Plugin_logic_writeback_write_bufferRead_fire && 1'b1);
+  assign _zz_LsuL1Plugin_logic_writeback_write_wordIndex = {3'd0, _zz_LsuL1Plugin_logic_writeback_write_wordIndex_1};
+  assign _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback = (execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded & execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty);
+  assign _zz_LsuL1Plugin_logic_lsu_ctrl_doWrite = (_zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0 ? (1'b1 && (! execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault)) : 1'b0);
+  assign _zz_when = 1'b1;
+  assign _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty = 1'b0;
   assign _zz_execute_ctrl2_down_MUL_SRC1_lane0 = {(execute_ctrl2_down_RsUnsignedPlugin_RS1_SIGNED_lane0 && execute_ctrl2_up_integer_RS1_lane0[31]),execute_ctrl2_up_integer_RS1_lane0};
   assign _zz_execute_ctrl2_down_MUL_SRC2_lane0 = {(execute_ctrl2_down_RsUnsignedPlugin_RS2_SIGNED_lane0 && execute_ctrl2_up_integer_RS2_lane0[31]),execute_ctrl2_up_integer_RS2_lane0};
   assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_1 = ($signed(_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_2) * $signed(_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_3));
@@ -2272,10 +2827,19 @@ module VexiiRiscv (
   assign _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0_1 = 2'b00;
   assign _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 = {30'd0, _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0_1};
   assign _zz_FetchL1Plugin_logic_ctrl_dataAccessFault = (fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_error : 1'b0);
+  assign _zz_LsuPlugin_logic_onAddress0_ls_storeId_1 = LsuPlugin_logic_onAddress0_ls_port_fire;
+  assign _zz_LsuPlugin_logic_onAddress0_ls_storeId = {11'd0, _zz_LsuPlugin_logic_onAddress0_ls_storeId_1};
+  assign _zz_LsuPlugin_logic_onAddress0_flush_port_payload_address = ({6'd0,LsuPlugin_logic_flusher_cmdCounter} <<< 3'd6);
+  assign _zz_LsuPlugin_logic_trapPort_payload_code = (execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 ? (execute_ctrl4_down_LsuL1_STORE_lane0 ? 3'b110 : 3'b100) : 3'b000);
+  assign _zz_LsuPlugin_logic_flusher_cmdCounter = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
   assign _zz_WhiteboxerPlugin_logic_decodes_0_pc = {32'd0, decode_ctrls_0_down_PC_0};
   assign _zz_FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit = (|_zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io);
   assign _zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io_1 = (|_zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io);
   assign _zz_FetchL1WishbonePlugin_logic_bus_ADR = (FetchL1Plugin_logic_bus_cmd_payload_address >>> 3'd6);
+  assign _zz_LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit = (|_zz_LsuPlugin_logic_onPma_cached_rsp_io);
+  assign _zz_LsuPlugin_logic_onPma_cached_rsp_io_1 = (|_zz_LsuPlugin_logic_onPma_cached_rsp_io);
+  assign _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit = (|((LsuPlugin_pmaBuilder_io_addressBits & 32'h0) == 32'h0));
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_io = (|_zz_LsuPlugin_logic_onPma_io_rsp_fault);
   assign _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl1_down_Decode_UOP_lane0[31 : 20];
   assign _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0_1 = {execute_ctrl1_down_Decode_UOP_lane0[31 : 25],execute_ctrl1_down_Decode_UOP_lane0[11 : 7]};
   assign _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0 = ($signed(execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0) + $signed(early0_SrcPlugin_logic_addsub_combined_rs2Patched));
@@ -2286,11 +2850,6 @@ module VexiiRiscv (
   assign _zz_decode_ctrls_1_down_RS1_ENABLE_0 = (|{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000044) == 32'h0),{_zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0,{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00006004) == 32'h00002000),((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00005004) == 32'h00001000)}}});
   assign _zz_decode_ctrls_1_down_RS2_ENABLE_0 = (|{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000034) == 32'h00000020),((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000064) == 32'h00000020)});
   assign _zz_decode_ctrls_1_down_RD_ENABLE_0 = (|{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000048) == 32'h00000048),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001010) == 32'h00001010),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & _zz_decode_ctrls_1_down_RD_ENABLE_0_1) == 32'h00002010),{(_zz_decode_ctrls_1_down_RD_ENABLE_0_2 == _zz_decode_ctrls_1_down_RD_ENABLE_0_3),{_zz_decode_ctrls_1_down_RD_ENABLE_0_4,_zz_decode_ctrls_1_down_RD_ENABLE_0_5}}}}});
-  assign _zz_LsuCachelessPlugin_logic_trapPort_payload_code = (execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_MISS_ALIGNED_lane0 ? (execute_ctrl2_down_AguPlugin_STORE_lane0 ? 3'b110 : 3'b100) : 3'b000);
-  assign _zz_LsuCachelessPlugin_logic_onWb_rspShifted_2 = execute_ctrl4_down_early0_SrcPlugin_ADD_SUB_lane0[1 : 0];
-  assign _zz_LsuCachelessPlugin_logic_onWb_rspShifted_5 = execute_ctrl4_down_early0_SrcPlugin_ADD_SUB_lane0[1 : 1];
-  assign _zz_LsuCachelessPlugin_pmaBuilder_onTransfers_0_addressHit = (|((LsuCachelessPlugin_pmaBuilder_addressBits & 32'h0) == 32'h0));
-  assign _zz_LsuCachelessPlugin_logic_onPma_port_rsp_io = (|_zz_LsuCachelessPlugin_logic_onPma_port_rsp_fault);
   assign _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0 = _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0_1[0];
   assign _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0_1 = 1'b0;
   assign _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0 = _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0_1[0];
@@ -2300,11 +2859,15 @@ module VexiiRiscv (
   assign _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_1 = _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_2[0];
   assign _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_2 = (|{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000040) == 32'h00000040),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001010) == 32'h00001000),_zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0}});
   assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0_1[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0_1 = 1'b0;
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_2 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_3[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_3 = (|{_zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1,_zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0});
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1[0];
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
   assign _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0 = _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0_1[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0_1 = (|{_zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1,_zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0});
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1[0];
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_2 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_3[0];
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_3 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
   assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0_1[0];
   assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0_1 = (|_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0);
   assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_1 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_2[0];
@@ -2353,7 +2916,7 @@ module VexiiRiscv (
   assign _zz_execute_ctrl1_down_early0_BranchPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_BranchPlugin_SEL_lane0_1[0];
   assign _zz_execute_ctrl1_down_early0_BranchPlugin_SEL_lane0_1 = (|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0);
   assign _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0_1 = (|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0);
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h02004074) == 32'h02000030));
   assign _zz_execute_ctrl1_down_early0_DivPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_DivPlugin_SEL_lane0_1[0];
   assign _zz_execute_ctrl1_down_early0_DivPlugin_SEL_lane0_1 = (|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0);
   assign _zz_execute_ctrl1_down_early0_EnvPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_EnvPlugin_SEL_lane0_1[0];
@@ -2361,23 +2924,23 @@ module VexiiRiscv (
   assign _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0_1[0];
   assign _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1});
   assign _zz_execute_ctrl1_down_AguPlugin_SEL_lane0 = _zz_execute_ctrl1_down_AguPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_AguPlugin_SEL_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00000058) == 32'h0));
-  assign _zz_execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0 = _zz_execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0_1[0];
-  assign _zz_execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00001048) == 32'h00000008));
-  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_1 = _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_2[0];
-  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_2 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00000048) == 32'h00000048),{((execute_lane0_logic_decoding_decodingBits & 32'h00001010) == 32'h00001010),{((execute_lane0_logic_decoding_decodingBits & 32'h00002010) == 32'h00002010),{((execute_lane0_logic_decoding_decodingBits & _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_3) == 32'h00000010),{_zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0,(_zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_4 == _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_5)}}}}});
+  assign _zz_execute_ctrl1_down_AguPlugin_SEL_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0});
+  assign _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0 = _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0_1[0];
+  assign _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00001048) == 32'h00000008));
+  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0 = _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00000048) == 32'h00000048),{((execute_lane0_logic_decoding_decodingBits & 32'h00001010) == 32'h00001010),{((execute_lane0_logic_decoding_decodingBits & 32'h00002010) == 32'h00002010),{((execute_lane0_logic_decoding_decodingBits & 32'h00000050) == 32'h00000010),{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1,_zz_execute_ctrl1_down_AguPlugin_LOAD_lane0}}}}});
   assign _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0_1[0];
-  assign _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0_1 = (|{_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1}}}});
+  assign _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2}}}}});
   assign _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0_1[0];
-  assign _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0});
+  assign _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2}});
   assign _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0_1[0];
-  assign _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0}}});
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5[0];
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5 = (|{_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1}}}});
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3[0];
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0});
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_5[0];
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_5 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0}}});
+  assign _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0}});
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_6 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_7[0];
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_7 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2}}}}});
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_4[0];
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_4 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2}});
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4[0];
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0}});
   assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_1 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_2[0];
   assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_2 = (|{_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0,_zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0});
   assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0_1[0];
@@ -2396,6 +2959,10 @@ module VexiiRiscv (
   assign _zz_execute_ctrl1_down_BYPASSED_AT_3_lane0_1 = 1'b0;
   assign _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0_1[0];
   assign _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0_1 = 1'b0;
+  assign _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0 = _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0_1[0];
+  assign _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0_1 = (|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0);
+  assign _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0 = _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0_1[0];
+  assign _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0_1 = (|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0);
   assign _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0 = _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0_1[0];
   assign _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00002010) == 32'h00002000),((execute_lane0_logic_decoding_decodingBits & 32'h00005000) == 32'h00001000)});
   assign _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_1 = _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_2[0];
@@ -2416,14 +2983,16 @@ module VexiiRiscv (
   assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0_2 = (|_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0);
   assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_1 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_2[0];
   assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_2 = (|_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0);
-  assign _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0 = _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_1[0];
-  assign _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00000020) == 32'h0));
+  assign _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_1 = _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_2[0];
+  assign _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_2 = (|_zz_execute_ctrl1_down_AguPlugin_LOAD_lane0);
   assign _zz_execute_ctrl1_down_AguPlugin_STORE_lane0 = _zz_execute_ctrl1_down_AguPlugin_STORE_lane0_1[0];
   assign _zz_execute_ctrl1_down_AguPlugin_STORE_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00000020) == 32'h00000020));
   assign _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0 = _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0_1[0];
   assign _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0_1 = 1'b0;
   assign _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0 = _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0_1[0];
   assign _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0_1 = 1'b0;
+  assign _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0_1[0];
+  assign _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0_1 = 1'b0;
   assign _zz_WhiteboxerPlugin_logic_csr_access_payload_address = CsrAccessPlugin_logic_fsm_interface_uop;
   assign _zz__zz_WhiteboxerPlugin_logic_perf_executeFreezedCounter_1_1 = _zz_WhiteboxerPlugin_logic_perf_executeFreezedCounter;
   assign _zz__zz_WhiteboxerPlugin_logic_perf_executeFreezedCounter_1 = {59'd0, _zz__zz_WhiteboxerPlugin_logic_perf_executeFreezedCounter_1_1};
@@ -2437,10 +3006,15 @@ module VexiiRiscv (
   assign _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_0_1 = {59'd0, _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_0_1_1};
   assign _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1_1_1 = _zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1;
   assign _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1_1 = {59'd0, _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1_1_1};
+  assign _zz_LsuL1Plugin_logic_ways_0_mem_port = {LsuL1Plugin_logic_waysWrite_tag_fault,{LsuL1Plugin_logic_waysWrite_tag_address,LsuL1Plugin_logic_waysWrite_tag_loaded}};
+  assign _zz_LsuL1Plugin_logic_ways_0_mem_port_1 = LsuL1Plugin_logic_waysWrite_mask[0];
+  assign _zz_LsuL1Plugin_logic_writeback_victimBuffer_port = LsuL1Plugin_logic_writeback_read_slotReadLast_payload_wordIndex;
   assign _zz_FetchL1Plugin_logic_ways_0_mem_port = {FetchL1Plugin_logic_waysWrite_tag_address,{FetchL1Plugin_logic_waysWrite_tag_error,FetchL1Plugin_logic_waysWrite_tag_loaded}};
   assign _zz_FetchL1Plugin_logic_ways_0_mem_port_1 = FetchL1Plugin_logic_waysWrite_mask[0];
-  assign _zz_LsuCachelessPlugin_logic_onWb_rspShifted_1 = _zz_LsuCachelessPlugin_logic_onWb_rspShifted_2;
-  assign _zz_LsuCachelessPlugin_logic_onWb_rspShifted_4 = _zz_LsuCachelessPlugin_logic_onWb_rspShifted_5;
+  assign _zz_21 = _zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
+  assign _zz_23 = {_zz_13[2],{_zz_13[1],_zz_13[0]}};
+  assign _zz_LsuPlugin_logic_onCtrl_loadData_shited_1 = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[1 : 0];
+  assign _zz_LsuPlugin_logic_onCtrl_loadData_shited_3 = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[1 : 1];
   assign _zz_WhiteboxerPlugin_logic_perf_candidatesCount_1 = DispatchPlugin_logic_candidates_0_ctx_valid;
   assign _zz_WhiteboxerPlugin_logic_perf_dispatchFeedCount_1 = decode_ctrls_1_up_LANE_SEL_0;
   assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_1 = execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[9];
@@ -2490,45 +3064,90 @@ module VexiiRiscv (
   assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_3 = 1'b1;
   assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_4 = ((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0 && execute_ctrl1_up_RD_ENABLE_lane0) && (execute_ctrl1_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS2_PHYS));
   assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_5 = 1'b1;
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_2 && 1'b0);
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1 = (! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1 && 1'b0));
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_2 = (! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid && 1'b0));
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_3 = (! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_3 && 1'b0));
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_4 = (! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1 && _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_5));
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_6 = (! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid && _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_7));
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_8 = (! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_3 && _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_9));
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_10 = {(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_11),(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_12)};
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_13 = (! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_3 && _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_14));
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_15 = {(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_16),(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_17)};
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_5 = 1'b0;
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_7 = 1'b0;
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_9 = 1'b0;
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_11 = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_2 && 1'b0);
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_12 = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid && 1'b0);
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_14 = 1'b0;
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_16 = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_2 && 1'b0);
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_17 = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1 && 1'b0);
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_1 = {early0_EnvPlugin_logic_trapPort_payload_tval,early0_EnvPlugin_logic_trapPort_payload_exception};
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_2 = {LsuCachelessPlugin_logic_trapPort_payload_tval,LsuCachelessPlugin_logic_trapPort_payload_exception};
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_3 = {early0_BranchPlugin_logic_trapPort_payload_tval,early0_BranchPlugin_logic_trapPort_payload_exception};
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_4 = {CsrAccessPlugin_logic_trapPort_payload_tval,CsrAccessPlugin_logic_trapPort_payload_exception};
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception = TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception;
-  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_1 = TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception;
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception = 1'b0;
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1 = 1'b0;
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_2 = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2 && 1'b0);
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_3 = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid && 1'b0);
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_4 = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2 && 1'b0);
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_5 = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1 && 1'b0);
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1_1 = early0_EnvPlugin_logic_trapPort_payload_exception;
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1_2 = early0_BranchPlugin_logic_trapPort_payload_exception;
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception = {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_tval,TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception};
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_1 = {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_tval,TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception};
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_2 = {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_tval,TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_exception};
+  assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_3 = {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_tval,TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_exception};
   assign _zz_CsrAccessPlugin_logic_fsm_inject_implemented = COMB_CSR_3859;
   assign _zz_CsrAccessPlugin_logic_fsm_inject_implemented_1 = {COMB_CSR_3858,{COMB_CSR_3857,{COMB_CSR_1954,{COMB_CSR_1953,COMB_CSR_1952}}}};
   assign _zz_CsrAccessPlugin_logic_fsm_readLogic_csrValue_7 = 32'h40001100;
   assign _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_2 = 32'h02002050;
   assign _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_3 = 32'h02001050;
-  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_3 = 32'h00000050;
-  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_4 = (execute_lane0_logic_decoding_decodingBits & 32'h00000028);
-  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_5 = 32'h0;
   assign _zz_when_ExecuteLanePlugin_l307_2 = 1'b1;
   assign _zz_when_ExecuteLanePlugin_l307_2_1 = 1'b1;
   assign _zz_when_ExecuteLanePlugin_l307_2_2 = 1'b0;
   assign _zz_when_ExecuteLanePlugin_l307_2_3 = (1'b1 && early0_BranchPlugin_logic_flushPort_payload_self);
-  assign _zz_when_ExecuteLanePlugin_l307_2_4 = 1'b1;
-  assign _zz_when_ExecuteLanePlugin_l307_2_5 = 1'b0;
-  assign _zz_when_ExecuteLanePlugin_l307_2_6 = (1'b1 && LsuCachelessPlugin_logic_flushPort_payload_self);
+  always @(*) begin
+    LsuL1Plugin_logic_banks_0_mem_spinal_port1 = {_zz_LsuL1Plugin_logic_banks_0_memsymbol_read_3, _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_2, _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_1, _zz_LsuL1Plugin_logic_banks_0_memsymbol_read};
+  end
+  always @(posedge clk) begin
+    if(LsuL1Plugin_logic_banks_0_write_payload_mask[0] && LsuL1Plugin_logic_banks_0_write_valid) begin
+      LsuL1Plugin_logic_banks_0_mem_symbol0[LsuL1Plugin_logic_banks_0_write_payload_address] <= LsuL1Plugin_logic_banks_0_write_payload_data[7 : 0];
+    end
+    if(LsuL1Plugin_logic_banks_0_write_payload_mask[1] && LsuL1Plugin_logic_banks_0_write_valid) begin
+      LsuL1Plugin_logic_banks_0_mem_symbol1[LsuL1Plugin_logic_banks_0_write_payload_address] <= LsuL1Plugin_logic_banks_0_write_payload_data[15 : 8];
+    end
+    if(LsuL1Plugin_logic_banks_0_write_payload_mask[2] && LsuL1Plugin_logic_banks_0_write_valid) begin
+      LsuL1Plugin_logic_banks_0_mem_symbol2[LsuL1Plugin_logic_banks_0_write_payload_address] <= LsuL1Plugin_logic_banks_0_write_payload_data[23 : 16];
+    end
+    if(LsuL1Plugin_logic_banks_0_write_payload_mask[3] && LsuL1Plugin_logic_banks_0_write_valid) begin
+      LsuL1Plugin_logic_banks_0_mem_symbol3[LsuL1Plugin_logic_banks_0_write_payload_address] <= LsuL1Plugin_logic_banks_0_write_payload_data[31 : 24];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(LsuL1Plugin_logic_banks_0_read_cmd_valid) begin
+      _zz_LsuL1Plugin_logic_banks_0_memsymbol_read <= LsuL1Plugin_logic_banks_0_mem_symbol0[LsuL1Plugin_logic_banks_0_read_cmd_payload];
+      _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_1 <= LsuL1Plugin_logic_banks_0_mem_symbol1[LsuL1Plugin_logic_banks_0_read_cmd_payload];
+      _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_2 <= LsuL1Plugin_logic_banks_0_mem_symbol2[LsuL1Plugin_logic_banks_0_read_cmd_payload];
+      _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_3 <= LsuL1Plugin_logic_banks_0_mem_symbol3[LsuL1Plugin_logic_banks_0_read_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_LsuL1Plugin_logic_ways_0_mem_port_1) begin
+      LsuL1Plugin_logic_ways_0_mem[LsuL1Plugin_logic_waysWrite_address] <= _zz_LsuL1Plugin_logic_ways_0_mem_port;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(LsuL1Plugin_logic_ways_0_lsuRead_cmd_valid) begin
+      LsuL1Plugin_logic_ways_0_mem_spinal_port1 <= LsuL1Plugin_logic_ways_0_mem[LsuL1Plugin_logic_ways_0_lsuRead_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_4) begin
+      LsuL1Plugin_logic_shared_mem[LsuL1Plugin_logic_shared_write_payload_address] <= LsuL1Plugin_logic_shared_write_payload_data_dirty;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(LsuL1Plugin_logic_shared_lsuRead_cmd_valid) begin
+      LsuL1Plugin_logic_shared_mem_spinal_port1 <= LsuL1Plugin_logic_shared_mem[LsuL1Plugin_logic_shared_lsuRead_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_3) begin
+      LsuL1Plugin_logic_writeback_victimBuffer[_zz_LsuL1Plugin_logic_writeback_victimBuffer_port] <= LsuL1Plugin_logic_writeback_read_readedData;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(LsuL1Plugin_logic_writeback_write_bufferRead_ready) begin
+      LsuL1Plugin_logic_writeback_victimBuffer_spinal_port1 <= LsuL1Plugin_logic_writeback_victimBuffer[_zz_LsuL1Plugin_logic_writeback_write_word];
+    end
+  end
+
   always @(posedge clk) begin
     if(_zz_2) begin
       FetchL1Plugin_logic_banks_0_mem[FetchL1Plugin_logic_banks_0_write_payload_address] <= FetchL1Plugin_logic_banks_0_write_payload_data;
@@ -2580,9 +3199,72 @@ module VexiiRiscv (
     .clk                       (clk                                                              ), //i
     .reset                     (reset                                                            )  //i
   );
-  StreamArbiter streamArbiter_1 (
+  StreamArbiter LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter (
+    .io_inputs_0_valid                    (LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_valid                                   ), //i
+    .io_inputs_0_ready                    (LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_inputs_0_ready                       ), //o
+    .io_inputs_0_payload_last             (LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_last                            ), //i
+    .io_inputs_0_payload_fragment_write   (LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_fragment_write                  ), //i
+    .io_inputs_0_payload_fragment_address (LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_fragment_address[31:0]          ), //i
+    .io_inputs_1_valid                    (LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_valid                                  ), //i
+    .io_inputs_1_ready                    (LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_inputs_1_ready                       ), //o
+    .io_inputs_1_payload_last             (LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_payload_last                           ), //i
+    .io_inputs_1_payload_fragment_write   (LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_payload_fragment_write                 ), //i
+    .io_inputs_1_payload_fragment_address (LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_payload_fragment_address[31:0]         ), //i
+    .io_output_valid                      (LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_valid                         ), //o
+    .io_output_ready                      (LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_ready                         ), //i
+    .io_output_payload_last               (LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_payload_last                  ), //o
+    .io_output_payload_fragment_write     (LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_payload_fragment_write        ), //o
+    .io_output_payload_fragment_address   (LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_payload_fragment_address[31:0]), //o
+    .io_chosen                            (LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_chosen                               ), //o
+    .io_chosenOH                          (LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_chosenOH[1:0]                        ), //o
+    .clk                                  (clk                                                                                      ), //i
+    .reset                                (reset                                                                                    )  //i
+  );
+  StreamArbiter_1 LsuPlugin_logic_flusher_arbiter (
+    .io_inputs_0_valid (TrapPlugin_logic_lsuL1Invalidate_0_cmd_valid     ), //i
+    .io_inputs_0_ready (LsuPlugin_logic_flusher_arbiter_io_inputs_0_ready), //o
+    .io_output_valid   (LsuPlugin_logic_flusher_arbiter_io_output_valid  ), //o
+    .io_output_ready   (LsuPlugin_logic_flusher_arbiter_io_output_ready  ), //i
+    .io_chosenOH       (LsuPlugin_logic_flusher_arbiter_io_chosenOH      ), //o
+    .clk               (clk                                              ), //i
+    .reset             (reset                                            )  //i
+  );
+  StreamArbiter_2 LsuPlugin_logic_onAddress0_arbiter (
+    .io_inputs_0_valid           (LsuPlugin_logic_onAddress0_ls_port_valid                          ), //i
+    .io_inputs_0_ready           (LsuPlugin_logic_onAddress0_arbiter_io_inputs_0_ready              ), //o
+    .io_inputs_0_payload_op      (LsuPlugin_logic_onAddress0_ls_port_payload_op[2:0]                ), //i
+    .io_inputs_0_payload_address (LsuPlugin_logic_onAddress0_ls_port_payload_address[31:0]          ), //i
+    .io_inputs_0_payload_size    (LsuPlugin_logic_onAddress0_ls_port_payload_size[1:0]              ), //i
+    .io_inputs_0_payload_load    (LsuPlugin_logic_onAddress0_ls_port_payload_load                   ), //i
+    .io_inputs_0_payload_store   (LsuPlugin_logic_onAddress0_ls_port_payload_store                  ), //i
+    .io_inputs_0_payload_atomic  (LsuPlugin_logic_onAddress0_ls_port_payload_atomic                 ), //i
+    .io_inputs_0_payload_storeId (LsuPlugin_logic_onAddress0_ls_port_payload_storeId[11:0]          ), //i
+    .io_inputs_1_valid           (LsuPlugin_logic_onAddress0_flush_port_valid                       ), //i
+    .io_inputs_1_ready           (LsuPlugin_logic_onAddress0_arbiter_io_inputs_1_ready              ), //o
+    .io_inputs_1_payload_op      (LsuPlugin_logic_onAddress0_flush_port_payload_op[2:0]             ), //i
+    .io_inputs_1_payload_address (LsuPlugin_logic_onAddress0_flush_port_payload_address[31:0]       ), //i
+    .io_inputs_1_payload_size    (LsuPlugin_logic_onAddress0_flush_port_payload_size[1:0]           ), //i
+    .io_inputs_1_payload_load    (LsuPlugin_logic_onAddress0_flush_port_payload_load                ), //i
+    .io_inputs_1_payload_store   (LsuPlugin_logic_onAddress0_flush_port_payload_store               ), //i
+    .io_inputs_1_payload_atomic  (LsuPlugin_logic_onAddress0_flush_port_payload_atomic              ), //i
+    .io_inputs_1_payload_storeId (LsuPlugin_logic_onAddress0_flush_port_payload_storeId[11:0]       ), //i
+    .io_output_valid             (LsuPlugin_logic_onAddress0_arbiter_io_output_valid                ), //o
+    .io_output_ready             (LsuPlugin_logic_onAddress0_arbiter_io_output_ready                ), //i
+    .io_output_payload_op        (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op[2:0]      ), //o
+    .io_output_payload_address   (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_address[31:0]), //o
+    .io_output_payload_size      (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_size[1:0]    ), //o
+    .io_output_payload_load      (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_load         ), //o
+    .io_output_payload_store     (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_store        ), //o
+    .io_output_payload_atomic    (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_atomic       ), //o
+    .io_output_payload_storeId   (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_storeId[11:0]), //o
+    .io_chosen                   (LsuPlugin_logic_onAddress0_arbiter_io_chosen                      ), //o
+    .io_chosenOH                 (LsuPlugin_logic_onAddress0_arbiter_io_chosenOH[1:0]               ), //o
+    .clk                         (clk                                                               ), //i
+    .reset                       (reset                                                             )  //i
+  );
+  StreamArbiter_3 streamArbiter_4 (
     .io_inputs_0_valid                      (LearnPlugin_logic_buffered_0_valid                      ), //i
-    .io_inputs_0_ready                      (streamArbiter_1_io_inputs_0_ready                       ), //o
+    .io_inputs_0_ready                      (streamArbiter_4_io_inputs_0_ready                       ), //o
     .io_inputs_0_payload_pcOnLastSlice      (LearnPlugin_logic_buffered_0_payload_pcOnLastSlice[31:0]), //i
     .io_inputs_0_payload_pcTarget           (LearnPlugin_logic_buffered_0_payload_pcTarget[31:0]     ), //i
     .io_inputs_0_payload_taken              (LearnPlugin_logic_buffered_0_payload_taken              ), //i
@@ -2592,18 +3274,18 @@ module VexiiRiscv (
     .io_inputs_0_payload_wasWrong           (LearnPlugin_logic_buffered_0_payload_wasWrong           ), //i
     .io_inputs_0_payload_badPredictedTarget (LearnPlugin_logic_buffered_0_payload_badPredictedTarget ), //i
     .io_inputs_0_payload_uopId              (LearnPlugin_logic_buffered_0_payload_uopId[15:0]        ), //i
-    .io_output_valid                        (streamArbiter_1_io_output_valid                         ), //o
+    .io_output_valid                        (streamArbiter_4_io_output_valid                         ), //o
     .io_output_ready                        (LearnPlugin_logic_arbitrated_ready                      ), //i
-    .io_output_payload_pcOnLastSlice        (streamArbiter_1_io_output_payload_pcOnLastSlice[31:0]   ), //o
-    .io_output_payload_pcTarget             (streamArbiter_1_io_output_payload_pcTarget[31:0]        ), //o
-    .io_output_payload_taken                (streamArbiter_1_io_output_payload_taken                 ), //o
-    .io_output_payload_isBranch             (streamArbiter_1_io_output_payload_isBranch              ), //o
-    .io_output_payload_isPush               (streamArbiter_1_io_output_payload_isPush                ), //o
-    .io_output_payload_isPop                (streamArbiter_1_io_output_payload_isPop                 ), //o
-    .io_output_payload_wasWrong             (streamArbiter_1_io_output_payload_wasWrong              ), //o
-    .io_output_payload_badPredictedTarget   (streamArbiter_1_io_output_payload_badPredictedTarget    ), //o
-    .io_output_payload_uopId                (streamArbiter_1_io_output_payload_uopId[15:0]           ), //o
-    .io_chosenOH                            (streamArbiter_1_io_chosenOH                             ), //o
+    .io_output_payload_pcOnLastSlice        (streamArbiter_4_io_output_payload_pcOnLastSlice[31:0]   ), //o
+    .io_output_payload_pcTarget             (streamArbiter_4_io_output_payload_pcTarget[31:0]        ), //o
+    .io_output_payload_taken                (streamArbiter_4_io_output_payload_taken                 ), //o
+    .io_output_payload_isBranch             (streamArbiter_4_io_output_payload_isBranch              ), //o
+    .io_output_payload_isPush               (streamArbiter_4_io_output_payload_isPush                ), //o
+    .io_output_payload_isPop                (streamArbiter_4_io_output_payload_isPop                 ), //o
+    .io_output_payload_wasWrong             (streamArbiter_4_io_output_payload_wasWrong              ), //o
+    .io_output_payload_badPredictedTarget   (streamArbiter_4_io_output_payload_badPredictedTarget    ), //o
+    .io_output_payload_uopId                (streamArbiter_4_io_output_payload_uopId[15:0]           ), //o
+    .io_chosenOH                            (streamArbiter_4_io_chosenOH                             ), //o
     .clk                                    (clk                                                     ), //i
     .reset                                  (reset                                                   )  //i
   );
@@ -2622,33 +3304,38 @@ module VexiiRiscv (
     .reset               (reset                                                            )  //i
   );
   always @(*) begin
-    case(LsuCachelessPlugin_logic_onJoin_rspCounter_value)
-      1'b0 : begin
-        _zz_LsuCachelessPlugin_logic_onJoin_readerValid = LsuCachelessPlugin_logic_onJoin_buffers_0_valid;
-        _zz_LsuCachelessPlugin_logic_onJoin_rspPayload_error = LsuCachelessPlugin_logic_onJoin_buffers_0_payload_error;
-        _zz_LsuCachelessPlugin_logic_onJoin_rspPayload_data = LsuCachelessPlugin_logic_onJoin_buffers_0_payload_data;
-      end
-      default : begin
-        _zz_LsuCachelessPlugin_logic_onJoin_readerValid = LsuCachelessPlugin_logic_onJoin_buffers_1_valid;
-        _zz_LsuCachelessPlugin_logic_onJoin_rspPayload_error = LsuCachelessPlugin_logic_onJoin_buffers_1_payload_error;
-        _zz_LsuCachelessPlugin_logic_onJoin_rspPayload_data = LsuCachelessPlugin_logic_onJoin_buffers_1_payload_data;
-      end
+    case(_zz_21)
+      1'b0 : _zz_20 = 1'b0;
+      default : _zz_20 = 1'b1;
     endcase
   end
 
   always @(*) begin
-    case(_zz_LsuCachelessPlugin_logic_onWb_rspShifted_1)
-      2'b00 : _zz_LsuCachelessPlugin_logic_onWb_rspShifted = LsuCachelessPlugin_logic_onWb_rspSplits_0;
-      2'b01 : _zz_LsuCachelessPlugin_logic_onWb_rspShifted = LsuCachelessPlugin_logic_onWb_rspSplits_1;
-      2'b10 : _zz_LsuCachelessPlugin_logic_onWb_rspShifted = LsuCachelessPlugin_logic_onWb_rspSplits_2;
-      default : _zz_LsuCachelessPlugin_logic_onWb_rspShifted = LsuCachelessPlugin_logic_onWb_rspSplits_3;
+    case(_zz_23)
+      3'b000 : _zz_22 = 2'b00;
+      3'b001 : _zz_22 = 2'b01;
+      3'b010 : _zz_22 = 2'b01;
+      3'b011 : _zz_22 = 2'b10;
+      3'b100 : _zz_22 = 2'b01;
+      3'b101 : _zz_22 = 2'b10;
+      3'b110 : _zz_22 = 2'b10;
+      default : _zz_22 = 2'b11;
     endcase
   end
 
   always @(*) begin
-    case(_zz_LsuCachelessPlugin_logic_onWb_rspShifted_4)
-      1'b0 : _zz_LsuCachelessPlugin_logic_onWb_rspShifted_3 = LsuCachelessPlugin_logic_onWb_rspSplits_1;
-      default : _zz_LsuCachelessPlugin_logic_onWb_rspShifted_3 = LsuCachelessPlugin_logic_onWb_rspSplits_3;
+    case(_zz_LsuPlugin_logic_onCtrl_loadData_shited_1)
+      2'b00 : _zz_LsuPlugin_logic_onCtrl_loadData_shited = LsuPlugin_logic_onCtrl_loadData_splited_0;
+      2'b01 : _zz_LsuPlugin_logic_onCtrl_loadData_shited = LsuPlugin_logic_onCtrl_loadData_splited_1;
+      2'b10 : _zz_LsuPlugin_logic_onCtrl_loadData_shited = LsuPlugin_logic_onCtrl_loadData_splited_2;
+      default : _zz_LsuPlugin_logic_onCtrl_loadData_shited = LsuPlugin_logic_onCtrl_loadData_splited_3;
+    endcase
+  end
+
+  always @(*) begin
+    case(_zz_LsuPlugin_logic_onCtrl_loadData_shited_3)
+      1'b0 : _zz_LsuPlugin_logic_onCtrl_loadData_shited_2 = LsuPlugin_logic_onCtrl_loadData_splited_1;
+      default : _zz_LsuPlugin_logic_onCtrl_loadData_shited_2 = LsuPlugin_logic_onCtrl_loadData_splited_3;
     endcase
   end
 
@@ -2759,6 +3446,26 @@ module VexiiRiscv (
     endcase
   end
   always @(*) begin
+    case(LsuPlugin_logic_onAddress0_ls_port_payload_op)
+      LsuL1CmdOpcode_LSU : LsuPlugin_logic_onAddress0_ls_port_payload_op_string = "LSU         ";
+      LsuL1CmdOpcode_ACCESS_1 : LsuPlugin_logic_onAddress0_ls_port_payload_op_string = "ACCESS_1    ";
+      LsuL1CmdOpcode_STORE_BUFFER : LsuPlugin_logic_onAddress0_ls_port_payload_op_string = "STORE_BUFFER";
+      LsuL1CmdOpcode_FLUSH : LsuPlugin_logic_onAddress0_ls_port_payload_op_string = "FLUSH       ";
+      LsuL1CmdOpcode_PREFETCH : LsuPlugin_logic_onAddress0_ls_port_payload_op_string = "PREFETCH    ";
+      default : LsuPlugin_logic_onAddress0_ls_port_payload_op_string = "????????????";
+    endcase
+  end
+  always @(*) begin
+    case(LsuPlugin_logic_onAddress0_flush_port_payload_op)
+      LsuL1CmdOpcode_LSU : LsuPlugin_logic_onAddress0_flush_port_payload_op_string = "LSU         ";
+      LsuL1CmdOpcode_ACCESS_1 : LsuPlugin_logic_onAddress0_flush_port_payload_op_string = "ACCESS_1    ";
+      LsuL1CmdOpcode_STORE_BUFFER : LsuPlugin_logic_onAddress0_flush_port_payload_op_string = "STORE_BUFFER";
+      LsuL1CmdOpcode_FLUSH : LsuPlugin_logic_onAddress0_flush_port_payload_op_string = "FLUSH       ";
+      LsuL1CmdOpcode_PREFETCH : LsuPlugin_logic_onAddress0_flush_port_payload_op_string = "PREFETCH    ";
+      default : LsuPlugin_logic_onAddress0_flush_port_payload_op_string = "????????????";
+    endcase
+  end
+  always @(*) begin
     case(_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
       IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
       IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
@@ -2843,6 +3550,22 @@ module VexiiRiscv (
     endcase
   end
   always @(*) begin
+    case(LsuPlugin_logic_flusher_stateReg)
+      LsuPlugin_logic_flusher_IDLE : LsuPlugin_logic_flusher_stateReg_string = "IDLE      ";
+      LsuPlugin_logic_flusher_CMD : LsuPlugin_logic_flusher_stateReg_string = "CMD       ";
+      LsuPlugin_logic_flusher_COMPLETION : LsuPlugin_logic_flusher_stateReg_string = "COMPLETION";
+      default : LsuPlugin_logic_flusher_stateReg_string = "??????????";
+    endcase
+  end
+  always @(*) begin
+    case(LsuPlugin_logic_flusher_stateNext)
+      LsuPlugin_logic_flusher_IDLE : LsuPlugin_logic_flusher_stateNext_string = "IDLE      ";
+      LsuPlugin_logic_flusher_CMD : LsuPlugin_logic_flusher_stateNext_string = "CMD       ";
+      LsuPlugin_logic_flusher_COMPLETION : LsuPlugin_logic_flusher_stateNext_string = "COMPLETION";
+      default : LsuPlugin_logic_flusher_stateNext_string = "??????????";
+    endcase
+  end
+  always @(*) begin
     case(TrapPlugin_logic_harts_0_trap_fsm_stateReg)
       TrapPlugin_logic_harts_0_trap_fsm_RESET : TrapPlugin_logic_harts_0_trap_fsm_stateReg_string = "RESET      ";
       TrapPlugin_logic_harts_0_trap_fsm_RUNNING : TrapPlugin_logic_harts_0_trap_fsm_stateReg_string = "RUNNING    ";
@@ -2854,6 +3577,7 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC : TrapPlugin_logic_harts_0_trap_fsm_stateReg_string = "XRET_EPC   ";
       TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : TrapPlugin_logic_harts_0_trap_fsm_stateReg_string = "XRET_APPLY ";
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : TrapPlugin_logic_harts_0_trap_fsm_stateReg_string = "JUMP       ";
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : TrapPlugin_logic_harts_0_trap_fsm_stateReg_string = "LSU_FLUSH  ";
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : TrapPlugin_logic_harts_0_trap_fsm_stateReg_string = "FETCH_FLUSH";
       default : TrapPlugin_logic_harts_0_trap_fsm_stateReg_string = "???????????";
     endcase
@@ -2870,6 +3594,7 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC : TrapPlugin_logic_harts_0_trap_fsm_stateNext_string = "XRET_EPC   ";
       TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : TrapPlugin_logic_harts_0_trap_fsm_stateNext_string = "XRET_APPLY ";
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : TrapPlugin_logic_harts_0_trap_fsm_stateNext_string = "JUMP       ";
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : TrapPlugin_logic_harts_0_trap_fsm_stateNext_string = "LSU_FLUSH  ";
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : TrapPlugin_logic_harts_0_trap_fsm_stateNext_string = "FETCH_FLUSH";
       default : TrapPlugin_logic_harts_0_trap_fsm_stateNext_string = "???????????";
     endcase
@@ -2893,6 +3618,38 @@ module VexiiRiscv (
     endcase
   end
   `endif
+
+  assign execute_ctrl4_down_RD_ENABLE_lane0 = execute_ctrl4_RD_ENABLE_lane0_bypass;
+  always @(*) begin
+    execute_ctrl4_RD_ENABLE_lane0_bypass = execute_ctrl4_up_RD_ENABLE_lane0;
+    if(when_ExecuteLanePlugin_l307_4) begin
+      execute_ctrl4_RD_ENABLE_lane0_bypass = 1'b0;
+    end
+  end
+
+  assign execute_ctrl4_down_LANE_SEL_lane0 = execute_ctrl4_LANE_SEL_lane0_bypass;
+  always @(*) begin
+    execute_ctrl4_LANE_SEL_lane0_bypass = execute_ctrl4_up_LANE_SEL_lane0;
+    if(when_ExecuteLanePlugin_l307_4) begin
+      execute_ctrl4_LANE_SEL_lane0_bypass = 1'b0;
+    end
+  end
+
+  assign execute_ctrl3_down_RD_ENABLE_lane0 = execute_ctrl3_RD_ENABLE_lane0_bypass;
+  always @(*) begin
+    execute_ctrl3_RD_ENABLE_lane0_bypass = execute_ctrl3_up_RD_ENABLE_lane0;
+    if(when_ExecuteLanePlugin_l307_3) begin
+      execute_ctrl3_RD_ENABLE_lane0_bypass = 1'b0;
+    end
+  end
+
+  assign execute_ctrl3_down_LANE_SEL_lane0 = execute_ctrl3_LANE_SEL_lane0_bypass;
+  always @(*) begin
+    execute_ctrl3_LANE_SEL_lane0_bypass = execute_ctrl3_up_LANE_SEL_lane0;
+    if(when_ExecuteLanePlugin_l307_3) begin
+      execute_ctrl3_LANE_SEL_lane0_bypass = 1'b0;
+    end
+  end
 
   assign execute_ctrl2_down_RD_ENABLE_lane0 = execute_ctrl2_RD_ENABLE_lane0_bypass;
   always @(*) begin
@@ -2990,9 +3747,6 @@ module VexiiRiscv (
         execute_ctrl2_COMMIT_lane0_bypass = 1'b0;
       end
     end
-    if(when_LsuCachelessPlugin_l315) begin
-      execute_ctrl2_COMMIT_lane0_bypass = 1'b0;
-    end
     case(CsrAccessPlugin_logic_fsm_stateReg)
       CsrAccessPlugin_logic_fsm_READ : begin
       end
@@ -3021,9 +3775,6 @@ module VexiiRiscv (
     if(when_EnvPlugin_l119) begin
       execute_ctrl2_TRAP_lane0_bypass = 1'b1;
     end
-    if(when_LsuCachelessPlugin_l315) begin
-      execute_ctrl2_TRAP_lane0_bypass = 1'b1;
-    end
     if(CsrAccessPlugin_logic_fsm_inject_flushReg) begin
       execute_ctrl2_TRAP_lane0_bypass = 1'b1;
     end
@@ -3050,6 +3801,42 @@ module VexiiRiscv (
     endcase
   end
 
+  assign execute_ctrl4_down_COMMIT_lane0 = execute_ctrl4_COMMIT_lane0_bypass;
+  always @(*) begin
+    execute_ctrl4_COMMIT_lane0_bypass = execute_ctrl4_up_COMMIT_lane0;
+    if(when_LsuPlugin_l788) begin
+      if(LsuPlugin_logic_onCtrl_lsuTrap) begin
+        execute_ctrl4_COMMIT_lane0_bypass = 1'b0;
+      end
+    end
+  end
+
+  assign execute_ctrl4_down_TRAP_lane0 = execute_ctrl4_TRAP_lane0_bypass;
+  always @(*) begin
+    execute_ctrl4_TRAP_lane0_bypass = execute_ctrl4_up_TRAP_lane0;
+    if(when_LsuPlugin_l788) begin
+      if(LsuPlugin_logic_onCtrl_lsuTrap) begin
+        execute_ctrl4_TRAP_lane0_bypass = 1'b1;
+      end
+    end
+  end
+
+  assign execute_ctrl4_down_LsuL1_SEL_lane0 = execute_ctrl4_LsuL1_SEL_lane0_bypass;
+  always @(*) begin
+    execute_ctrl4_LsuL1_SEL_lane0_bypass = execute_ctrl4_up_LsuL1_SEL_lane0;
+    if(when_LsuPlugin_l497_1) begin
+      execute_ctrl4_LsuL1_SEL_lane0_bypass = 1'b0;
+    end
+  end
+
+  assign execute_ctrl3_down_LsuL1_SEL_lane0 = execute_ctrl3_LsuL1_SEL_lane0_bypass;
+  always @(*) begin
+    execute_ctrl3_LsuL1_SEL_lane0_bypass = execute_ctrl3_up_LsuL1_SEL_lane0;
+    if(when_LsuPlugin_l497) begin
+      execute_ctrl3_LsuL1_SEL_lane0_bypass = 1'b0;
+    end
+  end
+
   always @(*) begin
     _zz_fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l217 = 1'b0;
     if(when_FetchL1Plugin_l216) begin
@@ -3064,9 +3851,30 @@ module VexiiRiscv (
     end
   end
 
+  assign execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl3_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty;
+  always @(*) begin
+    _zz_3 = 1'b0;
+    if(LsuL1Plugin_logic_writeback_read_slotReadLast_valid) begin
+      _zz_3 = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    _zz_4 = 1'b0;
+    if(LsuL1Plugin_logic_shared_write_valid) begin
+      _zz_4 = 1'b1;
+    end
+  end
+
   assign AlignerPlugin_api_singleFetch = 1'b0;
   assign AlignerPlugin_api_haltIt = 1'b0;
-  assign DispatchPlugin_api_haltDispatch = 1'b0;
+  always @(*) begin
+    DispatchPlugin_api_haltDispatch = 1'b0;
+    if(LsuPlugin_logic_onCtrl_hartRegulation_valid) begin
+      DispatchPlugin_api_haltDispatch = 1'b1;
+    end
+  end
+
   assign CsrRamPlugin_api_holdRead = 1'b0;
   assign CsrRamPlugin_api_holdWrite = 1'b0;
   assign PrivilegedPlugin_api_harts_0_allowInterrupts = 1'b1;
@@ -3115,6 +3923,8 @@ module VexiiRiscv (
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
       default : begin
@@ -3151,6 +3961,8 @@ module VexiiRiscv (
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
       default : begin
@@ -3186,6 +3998,471 @@ module VexiiRiscv (
   assign execute_ctrl2_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0 = early0_BarrelShifterPlugin_logic_shift_patched;
   assign early0_BarrelShifterPlugin_logic_wb_valid = execute_ctrl2_down_early0_BarrelShifterPlugin_SEL_lane0;
   assign early0_BarrelShifterPlugin_logic_wb_payload = execute_ctrl2_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
+  always @(*) begin
+    LsuL1_ackUnlock = 1'b0;
+    if(LsuPlugin_logic_onCtrl_io_cmdSent) begin
+      LsuL1_ackUnlock = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_banksWrite_address = 10'bxxxxxxxxxx;
+    LsuL1Plugin_logic_banksWrite_address = {LsuL1Plugin_logic_refill_read_rspAddress[11 : 6],LsuL1Plugin_logic_refill_read_wordIndex};
+    if(LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win) begin
+      LsuL1Plugin_logic_banksWrite_address = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0[11 : 2];
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_banksWrite_writeData = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    LsuL1Plugin_logic_banksWrite_writeData = LsuL1Plugin_logic_bus_read_rsp_payload_data;
+    if(LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win) begin
+      LsuL1Plugin_logic_banksWrite_writeData[31 : 0] = execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_banksWrite_writeMask = 4'bxxxx;
+    LsuL1Plugin_logic_banksWrite_writeMask = 4'b1111;
+    if(LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win) begin
+      LsuL1Plugin_logic_banksWrite_writeMask = 4'b0000;
+      if(_zz_when[0]) begin
+        LsuL1Plugin_logic_banksWrite_writeMask[3 : 0] = execute_ctrl4_down_LsuL1_MASK_lane0;
+      end
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_preventSideEffects) begin
+      if(LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win) begin
+        LsuL1Plugin_logic_banksWrite_writeMask = 4'b0000;
+      end
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_waysWrite_mask = 1'b0;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      if(when_LsuL1Plugin_l463) begin
+        LsuL1Plugin_logic_waysWrite_mask[0] = 1'b1;
+      end
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_waysWrite_mask = LsuL1Plugin_logic_lsu_ctrl_needFlushOh;
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_preventSideEffects) begin
+      if(LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win) begin
+        LsuL1Plugin_logic_waysWrite_mask = 1'b0;
+      end
+    end
+    if(when_LsuL1Plugin_l1192) begin
+      LsuL1Plugin_logic_waysWrite_mask = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_waysWrite_address = 6'bxxxxxx;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      if(when_LsuL1Plugin_l463) begin
+        LsuL1Plugin_logic_waysWrite_address = LsuL1Plugin_logic_refill_read_rspAddress[11 : 6];
+      end
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_waysWrite_address = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+    end
+    if(when_LsuL1Plugin_l1192) begin
+      LsuL1Plugin_logic_waysWrite_address = LsuL1Plugin_logic_initializer_counter[5:0];
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_waysWrite_tag_loaded = 1'bx;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      if(when_LsuL1Plugin_l463) begin
+        LsuL1Plugin_logic_waysWrite_tag_loaded = 1'b1;
+      end
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_waysWrite_tag_loaded = 1'b1;
+    end
+    if(when_LsuL1Plugin_l1192) begin
+      LsuL1Plugin_logic_waysWrite_tag_loaded = 1'b0;
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_waysWrite_tag_address = 20'bxxxxxxxxxxxxxxxxxxxx;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      if(when_LsuL1Plugin_l463) begin
+        LsuL1Plugin_logic_waysWrite_tag_address = LsuL1Plugin_logic_refill_read_rspAddress[31 : 12];
+      end
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_waysWrite_tag_address = _zz_LsuL1Plugin_logic_waysWrite_tag_address;
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_waysWrite_tag_fault = 1'bx;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      if(when_LsuL1Plugin_l463) begin
+        LsuL1Plugin_logic_waysWrite_tag_fault = LsuL1Plugin_logic_refill_read_faulty;
+      end
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_waysWrite_tag_fault = execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+    end
+  end
+
+  assign LsuL1Plugin_logic_waysWrite_valid = (|LsuL1Plugin_logic_waysWrite_mask);
+  assign LsuL1Plugin_logic_banks_0_write_valid = LsuL1Plugin_logic_banksWrite_mask[0];
+  assign LsuL1Plugin_logic_banks_0_write_payload_address = LsuL1Plugin_logic_banksWrite_address;
+  assign LsuL1Plugin_logic_banks_0_write_payload_data = LsuL1Plugin_logic_banksWrite_writeData;
+  assign LsuL1Plugin_logic_banks_0_write_payload_mask = LsuL1Plugin_logic_banksWrite_writeMask;
+  assign LsuL1Plugin_logic_banks_0_read_rsp = LsuL1Plugin_logic_banks_0_mem_spinal_port1;
+  assign _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded = LsuL1Plugin_logic_ways_0_mem_spinal_port1;
+  assign LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded = _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded[0];
+  assign LsuL1Plugin_logic_ways_0_lsuRead_rsp_address = _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded[20 : 1];
+  assign LsuL1Plugin_logic_ways_0_lsuRead_rsp_fault = _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded[21];
+  assign LsuL1Plugin_logic_shared_lsuRead_rsp_dirty = LsuL1Plugin_logic_shared_mem_spinal_port1[0 : 0];
+  always @(*) begin
+    LsuL1Plugin_logic_refill_slots_0_loadedSet = 1'b0;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      if(when_LsuL1Plugin_l463) begin
+        LsuL1Plugin_logic_refill_slots_0_loadedSet = 1'b1;
+      end
+    end
+  end
+
+  assign LsuL1Plugin_logic_refill_slots_0_loadedDone = (LsuL1Plugin_logic_refill_slots_0_loadedCounter == 1'b1);
+  assign LsuL1Plugin_logic_refill_slots_0_free = ((! LsuL1Plugin_logic_refill_slots_0_valid) && 1'b1);
+  assign LsuL1Plugin_logic_refill_slots_0_fire = ((! execute_freeze_valid) && LsuL1Plugin_logic_refill_slots_0_loadedDone);
+  assign LsuL1Plugin_logic_refill_free = LsuL1Plugin_logic_refill_slots_0_free;
+  assign LsuL1Plugin_logic_refill_full = (&(! LsuL1Plugin_logic_refill_slots_0_free));
+  assign when_LsuL1Plugin_l377 = (LsuL1Plugin_logic_refill_push_valid && LsuL1Plugin_logic_refill_free[0]);
+  assign when_LsuL1Plugin_l381 = LsuL1Plugin_logic_refill_free[0];
+  assign LsuL1Plugin_logic_refill_read_arbiter_slotsWithId_0_0 = ((LsuL1Plugin_logic_refill_slots_0_valid && (! LsuL1Plugin_logic_refill_slots_0_cmdSent)) && (LsuL1Plugin_logic_refill_slots_0_victim == 1'b0));
+  assign LsuL1Plugin_logic_refill_read_arbiter_hits = LsuL1Plugin_logic_refill_read_arbiter_slotsWithId_0_0;
+  assign LsuL1Plugin_logic_refill_read_arbiter_hit = (|LsuL1Plugin_logic_refill_read_arbiter_hits);
+  always @(*) begin
+    LsuL1Plugin_logic_refill_read_arbiter_oh = (LsuL1Plugin_logic_refill_read_arbiter_hits & 1'b1);
+    if(when_LsuL1Plugin_l301) begin
+      LsuL1Plugin_logic_refill_read_arbiter_oh = LsuL1Plugin_logic_refill_read_arbiter_lock;
+    end
+  end
+
+  assign when_LsuL1Plugin_l301 = (|LsuL1Plugin_logic_refill_read_arbiter_lock);
+  assign LsuL1Plugin_logic_bus_read_cmd_fire = (LsuL1Plugin_logic_bus_read_cmd_valid && LsuL1Plugin_logic_bus_read_cmd_ready);
+  assign LsuL1Plugin_logic_refill_read_cmdAddress = {LsuL1Plugin_logic_refill_slots_0_address[31 : 6],6'h0};
+  assign LsuL1Plugin_logic_bus_read_cmd_valid = LsuL1Plugin_logic_refill_read_arbiter_hit;
+  assign LsuL1Plugin_logic_bus_read_cmd_payload_address = LsuL1Plugin_logic_refill_read_cmdAddress;
+  assign LsuL1Plugin_logic_refill_read_rspAddress = LsuL1Plugin_logic_refill_slots_0_address;
+  assign LsuL1Plugin_logic_refill_read_dirty = LsuL1Plugin_logic_refill_slots_0_dirty;
+  assign LsuL1Plugin_logic_refill_read_rspWithData = 1'b1;
+  always @(*) begin
+    LsuL1Plugin_logic_refill_read_writeReservation_take = 1'b0;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      LsuL1Plugin_logic_refill_read_writeReservation_take = 1'b1;
+    end
+  end
+
+  assign LsuL1Plugin_logic_refill_read_bankWriteNotif[0] = ((LsuL1Plugin_logic_bus_read_rsp_valid && LsuL1Plugin_logic_refill_read_rspWithData) && 1'b1);
+  always @(*) begin
+    LsuL1Plugin_logic_banksWrite_mask[0] = LsuL1Plugin_logic_refill_read_bankWriteNotif[0];
+    if(LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win) begin
+      if(when_LsuL1Plugin_l926) begin
+        LsuL1Plugin_logic_banksWrite_mask[0] = (1'b1 && LsuL1Plugin_logic_lsu_ctrl_doWrite);
+      end
+    end
+  end
+
+  assign when_LsuL1Plugin_l450 = (LsuL1Plugin_logic_bus_read_rsp_valid && LsuL1Plugin_logic_bus_read_rsp_payload_error);
+  always @(*) begin
+    LsuL1Plugin_logic_refill_read_fire = 1'b0;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      if(when_LsuL1Plugin_l463) begin
+        LsuL1Plugin_logic_refill_read_fire = 1'b1;
+      end
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_refill_read_reservation_take = 1'b0;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      if(when_LsuL1Plugin_l463) begin
+        LsuL1Plugin_logic_refill_read_reservation_take = 1'b1;
+      end
+    end
+  end
+
+  assign LsuL1Plugin_logic_refill_read_faulty = (LsuL1Plugin_logic_refill_read_hadError || LsuL1Plugin_logic_bus_read_rsp_payload_error);
+  always @(*) begin
+    LsuL1Plugin_logic_refillCompletions = 1'b0;
+    if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+      if(when_LsuL1Plugin_l463) begin
+        LsuL1Plugin_logic_refillCompletions[0] = 1'b1;
+      end
+    end
+  end
+
+  assign LsuL1Plugin_logic_bus_read_rsp_ready = 1'b1;
+  assign when_LsuL1Plugin_l463 = ((LsuL1Plugin_logic_refill_read_wordIndex == 4'b1111) || (! LsuL1Plugin_logic_refill_read_rspWithData));
+  assign LsuL1_REFILL_BUSY = ((! LsuL1Plugin_logic_refill_slots_0_loaded) && (! LsuL1Plugin_logic_refill_slots_0_loadedSet));
+  always @(*) begin
+    LsuL1Plugin_logic_writeback_slots_0_fire = 1'b0;
+    if(LsuL1Plugin_logic_bus_write_rsp_valid) begin
+      LsuL1Plugin_logic_writeback_slots_0_fire = 1'b1;
+    end
+  end
+
+  assign LsuL1Plugin_logic_writeback_slots_0_timer_done = (LsuL1Plugin_logic_writeback_slots_0_timer_counter == 1'b1);
+  assign when_LsuL1Plugin_l530 = (LsuL1Plugin_logic_writeback_slots_0_timer_done && (LsuL1Plugin_logic_writeback_slots_0_fire || (! LsuL1Plugin_logic_writeback_slots_0_busy)));
+  assign LsuL1Plugin_logic_writeback_slots_0_free = (! LsuL1Plugin_logic_writeback_slots_0_valid);
+  assign LsuL1_WRITEBACK_BUSY = (LsuL1Plugin_logic_writeback_slots_0_valid || LsuL1Plugin_logic_writeback_slots_0_fire);
+  assign LsuL1Plugin_logic_writebackBusy = (|LsuL1Plugin_logic_writeback_slots_0_valid);
+  assign LsuL1Plugin_logic_writeback_free = LsuL1Plugin_logic_writeback_slots_0_free;
+  assign LsuL1Plugin_logic_writeback_full = (&(! LsuL1Plugin_logic_writeback_slots_0_free));
+  always @(*) begin
+    LsuL1Plugin_logic_writeback_push_valid = 1'b0;
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_writeback_push_valid = 1'b1;
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_doRefill) begin
+      LsuL1Plugin_logic_writeback_push_valid = LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback;
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_preventSideEffects) begin
+      LsuL1Plugin_logic_writeback_push_valid = 1'b0;
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_writeback_push_payload_address = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_writeback_push_payload_address = ({6'd0,{_zz_LsuL1Plugin_logic_waysWrite_tag_address,execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]}} <<< 3'd6);
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_doRefill) begin
+      LsuL1Plugin_logic_writeback_push_payload_address = ({6'd0,{execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address,execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]}} <<< 3'd6);
+    end
+  end
+
+  assign when_LsuL1Plugin_l556 = (LsuL1Plugin_logic_writeback_free[0] && LsuL1Plugin_logic_writeback_push_valid);
+  assign when_LsuL1Plugin_l561 = LsuL1Plugin_logic_writeback_free[0];
+  assign LsuL1Plugin_logic_writeback_read_arbiter_slotsWithId_0_0 = (LsuL1Plugin_logic_writeback_slots_0_valid && (! LsuL1Plugin_logic_writeback_slots_0_readCmdDone));
+  assign LsuL1Plugin_logic_writeback_read_arbiter_hits = LsuL1Plugin_logic_writeback_read_arbiter_slotsWithId_0_0;
+  assign LsuL1Plugin_logic_writeback_read_arbiter_hit = (|LsuL1Plugin_logic_writeback_read_arbiter_hits);
+  always @(*) begin
+    LsuL1Plugin_logic_writeback_read_arbiter_oh = (LsuL1Plugin_logic_writeback_read_arbiter_hits & 1'b1);
+    if(when_LsuL1Plugin_l301_1) begin
+      LsuL1Plugin_logic_writeback_read_arbiter_oh = LsuL1Plugin_logic_writeback_read_arbiter_lock;
+    end
+  end
+
+  assign when_LsuL1Plugin_l301_1 = (|LsuL1Plugin_logic_writeback_read_arbiter_lock);
+  assign LsuL1Plugin_logic_writeback_read_address = LsuL1Plugin_logic_writeback_slots_0_address;
+  assign LsuL1Plugin_logic_writeback_read_slotRead_valid = LsuL1Plugin_logic_writeback_read_arbiter_hit;
+  assign LsuL1Plugin_logic_writeback_read_slotRead_payload_wordIndex = LsuL1Plugin_logic_writeback_read_wordIndex;
+  assign LsuL1Plugin_logic_writeback_read_slotRead_payload_last = (LsuL1Plugin_logic_writeback_read_wordIndex == 4'b1111);
+  assign when_LsuL1Plugin_l605 = (LsuL1Plugin_logic_writeback_read_slotRead_valid && LsuL1Plugin_logic_writeback_read_slotRead_payload_last);
+  always @(*) begin
+    LsuL1Plugin_logic_banks_0_read_cmd_valid = LsuL1Plugin_logic_banks_0_usedByWriteback;
+    if(when_LsuL1Plugin_l718) begin
+      LsuL1Plugin_logic_banks_0_read_cmd_valid = 1'b1;
+    end
+  end
+
+  assign LsuL1Plugin_logic_banks_0_usedByWriteback = (LsuL1Plugin_logic_writeback_read_slotRead_valid && 1'b1);
+  always @(*) begin
+    LsuL1Plugin_logic_banks_0_read_cmd_payload = {LsuL1Plugin_logic_writeback_read_address[11 : 6],LsuL1Plugin_logic_writeback_read_wordIndex};
+    if(when_LsuL1Plugin_l719) begin
+      LsuL1Plugin_logic_banks_0_read_cmd_payload = LsuL1Plugin_logic_lsu_rb0_readAddress;
+    end
+  end
+
+  assign LsuL1Plugin_logic_writeback_read_readedData = LsuL1Plugin_logic_banks_0_read_rsp;
+  assign LsuL1Plugin_logic_writeback_write_arbiter_slotsWithId_0_0 = ((LsuL1Plugin_logic_writeback_slots_0_valid && LsuL1Plugin_logic_writeback_slots_0_victimBufferReady) && (! LsuL1Plugin_logic_writeback_slots_0_writeCmdDone));
+  assign LsuL1Plugin_logic_writeback_write_arbiter_hits = LsuL1Plugin_logic_writeback_write_arbiter_slotsWithId_0_0;
+  assign LsuL1Plugin_logic_writeback_write_arbiter_hit = (|LsuL1Plugin_logic_writeback_write_arbiter_hits);
+  always @(*) begin
+    LsuL1Plugin_logic_writeback_write_arbiter_oh = (LsuL1Plugin_logic_writeback_write_arbiter_hits & 1'b1);
+    if(when_LsuL1Plugin_l301_2) begin
+      LsuL1Plugin_logic_writeback_write_arbiter_oh = LsuL1Plugin_logic_writeback_write_arbiter_lock;
+    end
+  end
+
+  assign when_LsuL1Plugin_l301_2 = (|LsuL1Plugin_logic_writeback_write_arbiter_lock);
+  assign LsuL1Plugin_logic_writeback_write_last = (LsuL1Plugin_logic_writeback_write_wordIndex == 4'b1111);
+  assign LsuL1Plugin_logic_writeback_write_bufferRead_valid = LsuL1Plugin_logic_writeback_write_arbiter_hit;
+  assign LsuL1Plugin_logic_writeback_write_bufferRead_payload_last = LsuL1Plugin_logic_writeback_write_last;
+  assign LsuL1Plugin_logic_writeback_write_bufferRead_payload_address = LsuL1Plugin_logic_writeback_slots_0_address;
+  assign LsuL1Plugin_logic_writeback_write_bufferRead_fire = (LsuL1Plugin_logic_writeback_write_bufferRead_valid && LsuL1Plugin_logic_writeback_write_bufferRead_ready);
+  assign when_LsuL1Plugin_l676 = (LsuL1Plugin_logic_writeback_write_bufferRead_fire && LsuL1Plugin_logic_writeback_write_last);
+  always @(*) begin
+    LsuL1Plugin_logic_writeback_write_bufferRead_ready = LsuL1Plugin_logic_writeback_write_cmd_ready;
+    if(when_Stream_l399) begin
+      LsuL1Plugin_logic_writeback_write_bufferRead_ready = 1'b1;
+    end
+  end
+
+  assign when_Stream_l399 = (! LsuL1Plugin_logic_writeback_write_cmd_valid);
+  assign LsuL1Plugin_logic_writeback_write_cmd_valid = LsuL1Plugin_logic_writeback_write_bufferRead_rValid;
+  assign LsuL1Plugin_logic_writeback_write_cmd_payload_address = LsuL1Plugin_logic_writeback_write_bufferRead_rData_address;
+  assign LsuL1Plugin_logic_writeback_write_cmd_payload_last = LsuL1Plugin_logic_writeback_write_bufferRead_rData_last;
+  assign _zz_LsuL1Plugin_logic_writeback_write_word = LsuL1Plugin_logic_writeback_write_wordIndex;
+  assign LsuL1Plugin_logic_writeback_write_word = LsuL1Plugin_logic_writeback_victimBuffer_spinal_port1;
+  assign LsuL1Plugin_logic_bus_write_cmd_valid = LsuL1Plugin_logic_writeback_write_cmd_valid;
+  assign LsuL1Plugin_logic_writeback_write_cmd_ready = LsuL1Plugin_logic_bus_write_cmd_ready;
+  assign LsuL1Plugin_logic_bus_write_cmd_payload_fragment_address = LsuL1Plugin_logic_writeback_write_cmd_payload_address;
+  assign LsuL1Plugin_logic_bus_write_cmd_payload_fragment_data = LsuL1Plugin_logic_writeback_write_word;
+  assign LsuL1Plugin_logic_bus_write_cmd_payload_last = LsuL1Plugin_logic_writeback_write_cmd_payload_last;
+  assign LsuL1Plugin_logic_lsu_rb0_readAddress = execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[11 : 2];
+  assign execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0[0] = LsuL1Plugin_logic_banks_0_usedByWriteback;
+  assign when_LsuL1Plugin_l718 = (! execute_freeze_valid);
+  assign when_LsuL1Plugin_l719 = (! LsuL1Plugin_logic_banks_0_usedByWriteback);
+  assign when_LsuL1Plugin_l735 = (! execute_freeze_valid);
+  assign execute_ctrl3_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0 = LsuL1Plugin_logic_banks_0_read_rsp;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0[0] = (execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_lane0[0] || LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg);
+  assign execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 = execute_ctrl3_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0[31 : 0];
+  assign _zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0 = execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0[0];
+  assign execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0 = (_zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0 ? execute_ctrl4_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 : 32'h0);
+  always @(*) begin
+    execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0[0] = ((execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 && (execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0[31 : 2] == execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 2])) && (|(execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 & execute_ctrl3_down_LsuL1_MASK_lane0)));
+    execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0[1] = ((execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 && (execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0[31 : 2] == execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 2])) && (|(execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 & execute_ctrl3_down_LsuL1_MASK_lane0)));
+  end
+
+  assign LsuL1Plugin_logic_shared_lsuRead_cmd_valid = (! execute_freeze_valid);
+  assign LsuL1Plugin_logic_shared_lsuRead_cmd_payload = execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+  assign execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0 = (LsuL1Plugin_logic_shared_write_valid && (LsuL1Plugin_logic_shared_write_payload_address == execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]));
+  assign execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty = LsuL1Plugin_logic_shared_write_payload_data_dirty;
+  assign LsuL1Plugin_logic_ways_0_lsuRead_cmd_valid = (! execute_freeze_valid);
+  assign LsuL1Plugin_logic_ways_0_lsuRead_cmd_payload = execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+  always @(*) begin
+    execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty = LsuL1Plugin_logic_shared_lsuRead_rsp_dirty;
+    if(execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0) begin
+      execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+    end
+  end
+
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded = LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address = LsuL1Plugin_logic_ways_0_lsuRead_rsp_address;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault = LsuL1Plugin_logic_ways_0_lsuRead_rsp_fault;
+  assign LsuL1Plugin_logic_lsu_sharedBypassers_0_hit = (LsuL1Plugin_logic_shared_write_valid && (LsuL1Plugin_logic_shared_write_payload_address == execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]));
+  assign execute_ctrl3_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty = (LsuL1Plugin_logic_lsu_sharedBypassers_0_hit ? LsuL1Plugin_logic_shared_write_payload_data_dirty : execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty);
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0[0] = (execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded && (execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address == execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 12]));
+  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0 = (|execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0);
+  assign execute_ctrl4_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0 = (execute_ctrl4_down_LsuL1_STORE_lane0 || execute_ctrl4_down_LsuL1_ATOMIC_lane0);
+  always @(*) begin
+    LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_take = 1'b0;
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_take = 1'b1;
+    end
+  end
+
+  assign LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_take = 1'b0;
+  assign LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback = _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback[0];
+  assign LsuL1Plugin_logic_lsu_ctrl_refillHazards = (LsuL1Plugin_logic_refill_slots_0_valid && (LsuL1Plugin_logic_refill_slots_0_address[11 : 6] == execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0[11 : 6]));
+  assign LsuL1Plugin_logic_lsu_ctrl_writebackHazards = (LsuL1Plugin_logic_writeback_slots_0_valid && (LsuL1Plugin_logic_writeback_slots_0_address[11 : 6] == execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0[11 : 6]));
+  assign LsuL1Plugin_logic_lsu_ctrl_refillHazard = (|LsuL1Plugin_logic_lsu_ctrl_refillHazards);
+  assign LsuL1Plugin_logic_lsu_ctrl_writebackHazard = (|LsuL1Plugin_logic_lsu_ctrl_writebackHazards);
+  assign LsuL1Plugin_logic_lsu_ctrl_wasDirty = (|(execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty & execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0));
+  assign LsuL1Plugin_logic_lsu_ctrl_loadedDirties = (execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded & execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty);
+  assign LsuL1Plugin_logic_lsu_ctrl_refillWayWasDirty = LsuL1Plugin_logic_lsu_ctrl_loadedDirties[0];
+  assign LsuL1Plugin_logic_lsu_ctrl_writeToReadHazard = (|execute_ctrl4_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0);
+  assign LsuL1Plugin_logic_lsu_ctrl_bankNotRead = (|(execute_ctrl4_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0 & execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0));
+  assign LsuL1Plugin_logic_lsu_ctrl_loadHazard = ((execute_ctrl4_down_LsuL1_LOAD_lane0 && (! execute_ctrl4_down_LsuL1_PREFETCH_lane0)) && (LsuL1Plugin_logic_lsu_ctrl_bankNotRead || LsuL1Plugin_logic_lsu_ctrl_writeToReadHazard));
+  assign LsuL1Plugin_logic_lsu_ctrl_storeHazard = ((execute_ctrl4_down_LsuL1_STORE_lane0 && (! execute_ctrl4_down_LsuL1_PREFETCH_lane0)) && (! LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win));
+  assign LsuL1Plugin_logic_lsu_ctrl_flushHazard = (execute_ctrl4_down_LsuL1_FLUSH_lane0 && (! LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win));
+  assign LsuL1Plugin_logic_lsu_ctrl_coherencyHazard = 1'b0;
+  assign execute_ctrl4_down_LsuL1Plugin_logic_HAZARD_FORCED_lane0 = 1'b0;
+  assign execute_ctrl4_down_LsuL1_HAZARD_lane0 = (((((LsuL1Plugin_logic_lsu_ctrl_hazardReg || LsuL1Plugin_logic_lsu_ctrl_loadHazard) || LsuL1Plugin_logic_lsu_ctrl_refillHazard) || LsuL1Plugin_logic_lsu_ctrl_storeHazard) || LsuL1Plugin_logic_lsu_ctrl_coherencyHazard) || execute_ctrl4_down_LsuL1Plugin_logic_HAZARD_FORCED_lane0);
+  assign execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0 = (LsuL1Plugin_logic_lsu_ctrl_flushHazardReg || LsuL1Plugin_logic_lsu_ctrl_flushHazard);
+  assign execute_ctrl4_down_LsuL1_MISS_lane0 = (! execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0);
+  assign execute_ctrl4_down_LsuL1_FAULT_lane0 = ((execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0 && (|(execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0 & execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault))) && (! execute_ctrl4_down_LsuL1_FLUSH_lane0));
+  assign execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0 = ((execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0 && execute_ctrl4_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0) && 1'b0);
+  assign execute_ctrl4_down_LsuL1_REFILL_HIT_lane0 = LsuL1Plugin_logic_lsu_ctrl_refillHazard;
+  assign LsuL1Plugin_logic_lsu_ctrl_canRefill = (((! (LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback && LsuL1Plugin_logic_writeback_full)) && (! LsuL1Plugin_logic_refill_full)) && (! LsuL1Plugin_logic_lsu_ctrl_writebackHazard));
+  assign LsuL1Plugin_logic_lsu_ctrl_canFlush = (((LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win && (! LsuL1Plugin_logic_writeback_full)) && (! (|LsuL1Plugin_logic_refill_slots_0_valid))) && (! LsuL1Plugin_logic_lsu_ctrl_writebackHazard));
+  assign LsuL1Plugin_logic_lsu_ctrl_needFlushs = LsuL1Plugin_logic_lsu_ctrl_loadedDirties;
+  assign LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0 = LsuL1Plugin_logic_lsu_ctrl_needFlushs[0];
+  assign _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushOh[0] = (LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0 && (! 1'b0));
+  assign LsuL1Plugin_logic_lsu_ctrl_needFlushOh = _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushOh;
+  assign LsuL1Plugin_logic_lsu_ctrl_isAccess = (! execute_ctrl4_down_LsuL1_FLUSH_lane0);
+  assign LsuL1Plugin_logic_lsu_ctrl_askRefill = ((LsuL1Plugin_logic_lsu_ctrl_isAccess && execute_ctrl4_down_LsuL1_MISS_lane0) && LsuL1Plugin_logic_lsu_ctrl_canRefill);
+  assign LsuL1Plugin_logic_lsu_ctrl_askUpgrade = ((LsuL1Plugin_logic_lsu_ctrl_isAccess && execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0) && LsuL1Plugin_logic_lsu_ctrl_canRefill);
+  assign LsuL1Plugin_logic_lsu_ctrl_askFlush = ((execute_ctrl4_down_LsuL1_FLUSH_lane0 && LsuL1Plugin_logic_lsu_ctrl_canFlush) && (|LsuL1Plugin_logic_lsu_ctrl_needFlushs));
+  assign LsuL1Plugin_logic_lsu_ctrl_doRefill = (execute_ctrl4_down_LsuL1_SEL_lane0 && LsuL1Plugin_logic_lsu_ctrl_askRefill);
+  assign LsuL1Plugin_logic_lsu_ctrl_doUpgrade = (execute_ctrl4_down_LsuL1_SEL_lane0 && LsuL1Plugin_logic_lsu_ctrl_askUpgrade);
+  assign LsuL1Plugin_logic_lsu_ctrl_doFlush = (execute_ctrl4_down_LsuL1_SEL_lane0 && LsuL1Plugin_logic_lsu_ctrl_askFlush);
+  assign LsuL1Plugin_logic_lsu_ctrl_doWrite = ((((execute_ctrl4_down_LsuL1_SEL_lane0 && execute_ctrl4_down_LsuL1_STORE_lane0) && execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0) && _zz_LsuL1Plugin_logic_lsu_ctrl_doWrite[0]) && (! execute_ctrl4_down_LsuL1_SKIP_WRITE_lane0));
+  assign LsuL1Plugin_logic_lsu_ctrl_doRefillPush = (LsuL1Plugin_logic_lsu_ctrl_doRefill || LsuL1Plugin_logic_lsu_ctrl_doUpgrade);
+  always @(*) begin
+    LsuL1Plugin_logic_refill_push_valid = LsuL1Plugin_logic_lsu_ctrl_doRefillPush;
+    if(LsuL1Plugin_logic_lsu_ctrl_preventSideEffects) begin
+      LsuL1Plugin_logic_refill_push_valid = 1'b0;
+    end
+  end
+
+  assign LsuL1Plugin_logic_refill_push_payload_address = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  assign LsuL1Plugin_logic_refill_push_payload_unique = execute_ctrl4_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0;
+  assign LsuL1Plugin_logic_refill_push_payload_data = LsuL1Plugin_logic_lsu_ctrl_askRefill;
+  always @(*) begin
+    LsuL1Plugin_logic_refill_push_payload_victim = ((LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback && LsuL1Plugin_logic_lsu_ctrl_refillWayWasDirty) ? LsuL1Plugin_logic_writeback_free : 1'b0);
+    if(LsuL1Plugin_logic_lsu_ctrl_askUpgrade) begin
+      LsuL1Plugin_logic_refill_push_payload_victim = 1'b0;
+    end
+  end
+
+  assign LsuL1Plugin_logic_refill_push_payload_dirty = execute_ctrl4_down_LsuL1_STORE_lane0;
+  assign execute_ctrl4_down_LsuL1_WAIT_REFILL_lane0 = (LsuL1Plugin_logic_lsu_ctrl_refillHazards | (((! execute_ctrl4_down_LsuL1_HAZARD_lane0) && (LsuL1Plugin_logic_lsu_ctrl_askRefill || LsuL1Plugin_logic_lsu_ctrl_askUpgrade)) ? (LsuL1Plugin_logic_refill_full ? 1'b1 : LsuL1Plugin_logic_refill_free) : 1'b0));
+  assign execute_ctrl4_down_LsuL1_WAIT_WRITEBACK_lane0 = 1'b0;
+  assign when_LsuL1Plugin_l912 = (execute_ctrl4_down_LsuL1_SEL_lane0 && (! execute_ctrl4_down_LsuL1_ABORD_lane0));
+  assign _zz_13 = {LsuL1Plugin_logic_lsu_ctrl_askRefill,{LsuL1Plugin_logic_lsu_ctrl_doUpgrade,LsuL1Plugin_logic_lsu_ctrl_doFlush}};
+  always @(*) begin
+    LsuL1Plugin_logic_shared_write_valid = 1'b0;
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_shared_write_valid = 1'b1;
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_doRefill) begin
+      LsuL1Plugin_logic_shared_write_valid = 1'b1;
+    end
+    if(when_LsuL1Plugin_l991) begin
+      LsuL1Plugin_logic_shared_write_valid = 1'b1;
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_preventSideEffects) begin
+      LsuL1Plugin_logic_shared_write_valid = 1'b0;
+    end
+    if(when_LsuL1Plugin_l1192) begin
+      LsuL1Plugin_logic_shared_write_valid = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_shared_write_payload_address = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+    if(when_LsuL1Plugin_l1192) begin
+      LsuL1Plugin_logic_shared_write_payload_address = LsuL1Plugin_logic_initializer_counter[5:0];
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_shared_write_payload_data_dirty = ((execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty | (LsuL1Plugin_logic_lsu_ctrl_doWrite ? execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0 : 1'b0)) & (~ ((LsuL1Plugin_logic_lsu_ctrl_doRefill ? 1'b1 : 1'b0) | (LsuL1Plugin_logic_lsu_ctrl_doFlush ? LsuL1Plugin_logic_lsu_ctrl_needFlushOh : 1'b0))));
+    if(when_LsuL1Plugin_l1192) begin
+      LsuL1Plugin_logic_shared_write_payload_data_dirty = _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty[0 : 0];
+    end
+  end
+
+  assign when_LsuL1Plugin_l926 = execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0[0];
+  assign execute_ctrl4_down_LsuL1_FLUSH_HIT_lane0 = (|LsuL1Plugin_logic_lsu_ctrl_needFlushs);
+  assign _zz_LsuL1Plugin_logic_waysWrite_tag_address = execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 = LsuL1Plugin_logic_lsu_ctrl_doWrite;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0 = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_DATA_lane0 = execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 = execute_ctrl4_down_LsuL1_MASK_lane0;
+  assign when_LsuL1Plugin_l991 = ((execute_ctrl4_down_LsuL1_SEL_lane0 && (! execute_ctrl4_down_LsuL1_HAZARD_lane0)) && (! execute_ctrl4_down_LsuL1_MISS_lane0));
+  assign execute_ctrl4_down_LsuL1Plugin_logic_BYPASSED_DATA_lane0 = execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
+  assign execute_ctrl4_down_LsuL1_READ_DATA_lane0 = execute_ctrl4_down_LsuL1Plugin_logic_BYPASSED_DATA_lane0;
+  assign LsuL1Plugin_logic_lsu_ctrl_preventSideEffects = (execute_ctrl4_down_LsuL1_ABORD_lane0 || execute_freeze_valid);
+  assign LsuL1Plugin_logic_initializer_done = LsuL1Plugin_logic_initializer_counter[6];
+  assign when_LsuL1Plugin_l1192 = (! LsuL1Plugin_logic_initializer_done);
+  assign LsuL1Plugin_logic_refill_read_reservation_win = (! 1'b0);
+  assign LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win = (! (|LsuL1Plugin_logic_refill_read_reservation_take));
+  assign LsuL1Plugin_logic_refill_read_writeReservation_win = (! 1'b0);
+  assign LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win = (! (|LsuL1Plugin_logic_refill_read_writeReservation_take));
   assign execute_ctrl2_down_MUL_SRC1_lane0 = _zz_execute_ctrl2_down_MUL_SRC1_lane0;
   assign execute_ctrl2_down_MUL_SRC2_lane0 = _zz_execute_ctrl2_down_MUL_SRC2_lane0;
   assign execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_0_lane0 = (execute_ctrl2_down_MUL_SRC1_lane0[16 : 0] * execute_ctrl2_down_MUL_SRC2_lane0[16 : 0]);
@@ -3278,6 +4555,8 @@ module VexiiRiscv (
         end
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
@@ -3408,6 +4687,56 @@ module VexiiRiscv (
   assign decode_ctrls_0_up_valid = (|AlignerPlugin_logic_feeder_lanes_0_valid);
   assign AlignerPlugin_logic_nobuffer_remaningMask = (AlignerPlugin_logic_nobuffer_mask & (~ AlignerPlugin_logic_usedMask_1));
   assign when_AlignerPlugin_l292 = (decode_ctrls_0_up_isValid && decode_ctrls_0_up_isReady);
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_valid = LsuL1Plugin_logic_bus_read_cmd_valid;
+  assign LsuL1Plugin_logic_bus_read_cmd_ready = LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_ready;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_last = 1'b1;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_fragment_write = 1'b0;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_fragment_address = LsuL1Plugin_logic_bus_read_cmd_payload_address;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_valid = LsuL1Plugin_logic_bus_write_cmd_valid;
+  assign LsuL1Plugin_logic_bus_write_cmd_ready = LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_ready;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_payload_last = LsuL1Plugin_logic_bus_write_cmd_payload_last;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_payload_fragment_write = 1'b1;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_payload_fragment_address = LsuL1Plugin_logic_bus_write_cmd_payload_fragment_address;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_ready = LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_inputs_0_ready;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_writeCmd_ready = LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_inputs_1_ready;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_fire = (LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_valid && LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_ready);
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_ready = (LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_ready && (LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_last == LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_payload_last));
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_valid = LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_valid;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_write = LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_payload_fragment_write;
+  always @(*) begin
+    LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_address = LsuL1Plugin_logic_bus_toWishbone_arbiter_arbiter_io_output_payload_fragment_address;
+    LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_address[5 : 2] = LsuL1Plugin_logic_bus_toWishbone_arbiter_counter;
+  end
+
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_data = LsuL1Plugin_logic_bus_write_cmd_payload_fragment_data;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_last = (&LsuL1Plugin_logic_bus_toWishbone_arbiter_counter);
+  always @(*) begin
+    LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_ready = LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_ready;
+    if(when_Stream_l399_1) begin
+      LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_ready = 1'b1;
+    end
+  end
+
+  assign when_Stream_l399_1 = (! LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_valid);
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_valid = LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rValid;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_last = LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_last;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_write = LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_write;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_address = LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_address;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_data = LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_data;
+  assign LsuL1WishbonePlugin_logic_bus_ADR = (LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_address >>> 2'd2);
+  assign LsuL1WishbonePlugin_logic_bus_CTI = (LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_last ? 3'b111 : 3'b010);
+  assign LsuL1WishbonePlugin_logic_bus_BTE = 2'b00;
+  assign LsuL1WishbonePlugin_logic_bus_SEL = 4'b1111;
+  assign LsuL1WishbonePlugin_logic_bus_WE = LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_write;
+  assign LsuL1WishbonePlugin_logic_bus_DAT_MOSI = LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_data;
+  assign LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_ready = (LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_valid && (LsuL1WishbonePlugin_logic_bus_ACK || LsuL1WishbonePlugin_logic_bus_ERR));
+  assign LsuL1WishbonePlugin_logic_bus_CYC = LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_valid;
+  assign LsuL1WishbonePlugin_logic_bus_STB = LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_valid;
+  assign LsuL1Plugin_logic_bus_read_rsp_valid = ((LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_valid && (! LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_write)) && (LsuL1WishbonePlugin_logic_bus_ACK || LsuL1WishbonePlugin_logic_bus_ERR));
+  assign LsuL1Plugin_logic_bus_read_rsp_payload_error = LsuL1WishbonePlugin_logic_bus_ERR;
+  assign LsuL1Plugin_logic_bus_read_rsp_payload_data = LsuL1WishbonePlugin_logic_bus_DAT_MISO;
+  assign LsuL1Plugin_logic_bus_write_rsp_valid = (((LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_valid && LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_fragment_write) && LsuL1Plugin_logic_bus_toWishbone_arbiter_buffered_payload_last) && (LsuL1WishbonePlugin_logic_bus_ACK || LsuL1WishbonePlugin_logic_bus_ERR));
+  assign LsuL1Plugin_logic_bus_write_rsp_payload_error = LsuL1WishbonePlugin_logic_bus_ERR;
   always @(*) begin
     CsrAccessPlugin_bus_decode_exception = 1'b0;
     if(when_PrivilegedPlugin_l689) begin
@@ -3661,8 +4990,8 @@ module VexiiRiscv (
     end
   end
 
-  assign _zz_9 = zz_FetchL1Plugin_logic_trapPort_payload_arg(1'b0);
-  always @(*) FetchL1Plugin_logic_trapPort_payload_arg = _zz_9;
+  assign _zz_24 = zz_FetchL1Plugin_logic_trapPort_payload_arg(1'b0);
+  always @(*) FetchL1Plugin_logic_trapPort_payload_arg = _zz_24;
   always @(*) begin
     FetchL1Plugin_logic_ctrl_allowRefill = ((! fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HIT) && (! fetch_logic_ctrls_2_down_FetchL1Plugin_logic_HAZARD));
     if(when_FetchL1Plugin_l480) begin
@@ -3704,209 +5033,364 @@ module VexiiRiscv (
   assign when_FetchL1Plugin_l541 = (((! fetch_logic_ctrls_2_up_isValid) || fetch_logic_ctrls_2_down_isReady) || fetch_logic_ctrls_2_up_isCanceling);
   assign when_FetchL1Plugin_l558 = (! FetchL1Plugin_logic_invalidate_done);
   assign execute_ctrl0_down_AguPlugin_SIZE_lane0 = execute_ctrl0_down_Decode_UOP_lane0[13 : 12];
+  assign LsuPlugin_logic_flusher_wantExit = 1'b0;
   always @(*) begin
-    execute_ctrl2_down_LsuCachelessPlugin_logic_onFirst_WRITE_DATA_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
-    execute_ctrl2_down_LsuCachelessPlugin_logic_onFirst_WRITE_DATA_lane0[31 : 0] = execute_ctrl2_up_integer_RS2_lane0;
-  end
-
-  assign execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_RAW_ADDRESS_lane0 = execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
-  assign execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_MISS_ALIGNED_lane0 = (|{((execute_ctrl2_down_AguPlugin_SIZE_lane0 == 2'b10) && (execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_RAW_ADDRESS_lane0[1 : 0] != 2'b00)),((execute_ctrl2_down_AguPlugin_SIZE_lane0 == 2'b01) && (execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_RAW_ADDRESS_lane0[0 : 0] != 1'b0))});
-  assign LsuCachelessPlugin_logic_onPma_port_cmd_address = execute_ctrl2_down_MMU_TRANSLATED_lane0;
-  assign LsuCachelessPlugin_logic_onPma_port_cmd_size = execute_ctrl2_down_AguPlugin_SIZE_lane0;
-  assign LsuCachelessPlugin_logic_onPma_port_cmd_op[0] = execute_ctrl2_down_AguPlugin_STORE_lane0;
-  assign execute_ctrl2_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault = LsuCachelessPlugin_logic_onPma_port_rsp_fault;
-  assign execute_ctrl2_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io = LsuCachelessPlugin_logic_onPma_port_rsp_io;
-  assign PrivilegedPlugin_api_lsuTriggerBus_load = execute_ctrl2_down_AguPlugin_LOAD_lane0;
-  assign PrivilegedPlugin_api_lsuTriggerBus_store = execute_ctrl2_down_AguPlugin_STORE_lane0;
-  assign PrivilegedPlugin_api_lsuTriggerBus_virtual = execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_RAW_ADDRESS_lane0;
-  assign PrivilegedPlugin_api_lsuTriggerBus_size = execute_ctrl2_down_AguPlugin_SIZE_lane0;
-  assign execute_ctrl2_down_LsuCachelessPlugin_logic_onTrigger_HIT_lane0 = 1'b0;
-  always @(*) begin
-    LsuCachelessPlugin_logic_onFork_skip = 1'b0;
-    if(when_LsuCachelessPlugin_l261) begin
-      LsuCachelessPlugin_logic_onFork_skip = 1'b1;
-    end
-    if(when_LsuCachelessPlugin_l267) begin
-      LsuCachelessPlugin_logic_onFork_skip = 1'b1;
-    end
-    if(when_LsuCachelessPlugin_l274) begin
-      LsuCachelessPlugin_logic_onFork_skip = 1'b1;
-    end
-    if(execute_ctrl2_down_MMU_ACCESS_FAULT_lane0) begin
-      LsuCachelessPlugin_logic_onFork_skip = 1'b1;
-    end
-    if(execute_ctrl2_down_MMU_REFILL_lane0) begin
-      LsuCachelessPlugin_logic_onFork_skip = 1'b1;
-    end
-    if(execute_ctrl2_down_MMU_HAZARD_lane0) begin
-      LsuCachelessPlugin_logic_onFork_skip = 1'b1;
-    end
-    if(execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_MISS_ALIGNED_lane0) begin
-      LsuCachelessPlugin_logic_onFork_skip = 1'b1;
-    end
-    if(execute_ctrl2_down_LsuCachelessPlugin_logic_onTrigger_HIT_lane0) begin
-      LsuCachelessPlugin_logic_onFork_skip = 1'b1;
-    end
-  end
-
-  assign when_LsuCachelessPlugin_l215 = (! execute_freeze_valid);
-  assign LsuCachelessPlugin_logic_onFork_askFence = (execute_ctrl2_up_LANE_SEL_lane0 && ((execute_ctrl2_down_LsuCachelessPlugin_FENCE_lane0 || (execute_ctrl2_down_AguPlugin_SEL_lane0 && execute_ctrl2_down_AguPlugin_ATOMIC_lane0)) || LsuCachelessPlugin_logic_onFork_askFenceReg));
-  assign LsuCachelessPlugin_logic_onFork_doFence = (LsuCachelessPlugin_logic_onFork_askFence && LsuCachelessPlugin_logic_cmdInflights);
-  assign LsuCachelessPlugin_logic_bus_cmd_fire = (LsuCachelessPlugin_logic_bus_cmd_valid && LsuCachelessPlugin_logic_bus_cmd_ready);
-  always @(*) begin
-    LsuCachelessPlugin_logic_onFork_cmdCounter_willIncrement = 1'b0;
-    if(LsuCachelessPlugin_logic_bus_cmd_fire) begin
-      LsuCachelessPlugin_logic_onFork_cmdCounter_willIncrement = 1'b1;
-    end
-  end
-
-  assign LsuCachelessPlugin_logic_onFork_cmdCounter_willClear = 1'b0;
-  assign LsuCachelessPlugin_logic_onFork_cmdCounter_willOverflowIfInc = (LsuCachelessPlugin_logic_onFork_cmdCounter_value == 1'b1);
-  assign LsuCachelessPlugin_logic_onFork_cmdCounter_willOverflow = (LsuCachelessPlugin_logic_onFork_cmdCounter_willOverflowIfInc && LsuCachelessPlugin_logic_onFork_cmdCounter_willIncrement);
-  always @(*) begin
-    LsuCachelessPlugin_logic_onFork_cmdCounter_valueNext = (LsuCachelessPlugin_logic_onFork_cmdCounter_value + LsuCachelessPlugin_logic_onFork_cmdCounter_willIncrement);
-    if(LsuCachelessPlugin_logic_onFork_cmdCounter_willClear) begin
-      LsuCachelessPlugin_logic_onFork_cmdCounter_valueNext = 1'b0;
-    end
-  end
-
-  assign when_LsuCachelessPlugin_l220 = (! execute_freeze_valid);
-  assign LsuCachelessPlugin_logic_bus_cmd_isStall = (LsuCachelessPlugin_logic_bus_cmd_valid && (! LsuCachelessPlugin_logic_bus_cmd_ready));
-  assign LsuCachelessPlugin_logic_bus_cmd_valid = (((((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_AguPlugin_SEL_lane0) && (! LsuCachelessPlugin_logic_onFork_cmdSent)) && (! execute_lane0_ctrls_2_upIsCancel)) && (! LsuCachelessPlugin_logic_onFork_skip)) && (! LsuCachelessPlugin_logic_onFork_doFence));
-  assign LsuCachelessPlugin_logic_bus_cmd_payload_id = LsuCachelessPlugin_logic_onFork_cmdCounter_value;
-  assign LsuCachelessPlugin_logic_bus_cmd_payload_write = execute_ctrl2_down_AguPlugin_STORE_lane0;
-  assign LsuCachelessPlugin_logic_bus_cmd_payload_address = execute_ctrl2_down_MMU_TRANSLATED_lane0;
-  assign LsuCachelessPlugin_logic_onFork_mapping_0_1 = {4{execute_ctrl2_down_LsuCachelessPlugin_logic_onFirst_WRITE_DATA_lane0[7 : 0]}};
-  assign LsuCachelessPlugin_logic_onFork_mapping_1_1 = {2{execute_ctrl2_down_LsuCachelessPlugin_logic_onFirst_WRITE_DATA_lane0[15 : 0]}};
-  assign LsuCachelessPlugin_logic_onFork_mapping_2_1 = {1{execute_ctrl2_down_LsuCachelessPlugin_logic_onFirst_WRITE_DATA_lane0[31 : 0]}};
-  always @(*) begin
-    _zz_LsuCachelessPlugin_logic_bus_cmd_payload_data = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
-    case(LsuCachelessPlugin_logic_bus_cmd_payload_size)
-      2'b00 : begin
-        _zz_LsuCachelessPlugin_logic_bus_cmd_payload_data = LsuCachelessPlugin_logic_onFork_mapping_0_1;
+    LsuPlugin_logic_flusher_wantStart = 1'b0;
+    case(LsuPlugin_logic_flusher_stateReg)
+      LsuPlugin_logic_flusher_CMD : begin
       end
-      2'b01 : begin
-        _zz_LsuCachelessPlugin_logic_bus_cmd_payload_data = LsuCachelessPlugin_logic_onFork_mapping_1_1;
+      LsuPlugin_logic_flusher_COMPLETION : begin
       end
-      2'b10 : begin
-        _zz_LsuCachelessPlugin_logic_bus_cmd_payload_data = LsuCachelessPlugin_logic_onFork_mapping_2_1;
+      default : begin
+        LsuPlugin_logic_flusher_wantStart = 1'b1;
+      end
+    endcase
+  end
+
+  assign LsuPlugin_logic_flusher_wantKill = 1'b0;
+  assign TrapPlugin_logic_lsuL1Invalidate_0_cmd_ready = LsuPlugin_logic_flusher_arbiter_io_inputs_0_ready;
+  assign LsuPlugin_logic_flusher_inflight = (|{(execute_ctrl4_down_LsuL1_SEL_lane0 && execute_ctrl4_down_LsuL1_FLUSH_lane0),(execute_ctrl3_down_LsuL1_SEL_lane0 && execute_ctrl3_down_LsuL1_FLUSH_lane0)});
+  always @(*) begin
+    LsuPlugin_logic_flusher_arbiter_io_output_ready = 1'b0;
+    case(LsuPlugin_logic_flusher_stateReg)
+      LsuPlugin_logic_flusher_CMD : begin
+      end
+      LsuPlugin_logic_flusher_COMPLETION : begin
+        if(when_LsuPlugin_l334) begin
+          LsuPlugin_logic_flusher_arbiter_io_output_ready = 1'b1;
+        end
       end
       default : begin
       end
     endcase
   end
 
-  assign LsuCachelessPlugin_logic_bus_cmd_payload_data = _zz_LsuCachelessPlugin_logic_bus_cmd_payload_data;
-  assign LsuCachelessPlugin_logic_bus_cmd_payload_size = execute_ctrl2_down_AguPlugin_SIZE_lane0;
+  assign PrivilegedPlugin_api_lsuTriggerBus_load = execute_ctrl3_down_LsuL1_LOAD_lane0;
+  assign PrivilegedPlugin_api_lsuTriggerBus_store = execute_ctrl3_down_LsuL1_STORE_lane0;
+  assign PrivilegedPlugin_api_lsuTriggerBus_virtual = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
+  assign PrivilegedPlugin_api_lsuTriggerBus_size = execute_ctrl3_down_LsuL1_SIZE_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0 = 1'b0;
+  assign execute_ctrl2_down_LsuPlugin_logic_FORCE_PHYSICAL_lane0 = (execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0 || execute_ctrl2_down_LsuPlugin_logic_FROM_WB_lane0);
+  assign LsuPlugin_logic_onAddress0_ls_prefetchOp = execute_ctrl2_down_Decode_UOP_lane0[24 : 20];
+  assign LsuPlugin_logic_onAddress0_ls_port_valid = (execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_AguPlugin_SEL_lane0);
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_address = execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_size = execute_ctrl2_down_AguPlugin_SIZE_lane0;
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_load = execute_ctrl2_down_AguPlugin_LOAD_lane0;
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_store = execute_ctrl2_down_AguPlugin_STORE_lane0;
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_atomic = execute_ctrl2_down_AguPlugin_ATOMIC_lane0;
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_op = LsuL1CmdOpcode_LSU;
+  assign LsuPlugin_logic_onAddress0_ls_port_fire = (LsuPlugin_logic_onAddress0_ls_port_valid && LsuPlugin_logic_onAddress0_ls_port_ready);
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_storeId = LsuPlugin_logic_onAddress0_ls_storeId;
+  assign LsuPlugin_logic_onAddress0_flush_port_valid = ((LsuPlugin_logic_flusher_stateReg == LsuPlugin_logic_flusher_CMD) && (! LsuPlugin_logic_flusher_cmdCounter[6]));
+  assign LsuPlugin_logic_onAddress0_flush_port_payload_address = {19'd0, _zz_LsuPlugin_logic_onAddress0_flush_port_payload_address};
+  assign LsuPlugin_logic_onAddress0_flush_port_payload_size = 2'b00;
+  assign LsuPlugin_logic_onAddress0_flush_port_payload_load = 1'b0;
+  assign LsuPlugin_logic_onAddress0_flush_port_payload_store = 1'b0;
+  assign LsuPlugin_logic_onAddress0_flush_port_payload_atomic = 1'b0;
+  assign LsuPlugin_logic_onAddress0_flush_port_payload_op = LsuL1CmdOpcode_FLUSH;
+  assign LsuPlugin_logic_onAddress0_flush_port_payload_storeId = 12'h0;
+  assign LsuPlugin_logic_onAddress0_flush_port_fire = (LsuPlugin_logic_onAddress0_flush_port_valid && LsuPlugin_logic_onAddress0_flush_port_ready);
+  assign LsuPlugin_logic_onAddress0_ls_port_ready = LsuPlugin_logic_onAddress0_arbiter_io_inputs_0_ready;
+  assign LsuPlugin_logic_onAddress0_flush_port_ready = LsuPlugin_logic_onAddress0_arbiter_io_inputs_1_ready;
+  assign LsuPlugin_logic_onAddress0_arbiter_io_output_ready = (! execute_freeze_valid);
+  assign execute_ctrl2_down_LsuL1_SEL_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_valid;
+  assign execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_address;
   always @(*) begin
-    _zz_LsuCachelessPlugin_logic_bus_cmd_payload_mask = 4'bxxxx;
-    case(LsuCachelessPlugin_logic_bus_cmd_payload_size)
+    _zz_execute_ctrl2_down_LsuL1_MASK_lane0 = 4'bxxxx;
+    case(LsuPlugin_logic_onAddress0_arbiter_io_output_payload_size)
       2'b00 : begin
-        _zz_LsuCachelessPlugin_logic_bus_cmd_payload_mask = 4'b0001;
+        _zz_execute_ctrl2_down_LsuL1_MASK_lane0 = 4'b0001;
       end
       2'b01 : begin
-        _zz_LsuCachelessPlugin_logic_bus_cmd_payload_mask = 4'b0011;
+        _zz_execute_ctrl2_down_LsuL1_MASK_lane0 = 4'b0011;
       end
       2'b10 : begin
-        _zz_LsuCachelessPlugin_logic_bus_cmd_payload_mask = 4'b1111;
+        _zz_execute_ctrl2_down_LsuL1_MASK_lane0 = 4'b1111;
       end
       default : begin
       end
     endcase
   end
 
-  assign LsuCachelessPlugin_logic_bus_cmd_payload_mask = (_zz_LsuCachelessPlugin_logic_bus_cmd_payload_mask <<< LsuCachelessPlugin_logic_bus_cmd_payload_address[1 : 0]);
-  assign LsuCachelessPlugin_logic_bus_cmd_payload_io = execute_ctrl2_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
-  assign LsuCachelessPlugin_logic_bus_cmd_payload_fromHart = 1'b1;
-  assign LsuCachelessPlugin_logic_bus_cmd_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
-  assign LsuCachelessPlugin_logic_onFork_freezeIt = (LsuCachelessPlugin_logic_bus_cmd_isStall || LsuCachelessPlugin_logic_onFork_doFence);
+  assign execute_ctrl2_down_LsuL1_MASK_lane0 = (_zz_execute_ctrl2_down_LsuL1_MASK_lane0 <<< LsuPlugin_logic_onAddress0_arbiter_io_output_payload_address[1 : 0]);
+  assign execute_ctrl2_down_LsuL1_SIZE_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_size;
+  assign execute_ctrl2_down_LsuL1_LOAD_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_load;
+  assign execute_ctrl2_down_LsuL1_ATOMIC_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_atomic;
+  assign execute_ctrl2_down_LsuL1_STORE_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_store;
+  assign execute_ctrl2_down_LsuL1_PREFETCH_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_PREFETCH);
+  assign execute_ctrl2_down_LsuL1_FLUSH_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_FLUSH);
+  assign execute_ctrl2_down_Decode_STORE_ID_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_storeId;
+  assign execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_ACCESS_1);
+  assign execute_ctrl2_down_LsuPlugin_logic_FROM_WB_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_STORE_BUFFER);
+  assign execute_ctrl2_down_LsuPlugin_logic_FROM_LSU_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_LSU);
+  assign execute_ctrl2_down_LsuPlugin_logic_FROM_PREFETCH_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_PREFETCH);
+  assign execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0 = execute_ctrl3_down_MMU_TRANSLATED_lane0;
+  assign when_LsuPlugin_l497 = (execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 && (! execute_ctrl3_up_LANE_SEL_lane0));
+  assign when_LsuPlugin_l497_1 = (execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 && (! execute_ctrl4_up_LANE_SEL_lane0));
+  assign execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 = (|{((execute_ctrl3_down_LsuL1_SIZE_lane0 == 2'b10) && (execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[1 : 0] != 2'b00)),((execute_ctrl3_down_LsuL1_SIZE_lane0 == 2'b01) && (execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[0 : 0] != 1'b0))});
+  assign execute_ctrl3_down_LsuPlugin_logic_preCtrl_IS_AMO_lane0 = (((execute_ctrl3_down_AguPlugin_SEL_lane0 && execute_ctrl3_down_LsuL1_ATOMIC_lane0) && execute_ctrl3_down_LsuL1_STORE_lane0) && execute_ctrl3_down_LsuL1_LOAD_lane0);
+  assign LsuPlugin_logic_onPma_cached_cmd_address = execute_ctrl3_down_MMU_TRANSLATED_lane0;
+  assign LsuPlugin_logic_onPma_cached_cmd_op[0] = execute_ctrl3_down_LsuL1_STORE_lane0;
+  assign LsuPlugin_logic_onPma_io_cmd_address = execute_ctrl3_down_MMU_TRANSLATED_lane0;
+  assign LsuPlugin_logic_onPma_io_cmd_size = execute_ctrl3_down_LsuL1_SIZE_lane0;
+  assign LsuPlugin_logic_onPma_io_cmd_op[0] = execute_ctrl3_down_LsuL1_STORE_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault = LsuPlugin_logic_onPma_cached_rsp_fault;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io = LsuPlugin_logic_onPma_cached_rsp_io;
   always @(*) begin
-    LsuCachelessPlugin_logic_flushPort_valid = 1'b0;
-    if(when_LsuCachelessPlugin_l315) begin
-      LsuCachelessPlugin_logic_flushPort_valid = 1'b1;
+    execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault = LsuPlugin_logic_onPma_io_rsp_fault;
+    if(when_LsuPlugin_l519) begin
+      execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault = 1'b1;
     end
   end
 
-  assign LsuCachelessPlugin_logic_flushPort_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
-  assign LsuCachelessPlugin_logic_flushPort_payload_self = 1'b0;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io = LsuPlugin_logic_onPma_io_rsp_io;
+  assign when_LsuPlugin_l519 = (execute_ctrl3_down_LsuL1_ATOMIC_lane0 || execute_ctrl3_down_LsuPlugin_logic_FROM_ACCESS_lane0);
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0 = (((execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault && (! execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault)) && (! execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0)) && (! execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0));
+  assign LsuPlugin_logic_onPma_addressExtension = 1'b0;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0 = (execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 && 1'b0);
+  assign execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 = (execute_ctrl3_down_MMU_PAGE_FAULT_lane0 || (execute_ctrl3_down_AguPlugin_STORE_lane0 ? (! execute_ctrl3_down_MMU_ALLOW_WRITE_lane0) : (! execute_ctrl3_down_MMU_ALLOW_READ_lane0)));
+  assign execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0 = ((((execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 || execute_ctrl3_down_MMU_ACCESS_FAULT_lane0) || execute_ctrl3_down_MMU_REFILL_lane0) || execute_ctrl3_down_MMU_HAZARD_lane0) || execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0);
   always @(*) begin
-    LsuCachelessPlugin_logic_trapPort_valid = 1'b0;
-    if(when_LsuCachelessPlugin_l315) begin
-      LsuCachelessPlugin_logic_trapPort_valid = 1'b1;
+    LsuPlugin_logic_onCtrl_lsuTrap = 1'b0;
+    if(LsuPlugin_logic_onCtrl_traps_accessFault) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(LsuPlugin_logic_onCtrl_traps_l1Failed) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(LsuPlugin_logic_onCtrl_traps_pmaFault) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(execute_ctrl4_down_MMU_ACCESS_FAULT_lane0) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(execute_ctrl4_down_MMU_REFILL_lane0) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(execute_ctrl4_down_MMU_HAZARD_lane0) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
+    end
+    if(when_LsuPlugin_l774) begin
+      LsuPlugin_logic_onCtrl_lsuTrap = 1'b0;
     end
   end
 
-  assign LsuCachelessPlugin_logic_trapPort_payload_tval = execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_RAW_ADDRESS_lane0;
   always @(*) begin
-    LsuCachelessPlugin_logic_trapPort_payload_exception = 1'bx;
-    if(when_LsuCachelessPlugin_l261) begin
-      LsuCachelessPlugin_logic_trapPort_payload_exception = 1'b0;
-    end
-    if(when_LsuCachelessPlugin_l267) begin
-      LsuCachelessPlugin_logic_trapPort_payload_exception = 1'b1;
-    end
-    if(when_LsuCachelessPlugin_l274) begin
-      LsuCachelessPlugin_logic_trapPort_payload_exception = 1'b1;
-    end
-    if(execute_ctrl2_down_MMU_ACCESS_FAULT_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_exception = 1'b1;
-    end
-    if(execute_ctrl2_down_MMU_REFILL_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_exception = 1'b0;
-    end
-    if(execute_ctrl2_down_MMU_HAZARD_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_exception = 1'b0;
-    end
-    if(execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_MISS_ALIGNED_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_exception = 1'b1;
-    end
-    if(execute_ctrl2_down_LsuCachelessPlugin_logic_onTrigger_HIT_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_exception = 1'b0;
-    end
+    LsuPlugin_logic_onCtrl_writeData = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    LsuPlugin_logic_onCtrl_writeData[31 : 0] = execute_ctrl4_up_integer_RS2_lane0;
   end
 
+  assign when_LsuPlugin_l545 = ((! LsuPlugin_logic_onCtrl_lsuTrap) && (! execute_lane0_ctrls_4_upIsCancel));
+  assign LsuPlugin_logic_onCtrl_io_doIt = ((execute_ctrl4_up_LANE_SEL_lane0 && execute_ctrl4_down_LsuL1_SEL_lane0) && execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0);
+  assign LsuPlugin_logic_bus_cmd_fire = (LsuPlugin_logic_bus_cmd_valid && LsuPlugin_logic_bus_cmd_ready);
+  assign when_LsuPlugin_l549 = (! execute_freeze_valid);
+  assign LsuPlugin_logic_bus_cmd_valid = (((LsuPlugin_logic_onCtrl_io_doItReg && (! LsuPlugin_logic_onCtrl_io_cmdSent)) && LsuPlugin_logic_onCtrl_io_allowIt) && (! LsuPlugin_logic_onCtrl_io_tooEarly));
+  assign LsuPlugin_logic_bus_cmd_payload_write = execute_ctrl4_down_LsuL1_STORE_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_address = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_data = execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_size = execute_ctrl4_down_LsuL1_SIZE_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_mask = execute_ctrl4_down_LsuL1_MASK_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_io = 1'b1;
+  assign LsuPlugin_logic_bus_cmd_payload_fromHart = 1'b1;
+  assign LsuPlugin_logic_bus_cmd_payload_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
+  assign LsuPlugin_logic_bus_rsp_toStream_valid = LsuPlugin_logic_bus_rsp_valid;
+  assign LsuPlugin_logic_bus_rsp_toStream_payload_error = LsuPlugin_logic_bus_rsp_payload_error;
+  assign LsuPlugin_logic_bus_rsp_toStream_payload_data = LsuPlugin_logic_bus_rsp_payload_data;
+  assign LsuPlugin_logic_onCtrl_io_rsp_fire = (LsuPlugin_logic_onCtrl_io_rsp_valid && LsuPlugin_logic_onCtrl_io_rsp_ready);
+  assign LsuPlugin_logic_bus_rsp_toStream_ready = (! LsuPlugin_logic_bus_rsp_toStream_rValid);
+  assign LsuPlugin_logic_onCtrl_io_rsp_valid = LsuPlugin_logic_bus_rsp_toStream_rValid;
+  assign LsuPlugin_logic_onCtrl_io_rsp_payload_error = LsuPlugin_logic_bus_rsp_toStream_rData_error;
+  assign LsuPlugin_logic_onCtrl_io_rsp_payload_data = LsuPlugin_logic_bus_rsp_toStream_rData_data;
+  assign LsuPlugin_logic_onCtrl_io_rsp_ready = (! execute_freeze_valid);
+  assign LsuPlugin_logic_onCtrl_io_freezeIt = (LsuPlugin_logic_onCtrl_io_doIt && (LsuPlugin_logic_onCtrl_io_tooEarly || ((! LsuPlugin_logic_onCtrl_io_rsp_valid) && LsuPlugin_logic_onCtrl_io_allowIt)));
+  assign LsuPlugin_logic_onCtrl_loadData_input = (LsuPlugin_logic_onCtrl_io_cmdSent ? LsuPlugin_logic_onCtrl_io_rsp_payload_data : execute_ctrl4_down_LsuL1_READ_DATA_lane0);
+  assign LsuPlugin_logic_onCtrl_loadData_splited_0 = LsuPlugin_logic_onCtrl_loadData_input[7 : 0];
+  assign LsuPlugin_logic_onCtrl_loadData_splited_1 = LsuPlugin_logic_onCtrl_loadData_input[15 : 8];
+  assign LsuPlugin_logic_onCtrl_loadData_splited_2 = LsuPlugin_logic_onCtrl_loadData_input[23 : 16];
+  assign LsuPlugin_logic_onCtrl_loadData_splited_3 = LsuPlugin_logic_onCtrl_loadData_input[31 : 24];
   always @(*) begin
-    LsuCachelessPlugin_logic_trapPort_payload_code = 4'bxxxx;
-    if(when_LsuCachelessPlugin_l261) begin
-      LsuCachelessPlugin_logic_trapPort_payload_code = 4'b0100;
-    end
-    if(when_LsuCachelessPlugin_l267) begin
-      LsuCachelessPlugin_logic_trapPort_payload_code = 4'b0101;
-      if(execute_ctrl2_down_AguPlugin_STORE_lane0) begin
-        LsuCachelessPlugin_logic_trapPort_payload_code[1] = 1'b1;
+    LsuPlugin_logic_onCtrl_loadData_shited[7 : 0] = _zz_LsuPlugin_logic_onCtrl_loadData_shited;
+    LsuPlugin_logic_onCtrl_loadData_shited[15 : 8] = _zz_LsuPlugin_logic_onCtrl_loadData_shited_2;
+    LsuPlugin_logic_onCtrl_loadData_shited[23 : 16] = LsuPlugin_logic_onCtrl_loadData_splited_2;
+    LsuPlugin_logic_onCtrl_loadData_shited[31 : 24] = LsuPlugin_logic_onCtrl_loadData_splited_3;
+  end
+
+  assign execute_ctrl4_down_LsuPlugin_logic_onCtrl_loadData_RESULT_lane0 = LsuPlugin_logic_onCtrl_loadData_shited;
+  assign LsuPlugin_logic_onCtrl_storeData_mapping_0_1 = {4{LsuPlugin_logic_onCtrl_writeData[7 : 0]}};
+  assign LsuPlugin_logic_onCtrl_storeData_mapping_1_1 = {2{LsuPlugin_logic_onCtrl_writeData[15 : 0]}};
+  assign LsuPlugin_logic_onCtrl_storeData_mapping_2_1 = {1{LsuPlugin_logic_onCtrl_writeData[31 : 0]}};
+  always @(*) begin
+    _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    case(execute_ctrl4_down_LsuL1_SIZE_lane0)
+      2'b00 : begin
+        _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = LsuPlugin_logic_onCtrl_storeData_mapping_0_1;
+      end
+      2'b01 : begin
+        _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = LsuPlugin_logic_onCtrl_storeData_mapping_1_1;
+      end
+      2'b10 : begin
+        _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = LsuPlugin_logic_onCtrl_storeData_mapping_2_1;
+      end
+      default : begin
+      end
+    endcase
+  end
+
+  assign execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_onCtrl_SC_MISS_lane0 = LsuPlugin_logic_onCtrl_scMiss;
+  assign LsuPlugin_logic_onCtrl_scMiss = 1'b0;
+  assign LsuL1_lockPort_valid = 1'b0;
+  assign LsuL1_lockPort_address = 32'h0;
+  always @(*) begin
+    LsuPlugin_logic_flushPort_valid = 1'b0;
+    if(when_LsuPlugin_l788) begin
+      if(LsuPlugin_logic_onCtrl_lsuTrap) begin
+        LsuPlugin_logic_flushPort_valid = 1'b1;
       end
     end
-    if(when_LsuCachelessPlugin_l274) begin
-      LsuCachelessPlugin_logic_trapPort_payload_code = 4'b1101;
-      if(execute_ctrl2_down_AguPlugin_STORE_lane0) begin
-        LsuCachelessPlugin_logic_trapPort_payload_code[1] = 1'b1;
+  end
+
+  assign LsuPlugin_logic_flushPort_payload_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
+  assign LsuPlugin_logic_flushPort_payload_self = 1'b0;
+  always @(*) begin
+    LsuPlugin_logic_trapPort_valid = 1'b0;
+    if(when_LsuPlugin_l788) begin
+      if(LsuPlugin_logic_onCtrl_lsuTrap) begin
+        LsuPlugin_logic_trapPort_valid = 1'b1;
       end
     end
-    if(execute_ctrl2_down_MMU_ACCESS_FAULT_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_code = 4'b0101;
-      if(execute_ctrl2_down_AguPlugin_STORE_lane0) begin
-        LsuCachelessPlugin_logic_trapPort_payload_code[1] = 1'b1;
-      end
+  end
+
+  assign LsuPlugin_logic_trapPort_payload_tval = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0;
+  always @(*) begin
+    LsuPlugin_logic_trapPort_payload_exception = 1'bx;
+    if(LsuPlugin_logic_onCtrl_traps_accessFault) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b1;
     end
-    if(execute_ctrl2_down_MMU_REFILL_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_code = 4'b0111;
+    if(LsuPlugin_logic_onCtrl_traps_l1Failed) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b0;
     end
-    if(execute_ctrl2_down_MMU_HAZARD_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_code = 4'b0100;
+    if(LsuPlugin_logic_onCtrl_traps_pmaFault) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b1;
     end
-    if(execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_MISS_ALIGNED_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_code = {1'd0, _zz_LsuCachelessPlugin_logic_trapPort_payload_code};
+    if(execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b1;
     end
-    if(execute_ctrl2_down_LsuCachelessPlugin_logic_onTrigger_HIT_lane0) begin
-      LsuCachelessPlugin_logic_trapPort_payload_code = 4'b0011;
+    if(execute_ctrl4_down_MMU_ACCESS_FAULT_lane0) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b1;
+    end
+    if(execute_ctrl4_down_MMU_REFILL_lane0) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b0;
+    end
+    if(execute_ctrl4_down_MMU_HAZARD_lane0) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b0;
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b1;
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b1;
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0) begin
+      LsuPlugin_logic_trapPort_payload_exception = 1'b0;
     end
   end
 
   always @(*) begin
-    LsuCachelessPlugin_logic_trapPort_payload_arg = 2'b00;
-    LsuCachelessPlugin_logic_trapPort_payload_arg[1 : 0] = (execute_ctrl2_down_AguPlugin_STORE_lane0 ? 2'b01 : 2'b00);
+    LsuPlugin_logic_trapPort_payload_code = 4'bxxxx;
+    if(LsuPlugin_logic_onCtrl_traps_accessFault) begin
+      LsuPlugin_logic_trapPort_payload_code = 4'b0101;
+      if(execute_ctrl4_down_LsuL1_STORE_lane0) begin
+        LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
+      end
+    end
+    if(LsuPlugin_logic_onCtrl_traps_l1Failed) begin
+      LsuPlugin_logic_trapPort_payload_code = 4'b0100;
+    end
+    if(LsuPlugin_logic_onCtrl_traps_pmaFault) begin
+      LsuPlugin_logic_trapPort_payload_code = 4'b0101;
+      if(execute_ctrl4_down_LsuL1_STORE_lane0) begin
+        LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
+      end
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0) begin
+      LsuPlugin_logic_trapPort_payload_code = 4'b1101;
+      if(execute_ctrl4_down_LsuL1_STORE_lane0) begin
+        LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
+      end
+    end
+    if(execute_ctrl4_down_MMU_ACCESS_FAULT_lane0) begin
+      LsuPlugin_logic_trapPort_payload_code = 4'b0101;
+      if(execute_ctrl4_down_LsuL1_STORE_lane0) begin
+        LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
+      end
+    end
+    if(execute_ctrl4_down_MMU_REFILL_lane0) begin
+      LsuPlugin_logic_trapPort_payload_code = 4'b0111;
+    end
+    if(execute_ctrl4_down_MMU_HAZARD_lane0) begin
+      LsuPlugin_logic_trapPort_payload_code = 4'b0100;
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0) begin
+      LsuPlugin_logic_trapPort_payload_code = 4'b0101;
+      if(execute_ctrl4_down_AguPlugin_STORE_lane0) begin
+        LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
+      end
+      if(when_LsuPlugin_l747) begin
+        LsuPlugin_logic_trapPort_payload_code[3] = 1'b1;
+      end
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0) begin
+      LsuPlugin_logic_trapPort_payload_code = {1'd0, _zz_LsuPlugin_logic_trapPort_payload_code};
+    end
+    if(execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0) begin
+      LsuPlugin_logic_trapPort_payload_code = 4'b0011;
+    end
   end
 
+  always @(*) begin
+    LsuPlugin_logic_trapPort_payload_arg = 2'b00;
+    LsuPlugin_logic_trapPort_payload_arg[1 : 0] = (execute_ctrl4_down_LsuL1_STORE_lane0 ? 2'b01 : 2'b00);
+  end
+
+  assign LsuPlugin_logic_onCtrl_traps_accessFault = ((execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault ? (LsuPlugin_logic_onCtrl_io_rsp_valid && LsuPlugin_logic_onCtrl_io_rsp_payload_error) : execute_ctrl4_down_LsuL1_FAULT_lane0) || execute_ctrl4_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0);
+  assign LsuPlugin_logic_onCtrl_traps_l1Failed = ((! execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault) && ((execute_ctrl4_down_LsuL1_HAZARD_lane0 || execute_ctrl4_down_LsuL1_MISS_lane0) || execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0));
+  assign LsuPlugin_logic_onCtrl_traps_pmaFault = (execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault && execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault);
+  assign when_LsuPlugin_l747 = (! execute_ctrl4_down_MMU_BYPASS_TRANSLATION_lane0);
+  assign when_LsuPlugin_l774 = (execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0 || execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0);
+  assign when_LsuPlugin_l788 = (execute_ctrl4_up_LANE_SEL_lane0 && execute_ctrl4_down_AguPlugin_SEL_lane0);
+  assign LsuPlugin_logic_onCtrl_mmuNeeded = (execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 || execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0);
+  assign execute_ctrl4_down_LsuL1_ABORD_lane0 = (|{(LsuPlugin_logic_onCtrl_mmuNeeded && execute_ctrl4_down_LsuPlugin_logic_MMU_FAILURE_lane0),{(execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 && (((! execute_ctrl4_up_LANE_SEL_lane0) || execute_lane0_ctrls_4_upIsCancel) || execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0)),{((! execute_ctrl4_down_LsuL1_FLUSH_lane0) && execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault),{execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0,execute_ctrl4_down_LsuL1_HAZARD_lane0}}}});
+  assign execute_ctrl4_down_LsuL1_SKIP_WRITE_lane0 = (|{execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0,{(execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 && (execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0 || execute_ctrl4_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0)),{execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0,{execute_ctrl4_down_LsuL1_FAULT_lane0,(execute_ctrl4_down_LsuL1_MISS_lane0 || execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0)}}}});
+  assign when_LsuPlugin_l827 = ((execute_ctrl4_down_LsuL1_SEL_lane0 && execute_ctrl4_down_LsuL1_FLUSH_lane0) && ((execute_ctrl4_down_LsuL1_FLUSH_HIT_lane0 || execute_ctrl4_down_LsuL1_HAZARD_lane0) || execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0));
+  assign when_LsuPlugin_l222 = (|(LsuPlugin_logic_onCtrl_hartRegulation_refill & (~ LsuL1_REFILL_BUSY)));
+  assign when_LsuPlugin_l871 = ((((((execute_ctrl4_up_LANE_SEL_lane0 && execute_ctrl4_down_AguPlugin_SEL_lane0) && (! execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0)) && 1'b1) && ((execute_ctrl4_down_LsuL1_HAZARD_lane0 || execute_ctrl4_down_LsuL1_MISS_lane0) || execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0));
+  assign when_LsuPlugin_l226 = (|execute_ctrl4_down_LsuL1_WAIT_REFILL_lane0);
+  assign LsuPlugin_logic_commitProbe_valid = (((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && (execute_ctrl4_down_AguPlugin_SEL_lane0 ? execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 : (execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0 && execute_ctrl4_down_LsuL1_HAZARD_lane0)));
+  assign LsuPlugin_logic_commitProbe_payload_address = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0;
+  assign LsuPlugin_logic_commitProbe_payload_load = execute_ctrl4_down_LsuL1_LOAD_lane0;
+  assign LsuPlugin_logic_commitProbe_payload_store = execute_ctrl4_down_LsuL1_STORE_lane0;
+  assign LsuPlugin_logic_commitProbe_payload_trap = LsuPlugin_logic_onCtrl_lsuTrap;
+  assign LsuPlugin_logic_commitProbe_payload_miss = ((execute_ctrl4_down_LsuL1_MISS_lane0 && (! execute_ctrl4_down_LsuL1_HAZARD_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_MMU_FAILURE_lane0));
+  assign LsuPlugin_logic_commitProbe_payload_io = execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0;
+  assign LsuPlugin_logic_commitProbe_payload_prefetchFailed = execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  assign LsuPlugin_logic_commitProbe_payload_pc = execute_ctrl4_down_PC_lane0;
+  assign LsuPlugin_logic_iwb_valid = (execute_ctrl4_down_AguPlugin_SEL_lane0 && (! execute_ctrl4_down_AguPlugin_FLOAT_lane0));
+  assign LsuPlugin_logic_iwb_payload = execute_ctrl4_down_LsuPlugin_logic_onCtrl_loadData_RESULT_lane0;
+  assign LsuPlugin_logic_onWb_storeFire = ((((((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_AguPlugin_SEL_lane0) && execute_ctrl4_down_LsuL1_STORE_lane0) && (! execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0));
+  assign LsuPlugin_logic_onWb_storeBroadcast = (((((((execute_ctrl4_down_isReady && execute_ctrl4_down_LsuL1_SEL_lane0) && execute_ctrl4_down_LsuL1_STORE_lane0) && (! execute_ctrl4_down_LsuL1_ABORD_lane0)) && (! execute_ctrl4_down_LsuL1_SKIP_WRITE_lane0)) && (! execute_ctrl4_down_LsuL1_MISS_lane0)) && (! execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0)) && (! execute_ctrl4_down_LsuL1_HAZARD_lane0));
   assign WhiteboxerPlugin_logic_fetch_fetchId = fetch_logic_ctrls_0_down_Fetch_ID;
   assign WhiteboxerPlugin_logic_decodes_0_fire = ((decode_ctrls_0_up_LANE_SEL_0 && decode_ctrls_0_up_isReady) && (! decode_ctrls_0_lane0_upIsCancel));
   assign when_CtrlLaneApi_l50 = (decode_ctrls_0_up_isReady || decode_ctrls_0_lane0_upIsCancel);
@@ -4069,6 +5553,17 @@ module VexiiRiscv (
   assign PrivilegedPlugin_logic_defaultTrap_csrPrivilege = CsrAccessPlugin_bus_decode_address[9 : 8];
   assign PrivilegedPlugin_logic_defaultTrap_csrReadOnly = (CsrAccessPlugin_bus_decode_address[11 : 10] == 2'b11);
   assign when_PrivilegedPlugin_l689 = ((PrivilegedPlugin_logic_defaultTrap_csrReadOnly && CsrAccessPlugin_bus_decode_write) || (PrivilegedPlugin_logic_harts_0_privilege < PrivilegedPlugin_logic_defaultTrap_csrPrivilege));
+  assign PmpPlugin_logic_isMachine = (PrivilegedPlugin_logic_harts_0_privilege == 2'b11);
+  assign PmpPlugin_logic_checkInstruction = (! PmpPlugin_logic_isMachine);
+  assign PmpPlugin_logic_checkData = ((! PmpPlugin_logic_isMachine) || (PrivilegedPlugin_logic_harts_0_m_status_mprv && (PrivilegedPlugin_logic_harts_0_m_status_mpp != 2'b11)));
+  assign FetchL1Plugin_logic_pmpPort_logic_portCheckData = (PmpPlugin_logic_checkData || 1'b0);
+  assign FetchL1Plugin_logic_pmpPort_logic_torCmpAddress = (fetch_logic_ctrls_1_down_MMU_TRANSLATED >>> 4'd12);
+  assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_pmpPort_logic_NEED_HIT = ((PmpPlugin_logic_checkInstruction && 1'b1) || (FetchL1Plugin_logic_pmpPort_logic_portCheckData && (1'b0 || 1'b0)));
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_pmpPort_ACCESS_FAULT = 1'b0;
+  assign LsuPlugin_logic_pmpPort_logic_portCheckData = (PmpPlugin_logic_checkData || execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0);
+  assign LsuPlugin_logic_pmpPort_logic_torCmpAddress = (execute_ctrl3_down_MMU_TRANSLATED_lane0 >>> 4'd12);
+  assign execute_ctrl2_down_LsuPlugin_logic_pmpPort_logic_NEED_HIT_lane0 = ((PmpPlugin_logic_checkInstruction && 1'b0) || (LsuPlugin_logic_pmpPort_logic_portCheckData && (execute_ctrl2_down_LsuL1_LOAD_lane0 || execute_ctrl2_down_LsuL1_STORE_lane0)));
+  assign execute_ctrl4_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0 = 1'b0;
   assign FetchL1Plugin_pmaBuilder_addressBits = FetchL1Plugin_logic_ctrl_pmaPort_cmd_address;
   assign _zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io = ((FetchL1Plugin_pmaBuilder_addressBits & 32'h0) == 32'h0);
   assign FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit = _zz_FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit[0];
@@ -4104,6 +5599,51 @@ module VexiiRiscv (
   assign FetchL1Plugin_logic_bus_rsp_valid = _zz_FetchL1Plugin_logic_bus_rsp_valid;
   assign FetchL1Plugin_logic_bus_rsp_payload_data = FetchL1WishbonePlugin_logic_bus_DAT_MISO_regNext;
   assign FetchL1Plugin_logic_bus_rsp_payload_error = FetchL1WishbonePlugin_logic_bus_ERR_regNext;
+  always @(*) begin
+    LsuPlugin_logic_bus_cmd_ready = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_ready;
+    if(when_Stream_l399_2) begin
+      LsuPlugin_logic_bus_cmd_ready = 1'b1;
+    end
+  end
+
+  assign when_Stream_l399_2 = (! LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid);
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid = LsuPlugin_logic_bus_cmd_rValid;
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_write = LsuPlugin_logic_bus_cmd_rData_write;
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_address = LsuPlugin_logic_bus_cmd_rData_address;
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_data = LsuPlugin_logic_bus_cmd_rData_data;
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_size = LsuPlugin_logic_bus_cmd_rData_size;
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_mask = LsuPlugin_logic_bus_cmd_rData_mask;
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_io = LsuPlugin_logic_bus_cmd_rData_io;
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_fromHart = LsuPlugin_logic_bus_cmd_rData_fromHart;
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_uopId = LsuPlugin_logic_bus_cmd_rData_uopId;
+  assign LsuCachelessWishbonePlugin_logic_bridge_down_ADR = (LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_address >>> 2'd2);
+  assign LsuCachelessWishbonePlugin_logic_bridge_down_CTI = 3'b000;
+  assign LsuCachelessWishbonePlugin_logic_bridge_down_BTE = 2'b00;
+  assign LsuCachelessWishbonePlugin_logic_bridge_down_SEL = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_mask;
+  assign LsuCachelessWishbonePlugin_logic_bridge_down_WE = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_write;
+  assign LsuCachelessWishbonePlugin_logic_bridge_down_DAT_MOSI = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_data;
+  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_ready = (LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid && (LsuCachelessWishbonePlugin_logic_bridge_down_ACK || LsuCachelessWishbonePlugin_logic_bridge_down_ERR));
+  assign LsuCachelessWishbonePlugin_logic_bridge_down_CYC = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid;
+  assign LsuCachelessWishbonePlugin_logic_bridge_down_STB = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid;
+  assign LsuPlugin_logic_bus_rsp_valid = (LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid && (LsuCachelessWishbonePlugin_logic_bridge_down_ACK || LsuCachelessWishbonePlugin_logic_bridge_down_ERR));
+  assign LsuPlugin_logic_bus_rsp_payload_data = LsuCachelessWishbonePlugin_logic_bridge_down_DAT_MISO;
+  assign LsuPlugin_logic_bus_rsp_payload_error = LsuCachelessWishbonePlugin_logic_bridge_down_ERR;
+  assign LsuPlugin_pmaBuilder_l1_addressBits = LsuPlugin_logic_onPma_cached_cmd_address;
+  assign LsuPlugin_pmaBuilder_l1_argsBits = LsuPlugin_logic_onPma_cached_cmd_op;
+  assign _zz_LsuPlugin_logic_onPma_cached_rsp_io = ((LsuPlugin_pmaBuilder_l1_addressBits & 32'h0) == 32'h0);
+  assign LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit = _zz_LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit[0];
+  assign LsuPlugin_pmaBuilder_l1_onTransfers_0_argsHit = (|((LsuPlugin_pmaBuilder_l1_argsBits & 1'b0) == 1'b0));
+  assign LsuPlugin_pmaBuilder_l1_onTransfers_0_hit = (LsuPlugin_pmaBuilder_l1_onTransfers_0_argsHit && LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit);
+  assign LsuPlugin_logic_onPma_cached_rsp_fault = (! ((|((LsuPlugin_pmaBuilder_l1_addressBits & 32'h80000000) == 32'h0)) && (|LsuPlugin_pmaBuilder_l1_onTransfers_0_hit)));
+  assign LsuPlugin_logic_onPma_cached_rsp_io = (! _zz_LsuPlugin_logic_onPma_cached_rsp_io_1[0]);
+  assign LsuPlugin_pmaBuilder_io_addressBits = LsuPlugin_logic_onPma_io_cmd_address;
+  assign LsuPlugin_pmaBuilder_io_argsBits = {LsuPlugin_logic_onPma_io_cmd_size,LsuPlugin_logic_onPma_io_cmd_op};
+  assign LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit = _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit[0];
+  assign LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit = (|((LsuPlugin_pmaBuilder_io_argsBits & 3'b000) == 3'b000));
+  assign LsuPlugin_pmaBuilder_io_onTransfers_0_hit = (LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit && LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit);
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault = ((LsuPlugin_pmaBuilder_io_addressBits & 32'h80000000) == 32'h0);
+  assign LsuPlugin_logic_onPma_io_rsp_fault = (! ((|{_zz_LsuPlugin_logic_onPma_io_rsp_fault,((LsuPlugin_pmaBuilder_io_addressBits & 32'hffff0000) == 32'hf0000000)}) && (|LsuPlugin_pmaBuilder_io_onTransfers_0_hit)));
+  assign LsuPlugin_logic_onPma_io_rsp_io = (! _zz_LsuPlugin_logic_onPma_io_rsp_io[0]);
   always @(*) begin
     _zz_execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
     case(execute_ctrl1_down_early0_SrcPlugin_logic_SRC1_CTRL_lane0)
@@ -4152,9 +5692,9 @@ module VexiiRiscv (
   assign lane0_IntFormatPlugin_logic_stages_0_wb_valid = (execute_ctrl2_up_LANE_SEL_lane0 && (|lane0_IntFormatPlugin_logic_stages_0_hits));
   assign lane0_IntFormatPlugin_logic_stages_0_raw = ((lane0_IntFormatPlugin_logic_stages_0_hits[0] ? early0_IntAluPlugin_logic_wb_payload : 32'h0) | (lane0_IntFormatPlugin_logic_stages_0_hits[1] ? early0_BarrelShifterPlugin_logic_wb_payload : 32'h0));
   assign lane0_IntFormatPlugin_logic_stages_0_wb_payload = lane0_IntFormatPlugin_logic_stages_0_raw;
-  assign lane0_IntFormatPlugin_logic_stages_1_hits = {LsuCachelessPlugin_logic_iwb_valid,early0_MulPlugin_logic_formatBus_valid};
+  assign lane0_IntFormatPlugin_logic_stages_1_hits = {LsuPlugin_logic_iwb_valid,early0_MulPlugin_logic_formatBus_valid};
   assign lane0_IntFormatPlugin_logic_stages_1_wb_valid = (execute_ctrl4_up_LANE_SEL_lane0 && (|lane0_IntFormatPlugin_logic_stages_1_hits));
-  assign lane0_IntFormatPlugin_logic_stages_1_raw = ((lane0_IntFormatPlugin_logic_stages_1_hits[0] ? early0_MulPlugin_logic_formatBus_payload : 32'h0) | (lane0_IntFormatPlugin_logic_stages_1_hits[1] ? LsuCachelessPlugin_logic_iwb_payload : 32'h0));
+  assign lane0_IntFormatPlugin_logic_stages_1_raw = ((lane0_IntFormatPlugin_logic_stages_1_hits[0] ? early0_MulPlugin_logic_formatBus_payload : 32'h0) | (lane0_IntFormatPlugin_logic_stages_1_hits[1] ? LsuPlugin_logic_iwb_payload : 32'h0));
   always @(*) begin
     lane0_IntFormatPlugin_logic_stages_1_wb_payload = lane0_IntFormatPlugin_logic_stages_1_raw;
     if(lane0_IntFormatPlugin_logic_stages_1_segments_0_doIt) begin
@@ -4212,17 +5752,17 @@ module VexiiRiscv (
   assign LearnPlugin_logic_buffered_0_payload_wasWrong = early0_BranchPlugin_logic_jumpLogic_learn_payload_wasWrong;
   assign LearnPlugin_logic_buffered_0_payload_badPredictedTarget = early0_BranchPlugin_logic_jumpLogic_learn_payload_badPredictedTarget;
   assign LearnPlugin_logic_buffered_0_payload_uopId = early0_BranchPlugin_logic_jumpLogic_learn_payload_uopId;
-  assign LearnPlugin_logic_buffered_0_ready = streamArbiter_1_io_inputs_0_ready;
-  assign LearnPlugin_logic_arbitrated_valid = streamArbiter_1_io_output_valid;
-  assign LearnPlugin_logic_arbitrated_payload_pcOnLastSlice = streamArbiter_1_io_output_payload_pcOnLastSlice;
-  assign LearnPlugin_logic_arbitrated_payload_pcTarget = streamArbiter_1_io_output_payload_pcTarget;
-  assign LearnPlugin_logic_arbitrated_payload_taken = streamArbiter_1_io_output_payload_taken;
-  assign LearnPlugin_logic_arbitrated_payload_isBranch = streamArbiter_1_io_output_payload_isBranch;
-  assign LearnPlugin_logic_arbitrated_payload_isPush = streamArbiter_1_io_output_payload_isPush;
-  assign LearnPlugin_logic_arbitrated_payload_isPop = streamArbiter_1_io_output_payload_isPop;
-  assign LearnPlugin_logic_arbitrated_payload_wasWrong = streamArbiter_1_io_output_payload_wasWrong;
-  assign LearnPlugin_logic_arbitrated_payload_badPredictedTarget = streamArbiter_1_io_output_payload_badPredictedTarget;
-  assign LearnPlugin_logic_arbitrated_payload_uopId = streamArbiter_1_io_output_payload_uopId;
+  assign LearnPlugin_logic_buffered_0_ready = streamArbiter_4_io_inputs_0_ready;
+  assign LearnPlugin_logic_arbitrated_valid = streamArbiter_4_io_output_valid;
+  assign LearnPlugin_logic_arbitrated_payload_pcOnLastSlice = streamArbiter_4_io_output_payload_pcOnLastSlice;
+  assign LearnPlugin_logic_arbitrated_payload_pcTarget = streamArbiter_4_io_output_payload_pcTarget;
+  assign LearnPlugin_logic_arbitrated_payload_taken = streamArbiter_4_io_output_payload_taken;
+  assign LearnPlugin_logic_arbitrated_payload_isBranch = streamArbiter_4_io_output_payload_isBranch;
+  assign LearnPlugin_logic_arbitrated_payload_isPush = streamArbiter_4_io_output_payload_isPush;
+  assign LearnPlugin_logic_arbitrated_payload_isPop = streamArbiter_4_io_output_payload_isPop;
+  assign LearnPlugin_logic_arbitrated_payload_wasWrong = streamArbiter_4_io_output_payload_wasWrong;
+  assign LearnPlugin_logic_arbitrated_payload_badPredictedTarget = streamArbiter_4_io_output_payload_badPredictedTarget;
+  assign LearnPlugin_logic_arbitrated_payload_uopId = streamArbiter_4_io_output_payload_uopId;
   assign LearnPlugin_logic_arbitrated_ready = 1'b1;
   assign LearnPlugin_logic_arbitrated_toFlow_valid = LearnPlugin_logic_arbitrated_valid;
   assign LearnPlugin_logic_arbitrated_toFlow_payload_pcOnLastSlice = LearnPlugin_logic_arbitrated_payload_pcOnLastSlice;
@@ -4332,53 +5872,6 @@ module VexiiRiscv (
   assign execute_ctrl4_COMPLETED_lane0_bypass = (execute_ctrl4_up_COMPLETED_lane0 || execute_ctrl4_down_COMPLETION_AT_4_lane0);
   assign execute_ctrl3_COMPLETED_lane0_bypass = (execute_ctrl3_up_COMPLETED_lane0 || execute_ctrl3_down_COMPLETION_AT_3_lane0);
   assign execute_lane0_api_hartsInflight[0] = (|{(execute_ctrl4_up_LANE_SEL_lane0 && 1'b1),{(execute_ctrl3_up_LANE_SEL_lane0 && 1'b1),{(execute_ctrl2_up_LANE_SEL_lane0 && 1'b1),(execute_ctrl1_up_LANE_SEL_lane0 && 1'b1)}}});
-  assign when_LsuCachelessPlugin_l261 = ((execute_ctrl2_down_AguPlugin_LOAD_lane0 && execute_ctrl2_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io) && 1'b0);
-  assign when_LsuCachelessPlugin_l267 = ((execute_ctrl2_down_MMU_ACCESS_FAULT_lane0 || execute_ctrl2_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault) || execute_ctrl2_down_LsuCachelessPlugin_logic_pmpPort_ACCESS_FAULT_lane0);
-  assign when_LsuCachelessPlugin_l274 = (execute_ctrl2_down_MMU_PAGE_FAULT_lane0 || (execute_ctrl2_down_AguPlugin_STORE_lane0 ? (! execute_ctrl2_down_MMU_ALLOW_WRITE_lane0) : (! execute_ctrl2_down_MMU_ALLOW_READ_lane0)));
-  assign when_LsuCachelessPlugin_l315 = ((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_AguPlugin_SEL_lane0) && LsuCachelessPlugin_logic_onFork_skip);
-  assign execute_ctrl2_down_LsuCachelessPlugin_WITH_RSP_lane0 = (LsuCachelessPlugin_logic_bus_cmd_valid || LsuCachelessPlugin_logic_onFork_cmdSent);
-  assign LsuCachelessPlugin_logic_cmdInflights = (|{LsuCachelessPlugin_logic_onJoin_buffers_1_inflight,LsuCachelessPlugin_logic_onJoin_buffers_0_inflight});
-  assign LsuCachelessPlugin_logic_onJoin_busRspWithoutId_error = LsuCachelessPlugin_logic_bus_rsp_payload_error;
-  assign LsuCachelessPlugin_logic_onJoin_busRspWithoutId_data = LsuCachelessPlugin_logic_bus_rsp_payload_data;
-  assign LsuCachelessPlugin_logic_onJoin_pop = (execute_ctrl3_down_LsuCachelessPlugin_WITH_RSP_lane0 && (! execute_freeze_valid));
-  always @(*) begin
-    LsuCachelessPlugin_logic_onJoin_rspCounter_willIncrement = 1'b0;
-    if(LsuCachelessPlugin_logic_onJoin_pop) begin
-      LsuCachelessPlugin_logic_onJoin_rspCounter_willIncrement = 1'b1;
-    end
-  end
-
-  assign LsuCachelessPlugin_logic_onJoin_rspCounter_willClear = 1'b0;
-  assign LsuCachelessPlugin_logic_onJoin_rspCounter_willOverflowIfInc = (LsuCachelessPlugin_logic_onJoin_rspCounter_value == 1'b1);
-  assign LsuCachelessPlugin_logic_onJoin_rspCounter_willOverflow = (LsuCachelessPlugin_logic_onJoin_rspCounter_willOverflowIfInc && LsuCachelessPlugin_logic_onJoin_rspCounter_willIncrement);
-  always @(*) begin
-    LsuCachelessPlugin_logic_onJoin_rspCounter_valueNext = (LsuCachelessPlugin_logic_onJoin_rspCounter_value + LsuCachelessPlugin_logic_onJoin_rspCounter_willIncrement);
-    if(LsuCachelessPlugin_logic_onJoin_rspCounter_willClear) begin
-      LsuCachelessPlugin_logic_onJoin_rspCounter_valueNext = 1'b0;
-    end
-  end
-
-  assign LsuCachelessPlugin_logic_onJoin_readerValid = _zz_LsuCachelessPlugin_logic_onJoin_readerValid;
-  assign LsuCachelessPlugin_logic_onJoin_busRspHit = (LsuCachelessPlugin_logic_bus_rsp_valid && (LsuCachelessPlugin_logic_bus_rsp_payload_id == LsuCachelessPlugin_logic_onJoin_rspCounter_value));
-  assign LsuCachelessPlugin_logic_onJoin_rspValid = (LsuCachelessPlugin_logic_onJoin_readerValid || LsuCachelessPlugin_logic_onJoin_busRspHit);
-  assign LsuCachelessPlugin_logic_onJoin_rspPayload_error = (LsuCachelessPlugin_logic_onJoin_readerValid ? _zz_LsuCachelessPlugin_logic_onJoin_rspPayload_error : LsuCachelessPlugin_logic_onJoin_busRspWithoutId_error);
-  assign LsuCachelessPlugin_logic_onJoin_rspPayload_data = (LsuCachelessPlugin_logic_onJoin_readerValid ? _zz_LsuCachelessPlugin_logic_onJoin_rspPayload_data : LsuCachelessPlugin_logic_onJoin_busRspWithoutId_data);
-  assign execute_ctrl3_down_LsuCachelessPlugin_logic_onJoin_SC_MISS_lane0 = 1'b0;
-  assign execute_ctrl3_down_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0 = LsuCachelessPlugin_logic_onJoin_rspPayload_data;
-  assign execute_ctrl3_up_LsuCachelessPlugin_WITH_ACCESS_lane0 = 1'b0;
-  assign LsuCachelessPlugin_logic_onWb_rspSplits_0 = execute_ctrl4_down_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0[7 : 0];
-  assign LsuCachelessPlugin_logic_onWb_rspSplits_1 = execute_ctrl4_down_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0[15 : 8];
-  assign LsuCachelessPlugin_logic_onWb_rspSplits_2 = execute_ctrl4_down_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0[23 : 16];
-  assign LsuCachelessPlugin_logic_onWb_rspSplits_3 = execute_ctrl4_down_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0[31 : 24];
-  always @(*) begin
-    LsuCachelessPlugin_logic_onWb_rspShifted[7 : 0] = _zz_LsuCachelessPlugin_logic_onWb_rspShifted;
-    LsuCachelessPlugin_logic_onWb_rspShifted[15 : 8] = _zz_LsuCachelessPlugin_logic_onWb_rspShifted_3;
-    LsuCachelessPlugin_logic_onWb_rspShifted[23 : 16] = LsuCachelessPlugin_logic_onWb_rspSplits_2;
-    LsuCachelessPlugin_logic_onWb_rspShifted[31 : 24] = LsuCachelessPlugin_logic_onWb_rspSplits_3;
-  end
-
-  assign LsuCachelessPlugin_logic_iwb_valid = (execute_ctrl4_down_AguPlugin_SEL_lane0 && (! execute_ctrl4_down_AguPlugin_FLOAT_lane0));
-  assign LsuCachelessPlugin_logic_iwb_payload = LsuCachelessPlugin_logic_onWb_rspShifted;
   assign DispatchPlugin_logic_trapPendings[0] = 1'b0;
   assign DispatchPlugin_logic_candidates_0_moving = (((! DispatchPlugin_logic_candidates_0_ctx_valid) || DispatchPlugin_logic_candidates_0_fire) || DispatchPlugin_logic_candidates_0_cancel);
   assign DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard = (DispatchPlugin_logic_candidates_0_ctx_hm_RS1_ENABLE && (|{((((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0 && execute_ctrl4_up_RD_ENABLE_lane0) && (execute_ctrl4_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS1_PHYS)) && 1'b1) && (! execute_ctrl4_down_BYPASSED_AT_4_lane0)),{(((_zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard && _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_1) && 1'b1) && (! execute_ctrl3_down_BYPASSED_AT_3_lane0)),{((_zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_2 && _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_3) && (! execute_ctrl2_down_BYPASSED_AT_2_lane0)),((_zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_4 && _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_5) && (! execute_ctrl1_down_BYPASSED_AT_1_lane0))}}}));
@@ -4386,8 +5879,10 @@ module VexiiRiscv (
   assign DispatchPlugin_logic_candidates_0_rsHazards[0] = (|{DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard,DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard});
   assign DispatchPlugin_logic_reservationChecker_0_onLl_0_hit = 1'b0;
   assign DispatchPlugin_logic_candidates_0_reservationHazards[0] = DispatchPlugin_logic_reservationChecker_0_onLl_0_hit;
+  assign DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_0 = (|{(((DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_4 && execute_ctrl1_up_LANE_SEL_lane0) && 1'b1) && execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0),(((DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3 && execute_ctrl1_up_LANE_SEL_lane0) && 1'b1) && execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0)});
+  assign DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_1 = (|(((DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3 && execute_ctrl2_up_LANE_SEL_lane0) && 1'b1) && execute_ctrl2_down_MAY_FLUSH_PRECISE_3_lane0));
   assign DispatchPlugin_logic_flushChecker_0_oldersHazard = 1'b0;
-  assign DispatchPlugin_logic_candidates_0_flushHazards = (1'b0 || (DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH_FROM_LANES && DispatchPlugin_logic_flushChecker_0_oldersHazard));
+  assign DispatchPlugin_logic_candidates_0_flushHazards = ((|{DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_1,DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_0}) || (DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH_FROM_LANES && DispatchPlugin_logic_flushChecker_0_oldersHazard));
   assign DispatchPlugin_logic_fenceChecker_olderInflights = (|execute_lane0_api_hartsInflight[0]);
   assign DispatchPlugin_logic_candidates_0_fenceOlderHazards = (DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_FENCE_OLDER && (DispatchPlugin_logic_fenceChecker_olderInflights[0] || 1'b0));
   always @(*) begin
@@ -4412,6 +5907,8 @@ module VexiiRiscv (
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_MAY_FLUSH = decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH = decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH_FROM_LANES = decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3 = decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_4 = decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_PC = decode_ctrls_1_down_PC_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_TRAP = decode_ctrls_1_down_TRAP_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_Decode_UOP_ID = decode_ctrls_1_down_Decode_UOP_ID_0;
@@ -4450,6 +5947,8 @@ module VexiiRiscv (
 
   assign execute_ctrl0_up_DispatchPlugin_DONT_FLUSH_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH;
   assign execute_ctrl0_up_DispatchPlugin_DONT_FLUSH_FROM_LANES_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH_FROM_LANES;
+  assign execute_ctrl0_up_DONT_FLUSH_PRECISE_3_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3;
+  assign execute_ctrl0_up_DONT_FLUSH_PRECISE_4_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_4;
   assign execute_ctrl0_up_PC_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_PC;
   assign execute_ctrl0_up_TRAP_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_TRAP;
   assign execute_ctrl0_up_Decode_UOP_ID_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_Decode_UOP_ID;
@@ -4519,66 +6018,18 @@ module VexiiRiscv (
   assign CsrRamPlugin_csrMapper_write_address = CsrRamPlugin_csrMapper_ramAddress;
   assign CsrRamPlugin_csrMapper_write_data = CsrAccessPlugin_bus_write_bits;
   assign when_CsrRamPlugin_l96 = ((CsrRamPlugin_csrMapper_doWrite && (! CsrRamPlugin_csrMapper_fired)) && (! CsrRamPlugin_csrMapper_write_ready));
-  assign PmpPlugin_logic_isMachine = (PrivilegedPlugin_logic_harts_0_privilege == 2'b11);
-  assign PmpPlugin_logic_checkInstruction = (! PmpPlugin_logic_isMachine);
-  assign PmpPlugin_logic_checkData = ((! PmpPlugin_logic_isMachine) || (PrivilegedPlugin_logic_harts_0_m_status_mprv && (PrivilegedPlugin_logic_harts_0_m_status_mpp != 2'b11)));
-  assign FetchL1Plugin_logic_pmpPort_logic_portCheckData = (PmpPlugin_logic_checkData || 1'b0);
-  assign FetchL1Plugin_logic_pmpPort_logic_torCmpAddress = (fetch_logic_ctrls_1_down_MMU_TRANSLATED >>> 4'd12);
-  assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_pmpPort_logic_NEED_HIT = ((PmpPlugin_logic_checkInstruction && 1'b1) || (FetchL1Plugin_logic_pmpPort_logic_portCheckData && (1'b0 || 1'b0)));
-  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_pmpPort_ACCESS_FAULT = 1'b0;
-  assign LsuCachelessPlugin_logic_pmpPort_logic_portCheckData = (PmpPlugin_logic_checkData || 1'b0);
-  assign LsuCachelessPlugin_logic_pmpPort_logic_torCmpAddress = (execute_ctrl2_down_MMU_TRANSLATED_lane0 >>> 4'd12);
-  assign execute_ctrl2_down_LsuCachelessPlugin_logic_pmpPort_logic_NEED_HIT_lane0 = ((PmpPlugin_logic_checkInstruction && 1'b0) || (LsuCachelessPlugin_logic_pmpPort_logic_portCheckData && (execute_ctrl2_down_AguPlugin_LOAD_lane0 || execute_ctrl2_down_AguPlugin_STORE_lane0)));
-  assign execute_ctrl2_down_LsuCachelessPlugin_logic_pmpPort_ACCESS_FAULT_lane0 = 1'b0;
-  always @(*) begin
-    LsuCachelessPlugin_logic_bus_cmd_ready = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_ready;
-    if(when_Stream_l399) begin
-      LsuCachelessPlugin_logic_bus_cmd_ready = 1'b1;
-    end
-  end
-
-  assign when_Stream_l399 = (! LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid);
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid = LsuCachelessPlugin_logic_bus_cmd_rValid;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_id = LsuCachelessPlugin_logic_bus_cmd_rData_id;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_write = LsuCachelessPlugin_logic_bus_cmd_rData_write;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_address = LsuCachelessPlugin_logic_bus_cmd_rData_address;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_data = LsuCachelessPlugin_logic_bus_cmd_rData_data;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_size = LsuCachelessPlugin_logic_bus_cmd_rData_size;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_mask = LsuCachelessPlugin_logic_bus_cmd_rData_mask;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_io = LsuCachelessPlugin_logic_bus_cmd_rData_io;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_fromHart = LsuCachelessPlugin_logic_bus_cmd_rData_fromHart;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_uopId = LsuCachelessPlugin_logic_bus_cmd_rData_uopId;
-  assign LsuCachelessWishbonePlugin_logic_bridge_down_ADR = (LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_address >>> 2'd2);
-  assign LsuCachelessWishbonePlugin_logic_bridge_down_CTI = 3'b000;
-  assign LsuCachelessWishbonePlugin_logic_bridge_down_BTE = 2'b00;
-  assign LsuCachelessWishbonePlugin_logic_bridge_down_SEL = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_mask;
-  assign LsuCachelessWishbonePlugin_logic_bridge_down_WE = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_write;
-  assign LsuCachelessWishbonePlugin_logic_bridge_down_DAT_MOSI = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_data;
-  assign LsuCachelessWishbonePlugin_logic_bridge_cmdStage_ready = (LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid && (LsuCachelessWishbonePlugin_logic_bridge_down_ACK || LsuCachelessWishbonePlugin_logic_bridge_down_ERR));
-  assign LsuCachelessWishbonePlugin_logic_bridge_down_CYC = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid;
-  assign LsuCachelessWishbonePlugin_logic_bridge_down_STB = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid;
-  assign LsuCachelessPlugin_logic_bus_rsp_valid = (LsuCachelessWishbonePlugin_logic_bridge_cmdStage_valid && (LsuCachelessWishbonePlugin_logic_bridge_down_ACK || LsuCachelessWishbonePlugin_logic_bridge_down_ERR));
-  assign LsuCachelessPlugin_logic_bus_rsp_payload_id = LsuCachelessWishbonePlugin_logic_bridge_cmdStage_payload_id;
-  assign LsuCachelessPlugin_logic_bus_rsp_payload_data = LsuCachelessWishbonePlugin_logic_bridge_down_DAT_MISO;
-  assign LsuCachelessPlugin_logic_bus_rsp_payload_error = LsuCachelessWishbonePlugin_logic_bridge_down_ERR;
-  assign LsuCachelessPlugin_pmaBuilder_addressBits = LsuCachelessPlugin_logic_onPma_port_cmd_address;
-  assign LsuCachelessPlugin_pmaBuilder_argsBits = {LsuCachelessPlugin_logic_onPma_port_cmd_size,LsuCachelessPlugin_logic_onPma_port_cmd_op};
-  assign LsuCachelessPlugin_pmaBuilder_onTransfers_0_addressHit = _zz_LsuCachelessPlugin_pmaBuilder_onTransfers_0_addressHit[0];
-  assign LsuCachelessPlugin_pmaBuilder_onTransfers_0_argsHit = (|((LsuCachelessPlugin_pmaBuilder_argsBits & 3'b000) == 3'b000));
-  assign LsuCachelessPlugin_pmaBuilder_onTransfers_0_hit = (LsuCachelessPlugin_pmaBuilder_onTransfers_0_argsHit && LsuCachelessPlugin_pmaBuilder_onTransfers_0_addressHit);
-  assign _zz_LsuCachelessPlugin_logic_onPma_port_rsp_fault = ((LsuCachelessPlugin_pmaBuilder_addressBits & 32'h80000000) == 32'h0);
-  assign LsuCachelessPlugin_logic_onPma_port_rsp_fault = (! ((|{_zz_LsuCachelessPlugin_logic_onPma_port_rsp_fault,((LsuCachelessPlugin_pmaBuilder_addressBits & 32'hffff0000) == 32'hf0000000)}) && (|LsuCachelessPlugin_pmaBuilder_onTransfers_0_hit)));
-  assign LsuCachelessPlugin_logic_onPma_port_rsp_io = (! _zz_LsuCachelessPlugin_logic_onPma_port_rsp_io[0]);
   assign decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0 = _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0[0];
   assign decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0 = _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0[0];
   assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h0) == 32'h0);
   assign decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0[0];
   assign decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0 = _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_1[0];
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00002050) == 32'h00002050);
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001050) == 32'h00001050);
   assign decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00002050) == 32'h00002050);
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001050) == 32'h00001050);
-  assign decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_2[0];
+  assign decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0[0];
   assign decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0 = _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0[0];
+  assign decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0[0];
+  assign decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_2[0];
   assign decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0[0];
   assign decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_1[0];
   assign when_CtrlLaneApi_l50_2 = (decode_ctrls_1_up_isReady || decode_ctrls_1_lane0_upIsCancel);
@@ -4592,7 +6043,7 @@ module VexiiRiscv (
   assign when_CtrlLaneApi_l50_4 = (execute_ctrl2_down_isReady || execute_lane0_ctrls_2_downIsCancel);
   assign WhiteboxerPlugin_logic_executes_0_fire = ((execute_ctrl2_down_LANE_SEL_lane0 && (! execute_ctrl2_down_LANE_SEL_lane0_regNext)) && execute_ctrl2_down_COMMIT_lane0);
   assign WhiteboxerPlugin_logic_executes_0_microOpId = execute_ctrl2_down_Decode_UOP_ID_lane0;
-  assign AlignerPlugin_logic_nobuffer_flushIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuCachelessPlugin_logic_flushPort_valid && 1'b1)}}}});
+  assign AlignerPlugin_logic_nobuffer_flushIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
   assign when_AlignerPlugin_l298 = ((AlignerPlugin_logic_nobuffer_flushIt || (! fetch_logic_ctrls_2_down_isValid)) || fetch_logic_ctrls_2_down_isReady);
   assign AlignerPlugin_logic_slices_data_0 = fetch_logic_ctrls_2_down_Fetch_WORD[31 : 0];
   assign AlignerPlugin_logic_slices_mask = ((fetch_logic_ctrls_2_down_valid ? fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_MASK : 1'b0) & 1'b1);
@@ -4626,6 +6077,8 @@ module VexiiRiscv (
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
       default : begin
@@ -4656,6 +6109,8 @@ module VexiiRiscv (
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
       default : begin
@@ -4663,10 +6118,10 @@ module VexiiRiscv (
     endcase
   end
 
-  assign decode_logic_flushes_0_onLanes_0_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuCachelessPlugin_logic_flushPort_valid && 1'b1)}}}});
+  assign decode_logic_flushes_0_onLanes_0_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
   assign decode_ctrls_0_lane0_downIsCancel = 1'b0;
   assign decode_ctrls_0_lane0_upIsCancel = decode_logic_flushes_0_onLanes_0_doIt;
-  assign decode_logic_flushes_1_onLanes_0_doIt = (|{((DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && DecoderPlugin_logic_laneLogic_0_flushPort_payload_self))),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuCachelessPlugin_logic_flushPort_valid && 1'b1)}}}});
+  assign decode_logic_flushes_1_onLanes_0_doIt = (|{((DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && DecoderPlugin_logic_laneLogic_0_flushPort_payload_self))),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
   assign decode_ctrls_1_lane0_downIsCancel = 1'b0;
   assign decode_ctrls_1_lane0_upIsCancel = decode_logic_flushes_1_onLanes_0_doIt;
   assign decode_logic_trapPending[0] = (|{((decode_ctrls_1_up_LANE_SEL_0 && 1'b1) && decode_ctrls_1_down_TRAP_0),((decode_ctrls_0_up_LANE_SEL_0 && 1'b1) && decode_ctrls_0_down_TRAP_0)});
@@ -4692,6 +6147,8 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
@@ -4722,6 +6179,8 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
@@ -4755,6 +6214,8 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
@@ -4814,41 +6275,48 @@ module VexiiRiscv (
   assign when_TrapPlugin_l207_2 = ((_zz_when_TrapPlugin_l207_2 && 1'b1) && (! 1'b0));
   assign TrapPlugin_logic_harts_0_interrupt_pendingInterrupt = (TrapPlugin_logic_harts_0_interrupt_validBuffer && PrivilegedPlugin_api_harts_0_allowInterrupts);
   assign when_TrapPlugin_l226 = (|{_zz_when_TrapPlugin_l207_2,{_zz_when_TrapPlugin_l207_1,_zz_when_TrapPlugin_l207}});
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid = (early0_EnvPlugin_logic_trapPort_valid && 1'b1);
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid = (FetchL1Plugin_logic_trapPort_valid && 1'b1);
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1 = (LsuCachelessPlugin_logic_trapPort_valid && 1'b1);
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_2 = (early0_BranchPlugin_logic_trapPort_valid && 1'b1);
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_3 = (CsrAccessPlugin_logic_trapPort_valid && 1'b1);
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid = (DecoderPlugin_logic_laneLogic_0_trapPort_valid && 1'b1);
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception = {(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_3 && (&{(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception),{_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_2}})),{(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_2 && (&{_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_3,{_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_4,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_6}})),{(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1 && (&{_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_8,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_10})),(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid && (&{_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_13,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_15}))}}};
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid = (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_3,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_2,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid}}});
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1 = (((_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception[0] ? {early0_EnvPlugin_logic_trapPort_payload_arg,{early0_EnvPlugin_logic_trapPort_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_1}} : 39'h0) | (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception[1] ? {LsuCachelessPlugin_logic_trapPort_payload_arg,{LsuCachelessPlugin_logic_trapPort_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_2}} : 39'h0)) | ((_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception[2] ? {early0_BranchPlugin_logic_trapPort_payload_arg,{early0_BranchPlugin_logic_trapPort_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_3}} : 39'h0) | (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception[3] ? {CsrAccessPlugin_logic_trapPort_payload_arg,{CsrAccessPlugin_logic_trapPort_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1_4}} : 39'h0)));
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1[0];
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_tval = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1[32 : 1];
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_code = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1[36 : 33];
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_arg = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1[38 : 37];
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid = (|_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid);
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception = DecoderPlugin_logic_laneLogic_0_trapPort_payload_exception;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_tval = DecoderPlugin_logic_laneLogic_0_trapPort_payload_tval;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_code = DecoderPlugin_logic_laneLogic_0_trapPort_payload_code;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_arg = DecoderPlugin_logic_laneLogic_0_trapPort_payload_arg;
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid = (early0_EnvPlugin_logic_trapPort_valid && 1'b1);
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_valid = (FetchL1Plugin_logic_trapPort_valid && 1'b1);
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid = (LsuPlugin_logic_trapPort_valid && 1'b1);
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1 = (early0_BranchPlugin_logic_trapPort_valid && 1'b1);
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2 = (CsrAccessPlugin_logic_trapPort_valid && 1'b1);
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid = (DecoderPlugin_logic_laneLogic_0_trapPort_valid && 1'b1);
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid = (|_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid);
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception = LsuPlugin_logic_trapPort_payload_exception;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_tval = LsuPlugin_logic_trapPort_payload_tval;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_code = LsuPlugin_logic_trapPort_payload_code;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_arg = LsuPlugin_logic_trapPort_payload_arg;
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception = {(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2 && (&{(! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1 && _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception)),(! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid && _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1))})),{(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1 && (&{(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_2),(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_3)})),(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid && (&{(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_4),(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_5)}))}};
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid = (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid}});
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1 = (((_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception[0] ? {early0_EnvPlugin_logic_trapPort_payload_arg,{early0_EnvPlugin_logic_trapPort_payload_code,{early0_EnvPlugin_logic_trapPort_payload_tval,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1_1}}} : 39'h0) | (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception[1] ? {early0_BranchPlugin_logic_trapPort_payload_arg,{early0_BranchPlugin_logic_trapPort_payload_code,{early0_BranchPlugin_logic_trapPort_payload_tval,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1_2}}} : 39'h0)) | (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception[2] ? {CsrAccessPlugin_logic_trapPort_payload_arg,{CsrAccessPlugin_logic_trapPort_payload_code,{CsrAccessPlugin_logic_trapPort_payload_tval,CsrAccessPlugin_logic_trapPort_payload_exception}}} : 39'h0));
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1[0];
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_tval = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1[32 : 1];
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_code = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1[36 : 33];
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_arg = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1[38 : 37];
   assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid = (|_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid);
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_exception = FetchL1Plugin_logic_trapPort_payload_exception;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_tval = FetchL1Plugin_logic_trapPort_payload_tval;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_code = FetchL1Plugin_logic_trapPort_payload_code;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_arg = FetchL1Plugin_logic_trapPort_payload_arg;
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh = {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid,TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid}};
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_exception = DecoderPlugin_logic_laneLogic_0_trapPort_payload_exception;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_tval = DecoderPlugin_logic_laneLogic_0_trapPort_payload_tval;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_code = DecoderPlugin_logic_laneLogic_0_trapPort_payload_code;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_arg = DecoderPlugin_logic_laneLogic_0_trapPort_payload_arg;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_valid = (|_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_valid);
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_exception = FetchL1Plugin_logic_trapPort_payload_exception;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_tval = FetchL1Plugin_logic_trapPort_payload_tval;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_code = FetchL1Plugin_logic_trapPort_payload_code;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_arg = FetchL1Plugin_logic_trapPort_payload_arg;
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh = {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_valid,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid,TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid}}};
   assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_1 = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[0];
   assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_2 = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[1];
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_3 = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[2];
   always @(*) begin
-    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_3[0] = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_1 && (! 1'b0));
-    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_3[1] = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_2 && (! _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_1));
-    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_3[2] = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[2] && (! (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_2,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_1})));
+    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_4[0] = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_1 && (! 1'b0));
+    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_4[1] = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_2 && (! _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_1));
+    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_4[2] = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_3 && (! (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_2,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_1})));
+    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_4[3] = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[3] && (! (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_3,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_2,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_1}})));
   end
 
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_oh = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_3;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_down_valid = (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_3,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_2,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid}}}}});
-  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception = (((TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[0] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_code,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_tval,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception}}} : 39'h0) | (TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[1] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_code,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_tval,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_1}}} : 39'h0)) | (TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[2] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_code,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_tval,TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_exception}}} : 39'h0));
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_oh = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_4;
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_down_valid = (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_valid,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid}}}}});
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception = (((TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[0] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception}} : 39'h0) | (TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[1] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_1}} : 39'h0)) | ((TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[2] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_2}} : 39'h0) | (TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[3] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_3}} : 39'h0)));
   assign TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception[0];
   assign TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_tval = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception[32 : 1];
   assign TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_code = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception[36 : 33];
@@ -4883,6 +6351,8 @@ module VexiiRiscv (
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
       default : begin
@@ -4912,6 +6382,8 @@ module VexiiRiscv (
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
       default : begin
@@ -4940,6 +6412,8 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
@@ -4992,6 +6466,8 @@ module VexiiRiscv (
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
         TrapPlugin_logic_harts_0_trap_pcPort_valid = 1'b1;
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
@@ -5046,6 +6522,8 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
         TrapPlugin_logic_harts_0_trap_pcPort_payload_pc = TrapPlugin_logic_harts_0_trap_fsm_jumpTarget;
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
       default : begin
@@ -5074,6 +6552,8 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
@@ -5129,6 +6609,8 @@ module VexiiRiscv (
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
       default : begin
@@ -5159,6 +6641,8 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
       end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
@@ -5194,8 +6678,41 @@ module VexiiRiscv (
       end
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
         TrapPlugin_logic_fetchL1Invalidate_0_cmd_valid = 1'b1;
+      end
+      default : begin
+      end
+    endcase
+  end
+
+  always @(*) begin
+    TrapPlugin_logic_lsuL1Invalidate_0_cmd_valid = 1'b0;
+    case(TrapPlugin_logic_harts_0_trap_fsm_stateReg)
+      TrapPlugin_logic_harts_0_trap_fsm_RUNNING : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_PROCESS_1 : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_EPC : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_TVAL : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_TVEC : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_APPLY : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+        TrapPlugin_logic_lsuL1Invalidate_0_cmd_valid = 1'b1;
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
       end
       default : begin
       end
@@ -5531,18 +7048,18 @@ module VexiiRiscv (
   assign fetch_logic_ctrls_1_down_MMU_PAGE_FAULT = 1'b0;
   assign fetch_logic_ctrls_1_down_MMU_ACCESS_FAULT = 1'b0;
   assign fetch_logic_ctrls_1_down_MMU_BYPASS_TRANSLATION = 1'b1;
-  assign execute_ctrl2_down_MMU_REFILL_lane0 = 1'b0;
-  assign execute_ctrl2_down_MMU_HAZARD_lane0 = 1'b0;
-  assign execute_ctrl2_down_MMU_TRANSLATED_lane0 = execute_ctrl2_down_LsuCachelessPlugin_logic_onAddress_RAW_ADDRESS_lane0;
-  assign execute_ctrl2_down_MMU_ALLOW_EXECUTE_lane0 = 1'b1;
-  assign execute_ctrl2_down_MMU_ALLOW_READ_lane0 = 1'b1;
-  assign execute_ctrl2_down_MMU_ALLOW_WRITE_lane0 = 1'b1;
-  assign execute_ctrl2_down_MMU_PAGE_FAULT_lane0 = 1'b0;
-  assign execute_ctrl2_down_MMU_ACCESS_FAULT_lane0 = 1'b0;
-  assign execute_ctrl2_down_MMU_BYPASS_TRANSLATION_lane0 = 1'b1;
-  assign fetch_logic_flushes_0_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuCachelessPlugin_logic_flushPort_valid && 1'b1)}}}});
+  assign execute_ctrl3_down_MMU_REFILL_lane0 = 1'b0;
+  assign execute_ctrl3_down_MMU_HAZARD_lane0 = 1'b0;
+  assign execute_ctrl3_down_MMU_TRANSLATED_lane0 = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
+  assign execute_ctrl3_down_MMU_ALLOW_EXECUTE_lane0 = 1'b1;
+  assign execute_ctrl3_down_MMU_ALLOW_READ_lane0 = 1'b1;
+  assign execute_ctrl3_down_MMU_ALLOW_WRITE_lane0 = 1'b1;
+  assign execute_ctrl3_down_MMU_PAGE_FAULT_lane0 = 1'b0;
+  assign execute_ctrl3_down_MMU_ACCESS_FAULT_lane0 = 1'b0;
+  assign execute_ctrl3_down_MMU_BYPASS_TRANSLATION_lane0 = 1'b1;
+  assign fetch_logic_flushes_0_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
   assign fetch_logic_ctrls_1_throwWhen_FetchPipelinePlugin_l48 = fetch_logic_flushes_0_doIt;
-  assign fetch_logic_flushes_1_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuCachelessPlugin_logic_flushPort_valid && 1'b1)}}}});
+  assign fetch_logic_flushes_1_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
   assign fetch_logic_ctrls_2_forgetsSingleRequest_FetchPipelinePlugin_l50 = fetch_logic_flushes_1_doIt;
   assign CsrRamPlugin_logic_writeLogic_hits = {CsrRamPlugin_setup_initPort_valid,{CsrRamPlugin_csrMapper_write_valid,TrapPlugin_logic_harts_0_crsPorts_write_valid}};
   assign CsrRamPlugin_logic_writeLogic_hit = (|CsrRamPlugin_logic_writeLogic_hits);
@@ -5645,7 +7162,6 @@ module VexiiRiscv (
     end
   end
 
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h02004074) == 32'h02000030);
   always @(*) begin
     execute_ctrl1_down_early0_MulPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
@@ -5677,6 +7193,8 @@ module VexiiRiscv (
     end
   end
 
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000058) == 32'h0);
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 32'h00001050) == 32'h0);
   always @(*) begin
     execute_ctrl1_down_AguPlugin_SEL_lane0 = _zz_execute_ctrl1_down_AguPlugin_SEL_lane0[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
@@ -5685,24 +7203,25 @@ module VexiiRiscv (
   end
 
   always @(*) begin
-    execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0 = _zz_execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0[0];
+    execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0 = _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0 = 1'b0;
+      execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0 = 1'b0;
     end
   end
 
-  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h0000000c) == 32'h00000004);
+  assign _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000028) == 32'h0);
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 32'h0000000c) == 32'h00000004);
   always @(*) begin
-    execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0 = _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_1[0];
+    execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0 = _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
       execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0 = 1'b0;
     end
   end
 
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 32'h02000050) == 32'h00000010);
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2 = ((execute_lane0_logic_decoding_decodingBits & 32'h00003040) == 32'h00000040);
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000030) == 32'h00000010);
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000004) == 32'h00000004);
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2 = ((execute_lane0_logic_decoding_decodingBits & 32'h02000050) == 32'h00000010);
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3 = ((execute_lane0_logic_decoding_decodingBits & 32'h00003040) == 32'h00000040);
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000030) == 32'h00000010);
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5 = ((execute_lane0_logic_decoding_decodingBits & 32'h00001008) == 32'h00001008);
   always @(*) begin
     execute_ctrl1_down_COMPLETION_AT_2_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
@@ -5710,7 +7229,7 @@ module VexiiRiscv (
     end
   end
 
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000038) == 32'h0);
+  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2 = ((execute_lane0_logic_decoding_decodingBits & 32'h02004064) == 32'h02000020);
   always @(*) begin
     execute_ctrl1_down_COMPLETION_AT_4_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
@@ -5718,7 +7237,6 @@ module VexiiRiscv (
     end
   end
 
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000070) == 32'h00000020);
   always @(*) begin
     execute_ctrl1_down_COMPLETION_AT_3_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
@@ -5727,27 +7245,28 @@ module VexiiRiscv (
   end
 
   always @(*) begin
-    execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4[0];
+    execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_6[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
       execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = 1'b0;
     end
   end
 
   always @(*) begin
-    execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2[0];
+    execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
       execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = 1'b0;
     end
   end
 
   always @(*) begin
-    execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4[0];
+    execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3[0];
     if(execute_ctrl1_down_TRAP_lane0) begin
       execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = 1'b0;
     end
   end
 
   assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00006000) == 32'h0);
+  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000004) == 32'h00000004);
   assign execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_1[0];
   assign execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0[0];
   assign _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00004000) == 32'h0);
@@ -5759,7 +7278,7 @@ module VexiiRiscv (
   assign execute_ctrl1_down_SrcStageables_REVERT_lane0 = _zz_execute_ctrl1_down_SrcStageables_REVERT_lane0[0];
   assign execute_ctrl1_down_SrcStageables_ZERO_lane0 = _zz_execute_ctrl1_down_SrcStageables_ZERO_lane0[0];
   assign execute_ctrl1_down_early0_SrcPlugin_logic_SRC1_CTRL_lane0 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00000044) == 32'h00000004));
-  assign execute_ctrl1_down_early0_SrcPlugin_logic_SRC2_CTRL_lane0 = {(|{_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3}),(|{((execute_lane0_logic_decoding_decodingBits & 32'h00000050) == 32'h0),((execute_lane0_logic_decoding_decodingBits & 32'h00000024) == 32'h0)})};
+  assign execute_ctrl1_down_early0_SrcPlugin_logic_SRC2_CTRL_lane0 = {(|{_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0,((execute_lane0_logic_decoding_decodingBits & 32'h00000070) == 32'h00000020)}),(|{((execute_lane0_logic_decoding_decodingBits & 32'h00000050) == 32'h0),((execute_lane0_logic_decoding_decodingBits & 32'h00000024) == 32'h0)})};
   assign execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 = _zz_execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0[0];
   assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00002000) == 32'h00002000);
   assign execute_ctrl1_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 = {(|{((execute_lane0_logic_decoding_decodingBits & 32'h00000010) == 32'h00000010),_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0}),(|((execute_lane0_logic_decoding_decodingBits & 32'h00001010) == 32'h00001000))};
@@ -5767,10 +7286,12 @@ module VexiiRiscv (
   assign execute_ctrl1_down_BYPASSED_AT_2_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_2_lane0[0];
   assign execute_ctrl1_down_BYPASSED_AT_3_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_3_lane0[0];
   assign execute_ctrl1_down_BYPASSED_AT_4_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0[0];
+  assign execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0 = _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0[0];
+  assign execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0 = _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0[0];
   assign execute_ctrl1_down_SrcStageables_UNSIGNED_lane0 = _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0[0];
   assign execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0 = _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_1[0];
   assign execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0 = _zz_execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0[0];
-  assign _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1 = {(|_zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0),(|((execute_lane0_logic_decoding_decodingBits & 32'h00000008) == 32'h00000008))};
+  assign _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1 = {(|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1),(|((execute_lane0_logic_decoding_decodingBits & 32'h00000008) == 32'h00000008))};
   assign _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0 = _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1;
   assign _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2 = _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0;
   assign execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0 = _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2;
@@ -5781,28 +7302,31 @@ module VexiiRiscv (
   assign execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0[0];
   assign execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0_1[0];
   assign execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_1[0];
-  assign execute_ctrl1_down_AguPlugin_LOAD_lane0 = _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0[0];
+  assign execute_ctrl1_down_AguPlugin_LOAD_lane0 = _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_1[0];
   assign execute_ctrl1_down_AguPlugin_STORE_lane0 = _zz_execute_ctrl1_down_AguPlugin_STORE_lane0[0];
   assign execute_ctrl1_down_AguPlugin_ATOMIC_lane0 = _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0[0];
   assign execute_ctrl1_down_AguPlugin_FLOAT_lane0 = _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0[0];
+  assign execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0[0];
   assign _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000040) == 32'h0);
   assign _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2 = {(|((execute_lane0_logic_decoding_decodingBits & 32'h30001000) == 32'h10000000)),{(|{((execute_lane0_logic_decoding_decodingBits & 32'h20000000) == 32'h20000000),_zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0}),(|{((execute_lane0_logic_decoding_decodingBits & 32'h00100000) == 32'h00100000),_zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0})}};
   assign _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1 = _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2;
   assign _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3 = _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1;
   assign execute_ctrl1_down_early0_EnvPlugin_OP_lane0 = _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3;
-  assign when_ExecuteLanePlugin_l307 = (|{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuCachelessPlugin_logic_flushPort_valid && 1'b1)}}});
+  assign when_ExecuteLanePlugin_l307 = (|{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}});
   assign execute_lane0_ctrls_0_downIsCancel = 1'b0;
   assign execute_lane0_ctrls_0_upIsCancel = when_ExecuteLanePlugin_l307;
-  assign when_ExecuteLanePlugin_l307_1 = (|{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuCachelessPlugin_logic_flushPort_valid && 1'b1)}}});
+  assign when_ExecuteLanePlugin_l307_1 = (|{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}});
   assign execute_lane0_ctrls_1_downIsCancel = 1'b0;
   assign execute_lane0_ctrls_1_upIsCancel = when_ExecuteLanePlugin_l307_1;
-  assign when_ExecuteLanePlugin_l307_2 = (|{((early0_EnvPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && early0_EnvPlugin_logic_flushPort_payload_self))),{((CsrAccessPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (_zz_when_ExecuteLanePlugin_l307_2 && CsrAccessPlugin_logic_flushPort_payload_self))),{((early0_BranchPlugin_logic_flushPort_valid && _zz_when_ExecuteLanePlugin_l307_2_1) && (_zz_when_ExecuteLanePlugin_l307_2_2 || _zz_when_ExecuteLanePlugin_l307_2_3)),((LsuCachelessPlugin_logic_flushPort_valid && _zz_when_ExecuteLanePlugin_l307_2_4) && (_zz_when_ExecuteLanePlugin_l307_2_5 || _zz_when_ExecuteLanePlugin_l307_2_6))}}});
+  assign when_ExecuteLanePlugin_l307_2 = (|{((early0_EnvPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && early0_EnvPlugin_logic_flushPort_payload_self))),{((CsrAccessPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (_zz_when_ExecuteLanePlugin_l307_2 && CsrAccessPlugin_logic_flushPort_payload_self))),{((early0_BranchPlugin_logic_flushPort_valid && _zz_when_ExecuteLanePlugin_l307_2_1) && (_zz_when_ExecuteLanePlugin_l307_2_2 || _zz_when_ExecuteLanePlugin_l307_2_3)),(LsuPlugin_logic_flushPort_valid && 1'b1)}}});
   assign execute_lane0_ctrls_2_downIsCancel = 1'b0;
   assign execute_lane0_ctrls_2_upIsCancel = when_ExecuteLanePlugin_l307_2;
+  assign when_ExecuteLanePlugin_l307_3 = (|(LsuPlugin_logic_flushPort_valid && 1'b1));
   assign execute_lane0_ctrls_3_downIsCancel = 1'b0;
-  assign execute_lane0_ctrls_3_upIsCancel = 1'b0;
+  assign execute_lane0_ctrls_3_upIsCancel = when_ExecuteLanePlugin_l307_3;
+  assign when_ExecuteLanePlugin_l307_4 = (|((LsuPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && LsuPlugin_logic_flushPort_payload_self))));
   assign execute_lane0_ctrls_4_downIsCancel = 1'b0;
-  assign execute_lane0_ctrls_4_upIsCancel = 1'b0;
+  assign execute_lane0_ctrls_4_upIsCancel = when_ExecuteLanePlugin_l307_4;
   assign execute_lane0_ctrls_5_downIsCancel = 1'b0;
   assign execute_lane0_ctrls_5_upIsCancel = 1'b0;
   assign execute_lane0_logic_trapPending[0] = (|{((execute_ctrl4_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl4_down_TRAP_lane0),{((execute_ctrl3_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl3_down_TRAP_lane0),{((execute_ctrl2_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl2_down_TRAP_lane0),((execute_ctrl1_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl1_down_TRAP_lane0)}}});
@@ -5850,9 +7374,9 @@ module VexiiRiscv (
   assign WhiteboxerPlugin_logic_commits_ports_0_valid = (|WhiteboxerPlugin_logic_commits_ports_0_oh_0);
   assign WhiteboxerPlugin_logic_commits_ports_0_pc = (WhiteboxerPlugin_logic_commits_ports_0_oh_0 ? execute_ctrl4_down_PC_lane0 : 32'h0);
   assign WhiteboxerPlugin_logic_commits_ports_0_uop = (WhiteboxerPlugin_logic_commits_ports_0_oh_0 ? execute_ctrl4_down_Decode_UOP_lane0 : 32'h0);
-  assign WhiteboxerPlugin_logic_reschedules_flushes_0_valid = LsuCachelessPlugin_logic_flushPort_valid;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_0_payload_uopId = LsuCachelessPlugin_logic_flushPort_payload_uopId;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_0_payload_self = LsuCachelessPlugin_logic_flushPort_payload_self;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_0_valid = LsuPlugin_logic_flushPort_valid;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_0_payload_uopId = LsuPlugin_logic_flushPort_payload_uopId;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_0_payload_self = LsuPlugin_logic_flushPort_payload_self;
   assign WhiteboxerPlugin_logic_reschedules_flushes_1_valid = early0_BranchPlugin_logic_flushPort_valid;
   assign WhiteboxerPlugin_logic_reschedules_flushes_1_payload_uopId = early0_BranchPlugin_logic_flushPort_payload_uopId;
   assign WhiteboxerPlugin_logic_reschedules_flushes_1_payload_self = early0_BranchPlugin_logic_flushPort_payload_self;
@@ -5885,23 +7409,23 @@ module VexiiRiscv (
   assign WhiteboxerPlugin_logic_prediction_learns_0_payload_wasWrong = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_wasWrong;
   assign WhiteboxerPlugin_logic_prediction_learns_0_payload_badPredictedTarget = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_badPredictedTarget;
   assign WhiteboxerPlugin_logic_prediction_learns_0_payload_uopId = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_uopId;
-  assign WhiteboxerPlugin_logic_loadExecute_fire = ((((((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_AguPlugin_SEL_lane0) && execute_ctrl4_down_AguPlugin_LOAD_lane0) && (! execute_ctrl4_down_TRAP_lane0)) && (! execute_ctrl4_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io));
+  assign WhiteboxerPlugin_logic_loadExecute_fire = (((((((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_AguPlugin_SEL_lane0) && execute_ctrl4_down_AguPlugin_LOAD_lane0) && (! execute_ctrl4_down_LsuPlugin_logic_LSU_PREFETCH_lane0)) && (! execute_ctrl4_down_TRAP_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0));
   assign WhiteboxerPlugin_logic_loadExecute_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
   assign WhiteboxerPlugin_logic_loadExecute_size = execute_ctrl4_down_AguPlugin_SIZE_lane0;
-  assign WhiteboxerPlugin_logic_loadExecute_address = execute_ctrl4_down_MMU_TRANSLATED_lane0;
+  assign WhiteboxerPlugin_logic_loadExecute_address = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
   assign WhiteboxerPlugin_logic_loadExecute_data = lane0_IntFormatPlugin_logic_stages_1_wb_payload;
-  assign WhiteboxerPlugin_logic_storeCommit_fire = ((LsuCachelessPlugin_logic_bus_cmd_fire && LsuCachelessPlugin_logic_bus_cmd_payload_write) && (! LsuCachelessPlugin_logic_bus_cmd_payload_io));
-  assign WhiteboxerPlugin_logic_storeCommit_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
-  assign WhiteboxerPlugin_logic_storeCommit_size = LsuCachelessPlugin_logic_bus_cmd_payload_size;
-  assign WhiteboxerPlugin_logic_storeCommit_address = LsuCachelessPlugin_logic_bus_cmd_payload_address;
-  assign WhiteboxerPlugin_logic_storeCommit_data = LsuCachelessPlugin_logic_bus_cmd_payload_data;
-  assign WhiteboxerPlugin_logic_storeCommit_storeId = execute_ctrl2_down_Decode_UOP_ID_lane0[11:0];
+  assign WhiteboxerPlugin_logic_storeCommit_fire = LsuPlugin_logic_onWb_storeFire;
+  assign WhiteboxerPlugin_logic_storeCommit_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
+  assign WhiteboxerPlugin_logic_storeCommit_size = execute_ctrl4_down_AguPlugin_SIZE_lane0;
+  assign WhiteboxerPlugin_logic_storeCommit_address = execute_ctrl4_down_MMU_TRANSLATED_lane0;
+  assign WhiteboxerPlugin_logic_storeCommit_data = execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
+  assign WhiteboxerPlugin_logic_storeCommit_storeId = execute_ctrl4_down_Decode_STORE_ID_lane0;
   assign WhiteboxerPlugin_logic_storeCommit_amo = 1'b0;
   assign WhiteboxerPlugin_logic_storeConditional_fire = (((((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_AguPlugin_SEL_lane0) && (execute_ctrl4_down_AguPlugin_ATOMIC_lane0 && (! execute_ctrl4_down_AguPlugin_LOAD_lane0))) && (! execute_ctrl4_down_TRAP_lane0));
   assign WhiteboxerPlugin_logic_storeConditional_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
-  assign WhiteboxerPlugin_logic_storeConditional_miss = execute_ctrl4_down_LsuCachelessPlugin_logic_onJoin_SC_MISS_lane0;
-  assign WhiteboxerPlugin_logic_storeBroadcast_fire = WhiteboxerPlugin_logic_storeCommit_fire;
-  assign WhiteboxerPlugin_logic_storeBroadcast_storeId = WhiteboxerPlugin_logic_storeCommit_storeId;
+  assign WhiteboxerPlugin_logic_storeConditional_miss = execute_ctrl4_down_LsuPlugin_logic_onCtrl_SC_MISS_lane0;
+  assign WhiteboxerPlugin_logic_storeBroadcast_fire = LsuPlugin_logic_onWb_storeBroadcast;
+  assign WhiteboxerPlugin_logic_storeBroadcast_storeId = execute_ctrl4_down_Decode_STORE_ID_lane0;
   assign integer_RegFilePlugin_logic_writeMerges_0_bus_valid = (|lane0_integer_WriteBackPlugin_logic_write_port_valid);
   assign integer_RegFilePlugin_logic_writeMerges_0_bus_address = lane0_integer_WriteBackPlugin_logic_write_port_address;
   assign integer_RegFilePlugin_logic_writeMerges_0_bus_data = lane0_integer_WriteBackPlugin_logic_write_port_data;
@@ -5935,9 +7459,9 @@ module VexiiRiscv (
   assign integer_write_0_address = integer_RegFilePlugin_logic_writeMerges_0_bus_address;
   assign integer_write_0_data = integer_RegFilePlugin_logic_writeMerges_0_bus_data;
   assign integer_write_0_uopId = integer_RegFilePlugin_logic_writeMerges_0_bus_uopId;
-  assign execute_freeze_valid = (|{CsrAccessPlugin_logic_fsm_inject_freeze,{(execute_ctrl3_down_LsuCachelessPlugin_WITH_RSP_lane0 && (! LsuCachelessPlugin_logic_onJoin_rspValid)),{LsuCachelessPlugin_logic_onFork_freezeIt,early0_DivPlugin_logic_processing_freeze}}});
+  assign execute_freeze_valid = (|{CsrAccessPlugin_logic_fsm_inject_freeze,{LsuPlugin_logic_onCtrl_io_freezeIt,early0_DivPlugin_logic_processing_freeze}});
   assign execute_ctrl5_down_ready = (! execute_freeze_valid);
-  assign TrapPlugin_logic_initHold = (|{(! CsrRamPlugin_logic_flush_done),{(! integer_RegFilePlugin_logic_initalizer_done),(FetchL1Plugin_logic_invalidate_firstEver || 1'b0)}});
+  assign TrapPlugin_logic_initHold = (|{(! CsrRamPlugin_logic_flush_done),{((! LsuL1Plugin_logic_initializer_done) || 1'b0),{(! integer_RegFilePlugin_logic_initalizer_done),(FetchL1Plugin_logic_invalidate_firstEver || 1'b0)}}});
   assign WhiteboxerPlugin_logic_wfi = TrapPlugin_logic_harts_0_trap_fsm_wfi;
   assign WhiteboxerPlugin_logic_perf_executeFreezed = execute_freeze_valid;
   assign WhiteboxerPlugin_logic_perf_dispatchHazards = (|(DispatchPlugin_logic_candidates_0_ctx_valid && (! DispatchPlugin_logic_candidates_0_fire)));
@@ -6155,6 +7679,8 @@ module VexiiRiscv (
   assign execute_ctrl2_down_AguPlugin_SIZE_lane0 = execute_ctrl2_up_AguPlugin_SIZE_lane0;
   assign execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0 = execute_ctrl2_up_early0_SrcPlugin_SRC1_lane0;
   assign execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl2_up_early0_SrcPlugin_SRC2_lane0;
+  assign execute_ctrl2_down_integer_RS2_lane0 = execute_ctrl2_up_integer_RS2_lane0;
+  assign execute_ctrl2_down_MAY_FLUSH_PRECISE_3_lane0 = execute_ctrl2_up_MAY_FLUSH_PRECISE_3_lane0;
   assign execute_ctrl2_down_early0_IntAluPlugin_SEL_lane0 = execute_ctrl2_up_early0_IntAluPlugin_SEL_lane0;
   assign execute_ctrl2_down_early0_BarrelShifterPlugin_SEL_lane0 = execute_ctrl2_up_early0_BarrelShifterPlugin_SEL_lane0;
   assign execute_ctrl2_down_early0_BranchPlugin_SEL_lane0 = execute_ctrl2_up_early0_BranchPlugin_SEL_lane0;
@@ -6163,7 +7689,7 @@ module VexiiRiscv (
   assign execute_ctrl2_down_early0_EnvPlugin_SEL_lane0 = execute_ctrl2_up_early0_EnvPlugin_SEL_lane0;
   assign execute_ctrl2_down_CsrAccessPlugin_SEL_lane0 = execute_ctrl2_up_CsrAccessPlugin_SEL_lane0;
   assign execute_ctrl2_down_AguPlugin_SEL_lane0 = execute_ctrl2_up_AguPlugin_SEL_lane0;
-  assign execute_ctrl2_down_LsuCachelessPlugin_FENCE_lane0 = execute_ctrl2_up_LsuCachelessPlugin_FENCE_lane0;
+  assign execute_ctrl2_down_LsuPlugin_logic_FENCE_lane0 = execute_ctrl2_up_LsuPlugin_logic_FENCE_lane0;
   assign execute_ctrl2_down_lane0_integer_WriteBackPlugin_SEL_lane0 = execute_ctrl2_up_lane0_integer_WriteBackPlugin_SEL_lane0;
   assign execute_ctrl2_down_COMPLETION_AT_2_lane0 = execute_ctrl2_up_COMPLETION_AT_2_lane0;
   assign execute_ctrl2_down_COMPLETION_AT_4_lane0 = execute_ctrl2_up_COMPLETION_AT_4_lane0;
@@ -6196,20 +7722,21 @@ module VexiiRiscv (
   assign execute_ctrl2_down_AguPlugin_STORE_lane0 = execute_ctrl2_up_AguPlugin_STORE_lane0;
   assign execute_ctrl2_down_AguPlugin_ATOMIC_lane0 = execute_ctrl2_up_AguPlugin_ATOMIC_lane0;
   assign execute_ctrl2_down_AguPlugin_FLOAT_lane0 = execute_ctrl2_up_AguPlugin_FLOAT_lane0;
+  assign execute_ctrl2_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = execute_ctrl2_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
   assign execute_ctrl2_down_early0_EnvPlugin_OP_lane0 = execute_ctrl2_up_early0_EnvPlugin_OP_lane0;
   assign execute_ctrl3_up_ready = execute_ctrl3_down_isReady;
-  assign execute_ctrl3_down_LANE_SEL_lane0 = execute_ctrl3_up_LANE_SEL_lane0;
   assign execute_ctrl3_down_Decode_UOP_lane0 = execute_ctrl3_up_Decode_UOP_lane0;
   assign execute_ctrl3_down_PC_lane0 = execute_ctrl3_up_PC_lane0;
   assign execute_ctrl3_down_TRAP_lane0 = execute_ctrl3_up_TRAP_lane0;
   assign execute_ctrl3_down_Decode_UOP_ID_lane0 = execute_ctrl3_up_Decode_UOP_ID_lane0;
-  assign execute_ctrl3_down_RD_ENABLE_lane0 = execute_ctrl3_up_RD_ENABLE_lane0;
   assign execute_ctrl3_down_RD_PHYS_lane0 = execute_ctrl3_up_RD_PHYS_lane0;
   assign execute_ctrl3_down_AguPlugin_SIZE_lane0 = execute_ctrl3_up_AguPlugin_SIZE_lane0;
+  assign execute_ctrl3_down_integer_RS2_lane0 = execute_ctrl3_up_integer_RS2_lane0;
   assign execute_ctrl3_down_early0_MulPlugin_SEL_lane0 = execute_ctrl3_up_early0_MulPlugin_SEL_lane0;
   assign execute_ctrl3_down_early0_DivPlugin_SEL_lane0 = execute_ctrl3_up_early0_DivPlugin_SEL_lane0;
   assign execute_ctrl3_down_CsrAccessPlugin_SEL_lane0 = execute_ctrl3_up_CsrAccessPlugin_SEL_lane0;
   assign execute_ctrl3_down_AguPlugin_SEL_lane0 = execute_ctrl3_up_AguPlugin_SEL_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0 = execute_ctrl3_up_LsuPlugin_logic_FENCE_lane0;
   assign execute_ctrl3_down_lane0_integer_WriteBackPlugin_SEL_lane0 = execute_ctrl3_up_lane0_integer_WriteBackPlugin_SEL_lane0;
   assign execute_ctrl3_down_COMPLETION_AT_4_lane0 = execute_ctrl3_up_COMPLETION_AT_4_lane0;
   assign execute_ctrl3_down_COMPLETION_AT_3_lane0 = execute_ctrl3_up_COMPLETION_AT_3_lane0;
@@ -6224,28 +7751,41 @@ module VexiiRiscv (
   assign execute_ctrl3_down_AguPlugin_STORE_lane0 = execute_ctrl3_up_AguPlugin_STORE_lane0;
   assign execute_ctrl3_down_AguPlugin_ATOMIC_lane0 = execute_ctrl3_up_AguPlugin_ATOMIC_lane0;
   assign execute_ctrl3_down_AguPlugin_FLOAT_lane0 = execute_ctrl3_up_AguPlugin_FLOAT_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = execute_ctrl3_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
   assign execute_ctrl3_down_COMMIT_lane0 = execute_ctrl3_up_COMMIT_lane0;
   assign execute_ctrl3_down_early0_SrcPlugin_ADD_SUB_lane0 = execute_ctrl3_up_early0_SrcPlugin_ADD_SUB_lane0;
+  assign execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0 = execute_ctrl3_up_LsuL1_MIXED_ADDRESS_lane0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty = execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
   assign execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_0_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_0_lane0;
   assign execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_1_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_1_lane0;
   assign execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_2_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_2_lane0;
   assign execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_3_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_3_lane0;
   assign execute_ctrl3_down_DivPlugin_DIV_RESULT_lane0 = execute_ctrl3_up_DivPlugin_DIV_RESULT_lane0;
-  assign execute_ctrl3_down_MMU_TRANSLATED_lane0 = execute_ctrl3_up_MMU_TRANSLATED_lane0;
-  assign execute_ctrl3_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault = execute_ctrl3_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault;
-  assign execute_ctrl3_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io = execute_ctrl3_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
-  assign execute_ctrl3_down_LsuCachelessPlugin_WITH_RSP_lane0 = execute_ctrl3_up_LsuCachelessPlugin_WITH_RSP_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_FROM_ACCESS_lane0 = execute_ctrl3_up_LsuPlugin_logic_FROM_ACCESS_lane0;
+  assign execute_ctrl3_down_LsuL1_MASK_lane0 = execute_ctrl3_up_LsuL1_MASK_lane0;
+  assign execute_ctrl3_down_LsuL1_SIZE_lane0 = execute_ctrl3_up_LsuL1_SIZE_lane0;
+  assign execute_ctrl3_down_LsuL1_LOAD_lane0 = execute_ctrl3_up_LsuL1_LOAD_lane0;
+  assign execute_ctrl3_down_LsuL1_ATOMIC_lane0 = execute_ctrl3_up_LsuL1_ATOMIC_lane0;
+  assign execute_ctrl3_down_LsuL1_STORE_lane0 = execute_ctrl3_up_LsuL1_STORE_lane0;
+  assign execute_ctrl3_down_LsuL1_PREFETCH_lane0 = execute_ctrl3_up_LsuL1_PREFETCH_lane0;
+  assign execute_ctrl3_down_LsuL1_FLUSH_lane0 = execute_ctrl3_up_LsuL1_FLUSH_lane0;
+  assign execute_ctrl3_down_Decode_STORE_ID_lane0 = execute_ctrl3_up_Decode_STORE_ID_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 = execute_ctrl3_up_LsuPlugin_logic_FROM_LSU_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0 = execute_ctrl3_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
   assign execute_ctrl4_up_ready = execute_ctrl4_down_isReady;
-  assign execute_ctrl4_down_LANE_SEL_lane0 = execute_ctrl4_up_LANE_SEL_lane0;
   assign execute_ctrl4_down_Decode_UOP_lane0 = execute_ctrl4_up_Decode_UOP_lane0;
   assign execute_ctrl4_down_PC_lane0 = execute_ctrl4_up_PC_lane0;
-  assign execute_ctrl4_down_TRAP_lane0 = execute_ctrl4_up_TRAP_lane0;
   assign execute_ctrl4_down_Decode_UOP_ID_lane0 = execute_ctrl4_up_Decode_UOP_ID_lane0;
-  assign execute_ctrl4_down_RD_ENABLE_lane0 = execute_ctrl4_up_RD_ENABLE_lane0;
   assign execute_ctrl4_down_RD_PHYS_lane0 = execute_ctrl4_up_RD_PHYS_lane0;
   assign execute_ctrl4_down_AguPlugin_SIZE_lane0 = execute_ctrl4_up_AguPlugin_SIZE_lane0;
   assign execute_ctrl4_down_early0_MulPlugin_SEL_lane0 = execute_ctrl4_up_early0_MulPlugin_SEL_lane0;
   assign execute_ctrl4_down_AguPlugin_SEL_lane0 = execute_ctrl4_up_AguPlugin_SEL_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0 = execute_ctrl4_up_LsuPlugin_logic_FENCE_lane0;
   assign execute_ctrl4_down_lane0_integer_WriteBackPlugin_SEL_lane0 = execute_ctrl4_up_lane0_integer_WriteBackPlugin_SEL_lane0;
   assign execute_ctrl4_down_COMPLETION_AT_4_lane0 = execute_ctrl4_up_COMPLETION_AT_4_lane0;
   assign execute_ctrl4_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = execute_ctrl4_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
@@ -6254,17 +7794,47 @@ module VexiiRiscv (
   assign execute_ctrl4_down_BYPASSED_AT_4_lane0 = execute_ctrl4_up_BYPASSED_AT_4_lane0;
   assign execute_ctrl4_down_MulPlugin_HIGH_lane0 = execute_ctrl4_up_MulPlugin_HIGH_lane0;
   assign execute_ctrl4_down_AguPlugin_LOAD_lane0 = execute_ctrl4_up_AguPlugin_LOAD_lane0;
+  assign execute_ctrl4_down_AguPlugin_STORE_lane0 = execute_ctrl4_up_AguPlugin_STORE_lane0;
   assign execute_ctrl4_down_AguPlugin_ATOMIC_lane0 = execute_ctrl4_up_AguPlugin_ATOMIC_lane0;
   assign execute_ctrl4_down_AguPlugin_FLOAT_lane0 = execute_ctrl4_up_AguPlugin_FLOAT_lane0;
-  assign execute_ctrl4_down_COMMIT_lane0 = execute_ctrl4_up_COMMIT_lane0;
-  assign execute_ctrl4_down_early0_SrcPlugin_ADD_SUB_lane0 = execute_ctrl4_up_early0_SrcPlugin_ADD_SUB_lane0;
-  assign execute_ctrl4_down_MMU_TRANSLATED_lane0 = execute_ctrl4_up_MMU_TRANSLATED_lane0;
-  assign execute_ctrl4_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault = execute_ctrl4_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault;
-  assign execute_ctrl4_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io = execute_ctrl4_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
+  assign execute_ctrl4_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = execute_ctrl4_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
+  assign execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0 = execute_ctrl4_up_LsuL1_MIXED_ADDRESS_lane0;
+  assign execute_ctrl4_down_LsuL1_MASK_lane0 = execute_ctrl4_up_LsuL1_MASK_lane0;
+  assign execute_ctrl4_down_LsuL1_SIZE_lane0 = execute_ctrl4_up_LsuL1_SIZE_lane0;
+  assign execute_ctrl4_down_LsuL1_LOAD_lane0 = execute_ctrl4_up_LsuL1_LOAD_lane0;
+  assign execute_ctrl4_down_LsuL1_ATOMIC_lane0 = execute_ctrl4_up_LsuL1_ATOMIC_lane0;
+  assign execute_ctrl4_down_LsuL1_STORE_lane0 = execute_ctrl4_up_LsuL1_STORE_lane0;
+  assign execute_ctrl4_down_LsuL1_PREFETCH_lane0 = execute_ctrl4_up_LsuL1_PREFETCH_lane0;
+  assign execute_ctrl4_down_LsuL1_FLUSH_lane0 = execute_ctrl4_up_LsuL1_FLUSH_lane0;
+  assign execute_ctrl4_down_Decode_STORE_ID_lane0 = execute_ctrl4_up_Decode_STORE_ID_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 = execute_ctrl4_up_LsuPlugin_logic_FROM_LSU_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0 = execute_ctrl4_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  assign execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl4_up_LsuL1Plugin_logic_SHARED_lane0_dirty;
+  assign execute_ctrl4_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0 = execute_ctrl4_up_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+  assign execute_ctrl4_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 = execute_ctrl4_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
+  assign execute_ctrl4_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0 = execute_ctrl4_up_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
+  assign execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0 = execute_ctrl4_up_LsuL1_PHYSICAL_ADDRESS_lane0;
+  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded = execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
+  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address = execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault = execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0 = execute_ctrl4_up_LsuL1Plugin_logic_WAYS_HITS_lane0;
   assign execute_ctrl4_down_early0_MulPlugin_logic_steps_0_adders_0_lane0 = execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_0_lane0;
   assign execute_ctrl4_down_early0_MulPlugin_logic_steps_0_adders_1_lane0 = execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_1_lane0;
-  assign execute_ctrl4_down_LsuCachelessPlugin_logic_onJoin_SC_MISS_lane0 = execute_ctrl4_up_LsuCachelessPlugin_logic_onJoin_SC_MISS_lane0;
-  assign execute_ctrl4_down_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0 = execute_ctrl4_up_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0 = execute_ctrl4_up_LsuPlugin_logic_onTrigger_HIT_lane0;
+  assign execute_ctrl4_down_MMU_TRANSLATED_lane0 = execute_ctrl4_up_MMU_TRANSLATED_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 = execute_ctrl4_up_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault = execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
+  assign execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io = execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
+  assign execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault = execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+  assign execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io = execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+  assign execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0 = execute_ctrl4_up_LsuPlugin_logic_onPma_IO_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0 = execute_ctrl4_up_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 = execute_ctrl4_up_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
+  assign execute_ctrl4_down_LsuPlugin_logic_MMU_FAILURE_lane0 = execute_ctrl4_up_LsuPlugin_logic_MMU_FAILURE_lane0;
+  assign execute_ctrl4_down_MMU_ACCESS_FAULT_lane0 = execute_ctrl4_up_MMU_ACCESS_FAULT_lane0;
+  assign execute_ctrl4_down_MMU_REFILL_lane0 = execute_ctrl4_up_MMU_REFILL_lane0;
+  assign execute_ctrl4_down_MMU_HAZARD_lane0 = execute_ctrl4_up_MMU_HAZARD_lane0;
+  assign execute_ctrl4_down_MMU_BYPASS_TRANSLATION_lane0 = execute_ctrl4_up_MMU_BYPASS_TRANSLATION_lane0;
   assign execute_ctrl5_up_ready = execute_ctrl5_down_isReady;
   assign execute_ctrl5_down_LANE_SEL_lane0 = execute_ctrl5_up_LANE_SEL_lane0;
   assign execute_ctrl5_down_RD_PHYS_lane0 = execute_ctrl5_up_RD_PHYS_lane0;
@@ -6302,6 +7872,38 @@ module VexiiRiscv (
   assign execute_ctrl4_down_isReady = execute_ctrl4_down_ready;
   assign execute_ctrl5_down_isReady = execute_ctrl5_down_ready;
   always @(*) begin
+    LsuPlugin_logic_flusher_stateNext = LsuPlugin_logic_flusher_stateReg;
+    case(LsuPlugin_logic_flusher_stateReg)
+      LsuPlugin_logic_flusher_CMD : begin
+        if(when_LsuPlugin_l326) begin
+          LsuPlugin_logic_flusher_stateNext = LsuPlugin_logic_flusher_COMPLETION;
+        end
+      end
+      LsuPlugin_logic_flusher_COMPLETION : begin
+        if(when_LsuPlugin_l334) begin
+          LsuPlugin_logic_flusher_stateNext = LsuPlugin_logic_flusher_IDLE;
+        end
+      end
+      default : begin
+        if(LsuPlugin_logic_flusher_arbiter_io_output_valid) begin
+          LsuPlugin_logic_flusher_stateNext = LsuPlugin_logic_flusher_CMD;
+        end
+      end
+    endcase
+    if(LsuPlugin_logic_flusher_wantKill) begin
+      LsuPlugin_logic_flusher_stateNext = LsuPlugin_logic_flusher_IDLE;
+    end
+  end
+
+  assign when_LsuPlugin_l326 = (LsuPlugin_logic_flusher_cmdCounter[6] && (! LsuPlugin_logic_flusher_inflight));
+  assign when_LsuPlugin_l334 = (! (|LsuPlugin_logic_flusher_waiter));
+  assign LsuPlugin_logic_flusher_onExit_IDLE = ((LsuPlugin_logic_flusher_stateNext != LsuPlugin_logic_flusher_IDLE) && (LsuPlugin_logic_flusher_stateReg == LsuPlugin_logic_flusher_IDLE));
+  assign LsuPlugin_logic_flusher_onExit_CMD = ((LsuPlugin_logic_flusher_stateNext != LsuPlugin_logic_flusher_CMD) && (LsuPlugin_logic_flusher_stateReg == LsuPlugin_logic_flusher_CMD));
+  assign LsuPlugin_logic_flusher_onExit_COMPLETION = ((LsuPlugin_logic_flusher_stateNext != LsuPlugin_logic_flusher_COMPLETION) && (LsuPlugin_logic_flusher_stateReg == LsuPlugin_logic_flusher_COMPLETION));
+  assign LsuPlugin_logic_flusher_onEntry_IDLE = ((LsuPlugin_logic_flusher_stateNext == LsuPlugin_logic_flusher_IDLE) && (LsuPlugin_logic_flusher_stateReg != LsuPlugin_logic_flusher_IDLE));
+  assign LsuPlugin_logic_flusher_onEntry_CMD = ((LsuPlugin_logic_flusher_stateNext == LsuPlugin_logic_flusher_CMD) && (LsuPlugin_logic_flusher_stateReg != LsuPlugin_logic_flusher_CMD));
+  assign LsuPlugin_logic_flusher_onEntry_COMPLETION = ((LsuPlugin_logic_flusher_stateNext == LsuPlugin_logic_flusher_COMPLETION) && (LsuPlugin_logic_flusher_stateReg != LsuPlugin_logic_flusher_COMPLETION));
+  always @(*) begin
     TrapPlugin_logic_harts_0_trap_fsm_stateNext = TrapPlugin_logic_harts_0_trap_fsm_stateReg;
     case(TrapPlugin_logic_harts_0_trap_fsm_stateReg)
       TrapPlugin_logic_harts_0_trap_fsm_RUNNING : begin
@@ -6321,7 +7923,7 @@ module VexiiRiscv (
               TrapPlugin_logic_harts_0_trap_fsm_stateNext = TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC;
             end
             4'b0010 : begin
-              TrapPlugin_logic_harts_0_trap_fsm_stateNext = TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH;
+              TrapPlugin_logic_harts_0_trap_fsm_stateNext = TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH;
             end
             4'b0100 : begin
               TrapPlugin_logic_harts_0_trap_fsm_stateNext = TrapPlugin_logic_harts_0_trap_fsm_JUMP;
@@ -6371,6 +7973,11 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
         TrapPlugin_logic_harts_0_trap_fsm_stateNext = TrapPlugin_logic_harts_0_trap_fsm_RUNNING;
       end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+        if(TrapPlugin_logic_lsuL1Invalidate_0_cmd_ready) begin
+          TrapPlugin_logic_harts_0_trap_fsm_stateNext = TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH;
+        end
+      end
       TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
         if(TrapPlugin_logic_fetchL1Invalidate_0_cmd_ready) begin
           TrapPlugin_logic_harts_0_trap_fsm_stateNext = TrapPlugin_logic_harts_0_trap_fsm_JUMP;
@@ -6401,6 +8008,7 @@ module VexiiRiscv (
   assign TrapPlugin_logic_harts_0_trap_fsm_onExit_XRET_EPC = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext != TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg == TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC));
   assign TrapPlugin_logic_harts_0_trap_fsm_onExit_XRET_APPLY = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext != TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg == TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY));
   assign TrapPlugin_logic_harts_0_trap_fsm_onExit_JUMP = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext != TrapPlugin_logic_harts_0_trap_fsm_JUMP) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg == TrapPlugin_logic_harts_0_trap_fsm_JUMP));
+  assign TrapPlugin_logic_harts_0_trap_fsm_onExit_LSU_FLUSH = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext != TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg == TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH));
   assign TrapPlugin_logic_harts_0_trap_fsm_onExit_FETCH_FLUSH = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext != TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg == TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH));
   assign TrapPlugin_logic_harts_0_trap_fsm_onEntry_RESET = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext == TrapPlugin_logic_harts_0_trap_fsm_RESET) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg != TrapPlugin_logic_harts_0_trap_fsm_RESET));
   assign TrapPlugin_logic_harts_0_trap_fsm_onEntry_RUNNING = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext == TrapPlugin_logic_harts_0_trap_fsm_RUNNING) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg != TrapPlugin_logic_harts_0_trap_fsm_RUNNING));
@@ -6412,6 +8020,7 @@ module VexiiRiscv (
   assign TrapPlugin_logic_harts_0_trap_fsm_onEntry_XRET_EPC = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext == TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg != TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC));
   assign TrapPlugin_logic_harts_0_trap_fsm_onEntry_XRET_APPLY = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext == TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg != TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY));
   assign TrapPlugin_logic_harts_0_trap_fsm_onEntry_JUMP = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext == TrapPlugin_logic_harts_0_trap_fsm_JUMP) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg != TrapPlugin_logic_harts_0_trap_fsm_JUMP));
+  assign TrapPlugin_logic_harts_0_trap_fsm_onEntry_LSU_FLUSH = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext == TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg != TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH));
   assign TrapPlugin_logic_harts_0_trap_fsm_onEntry_FETCH_FLUSH = ((TrapPlugin_logic_harts_0_trap_fsm_stateNext == TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH) && (TrapPlugin_logic_harts_0_trap_fsm_stateReg != TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH));
   always @(*) begin
     CsrAccessPlugin_logic_fsm_stateNext = CsrAccessPlugin_logic_fsm_stateReg;
@@ -6460,319 +8069,26 @@ module VexiiRiscv (
   assign CsrAccessPlugin_logic_fsm_onEntry_READ = ((CsrAccessPlugin_logic_fsm_stateNext == CsrAccessPlugin_logic_fsm_READ) && (CsrAccessPlugin_logic_fsm_stateReg != CsrAccessPlugin_logic_fsm_READ));
   assign CsrAccessPlugin_logic_fsm_onEntry_WRITE = ((CsrAccessPlugin_logic_fsm_stateNext == CsrAccessPlugin_logic_fsm_WRITE) && (CsrAccessPlugin_logic_fsm_stateReg != CsrAccessPlugin_logic_fsm_WRITE));
   assign CsrAccessPlugin_logic_fsm_onEntry_COMPLETION = ((CsrAccessPlugin_logic_fsm_stateNext == CsrAccessPlugin_logic_fsm_COMPLETION) && (CsrAccessPlugin_logic_fsm_stateReg != CsrAccessPlugin_logic_fsm_COMPLETION));
-  always @(posedge clk) begin
-    early0_DivPlugin_logic_processing_divRevertResult <= ((execute_ctrl2_down_RsUnsignedPlugin_RS1_REVERT_lane0 ^ (execute_ctrl2_down_RsUnsignedPlugin_RS2_REVERT_lane0 && (! execute_ctrl2_down_DivPlugin_REM_lane0))) && (! (((execute_ctrl2_down_RsUnsignedPlugin_RS2_FORMATED_lane0 == 32'h0) && execute_ctrl2_down_RsUnsignedPlugin_RS2_SIGNED_lane0) && (! execute_ctrl2_down_DivPlugin_REM_lane0))));
-    if(when_FetchL1Plugin_l255) begin
-      if(_zz_when) begin
-        FetchL1Plugin_logic_refill_slots_0_address <= FetchL1Plugin_logic_refill_start_address;
-        FetchL1Plugin_logic_refill_slots_0_isIo <= FetchL1Plugin_logic_refill_start_isIo;
-        FetchL1Plugin_logic_refill_slots_0_priority <= FetchL1Plugin_logic_refill_slots_0_valid;
-      end
-    end
-    if(when_FetchL1Plugin_l276) begin
-      FetchL1Plugin_logic_refill_onCmd_lockedOh <= FetchL1Plugin_logic_refill_onCmd_propoedOh;
-    end
-    FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_address <= FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address;
-    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_id <= LsuCachelessPlugin_logic_bus_cmd_payload_id;
-    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_write <= LsuCachelessPlugin_logic_bus_cmd_payload_write;
-    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_address <= LsuCachelessPlugin_logic_bus_cmd_payload_address;
-    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_data <= LsuCachelessPlugin_logic_bus_cmd_payload_data;
-    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_size <= LsuCachelessPlugin_logic_bus_cmd_payload_size;
-    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_mask <= LsuCachelessPlugin_logic_bus_cmd_payload_mask;
-    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_io <= LsuCachelessPlugin_logic_bus_cmd_payload_io;
-    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_fromHart <= LsuCachelessPlugin_logic_bus_cmd_payload_fromHart;
-    LsuCachelessPlugin_logic_bus_cmd_payload_regNext_uopId <= LsuCachelessPlugin_logic_bus_cmd_payload_uopId;
-    FetchL1WishbonePlugin_logic_bus_DAT_MISO_regNext <= FetchL1WishbonePlugin_logic_bus_DAT_MISO;
-    FetchL1WishbonePlugin_logic_bus_ERR_regNext <= FetchL1WishbonePlugin_logic_bus_ERR;
-    if(LsuCachelessPlugin_logic_bus_rsp_valid) begin
-      case(LsuCachelessPlugin_logic_bus_rsp_payload_id)
-        1'b0 : begin
-          LsuCachelessPlugin_logic_onJoin_buffers_0_payload_error <= LsuCachelessPlugin_logic_onJoin_busRspWithoutId_error;
-          LsuCachelessPlugin_logic_onJoin_buffers_0_payload_data <= LsuCachelessPlugin_logic_onJoin_busRspWithoutId_data;
-        end
-        default : begin
-          LsuCachelessPlugin_logic_onJoin_buffers_1_payload_error <= LsuCachelessPlugin_logic_onJoin_busRspWithoutId_error;
-          LsuCachelessPlugin_logic_onJoin_buffers_1_payload_data <= LsuCachelessPlugin_logic_onJoin_busRspWithoutId_data;
-        end
-      endcase
-    end
-    if(LsuCachelessPlugin_logic_bus_cmd_ready) begin
-      LsuCachelessPlugin_logic_bus_cmd_rData_id <= LsuCachelessPlugin_logic_bus_cmd_payload_id;
-      LsuCachelessPlugin_logic_bus_cmd_rData_write <= LsuCachelessPlugin_logic_bus_cmd_payload_write;
-      LsuCachelessPlugin_logic_bus_cmd_rData_address <= LsuCachelessPlugin_logic_bus_cmd_payload_address;
-      LsuCachelessPlugin_logic_bus_cmd_rData_data <= LsuCachelessPlugin_logic_bus_cmd_payload_data;
-      LsuCachelessPlugin_logic_bus_cmd_rData_size <= LsuCachelessPlugin_logic_bus_cmd_payload_size;
-      LsuCachelessPlugin_logic_bus_cmd_rData_mask <= LsuCachelessPlugin_logic_bus_cmd_payload_mask;
-      LsuCachelessPlugin_logic_bus_cmd_rData_io <= LsuCachelessPlugin_logic_bus_cmd_payload_io;
-      LsuCachelessPlugin_logic_bus_cmd_rData_fromHart <= LsuCachelessPlugin_logic_bus_cmd_payload_fromHart;
-      LsuCachelessPlugin_logic_bus_cmd_rData_uopId <= LsuCachelessPlugin_logic_bus_cmd_payload_uopId;
-    end
-    if(TrapPlugin_logic_harts_0_trap_pending_arbiter_down_valid) begin
-      TrapPlugin_logic_harts_0_trap_pending_state_exception <= TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception;
-      TrapPlugin_logic_harts_0_trap_pending_state_tval <= TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_tval;
-      TrapPlugin_logic_harts_0_trap_pending_state_code <= TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_code;
-      TrapPlugin_logic_harts_0_trap_pending_state_arg <= TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_arg;
-    end
-    if(TrapPlugin_logic_harts_0_trap_trigger_valid) begin
-      TrapPlugin_logic_harts_0_trap_pending_pc <= execute_ctrl4_down_PC_lane0;
-      TrapPlugin_logic_harts_0_trap_pending_slices <= (1'b0 + 1'b1);
-    end
-    if(TrapPlugin_logic_harts_0_trap_fsm_buffer_sampleIt) begin
-      TrapPlugin_logic_harts_0_trap_fsm_buffer_i_valid <= TrapPlugin_logic_harts_0_interrupt_valid;
-    end
-    if(TrapPlugin_logic_harts_0_trap_fsm_buffer_sampleIt) begin
-      TrapPlugin_logic_harts_0_trap_fsm_buffer_i_code <= TrapPlugin_logic_harts_0_interrupt_code;
-    end
-    if(TrapPlugin_logic_harts_0_trap_fsm_buffer_sampleIt) begin
-      TrapPlugin_logic_harts_0_trap_fsm_buffer_i_targetPrivilege <= TrapPlugin_logic_harts_0_interrupt_targetPrivilege;
-    end
-    TrapPlugin_logic_harts_0_trap_fsm_jumpTarget <= (TrapPlugin_logic_harts_0_trap_pending_pc + _zz_TrapPlugin_logic_harts_0_trap_fsm_jumpTarget);
-    if(when_TrapPlugin_l556) begin
-      TrapPlugin_logic_harts_0_trap_fsm_readed <= TrapPlugin_logic_harts_0_crsPorts_read_data;
-    end
-    CsrAccessPlugin_logic_fsm_interface_read <= ((execute_ctrl2_down_CsrAccessPlugin_SEL_lane0 && (! CsrAccessPlugin_logic_fsm_inject_trap)) && CsrAccessPlugin_logic_fsm_inject_csrRead);
-    CsrAccessPlugin_logic_fsm_interface_write <= ((execute_ctrl2_down_CsrAccessPlugin_SEL_lane0 && (! CsrAccessPlugin_logic_fsm_inject_trap)) && CsrAccessPlugin_logic_fsm_inject_csrWrite);
-    CsrAccessPlugin_logic_fsm_inject_trapReg <= CsrAccessPlugin_logic_fsm_inject_trap;
-    CsrAccessPlugin_logic_fsm_inject_busTrapReg <= CsrAccessPlugin_bus_decode_trap;
-    CsrAccessPlugin_logic_fsm_inject_busTrapCodeReg <= CsrAccessPlugin_bus_decode_trapCode;
-    CsrAccessPlugin_logic_fsm_interface_onWriteBits <= CsrAccessPlugin_logic_fsm_writeLogic_alu_result;
-    if(fetch_logic_ctrls_0_down_isReady) begin
-      fetch_logic_ctrls_1_up_Fetch_WORD_PC <= fetch_logic_ctrls_0_down_Fetch_WORD_PC;
-      fetch_logic_ctrls_1_up_Fetch_PC_FAULT <= fetch_logic_ctrls_0_down_Fetch_PC_FAULT;
-      fetch_logic_ctrls_1_up_Fetch_ID <= fetch_logic_ctrls_0_down_Fetch_ID;
-      fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
-      fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
-      fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
-    end
-    if(fetch_logic_ctrls_1_down_isReady) begin
-      fetch_logic_ctrls_2_up_Fetch_WORD_PC <= fetch_logic_ctrls_1_down_Fetch_WORD_PC;
-      fetch_logic_ctrls_2_up_Fetch_PC_FAULT <= fetch_logic_ctrls_1_down_Fetch_PC_FAULT;
-      fetch_logic_ctrls_2_up_Fetch_ID <= fetch_logic_ctrls_1_down_Fetch_ID;
-      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_loaded <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
-      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_error <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_error;
-      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_address <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
-      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_0;
-      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_HAZARD <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_HAZARD;
-      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0;
-      fetch_logic_ctrls_2_up_MMU_TRANSLATED <= fetch_logic_ctrls_1_down_MMU_TRANSLATED;
-      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HIT <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT;
-      fetch_logic_ctrls_2_up_MMU_REFILL <= fetch_logic_ctrls_1_down_MMU_REFILL;
-      fetch_logic_ctrls_2_up_MMU_HAZARD <= fetch_logic_ctrls_1_down_MMU_HAZARD;
-      fetch_logic_ctrls_2_up_MMU_ALLOW_EXECUTE <= fetch_logic_ctrls_1_down_MMU_ALLOW_EXECUTE;
-      fetch_logic_ctrls_2_up_MMU_PAGE_FAULT <= fetch_logic_ctrls_1_down_MMU_PAGE_FAULT;
-      fetch_logic_ctrls_2_up_MMU_ACCESS_FAULT <= fetch_logic_ctrls_1_down_MMU_ACCESS_FAULT;
-      fetch_logic_ctrls_2_up_MMU_BYPASS_TRANSLATION <= fetch_logic_ctrls_1_down_MMU_BYPASS_TRANSLATION;
-    end
-    if(decode_ctrls_0_down_isReady) begin
-      decode_ctrls_1_up_Decode_INSTRUCTION_0 <= decode_ctrls_0_down_Decode_INSTRUCTION_0;
-      decode_ctrls_1_up_Decode_DECOMPRESSION_FAULT_0 <= decode_ctrls_0_down_Decode_DECOMPRESSION_FAULT_0;
-      decode_ctrls_1_up_Decode_INSTRUCTION_RAW_0 <= decode_ctrls_0_down_Decode_INSTRUCTION_RAW_0;
-      decode_ctrls_1_up_PC_0 <= decode_ctrls_0_down_PC_0;
-      decode_ctrls_1_up_Decode_DOP_ID_0 <= decode_ctrls_0_down_Decode_DOP_ID_0;
-      decode_ctrls_1_up_TRAP_0 <= decode_ctrls_0_down_TRAP_0;
-    end
-    if(execute_ctrl0_down_isReady) begin
-      execute_ctrl1_up_Decode_UOP_lane0 <= execute_ctrl0_down_Decode_UOP_lane0;
-      execute_ctrl1_up_PC_lane0 <= execute_ctrl0_down_PC_lane0;
-      execute_ctrl1_up_TRAP_lane0 <= execute_ctrl0_down_TRAP_lane0;
-      execute_ctrl1_up_Decode_UOP_ID_lane0 <= execute_ctrl0_down_Decode_UOP_ID_lane0;
-      execute_ctrl1_up_RS1_PHYS_lane0 <= execute_ctrl0_down_RS1_PHYS_lane0;
-      execute_ctrl1_up_RS2_PHYS_lane0 <= execute_ctrl0_down_RS2_PHYS_lane0;
-      execute_ctrl1_up_RD_ENABLE_lane0 <= execute_ctrl0_down_RD_ENABLE_lane0;
-      execute_ctrl1_up_RD_PHYS_lane0 <= execute_ctrl0_down_RD_PHYS_lane0;
-      execute_ctrl1_up_COMPLETED_lane0 <= execute_ctrl0_down_COMPLETED_lane0;
-      execute_ctrl1_up_AguPlugin_SIZE_lane0 <= execute_ctrl0_down_AguPlugin_SIZE_lane0;
-    end
-    if(execute_ctrl1_down_isReady) begin
-      execute_ctrl2_up_Decode_UOP_lane0 <= execute_ctrl1_down_Decode_UOP_lane0;
-      execute_ctrl2_up_PC_lane0 <= execute_ctrl1_down_PC_lane0;
-      execute_ctrl2_up_TRAP_lane0 <= execute_ctrl1_down_TRAP_lane0;
-      execute_ctrl2_up_Decode_UOP_ID_lane0 <= execute_ctrl1_down_Decode_UOP_ID_lane0;
-      execute_ctrl2_up_RD_ENABLE_lane0 <= execute_ctrl1_down_RD_ENABLE_lane0;
-      execute_ctrl2_up_RD_PHYS_lane0 <= execute_ctrl1_down_RD_PHYS_lane0;
-      execute_ctrl2_up_COMPLETED_lane0 <= execute_ctrl1_down_COMPLETED_lane0;
-      execute_ctrl2_up_AguPlugin_SIZE_lane0 <= execute_ctrl1_down_AguPlugin_SIZE_lane0;
-      execute_ctrl2_up_early0_SrcPlugin_SRC1_lane0 <= execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
-      execute_ctrl2_up_integer_RS1_lane0 <= execute_ctrl1_down_integer_RS1_lane0;
-      execute_ctrl2_up_early0_SrcPlugin_SRC2_lane0 <= execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
-      execute_ctrl2_up_integer_RS2_lane0 <= execute_ctrl1_down_integer_RS2_lane0;
-      execute_ctrl2_up_early0_IntAluPlugin_SEL_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0;
-      execute_ctrl2_up_early0_BarrelShifterPlugin_SEL_lane0 <= execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0;
-      execute_ctrl2_up_early0_BranchPlugin_SEL_lane0 <= execute_ctrl1_down_early0_BranchPlugin_SEL_lane0;
-      execute_ctrl2_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl1_down_early0_MulPlugin_SEL_lane0;
-      execute_ctrl2_up_early0_DivPlugin_SEL_lane0 <= execute_ctrl1_down_early0_DivPlugin_SEL_lane0;
-      execute_ctrl2_up_early0_EnvPlugin_SEL_lane0 <= execute_ctrl1_down_early0_EnvPlugin_SEL_lane0;
-      execute_ctrl2_up_CsrAccessPlugin_SEL_lane0 <= execute_ctrl1_down_CsrAccessPlugin_SEL_lane0;
-      execute_ctrl2_up_AguPlugin_SEL_lane0 <= execute_ctrl1_down_AguPlugin_SEL_lane0;
-      execute_ctrl2_up_LsuCachelessPlugin_FENCE_lane0 <= execute_ctrl1_down_LsuCachelessPlugin_FENCE_lane0;
-      execute_ctrl2_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-      execute_ctrl2_up_COMPLETION_AT_2_lane0 <= execute_ctrl1_down_COMPLETION_AT_2_lane0;
-      execute_ctrl2_up_COMPLETION_AT_4_lane0 <= execute_ctrl1_down_COMPLETION_AT_4_lane0;
-      execute_ctrl2_up_COMPLETION_AT_3_lane0 <= execute_ctrl1_down_COMPLETION_AT_3_lane0;
-      execute_ctrl2_up_lane0_logic_completions_onCtrl_0_ENABLE_lane0 <= execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
-      execute_ctrl2_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-      execute_ctrl2_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0 <= execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
-      execute_ctrl2_up_early0_IntAluPlugin_ALU_ADD_SUB_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
-      execute_ctrl2_up_early0_IntAluPlugin_ALU_SLTX_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0;
-      execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
-      execute_ctrl2_up_SrcStageables_REVERT_lane0 <= execute_ctrl1_down_SrcStageables_REVERT_lane0;
-      execute_ctrl2_up_SrcStageables_ZERO_lane0 <= execute_ctrl1_down_SrcStageables_ZERO_lane0;
-      execute_ctrl2_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-      execute_ctrl2_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl1_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-      execute_ctrl2_up_BYPASSED_AT_2_lane0 <= execute_ctrl1_down_BYPASSED_AT_2_lane0;
-      execute_ctrl2_up_BYPASSED_AT_3_lane0 <= execute_ctrl1_down_BYPASSED_AT_3_lane0;
-      execute_ctrl2_up_BYPASSED_AT_4_lane0 <= execute_ctrl1_down_BYPASSED_AT_4_lane0;
-      execute_ctrl2_up_SrcStageables_UNSIGNED_lane0 <= execute_ctrl1_down_SrcStageables_UNSIGNED_lane0;
-      execute_ctrl2_up_BarrelShifterPlugin_LEFT_lane0 <= execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0;
-      execute_ctrl2_up_BarrelShifterPlugin_SIGNED_lane0 <= execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0;
-      execute_ctrl2_up_BranchPlugin_BRANCH_CTRL_lane0 <= execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0;
-      execute_ctrl2_up_MulPlugin_HIGH_lane0 <= execute_ctrl1_down_MulPlugin_HIGH_lane0;
-      execute_ctrl2_up_RsUnsignedPlugin_RS1_SIGNED_lane0 <= execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
-      execute_ctrl2_up_RsUnsignedPlugin_RS2_SIGNED_lane0 <= execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
-      execute_ctrl2_up_DivPlugin_REM_lane0 <= execute_ctrl1_down_DivPlugin_REM_lane0;
-      execute_ctrl2_up_CsrAccessPlugin_CSR_IMM_lane0 <= execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0;
-      execute_ctrl2_up_CsrAccessPlugin_CSR_MASK_lane0 <= execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0;
-      execute_ctrl2_up_CsrAccessPlugin_CSR_CLEAR_lane0 <= execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0;
-      execute_ctrl2_up_AguPlugin_LOAD_lane0 <= execute_ctrl1_down_AguPlugin_LOAD_lane0;
-      execute_ctrl2_up_AguPlugin_STORE_lane0 <= execute_ctrl1_down_AguPlugin_STORE_lane0;
-      execute_ctrl2_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl1_down_AguPlugin_ATOMIC_lane0;
-      execute_ctrl2_up_AguPlugin_FLOAT_lane0 <= execute_ctrl1_down_AguPlugin_FLOAT_lane0;
-      execute_ctrl2_up_early0_EnvPlugin_OP_lane0 <= execute_ctrl1_down_early0_EnvPlugin_OP_lane0;
-    end
-    if(execute_ctrl2_down_isReady) begin
-      execute_ctrl3_up_Decode_UOP_lane0 <= execute_ctrl2_down_Decode_UOP_lane0;
-      execute_ctrl3_up_PC_lane0 <= execute_ctrl2_down_PC_lane0;
-      execute_ctrl3_up_TRAP_lane0 <= execute_ctrl2_down_TRAP_lane0;
-      execute_ctrl3_up_Decode_UOP_ID_lane0 <= execute_ctrl2_down_Decode_UOP_ID_lane0;
-      execute_ctrl3_up_RD_ENABLE_lane0 <= execute_ctrl2_down_RD_ENABLE_lane0;
-      execute_ctrl3_up_RD_PHYS_lane0 <= execute_ctrl2_down_RD_PHYS_lane0;
-      execute_ctrl3_up_COMPLETED_lane0 <= execute_ctrl2_down_COMPLETED_lane0;
-      execute_ctrl3_up_AguPlugin_SIZE_lane0 <= execute_ctrl2_down_AguPlugin_SIZE_lane0;
-      execute_ctrl3_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl2_down_early0_MulPlugin_SEL_lane0;
-      execute_ctrl3_up_early0_DivPlugin_SEL_lane0 <= execute_ctrl2_down_early0_DivPlugin_SEL_lane0;
-      execute_ctrl3_up_CsrAccessPlugin_SEL_lane0 <= execute_ctrl2_down_CsrAccessPlugin_SEL_lane0;
-      execute_ctrl3_up_AguPlugin_SEL_lane0 <= execute_ctrl2_down_AguPlugin_SEL_lane0;
-      execute_ctrl3_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl2_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-      execute_ctrl3_up_COMPLETION_AT_4_lane0 <= execute_ctrl2_down_COMPLETION_AT_4_lane0;
-      execute_ctrl3_up_COMPLETION_AT_3_lane0 <= execute_ctrl2_down_COMPLETION_AT_3_lane0;
-      execute_ctrl3_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl2_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-      execute_ctrl3_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0 <= execute_ctrl2_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
-      execute_ctrl3_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl2_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-      execute_ctrl3_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl2_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-      execute_ctrl3_up_BYPASSED_AT_3_lane0 <= execute_ctrl2_down_BYPASSED_AT_3_lane0;
-      execute_ctrl3_up_BYPASSED_AT_4_lane0 <= execute_ctrl2_down_BYPASSED_AT_4_lane0;
-      execute_ctrl3_up_MulPlugin_HIGH_lane0 <= execute_ctrl2_down_MulPlugin_HIGH_lane0;
-      execute_ctrl3_up_AguPlugin_LOAD_lane0 <= execute_ctrl2_down_AguPlugin_LOAD_lane0;
-      execute_ctrl3_up_AguPlugin_STORE_lane0 <= execute_ctrl2_down_AguPlugin_STORE_lane0;
-      execute_ctrl3_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl2_down_AguPlugin_ATOMIC_lane0;
-      execute_ctrl3_up_AguPlugin_FLOAT_lane0 <= execute_ctrl2_down_AguPlugin_FLOAT_lane0;
-      execute_ctrl3_up_COMMIT_lane0 <= execute_ctrl2_down_COMMIT_lane0;
-      execute_ctrl3_up_early0_SrcPlugin_ADD_SUB_lane0 <= execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
-      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_0_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_0_lane0;
-      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_1_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
-      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_2_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
-      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_3_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
-      execute_ctrl3_up_DivPlugin_DIV_RESULT_lane0 <= execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0;
-      execute_ctrl3_up_MMU_TRANSLATED_lane0 <= execute_ctrl2_down_MMU_TRANSLATED_lane0;
-      execute_ctrl3_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault <= execute_ctrl2_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault;
-      execute_ctrl3_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_io <= execute_ctrl2_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
-      execute_ctrl3_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl2_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
-    end
-    if(execute_ctrl3_down_isReady) begin
-      execute_ctrl4_up_Decode_UOP_lane0 <= execute_ctrl3_down_Decode_UOP_lane0;
-      execute_ctrl4_up_PC_lane0 <= execute_ctrl3_down_PC_lane0;
-      execute_ctrl4_up_TRAP_lane0 <= execute_ctrl3_down_TRAP_lane0;
-      execute_ctrl4_up_Decode_UOP_ID_lane0 <= execute_ctrl3_down_Decode_UOP_ID_lane0;
-      execute_ctrl4_up_RD_ENABLE_lane0 <= execute_ctrl3_down_RD_ENABLE_lane0;
-      execute_ctrl4_up_RD_PHYS_lane0 <= execute_ctrl3_down_RD_PHYS_lane0;
-      execute_ctrl4_up_COMPLETED_lane0 <= execute_ctrl3_down_COMPLETED_lane0;
-      execute_ctrl4_up_AguPlugin_SIZE_lane0 <= execute_ctrl3_down_AguPlugin_SIZE_lane0;
-      execute_ctrl4_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl3_down_early0_MulPlugin_SEL_lane0;
-      execute_ctrl4_up_AguPlugin_SEL_lane0 <= execute_ctrl3_down_AguPlugin_SEL_lane0;
-      execute_ctrl4_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl3_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-      execute_ctrl4_up_COMPLETION_AT_4_lane0 <= execute_ctrl3_down_COMPLETION_AT_4_lane0;
-      execute_ctrl4_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl3_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-      execute_ctrl4_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl3_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-      execute_ctrl4_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-      execute_ctrl4_up_BYPASSED_AT_4_lane0 <= execute_ctrl3_down_BYPASSED_AT_4_lane0;
-      execute_ctrl4_up_MulPlugin_HIGH_lane0 <= execute_ctrl3_down_MulPlugin_HIGH_lane0;
-      execute_ctrl4_up_AguPlugin_LOAD_lane0 <= execute_ctrl3_down_AguPlugin_LOAD_lane0;
-      execute_ctrl4_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl3_down_AguPlugin_ATOMIC_lane0;
-      execute_ctrl4_up_AguPlugin_FLOAT_lane0 <= execute_ctrl3_down_AguPlugin_FLOAT_lane0;
-      execute_ctrl4_up_COMMIT_lane0 <= execute_ctrl3_down_COMMIT_lane0;
-      execute_ctrl4_up_early0_SrcPlugin_ADD_SUB_lane0 <= execute_ctrl3_down_early0_SrcPlugin_ADD_SUB_lane0;
-      execute_ctrl4_up_MMU_TRANSLATED_lane0 <= execute_ctrl3_down_MMU_TRANSLATED_lane0;
-      execute_ctrl4_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault <= execute_ctrl3_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_fault;
-      execute_ctrl4_up_LsuCachelessPlugin_logic_onPma_RSP_lane0_io <= execute_ctrl3_down_LsuCachelessPlugin_logic_onPma_RSP_lane0_io;
-      execute_ctrl4_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
-      execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_0_lane0 <= execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
-      execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_1_lane0 <= execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
-      execute_ctrl4_up_LsuCachelessPlugin_logic_onJoin_SC_MISS_lane0 <= execute_ctrl3_down_LsuCachelessPlugin_logic_onJoin_SC_MISS_lane0;
-      execute_ctrl4_up_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0 <= execute_ctrl3_down_LsuCachelessPlugin_logic_onJoin_READ_DATA_lane0;
-    end
-    if(execute_ctrl4_down_isReady) begin
-      execute_ctrl5_up_RD_ENABLE_lane0 <= execute_ctrl4_down_RD_ENABLE_lane0;
-      execute_ctrl5_up_RD_PHYS_lane0 <= execute_ctrl4_down_RD_PHYS_lane0;
-      execute_ctrl5_up_COMMIT_lane0 <= execute_ctrl4_down_COMMIT_lane0;
-      execute_ctrl5_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl4_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
-    end
-    case(TrapPlugin_logic_harts_0_trap_fsm_stateReg)
-      TrapPlugin_logic_harts_0_trap_fsm_RUNNING : begin
-      end
-      TrapPlugin_logic_harts_0_trap_fsm_PROCESS_1 : begin
-        TrapPlugin_logic_harts_0_trap_fsm_triggerEbreakReg <= TrapPlugin_logic_harts_0_trap_fsm_triggerEbreak;
-      end
-      TrapPlugin_logic_harts_0_trap_fsm_TRAP_EPC : begin
-      end
-      TrapPlugin_logic_harts_0_trap_fsm_TRAP_TVAL : begin
-      end
-      TrapPlugin_logic_harts_0_trap_fsm_TRAP_TVEC : begin
-      end
-      TrapPlugin_logic_harts_0_trap_fsm_TRAP_APPLY : begin
-      end
-      TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC : begin
-      end
-      TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
-      end
-      TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
-      end
-      TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
-      end
-      default : begin
-      end
-    endcase
-    case(CsrAccessPlugin_logic_fsm_stateReg)
-      CsrAccessPlugin_logic_fsm_READ : begin
-        CsrAccessPlugin_logic_fsm_interface_aluInput <= CsrAccessPlugin_bus_read_toWriteBits;
-        CsrAccessPlugin_logic_fsm_interface_csrValue <= CsrAccessPlugin_logic_fsm_readLogic_csrValue;
-      end
-      CsrAccessPlugin_logic_fsm_WRITE : begin
-      end
-      CsrAccessPlugin_logic_fsm_COMPLETION : begin
-      end
-      default : begin
-        REG_CSR_1952 <= COMB_CSR_1952;
-        REG_CSR_1953 <= COMB_CSR_1953;
-        REG_CSR_1954 <= COMB_CSR_1954;
-        REG_CSR_3857 <= COMB_CSR_3857;
-        REG_CSR_3858 <= COMB_CSR_3858;
-        REG_CSR_3859 <= COMB_CSR_3859;
-        REG_CSR_3860 <= COMB_CSR_3860;
-        REG_CSR_769 <= COMB_CSR_769;
-        REG_CSR_768 <= COMB_CSR_768;
-        REG_CSR_834 <= COMB_CSR_834;
-        REG_CSR_836 <= COMB_CSR_836;
-        REG_CSR_772 <= COMB_CSR_772;
-        REG_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_tvecFilter <= COMB_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_tvecFilter;
-        REG_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_epcFilter <= COMB_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_epcFilter;
-        REG_CSR_CsrRamPlugin_csrMapper_selFilter <= COMB_CSR_CsrRamPlugin_csrMapper_selFilter;
-        REG_CSR_CsrAccessPlugin_logic_trapNextOnWriteFilter <= COMB_CSR_CsrAccessPlugin_logic_trapNextOnWriteFilter;
-      end
-    endcase
-  end
-
   always @(posedge clk or posedge reset) begin
     if(reset) begin
+      LsuL1Plugin_logic_refill_slots_0_valid <= 1'b0;
+      LsuL1Plugin_logic_refill_slots_0_loaded <= 1'b1;
+      LsuL1Plugin_logic_refill_pushCounter <= 32'h0;
+      LsuL1Plugin_logic_refill_read_arbiter_lock <= 1'b0;
+      LsuL1Plugin_logic_refill_read_wordIndex <= 4'b0000;
+      LsuL1Plugin_logic_refill_read_hadError <= 1'b0;
+      LsuL1Plugin_logic_writeback_slots_0_valid <= 1'b0;
+      LsuL1Plugin_logic_writeback_slots_0_busy <= 1'b0;
+      LsuL1Plugin_logic_writeback_read_arbiter_lock <= 1'b0;
+      LsuL1Plugin_logic_writeback_read_wordIndex <= 4'b0000;
+      LsuL1Plugin_logic_writeback_read_slotReadLast_valid <= 1'b0;
+      LsuL1Plugin_logic_writeback_write_arbiter_lock <= 1'b0;
+      LsuL1Plugin_logic_writeback_write_wordIndex <= 4'b0000;
+      LsuL1Plugin_logic_writeback_write_bufferRead_rValid <= 1'b0;
+      LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg <= 1'b0;
+      LsuL1Plugin_logic_lsu_ctrl_hazardReg <= 1'b0;
+      LsuL1Plugin_logic_lsu_ctrl_flushHazardReg <= 1'b0;
+      LsuL1Plugin_logic_initializer_counter <= 7'h0;
       early0_DivPlugin_logic_processing_cmdSent <= 1'b0;
       early0_DivPlugin_logic_processing_unscheduleRequest <= 1'b0;
       PrivilegedPlugin_logic_harts_0_privilege <= 2'b11;
@@ -6789,6 +8105,8 @@ module VexiiRiscv (
       PrivilegedPlugin_logic_harts_0_m_ie_msie <= 1'b0;
       AlignerPlugin_logic_feeder_harts_0_dopId <= 10'h0;
       AlignerPlugin_logic_nobuffer_mask <= 1'b1;
+      LsuL1Plugin_logic_bus_toWishbone_arbiter_counter <= 4'b0000;
+      LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rValid <= 1'b0;
       FetchL1Plugin_logic_invalidate_counter <= 7'h0;
       FetchL1Plugin_logic_invalidate_firstEver <= 1'b1;
       FetchL1Plugin_logic_refill_slots_0_valid <= 1'b0;
@@ -6800,27 +8118,24 @@ module VexiiRiscv (
       FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_valid <= 1'b0;
       FetchL1Plugin_logic_ctrl_trapSent <= 1'b0;
       FetchL1Plugin_logic_ctrl_firstCycle <= 1'b1;
-      LsuCachelessPlugin_logic_onFork_askFenceReg <= 1'b0;
-      LsuCachelessPlugin_logic_onFork_cmdCounter_value <= 1'b0;
-      LsuCachelessPlugin_logic_onFork_cmdSent <= 1'b0;
-      LsuCachelessPlugin_logic_bus_cmd_valid_regNext <= 1'b0;
-      LsuCachelessPlugin_logic_bus_cmd_ready_regNext <= 1'b0;
-      LsuCachelessPlugin_logic_bus_cmd_isStall_regNext <= 1'b0;
+      LsuPlugin_logic_onAddress0_ls_storeId <= 12'h0;
+      execute_ctrl3_up_LsuL1_SEL_lane0 <= 1'b0;
+      execute_ctrl4_up_LsuL1_SEL_lane0 <= 1'b0;
+      LsuPlugin_logic_onCtrl_io_tooEarly <= 1'b0;
+      LsuPlugin_logic_onCtrl_io_allowIt <= 1'b0;
+      LsuPlugin_logic_onCtrl_io_doItReg <= 1'b0;
+      LsuPlugin_logic_onCtrl_io_cmdSent <= 1'b0;
+      LsuPlugin_logic_bus_rsp_toStream_rValid <= 1'b0;
+      LsuPlugin_logic_onCtrl_hartRegulation_valid <= 1'b0;
       decode_ctrls_0_up_LANE_SEL_0_regNext <= 1'b0;
       FetchL1Plugin_logic_bus_toWishbone_counter <= 4'b0000;
       _zz_FetchL1Plugin_logic_bus_rsp_valid <= 1'b0;
+      LsuPlugin_logic_bus_cmd_rValid <= 1'b0;
       DecoderPlugin_logic_harts_0_uopId <= 16'h0;
       DecoderPlugin_logic_interrupt_buffered <= 1'b0;
       decode_ctrls_1_up_LANE_SEL_0_regNext <= 1'b0;
-      LsuCachelessPlugin_logic_onJoin_buffers_0_valid <= 1'b0;
-      LsuCachelessPlugin_logic_onJoin_buffers_0_inflight <= 1'b0;
-      LsuCachelessPlugin_logic_onJoin_buffers_1_valid <= 1'b0;
-      LsuCachelessPlugin_logic_onJoin_buffers_1_inflight <= 1'b0;
-      LsuCachelessPlugin_logic_onJoin_rspCounter_value <= 1'b0;
-      execute_ctrl3_up_LsuCachelessPlugin_WITH_RSP_lane0 <= 1'b0;
       DispatchPlugin_logic_feeds_0_sent <= 1'b0;
       CsrRamPlugin_csrMapper_fired <= 1'b0;
-      LsuCachelessPlugin_logic_bus_cmd_rValid <= 1'b0;
       decode_ctrls_1_up_LANE_SEL_0_regNext_1 <= 1'b0;
       execute_ctrl0_down_LANE_SEL_lane0_regNext <= 1'b0;
       execute_ctrl2_down_LANE_SEL_lane0_regNext <= 1'b0;
@@ -6853,9 +8168,122 @@ module VexiiRiscv (
       fetch_logic_ctrls_1_up_valid <= 1'b0;
       fetch_logic_ctrls_2_up_valid <= 1'b0;
       decode_ctrls_1_up_valid <= 1'b0;
+      LsuPlugin_logic_flusher_stateReg <= LsuPlugin_logic_flusher_IDLE;
       TrapPlugin_logic_harts_0_trap_fsm_stateReg <= TrapPlugin_logic_harts_0_trap_fsm_RESET;
       CsrAccessPlugin_logic_fsm_stateReg <= CsrAccessPlugin_logic_fsm_IDLE;
     end else begin
+      if(LsuL1Plugin_logic_refill_slots_0_loadedSet) begin
+        LsuL1Plugin_logic_refill_slots_0_loaded <= 1'b1;
+      end
+      if(LsuL1Plugin_logic_refill_slots_0_fire) begin
+        LsuL1Plugin_logic_refill_slots_0_valid <= 1'b0;
+      end
+      if(LsuL1Plugin_logic_refill_push_valid) begin
+        LsuL1Plugin_logic_refill_pushCounter <= (LsuL1Plugin_logic_refill_pushCounter + 32'h00000001);
+      end
+      if(when_LsuL1Plugin_l377) begin
+        LsuL1Plugin_logic_refill_slots_0_valid <= 1'b1;
+        LsuL1Plugin_logic_refill_slots_0_loaded <= 1'b0;
+      end
+      LsuL1Plugin_logic_refill_read_arbiter_lock <= LsuL1Plugin_logic_refill_read_arbiter_oh;
+      if(LsuL1Plugin_logic_bus_read_cmd_fire) begin
+        LsuL1Plugin_logic_refill_read_arbiter_lock <= 1'b0;
+      end
+      if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+        `ifndef SYNTHESIS
+          `ifdef FORMAL
+            assert(LsuL1Plugin_logic_refill_read_writeReservation_win); // LsuL1Plugin.scala:L429
+          `else
+            if(!LsuL1Plugin_logic_refill_read_writeReservation_win) begin
+              $display("FAILURE "); // LsuL1Plugin.scala:L429
+              $finish;
+            end
+          `endif
+        `endif
+      end
+      if(when_LsuL1Plugin_l450) begin
+        LsuL1Plugin_logic_refill_read_hadError <= 1'b1;
+      end
+      if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
+        `ifndef SYNTHESIS
+          `ifdef FORMAL
+            assert(LsuL1Plugin_logic_refill_read_reservation_win); // LsuL1Plugin.scala:L459
+          `else
+            if(!LsuL1Plugin_logic_refill_read_reservation_win) begin
+              $display("FAILURE "); // LsuL1Plugin.scala:L459
+              $finish;
+            end
+          `endif
+        `endif
+        if(LsuL1Plugin_logic_refill_read_rspWithData) begin
+          LsuL1Plugin_logic_refill_read_wordIndex <= (LsuL1Plugin_logic_refill_read_wordIndex + 4'b0001);
+        end
+        if(when_LsuL1Plugin_l463) begin
+          LsuL1Plugin_logic_refill_read_hadError <= 1'b0;
+        end
+      end
+      if(LsuL1Plugin_logic_writeback_slots_0_fire) begin
+        LsuL1Plugin_logic_writeback_slots_0_valid <= 1'b0;
+      end
+      if(LsuL1Plugin_logic_writeback_slots_0_fire) begin
+        LsuL1Plugin_logic_writeback_slots_0_busy <= 1'b0;
+      end
+      if(when_LsuL1Plugin_l530) begin
+        LsuL1Plugin_logic_writeback_slots_0_valid <= 1'b0;
+      end
+      if(when_LsuL1Plugin_l556) begin
+        LsuL1Plugin_logic_writeback_slots_0_valid <= 1'b1;
+        LsuL1Plugin_logic_writeback_slots_0_busy <= 1'b1;
+      end
+      LsuL1Plugin_logic_writeback_read_arbiter_lock <= LsuL1Plugin_logic_writeback_read_arbiter_oh;
+      LsuL1Plugin_logic_writeback_read_wordIndex <= (LsuL1Plugin_logic_writeback_read_wordIndex + _zz_LsuL1Plugin_logic_writeback_read_wordIndex);
+      if(when_LsuL1Plugin_l605) begin
+        LsuL1Plugin_logic_writeback_read_arbiter_lock <= 1'b0;
+      end
+      LsuL1Plugin_logic_writeback_read_slotReadLast_valid <= LsuL1Plugin_logic_writeback_read_slotRead_valid;
+      LsuL1Plugin_logic_writeback_write_arbiter_lock <= LsuL1Plugin_logic_writeback_write_arbiter_oh;
+      LsuL1Plugin_logic_writeback_write_wordIndex <= (LsuL1Plugin_logic_writeback_write_wordIndex + _zz_LsuL1Plugin_logic_writeback_write_wordIndex);
+      if(when_LsuL1Plugin_l676) begin
+        LsuL1Plugin_logic_writeback_write_arbiter_lock <= 1'b0;
+      end
+      if(LsuL1Plugin_logic_writeback_write_bufferRead_ready) begin
+        LsuL1Plugin_logic_writeback_write_bufferRead_rValid <= LsuL1Plugin_logic_writeback_write_bufferRead_valid;
+      end
+      if(LsuL1Plugin_logic_banks_0_usedByWriteback) begin
+        LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg <= 1'b1;
+      end
+      if(when_LsuL1Plugin_l735) begin
+        LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg <= 1'b0;
+      end
+      LsuL1Plugin_logic_lsu_ctrl_hazardReg <= (execute_ctrl4_down_LsuL1_HAZARD_lane0 && execute_freeze_valid);
+      LsuL1Plugin_logic_lsu_ctrl_flushHazardReg <= (execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0 && execute_freeze_valid);
+      if(execute_ctrl4_down_LsuL1_SEL_lane0) begin
+        `ifndef SYNTHESIS
+          `ifdef FORMAL
+            assert((_zz_20 <= 1'b1)); // LsuL1Plugin.scala:L889
+          `else
+            if(!(_zz_20 <= 1'b1)) begin
+              $display("FAILURE Multiple way hit ???"); // LsuL1Plugin.scala:L889
+              $finish;
+            end
+          `endif
+        `endif
+      end
+      if(when_LsuL1Plugin_l912) begin
+        `ifndef SYNTHESIS
+          `ifdef FORMAL
+            assert((_zz_22 < 2'b10)); // LsuL1Plugin.scala:L913
+          `else
+            if(!(_zz_22 < 2'b10)) begin
+              $display("FAILURE "); // LsuL1Plugin.scala:L913
+              $finish;
+            end
+          `endif
+        `endif
+      end
+      if(when_LsuL1Plugin_l1192) begin
+        LsuL1Plugin_logic_initializer_counter <= (LsuL1Plugin_logic_initializer_counter + 7'h01);
+      end
       if(io_cmd_fire) begin
         early0_DivPlugin_logic_processing_cmdSent <= 1'b1;
       end
@@ -6878,6 +8306,12 @@ module VexiiRiscv (
       if(when_AlignerPlugin_l292) begin
         AlignerPlugin_logic_nobuffer_mask <= AlignerPlugin_logic_nobuffer_remaningMask;
       end
+      if(LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_fire) begin
+        LsuL1Plugin_logic_bus_toWishbone_arbiter_counter <= (LsuL1Plugin_logic_bus_toWishbone_arbiter_counter + 4'b0001);
+      end
+      if(LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_ready) begin
+        LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rValid <= LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_valid;
+      end
       if(FetchL1Plugin_logic_invalidate_done) begin
         FetchL1Plugin_logic_invalidate_firstEver <= 1'b0;
       end
@@ -6888,7 +8322,7 @@ module VexiiRiscv (
         FetchL1Plugin_logic_invalidate_counter <= 7'h0;
       end
       if(when_FetchL1Plugin_l255) begin
-        if(_zz_when) begin
+        if(_zz_when_1) begin
           FetchL1Plugin_logic_refill_slots_0_valid <= 1'b1;
           FetchL1Plugin_logic_refill_slots_0_cmdSent <= 1'b0;
         end
@@ -6938,40 +8372,35 @@ module VexiiRiscv (
           end
         `endif
       `endif
-      if(when_LsuCachelessPlugin_l215) begin
-        LsuCachelessPlugin_logic_onFork_askFenceReg <= ((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_AguPlugin_SEL_lane0) && execute_ctrl2_down_AguPlugin_ATOMIC_lane0);
+      LsuPlugin_logic_onAddress0_ls_storeId <= (LsuPlugin_logic_onAddress0_ls_storeId + _zz_LsuPlugin_logic_onAddress0_ls_storeId);
+      LsuPlugin_logic_onCtrl_io_tooEarly <= 1'b1;
+      if(execute_freeze_valid) begin
+        LsuPlugin_logic_onCtrl_io_tooEarly <= 1'b0;
       end
-      LsuCachelessPlugin_logic_onFork_cmdCounter_value <= LsuCachelessPlugin_logic_onFork_cmdCounter_valueNext;
-      if(LsuCachelessPlugin_logic_bus_cmd_fire) begin
-        LsuCachelessPlugin_logic_onFork_cmdSent <= 1'b1;
+      LsuPlugin_logic_onCtrl_io_allowIt <= 1'b0;
+      if(when_LsuPlugin_l545) begin
+        LsuPlugin_logic_onCtrl_io_allowIt <= 1'b1;
       end
-      if(when_LsuCachelessPlugin_l220) begin
-        LsuCachelessPlugin_logic_onFork_cmdSent <= 1'b0;
+      LsuPlugin_logic_onCtrl_io_doItReg <= LsuPlugin_logic_onCtrl_io_doIt;
+      if(LsuPlugin_logic_bus_cmd_fire) begin
+        LsuPlugin_logic_onCtrl_io_cmdSent <= 1'b1;
       end
-      LsuCachelessPlugin_logic_bus_cmd_valid_regNext <= LsuCachelessPlugin_logic_bus_cmd_valid;
-      LsuCachelessPlugin_logic_bus_cmd_ready_regNext <= LsuCachelessPlugin_logic_bus_cmd_ready;
-      `ifndef SYNTHESIS
-        `ifdef FORMAL
-          assert((! (((! LsuCachelessPlugin_logic_bus_cmd_valid) && LsuCachelessPlugin_logic_bus_cmd_valid_regNext) && (! LsuCachelessPlugin_logic_bus_cmd_ready_regNext)))); // Stream.scala:L550
-        `else
-          if(!(! (((! LsuCachelessPlugin_logic_bus_cmd_valid) && LsuCachelessPlugin_logic_bus_cmd_valid_regNext) && (! LsuCachelessPlugin_logic_bus_cmd_ready_regNext)))) begin
-            $display("FAILURE Stream valid persistence failed"); // Stream.scala:L550
-            $finish;
-          end
-        `endif
-      `endif
-      LsuCachelessPlugin_logic_bus_cmd_isStall_regNext <= LsuCachelessPlugin_logic_bus_cmd_isStall;
-      if(LsuCachelessPlugin_logic_bus_cmd_isStall_regNext) begin
-        `ifndef SYNTHESIS
-          `ifdef FORMAL
-            assert(((((((((((LsuCachelessPlugin_logic_bus_cmd_payload_id == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_id) && (LsuCachelessPlugin_logic_bus_cmd_payload_write == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_write)) && (LsuCachelessPlugin_logic_bus_cmd_payload_address == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_address)) && (LsuCachelessPlugin_logic_bus_cmd_payload_data == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_data)) && (LsuCachelessPlugin_logic_bus_cmd_payload_size == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_size)) && (LsuCachelessPlugin_logic_bus_cmd_payload_mask == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_mask)) && (LsuCachelessPlugin_logic_bus_cmd_payload_io == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_io)) && (LsuCachelessPlugin_logic_bus_cmd_payload_fromHart == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_fromHart)) && (LsuCachelessPlugin_logic_bus_cmd_payload_uopId == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_uopId)) && 1'b1)); // Stream.scala:L554
-          `else
-            if(!((((((((((LsuCachelessPlugin_logic_bus_cmd_payload_id == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_id) && (LsuCachelessPlugin_logic_bus_cmd_payload_write == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_write)) && (LsuCachelessPlugin_logic_bus_cmd_payload_address == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_address)) && (LsuCachelessPlugin_logic_bus_cmd_payload_data == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_data)) && (LsuCachelessPlugin_logic_bus_cmd_payload_size == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_size)) && (LsuCachelessPlugin_logic_bus_cmd_payload_mask == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_mask)) && (LsuCachelessPlugin_logic_bus_cmd_payload_io == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_io)) && (LsuCachelessPlugin_logic_bus_cmd_payload_fromHart == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_fromHart)) && (LsuCachelessPlugin_logic_bus_cmd_payload_uopId == LsuCachelessPlugin_logic_bus_cmd_payload_regNext_uopId)) && 1'b1)) begin
-              $display("FAILURE Stream payload persistence failed"); // Stream.scala:L554
-              $finish;
-            end
-          `endif
-        `endif
+      if(when_LsuPlugin_l549) begin
+        LsuPlugin_logic_onCtrl_io_cmdSent <= 1'b0;
+      end
+      if(LsuPlugin_logic_bus_rsp_toStream_valid) begin
+        LsuPlugin_logic_bus_rsp_toStream_rValid <= 1'b1;
+      end
+      if(LsuPlugin_logic_onCtrl_io_rsp_fire) begin
+        LsuPlugin_logic_bus_rsp_toStream_rValid <= 1'b0;
+      end
+      if(when_LsuPlugin_l222) begin
+        LsuPlugin_logic_onCtrl_hartRegulation_valid <= 1'b0;
+      end
+      if(when_LsuPlugin_l871) begin
+        if(when_LsuPlugin_l226) begin
+          LsuPlugin_logic_onCtrl_hartRegulation_valid <= 1'b1;
+        end
       end
       decode_ctrls_0_up_LANE_SEL_0_regNext <= decode_ctrls_0_up_LANE_SEL_0;
       if(when_CtrlLaneApi_l50) begin
@@ -6983,6 +8412,9 @@ module VexiiRiscv (
         end
       end
       _zz_FetchL1Plugin_logic_bus_rsp_valid <= (FetchL1WishbonePlugin_logic_bus_CYC && (FetchL1WishbonePlugin_logic_bus_ACK || FetchL1WishbonePlugin_logic_bus_ERR));
+      if(LsuPlugin_logic_bus_cmd_ready) begin
+        LsuPlugin_logic_bus_cmd_rValid <= LsuPlugin_logic_bus_cmd_valid;
+      end
       if(when_DecoderPlugin_l138) begin
         DecoderPlugin_logic_harts_0_uopId <= (DecoderPlugin_logic_harts_0_uopId + 16'h0001);
       end
@@ -6993,49 +8425,6 @@ module VexiiRiscv (
       if(when_CtrlLaneApi_l50_1) begin
         decode_ctrls_1_up_LANE_SEL_0_regNext <= 1'b0;
       end
-      if(LsuCachelessPlugin_logic_bus_cmd_fire) begin
-        case(LsuCachelessPlugin_logic_bus_cmd_payload_id)
-          1'b0 : begin
-            LsuCachelessPlugin_logic_onJoin_buffers_0_inflight <= 1'b1;
-          end
-          default : begin
-            LsuCachelessPlugin_logic_onJoin_buffers_1_inflight <= 1'b1;
-          end
-        endcase
-      end
-      if(LsuCachelessPlugin_logic_bus_rsp_valid) begin
-        case(LsuCachelessPlugin_logic_bus_rsp_payload_id)
-          1'b0 : begin
-            LsuCachelessPlugin_logic_onJoin_buffers_0_valid <= 1'b1;
-            LsuCachelessPlugin_logic_onJoin_buffers_0_inflight <= 1'b0;
-          end
-          default : begin
-            LsuCachelessPlugin_logic_onJoin_buffers_1_valid <= 1'b1;
-            LsuCachelessPlugin_logic_onJoin_buffers_1_inflight <= 1'b0;
-          end
-        endcase
-      end
-      LsuCachelessPlugin_logic_onJoin_rspCounter_value <= LsuCachelessPlugin_logic_onJoin_rspCounter_valueNext;
-      if(LsuCachelessPlugin_logic_onJoin_pop) begin
-        case(LsuCachelessPlugin_logic_onJoin_rspCounter_value)
-          1'b0 : begin
-            LsuCachelessPlugin_logic_onJoin_buffers_0_valid <= 1'b0;
-          end
-          default : begin
-            LsuCachelessPlugin_logic_onJoin_buffers_1_valid <= 1'b0;
-          end
-        endcase
-      end
-      `ifndef SYNTHESIS
-        `ifdef FORMAL
-          assert((! ((((execute_ctrl3_up_LANE_SEL_lane0 && execute_lane0_ctrls_3_upIsCancel) && execute_ctrl3_down_AguPlugin_SEL_lane0) && execute_ctrl3_down_AguPlugin_STORE_lane0) && (! execute_ctrl3_up_TRAP_lane0)))); // LsuCachelessPlugin.scala:L380
-        `else
-          if(!(! ((((execute_ctrl3_up_LANE_SEL_lane0 && execute_lane0_ctrls_3_upIsCancel) && execute_ctrl3_down_AguPlugin_SEL_lane0) && execute_ctrl3_down_AguPlugin_STORE_lane0) && (! execute_ctrl3_up_TRAP_lane0)))) begin
-            $display("FAILURE LsuCachelessPlugin saw unexpected select && STORE && cancel request"); // LsuCachelessPlugin.scala:L380
-            $finish;
-          end
-        `endif
-      `endif
       if(DispatchPlugin_logic_feeds_0_sending) begin
         DispatchPlugin_logic_feeds_0_sent <= 1'b1;
       end
@@ -7047,9 +8436,6 @@ module VexiiRiscv (
       end
       if(CsrAccessPlugin_bus_write_moving) begin
         CsrRamPlugin_csrMapper_fired <= 1'b0;
-      end
-      if(LsuCachelessPlugin_logic_bus_cmd_ready) begin
-        LsuCachelessPlugin_logic_bus_cmd_rValid <= LsuCachelessPlugin_logic_bus_cmd_valid;
       end
       decode_ctrls_1_up_LANE_SEL_0_regNext_1 <= decode_ctrls_1_up_LANE_SEL_0;
       if(when_CtrlLaneApi_l50_2) begin
@@ -7150,14 +8536,16 @@ module VexiiRiscv (
       end
       if(execute_ctrl2_down_isReady) begin
         execute_ctrl3_up_LANE_SEL_lane0 <= execute_ctrl2_down_LANE_SEL_lane0;
-        execute_ctrl3_up_LsuCachelessPlugin_WITH_RSP_lane0 <= execute_ctrl2_down_LsuCachelessPlugin_WITH_RSP_lane0;
+        execute_ctrl3_up_LsuL1_SEL_lane0 <= execute_ctrl2_down_LsuL1_SEL_lane0;
       end
       if(execute_ctrl3_down_isReady) begin
         execute_ctrl4_up_LANE_SEL_lane0 <= execute_ctrl3_down_LANE_SEL_lane0;
+        execute_ctrl4_up_LsuL1_SEL_lane0 <= execute_ctrl3_down_LsuL1_SEL_lane0;
       end
       if(execute_ctrl4_down_isReady) begin
         execute_ctrl5_up_LANE_SEL_lane0 <= execute_ctrl4_down_LANE_SEL_lane0;
       end
+      LsuPlugin_logic_flusher_stateReg <= LsuPlugin_logic_flusher_stateNext;
       TrapPlugin_logic_harts_0_trap_fsm_stateReg <= TrapPlugin_logic_harts_0_trap_fsm_stateNext;
       case(TrapPlugin_logic_harts_0_trap_fsm_stateReg)
         TrapPlugin_logic_harts_0_trap_fsm_RUNNING : begin
@@ -7239,6 +8627,8 @@ module VexiiRiscv (
         end
         TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
         end
+        TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+        end
         TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
         end
         default : begin
@@ -7274,6 +8664,431 @@ module VexiiRiscv (
         end
       endcase
     end
+  end
+
+  always @(posedge clk) begin
+    LsuL1Plugin_logic_refill_slots_0_loadedCounter <= (LsuL1Plugin_logic_refill_slots_0_loadedCounter + ((LsuL1Plugin_logic_refill_slots_0_loaded && (! LsuL1Plugin_logic_refill_slots_0_loadedDone)) && (! execute_freeze_valid)));
+    if(when_LsuL1Plugin_l381) begin
+      LsuL1Plugin_logic_refill_slots_0_address <= LsuL1Plugin_logic_refill_push_payload_address;
+      LsuL1Plugin_logic_refill_slots_0_cmdSent <= 1'b0;
+      LsuL1Plugin_logic_refill_slots_0_loadedCounter <= 1'b0;
+      LsuL1Plugin_logic_refill_slots_0_victim <= LsuL1Plugin_logic_refill_push_payload_victim;
+      LsuL1Plugin_logic_refill_slots_0_dirty <= LsuL1Plugin_logic_refill_push_payload_dirty;
+    end
+    if(LsuL1Plugin_logic_refill_read_arbiter_oh[0]) begin
+      if(LsuL1Plugin_logic_bus_read_cmd_ready) begin
+        LsuL1Plugin_logic_refill_slots_0_cmdSent <= 1'b1;
+      end
+    end
+    LsuL1Plugin_logic_writeback_slots_0_timer_counter <= (LsuL1Plugin_logic_writeback_slots_0_timer_counter + ((! LsuL1Plugin_logic_writeback_slots_0_timer_done) && (! execute_freeze_valid)));
+    if(when_LsuL1Plugin_l561) begin
+      LsuL1Plugin_logic_writeback_slots_0_address <= LsuL1Plugin_logic_writeback_push_payload_address;
+      LsuL1Plugin_logic_writeback_slots_0_timer_counter <= 1'b0;
+      LsuL1Plugin_logic_writeback_slots_0_writeCmdDone <= 1'b0;
+      LsuL1Plugin_logic_writeback_slots_0_readCmdDone <= 1'b0;
+      LsuL1Plugin_logic_writeback_slots_0_readRspDone <= 1'b0;
+      LsuL1Plugin_logic_writeback_slots_0_victimBufferReady <= 1'b0;
+    end
+    if(when_LsuL1Plugin_l605) begin
+      if(LsuL1Plugin_logic_writeback_read_arbiter_oh[0]) begin
+        LsuL1Plugin_logic_writeback_slots_0_readCmdDone <= 1'b1;
+      end
+    end
+    if(LsuL1Plugin_logic_writeback_read_slotRead_valid) begin
+      LsuL1Plugin_logic_refill_slots_0_victim[0] <= 1'b0;
+    end
+    LsuL1Plugin_logic_writeback_read_slotReadLast_payload_last <= LsuL1Plugin_logic_writeback_read_slotRead_payload_last;
+    LsuL1Plugin_logic_writeback_read_slotReadLast_payload_wordIndex <= LsuL1Plugin_logic_writeback_read_slotRead_payload_wordIndex;
+    if(LsuL1Plugin_logic_writeback_read_slotReadLast_valid) begin
+      LsuL1Plugin_logic_writeback_slots_0_victimBufferReady <= 1'b1;
+      if(LsuL1Plugin_logic_writeback_read_slotReadLast_payload_last) begin
+        LsuL1Plugin_logic_writeback_slots_0_readRspDone <= 1'b1;
+      end
+    end
+    if(when_LsuL1Plugin_l676) begin
+      if(LsuL1Plugin_logic_writeback_write_arbiter_oh[0]) begin
+        LsuL1Plugin_logic_writeback_slots_0_writeCmdDone <= 1'b1;
+      end
+    end
+    if(LsuL1Plugin_logic_writeback_write_bufferRead_ready) begin
+      LsuL1Plugin_logic_writeback_write_bufferRead_rData_address <= LsuL1Plugin_logic_writeback_write_bufferRead_payload_address;
+      LsuL1Plugin_logic_writeback_write_bufferRead_rData_last <= LsuL1Plugin_logic_writeback_write_bufferRead_payload_last;
+    end
+    early0_DivPlugin_logic_processing_divRevertResult <= ((execute_ctrl2_down_RsUnsignedPlugin_RS1_REVERT_lane0 ^ (execute_ctrl2_down_RsUnsignedPlugin_RS2_REVERT_lane0 && (! execute_ctrl2_down_DivPlugin_REM_lane0))) && (! (((execute_ctrl2_down_RsUnsignedPlugin_RS2_FORMATED_lane0 == 32'h0) && execute_ctrl2_down_RsUnsignedPlugin_RS2_SIGNED_lane0) && (! execute_ctrl2_down_DivPlugin_REM_lane0))));
+    if(LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_ready) begin
+      LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_last <= LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_last;
+      LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_write <= LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_write;
+      LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_address <= LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_address;
+      LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_data <= LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_data;
+    end
+    if(when_FetchL1Plugin_l255) begin
+      if(_zz_when_1) begin
+        FetchL1Plugin_logic_refill_slots_0_address <= FetchL1Plugin_logic_refill_start_address;
+        FetchL1Plugin_logic_refill_slots_0_isIo <= FetchL1Plugin_logic_refill_start_isIo;
+        FetchL1Plugin_logic_refill_slots_0_priority <= FetchL1Plugin_logic_refill_slots_0_valid;
+      end
+    end
+    if(when_FetchL1Plugin_l276) begin
+      FetchL1Plugin_logic_refill_onCmd_lockedOh <= FetchL1Plugin_logic_refill_onCmd_propoedOh;
+    end
+    FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_address <= FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address;
+    if(LsuPlugin_logic_onAddress0_flush_port_fire) begin
+      LsuPlugin_logic_flusher_cmdCounter <= (LsuPlugin_logic_flusher_cmdCounter + 7'h01);
+    end
+    if(LsuPlugin_logic_bus_rsp_toStream_ready) begin
+      LsuPlugin_logic_bus_rsp_toStream_rData_error <= LsuPlugin_logic_bus_rsp_toStream_payload_error;
+      LsuPlugin_logic_bus_rsp_toStream_rData_data <= LsuPlugin_logic_bus_rsp_toStream_payload_data;
+    end
+    if(when_LsuPlugin_l827) begin
+      LsuPlugin_logic_flusher_cmdCounter <= {1'd0, _zz_LsuPlugin_logic_flusher_cmdCounter};
+    end
+    if(when_LsuPlugin_l871) begin
+      if(when_LsuPlugin_l226) begin
+        LsuPlugin_logic_onCtrl_hartRegulation_refill <= execute_ctrl4_down_LsuL1_WAIT_REFILL_lane0;
+      end
+    end
+    FetchL1WishbonePlugin_logic_bus_DAT_MISO_regNext <= FetchL1WishbonePlugin_logic_bus_DAT_MISO;
+    FetchL1WishbonePlugin_logic_bus_ERR_regNext <= FetchL1WishbonePlugin_logic_bus_ERR;
+    if(LsuPlugin_logic_bus_cmd_ready) begin
+      LsuPlugin_logic_bus_cmd_rData_write <= LsuPlugin_logic_bus_cmd_payload_write;
+      LsuPlugin_logic_bus_cmd_rData_address <= LsuPlugin_logic_bus_cmd_payload_address;
+      LsuPlugin_logic_bus_cmd_rData_data <= LsuPlugin_logic_bus_cmd_payload_data;
+      LsuPlugin_logic_bus_cmd_rData_size <= LsuPlugin_logic_bus_cmd_payload_size;
+      LsuPlugin_logic_bus_cmd_rData_mask <= LsuPlugin_logic_bus_cmd_payload_mask;
+      LsuPlugin_logic_bus_cmd_rData_io <= LsuPlugin_logic_bus_cmd_payload_io;
+      LsuPlugin_logic_bus_cmd_rData_fromHart <= LsuPlugin_logic_bus_cmd_payload_fromHart;
+      LsuPlugin_logic_bus_cmd_rData_uopId <= LsuPlugin_logic_bus_cmd_payload_uopId;
+    end
+    if(TrapPlugin_logic_harts_0_trap_pending_arbiter_down_valid) begin
+      TrapPlugin_logic_harts_0_trap_pending_state_exception <= TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception;
+      TrapPlugin_logic_harts_0_trap_pending_state_tval <= TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_tval;
+      TrapPlugin_logic_harts_0_trap_pending_state_code <= TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_code;
+      TrapPlugin_logic_harts_0_trap_pending_state_arg <= TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_arg;
+    end
+    if(TrapPlugin_logic_harts_0_trap_trigger_valid) begin
+      TrapPlugin_logic_harts_0_trap_pending_pc <= execute_ctrl4_down_PC_lane0;
+      TrapPlugin_logic_harts_0_trap_pending_slices <= (1'b0 + 1'b1);
+    end
+    if(TrapPlugin_logic_harts_0_trap_fsm_buffer_sampleIt) begin
+      TrapPlugin_logic_harts_0_trap_fsm_buffer_i_valid <= TrapPlugin_logic_harts_0_interrupt_valid;
+    end
+    if(TrapPlugin_logic_harts_0_trap_fsm_buffer_sampleIt) begin
+      TrapPlugin_logic_harts_0_trap_fsm_buffer_i_code <= TrapPlugin_logic_harts_0_interrupt_code;
+    end
+    if(TrapPlugin_logic_harts_0_trap_fsm_buffer_sampleIt) begin
+      TrapPlugin_logic_harts_0_trap_fsm_buffer_i_targetPrivilege <= TrapPlugin_logic_harts_0_interrupt_targetPrivilege;
+    end
+    TrapPlugin_logic_harts_0_trap_fsm_jumpTarget <= (TrapPlugin_logic_harts_0_trap_pending_pc + _zz_TrapPlugin_logic_harts_0_trap_fsm_jumpTarget);
+    if(when_TrapPlugin_l556) begin
+      TrapPlugin_logic_harts_0_trap_fsm_readed <= TrapPlugin_logic_harts_0_crsPorts_read_data;
+    end
+    CsrAccessPlugin_logic_fsm_interface_read <= ((execute_ctrl2_down_CsrAccessPlugin_SEL_lane0 && (! CsrAccessPlugin_logic_fsm_inject_trap)) && CsrAccessPlugin_logic_fsm_inject_csrRead);
+    CsrAccessPlugin_logic_fsm_interface_write <= ((execute_ctrl2_down_CsrAccessPlugin_SEL_lane0 && (! CsrAccessPlugin_logic_fsm_inject_trap)) && CsrAccessPlugin_logic_fsm_inject_csrWrite);
+    CsrAccessPlugin_logic_fsm_inject_trapReg <= CsrAccessPlugin_logic_fsm_inject_trap;
+    CsrAccessPlugin_logic_fsm_inject_busTrapReg <= CsrAccessPlugin_bus_decode_trap;
+    CsrAccessPlugin_logic_fsm_inject_busTrapCodeReg <= CsrAccessPlugin_bus_decode_trapCode;
+    CsrAccessPlugin_logic_fsm_interface_onWriteBits <= CsrAccessPlugin_logic_fsm_writeLogic_alu_result;
+    if(fetch_logic_ctrls_0_down_isReady) begin
+      fetch_logic_ctrls_1_up_Fetch_WORD_PC <= fetch_logic_ctrls_0_down_Fetch_WORD_PC;
+      fetch_logic_ctrls_1_up_Fetch_PC_FAULT <= fetch_logic_ctrls_0_down_Fetch_PC_FAULT;
+      fetch_logic_ctrls_1_up_Fetch_ID <= fetch_logic_ctrls_0_down_Fetch_ID;
+      fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
+      fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
+      fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
+    end
+    if(fetch_logic_ctrls_1_down_isReady) begin
+      fetch_logic_ctrls_2_up_Fetch_WORD_PC <= fetch_logic_ctrls_1_down_Fetch_WORD_PC;
+      fetch_logic_ctrls_2_up_Fetch_PC_FAULT <= fetch_logic_ctrls_1_down_Fetch_PC_FAULT;
+      fetch_logic_ctrls_2_up_Fetch_ID <= fetch_logic_ctrls_1_down_Fetch_ID;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_loaded <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_error <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_error;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_address <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_0;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_HAZARD <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_HAZARD;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0;
+      fetch_logic_ctrls_2_up_MMU_TRANSLATED <= fetch_logic_ctrls_1_down_MMU_TRANSLATED;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HIT <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT;
+      fetch_logic_ctrls_2_up_MMU_REFILL <= fetch_logic_ctrls_1_down_MMU_REFILL;
+      fetch_logic_ctrls_2_up_MMU_HAZARD <= fetch_logic_ctrls_1_down_MMU_HAZARD;
+      fetch_logic_ctrls_2_up_MMU_ALLOW_EXECUTE <= fetch_logic_ctrls_1_down_MMU_ALLOW_EXECUTE;
+      fetch_logic_ctrls_2_up_MMU_PAGE_FAULT <= fetch_logic_ctrls_1_down_MMU_PAGE_FAULT;
+      fetch_logic_ctrls_2_up_MMU_ACCESS_FAULT <= fetch_logic_ctrls_1_down_MMU_ACCESS_FAULT;
+      fetch_logic_ctrls_2_up_MMU_BYPASS_TRANSLATION <= fetch_logic_ctrls_1_down_MMU_BYPASS_TRANSLATION;
+    end
+    if(decode_ctrls_0_down_isReady) begin
+      decode_ctrls_1_up_Decode_INSTRUCTION_0 <= decode_ctrls_0_down_Decode_INSTRUCTION_0;
+      decode_ctrls_1_up_Decode_DECOMPRESSION_FAULT_0 <= decode_ctrls_0_down_Decode_DECOMPRESSION_FAULT_0;
+      decode_ctrls_1_up_Decode_INSTRUCTION_RAW_0 <= decode_ctrls_0_down_Decode_INSTRUCTION_RAW_0;
+      decode_ctrls_1_up_PC_0 <= decode_ctrls_0_down_PC_0;
+      decode_ctrls_1_up_Decode_DOP_ID_0 <= decode_ctrls_0_down_Decode_DOP_ID_0;
+      decode_ctrls_1_up_TRAP_0 <= decode_ctrls_0_down_TRAP_0;
+    end
+    if(execute_ctrl0_down_isReady) begin
+      execute_ctrl1_up_Decode_UOP_lane0 <= execute_ctrl0_down_Decode_UOP_lane0;
+      execute_ctrl1_up_PC_lane0 <= execute_ctrl0_down_PC_lane0;
+      execute_ctrl1_up_TRAP_lane0 <= execute_ctrl0_down_TRAP_lane0;
+      execute_ctrl1_up_Decode_UOP_ID_lane0 <= execute_ctrl0_down_Decode_UOP_ID_lane0;
+      execute_ctrl1_up_RS1_PHYS_lane0 <= execute_ctrl0_down_RS1_PHYS_lane0;
+      execute_ctrl1_up_RS2_PHYS_lane0 <= execute_ctrl0_down_RS2_PHYS_lane0;
+      execute_ctrl1_up_RD_ENABLE_lane0 <= execute_ctrl0_down_RD_ENABLE_lane0;
+      execute_ctrl1_up_RD_PHYS_lane0 <= execute_ctrl0_down_RD_PHYS_lane0;
+      execute_ctrl1_up_COMPLETED_lane0 <= execute_ctrl0_down_COMPLETED_lane0;
+      execute_ctrl1_up_AguPlugin_SIZE_lane0 <= execute_ctrl0_down_AguPlugin_SIZE_lane0;
+    end
+    if(execute_ctrl1_down_isReady) begin
+      execute_ctrl2_up_Decode_UOP_lane0 <= execute_ctrl1_down_Decode_UOP_lane0;
+      execute_ctrl2_up_PC_lane0 <= execute_ctrl1_down_PC_lane0;
+      execute_ctrl2_up_TRAP_lane0 <= execute_ctrl1_down_TRAP_lane0;
+      execute_ctrl2_up_Decode_UOP_ID_lane0 <= execute_ctrl1_down_Decode_UOP_ID_lane0;
+      execute_ctrl2_up_RD_ENABLE_lane0 <= execute_ctrl1_down_RD_ENABLE_lane0;
+      execute_ctrl2_up_RD_PHYS_lane0 <= execute_ctrl1_down_RD_PHYS_lane0;
+      execute_ctrl2_up_COMPLETED_lane0 <= execute_ctrl1_down_COMPLETED_lane0;
+      execute_ctrl2_up_AguPlugin_SIZE_lane0 <= execute_ctrl1_down_AguPlugin_SIZE_lane0;
+      execute_ctrl2_up_early0_SrcPlugin_SRC1_lane0 <= execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
+      execute_ctrl2_up_integer_RS1_lane0 <= execute_ctrl1_down_integer_RS1_lane0;
+      execute_ctrl2_up_early0_SrcPlugin_SRC2_lane0 <= execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
+      execute_ctrl2_up_integer_RS2_lane0 <= execute_ctrl1_down_integer_RS2_lane0;
+      execute_ctrl2_up_MAY_FLUSH_PRECISE_3_lane0 <= execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0;
+      execute_ctrl2_up_early0_IntAluPlugin_SEL_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0;
+      execute_ctrl2_up_early0_BarrelShifterPlugin_SEL_lane0 <= execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0;
+      execute_ctrl2_up_early0_BranchPlugin_SEL_lane0 <= execute_ctrl1_down_early0_BranchPlugin_SEL_lane0;
+      execute_ctrl2_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl1_down_early0_MulPlugin_SEL_lane0;
+      execute_ctrl2_up_early0_DivPlugin_SEL_lane0 <= execute_ctrl1_down_early0_DivPlugin_SEL_lane0;
+      execute_ctrl2_up_early0_EnvPlugin_SEL_lane0 <= execute_ctrl1_down_early0_EnvPlugin_SEL_lane0;
+      execute_ctrl2_up_CsrAccessPlugin_SEL_lane0 <= execute_ctrl1_down_CsrAccessPlugin_SEL_lane0;
+      execute_ctrl2_up_AguPlugin_SEL_lane0 <= execute_ctrl1_down_AguPlugin_SEL_lane0;
+      execute_ctrl2_up_LsuPlugin_logic_FENCE_lane0 <= execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0;
+      execute_ctrl2_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+      execute_ctrl2_up_COMPLETION_AT_2_lane0 <= execute_ctrl1_down_COMPLETION_AT_2_lane0;
+      execute_ctrl2_up_COMPLETION_AT_4_lane0 <= execute_ctrl1_down_COMPLETION_AT_4_lane0;
+      execute_ctrl2_up_COMPLETION_AT_3_lane0 <= execute_ctrl1_down_COMPLETION_AT_3_lane0;
+      execute_ctrl2_up_lane0_logic_completions_onCtrl_0_ENABLE_lane0 <= execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+      execute_ctrl2_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+      execute_ctrl2_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0 <= execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+      execute_ctrl2_up_early0_IntAluPlugin_ALU_ADD_SUB_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
+      execute_ctrl2_up_early0_IntAluPlugin_ALU_SLTX_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0;
+      execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+      execute_ctrl2_up_SrcStageables_REVERT_lane0 <= execute_ctrl1_down_SrcStageables_REVERT_lane0;
+      execute_ctrl2_up_SrcStageables_ZERO_lane0 <= execute_ctrl1_down_SrcStageables_ZERO_lane0;
+      execute_ctrl2_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+      execute_ctrl2_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl1_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
+      execute_ctrl2_up_BYPASSED_AT_2_lane0 <= execute_ctrl1_down_BYPASSED_AT_2_lane0;
+      execute_ctrl2_up_BYPASSED_AT_3_lane0 <= execute_ctrl1_down_BYPASSED_AT_3_lane0;
+      execute_ctrl2_up_BYPASSED_AT_4_lane0 <= execute_ctrl1_down_BYPASSED_AT_4_lane0;
+      execute_ctrl2_up_SrcStageables_UNSIGNED_lane0 <= execute_ctrl1_down_SrcStageables_UNSIGNED_lane0;
+      execute_ctrl2_up_BarrelShifterPlugin_LEFT_lane0 <= execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0;
+      execute_ctrl2_up_BarrelShifterPlugin_SIGNED_lane0 <= execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0;
+      execute_ctrl2_up_BranchPlugin_BRANCH_CTRL_lane0 <= execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0;
+      execute_ctrl2_up_MulPlugin_HIGH_lane0 <= execute_ctrl1_down_MulPlugin_HIGH_lane0;
+      execute_ctrl2_up_RsUnsignedPlugin_RS1_SIGNED_lane0 <= execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
+      execute_ctrl2_up_RsUnsignedPlugin_RS2_SIGNED_lane0 <= execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
+      execute_ctrl2_up_DivPlugin_REM_lane0 <= execute_ctrl1_down_DivPlugin_REM_lane0;
+      execute_ctrl2_up_CsrAccessPlugin_CSR_IMM_lane0 <= execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0;
+      execute_ctrl2_up_CsrAccessPlugin_CSR_MASK_lane0 <= execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0;
+      execute_ctrl2_up_CsrAccessPlugin_CSR_CLEAR_lane0 <= execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0;
+      execute_ctrl2_up_AguPlugin_LOAD_lane0 <= execute_ctrl1_down_AguPlugin_LOAD_lane0;
+      execute_ctrl2_up_AguPlugin_STORE_lane0 <= execute_ctrl1_down_AguPlugin_STORE_lane0;
+      execute_ctrl2_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl1_down_AguPlugin_ATOMIC_lane0;
+      execute_ctrl2_up_AguPlugin_FLOAT_lane0 <= execute_ctrl1_down_AguPlugin_FLOAT_lane0;
+      execute_ctrl2_up_LsuPlugin_logic_LSU_PREFETCH_lane0 <= execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+      execute_ctrl2_up_early0_EnvPlugin_OP_lane0 <= execute_ctrl1_down_early0_EnvPlugin_OP_lane0;
+    end
+    if(execute_ctrl2_down_isReady) begin
+      execute_ctrl3_up_Decode_UOP_lane0 <= execute_ctrl2_down_Decode_UOP_lane0;
+      execute_ctrl3_up_PC_lane0 <= execute_ctrl2_down_PC_lane0;
+      execute_ctrl3_up_TRAP_lane0 <= execute_ctrl2_down_TRAP_lane0;
+      execute_ctrl3_up_Decode_UOP_ID_lane0 <= execute_ctrl2_down_Decode_UOP_ID_lane0;
+      execute_ctrl3_up_RD_ENABLE_lane0 <= execute_ctrl2_down_RD_ENABLE_lane0;
+      execute_ctrl3_up_RD_PHYS_lane0 <= execute_ctrl2_down_RD_PHYS_lane0;
+      execute_ctrl3_up_COMPLETED_lane0 <= execute_ctrl2_down_COMPLETED_lane0;
+      execute_ctrl3_up_AguPlugin_SIZE_lane0 <= execute_ctrl2_down_AguPlugin_SIZE_lane0;
+      execute_ctrl3_up_integer_RS2_lane0 <= execute_ctrl2_down_integer_RS2_lane0;
+      execute_ctrl3_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl2_down_early0_MulPlugin_SEL_lane0;
+      execute_ctrl3_up_early0_DivPlugin_SEL_lane0 <= execute_ctrl2_down_early0_DivPlugin_SEL_lane0;
+      execute_ctrl3_up_CsrAccessPlugin_SEL_lane0 <= execute_ctrl2_down_CsrAccessPlugin_SEL_lane0;
+      execute_ctrl3_up_AguPlugin_SEL_lane0 <= execute_ctrl2_down_AguPlugin_SEL_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_FENCE_lane0 <= execute_ctrl2_down_LsuPlugin_logic_FENCE_lane0;
+      execute_ctrl3_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl2_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+      execute_ctrl3_up_COMPLETION_AT_4_lane0 <= execute_ctrl2_down_COMPLETION_AT_4_lane0;
+      execute_ctrl3_up_COMPLETION_AT_3_lane0 <= execute_ctrl2_down_COMPLETION_AT_3_lane0;
+      execute_ctrl3_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl2_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+      execute_ctrl3_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0 <= execute_ctrl2_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+      execute_ctrl3_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl2_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+      execute_ctrl3_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl2_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
+      execute_ctrl3_up_BYPASSED_AT_3_lane0 <= execute_ctrl2_down_BYPASSED_AT_3_lane0;
+      execute_ctrl3_up_BYPASSED_AT_4_lane0 <= execute_ctrl2_down_BYPASSED_AT_4_lane0;
+      execute_ctrl3_up_MulPlugin_HIGH_lane0 <= execute_ctrl2_down_MulPlugin_HIGH_lane0;
+      execute_ctrl3_up_AguPlugin_LOAD_lane0 <= execute_ctrl2_down_AguPlugin_LOAD_lane0;
+      execute_ctrl3_up_AguPlugin_STORE_lane0 <= execute_ctrl2_down_AguPlugin_STORE_lane0;
+      execute_ctrl3_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl2_down_AguPlugin_ATOMIC_lane0;
+      execute_ctrl3_up_AguPlugin_FLOAT_lane0 <= execute_ctrl2_down_AguPlugin_FLOAT_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_LSU_PREFETCH_lane0 <= execute_ctrl2_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+      execute_ctrl3_up_COMMIT_lane0 <= execute_ctrl2_down_COMMIT_lane0;
+      execute_ctrl3_up_early0_SrcPlugin_ADD_SUB_lane0 <= execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
+      execute_ctrl3_up_LsuL1_MIXED_ADDRESS_lane0 <= execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0;
+      execute_ctrl3_up_LsuL1Plugin_logic_BANK_BUSY_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
+      execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
+      execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
+      execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
+      execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
+      execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty <= execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_0_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_0_lane0;
+      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_1_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
+      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_2_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
+      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_3_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
+      execute_ctrl3_up_DivPlugin_DIV_RESULT_lane0 <= execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_FROM_ACCESS_lane0 <= execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0;
+      execute_ctrl3_up_LsuL1_MASK_lane0 <= execute_ctrl2_down_LsuL1_MASK_lane0;
+      execute_ctrl3_up_LsuL1_SIZE_lane0 <= execute_ctrl2_down_LsuL1_SIZE_lane0;
+      execute_ctrl3_up_LsuL1_LOAD_lane0 <= execute_ctrl2_down_LsuL1_LOAD_lane0;
+      execute_ctrl3_up_LsuL1_ATOMIC_lane0 <= execute_ctrl2_down_LsuL1_ATOMIC_lane0;
+      execute_ctrl3_up_LsuL1_STORE_lane0 <= execute_ctrl2_down_LsuL1_STORE_lane0;
+      execute_ctrl3_up_LsuL1_PREFETCH_lane0 <= execute_ctrl2_down_LsuL1_PREFETCH_lane0;
+      execute_ctrl3_up_LsuL1_FLUSH_lane0 <= execute_ctrl2_down_LsuL1_FLUSH_lane0;
+      execute_ctrl3_up_Decode_STORE_ID_lane0 <= execute_ctrl2_down_Decode_STORE_ID_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_FROM_LSU_lane0 <= execute_ctrl2_down_LsuPlugin_logic_FROM_LSU_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_FROM_PREFETCH_lane0 <= execute_ctrl2_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+      execute_ctrl3_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl2_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+    end
+    if(execute_ctrl3_down_isReady) begin
+      execute_ctrl4_up_Decode_UOP_lane0 <= execute_ctrl3_down_Decode_UOP_lane0;
+      execute_ctrl4_up_PC_lane0 <= execute_ctrl3_down_PC_lane0;
+      execute_ctrl4_up_TRAP_lane0 <= execute_ctrl3_down_TRAP_lane0;
+      execute_ctrl4_up_Decode_UOP_ID_lane0 <= execute_ctrl3_down_Decode_UOP_ID_lane0;
+      execute_ctrl4_up_RD_ENABLE_lane0 <= execute_ctrl3_down_RD_ENABLE_lane0;
+      execute_ctrl4_up_RD_PHYS_lane0 <= execute_ctrl3_down_RD_PHYS_lane0;
+      execute_ctrl4_up_COMPLETED_lane0 <= execute_ctrl3_down_COMPLETED_lane0;
+      execute_ctrl4_up_AguPlugin_SIZE_lane0 <= execute_ctrl3_down_AguPlugin_SIZE_lane0;
+      execute_ctrl4_up_integer_RS2_lane0 <= execute_ctrl3_down_integer_RS2_lane0;
+      execute_ctrl4_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl3_down_early0_MulPlugin_SEL_lane0;
+      execute_ctrl4_up_AguPlugin_SEL_lane0 <= execute_ctrl3_down_AguPlugin_SEL_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_FENCE_lane0 <= execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0;
+      execute_ctrl4_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl3_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+      execute_ctrl4_up_COMPLETION_AT_4_lane0 <= execute_ctrl3_down_COMPLETION_AT_4_lane0;
+      execute_ctrl4_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl3_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+      execute_ctrl4_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl3_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+      execute_ctrl4_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
+      execute_ctrl4_up_BYPASSED_AT_4_lane0 <= execute_ctrl3_down_BYPASSED_AT_4_lane0;
+      execute_ctrl4_up_MulPlugin_HIGH_lane0 <= execute_ctrl3_down_MulPlugin_HIGH_lane0;
+      execute_ctrl4_up_AguPlugin_LOAD_lane0 <= execute_ctrl3_down_AguPlugin_LOAD_lane0;
+      execute_ctrl4_up_AguPlugin_STORE_lane0 <= execute_ctrl3_down_AguPlugin_STORE_lane0;
+      execute_ctrl4_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl3_down_AguPlugin_ATOMIC_lane0;
+      execute_ctrl4_up_AguPlugin_FLOAT_lane0 <= execute_ctrl3_down_AguPlugin_FLOAT_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_LSU_PREFETCH_lane0 <= execute_ctrl3_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+      execute_ctrl4_up_COMMIT_lane0 <= execute_ctrl3_down_COMMIT_lane0;
+      execute_ctrl4_up_LsuL1_MIXED_ADDRESS_lane0 <= execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
+      execute_ctrl4_up_LsuL1_MASK_lane0 <= execute_ctrl3_down_LsuL1_MASK_lane0;
+      execute_ctrl4_up_LsuL1_SIZE_lane0 <= execute_ctrl3_down_LsuL1_SIZE_lane0;
+      execute_ctrl4_up_LsuL1_LOAD_lane0 <= execute_ctrl3_down_LsuL1_LOAD_lane0;
+      execute_ctrl4_up_LsuL1_ATOMIC_lane0 <= execute_ctrl3_down_LsuL1_ATOMIC_lane0;
+      execute_ctrl4_up_LsuL1_STORE_lane0 <= execute_ctrl3_down_LsuL1_STORE_lane0;
+      execute_ctrl4_up_LsuL1_PREFETCH_lane0 <= execute_ctrl3_down_LsuL1_PREFETCH_lane0;
+      execute_ctrl4_up_LsuL1_FLUSH_lane0 <= execute_ctrl3_down_LsuL1_FLUSH_lane0;
+      execute_ctrl4_up_Decode_STORE_ID_lane0 <= execute_ctrl3_down_Decode_STORE_ID_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_FROM_LSU_lane0 <= execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_FROM_PREFETCH_lane0 <= execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+      execute_ctrl4_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+      execute_ctrl4_up_LsuL1Plugin_logic_SHARED_lane0_dirty <= execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty;
+      execute_ctrl4_up_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0 <= execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+      execute_ctrl4_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 <= execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
+      execute_ctrl4_up_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0 <= execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
+      execute_ctrl4_up_LsuL1_PHYSICAL_ADDRESS_lane0 <= execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+      execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded <= execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
+      execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address <= execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+      execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault <= execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+      execute_ctrl4_up_LsuL1Plugin_logic_WAYS_HITS_lane0 <= execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0;
+      execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_0_lane0 <= execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
+      execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_1_lane0 <= execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_onTrigger_HIT_lane0 <= execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0;
+      execute_ctrl4_up_MMU_TRANSLATED_lane0 <= execute_ctrl3_down_MMU_TRANSLATED_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 <= execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault <= execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
+      execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io <= execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
+      execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_fault <= execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+      execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_io <= execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+      execute_ctrl4_up_LsuPlugin_logic_onPma_IO_lane0 <= execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0 <= execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 <= execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
+      execute_ctrl4_up_LsuPlugin_logic_MMU_FAILURE_lane0 <= execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0;
+      execute_ctrl4_up_MMU_ACCESS_FAULT_lane0 <= execute_ctrl3_down_MMU_ACCESS_FAULT_lane0;
+      execute_ctrl4_up_MMU_REFILL_lane0 <= execute_ctrl3_down_MMU_REFILL_lane0;
+      execute_ctrl4_up_MMU_HAZARD_lane0 <= execute_ctrl3_down_MMU_HAZARD_lane0;
+      execute_ctrl4_up_MMU_BYPASS_TRANSLATION_lane0 <= execute_ctrl3_down_MMU_BYPASS_TRANSLATION_lane0;
+    end
+    if(execute_ctrl4_down_isReady) begin
+      execute_ctrl5_up_RD_ENABLE_lane0 <= execute_ctrl4_down_RD_ENABLE_lane0;
+      execute_ctrl5_up_RD_PHYS_lane0 <= execute_ctrl4_down_RD_PHYS_lane0;
+      execute_ctrl5_up_COMMIT_lane0 <= execute_ctrl4_down_COMMIT_lane0;
+      execute_ctrl5_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl4_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+    end
+    case(LsuPlugin_logic_flusher_stateReg)
+      LsuPlugin_logic_flusher_CMD : begin
+        if(when_LsuPlugin_l326) begin
+          LsuPlugin_logic_flusher_waiter <= LsuL1_WRITEBACK_BUSY;
+        end
+      end
+      LsuPlugin_logic_flusher_COMPLETION : begin
+        LsuPlugin_logic_flusher_waiter <= (LsuPlugin_logic_flusher_waiter & LsuL1_WRITEBACK_BUSY);
+      end
+      default : begin
+        LsuPlugin_logic_flusher_cmdCounter <= 7'h0;
+      end
+    endcase
+    case(TrapPlugin_logic_harts_0_trap_fsm_stateReg)
+      TrapPlugin_logic_harts_0_trap_fsm_RUNNING : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_PROCESS_1 : begin
+        TrapPlugin_logic_harts_0_trap_fsm_triggerEbreakReg <= TrapPlugin_logic_harts_0_trap_fsm_triggerEbreak;
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_EPC : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_TVAL : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_TVEC : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_APPLY : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
+      end
+      default : begin
+      end
+    endcase
+    case(CsrAccessPlugin_logic_fsm_stateReg)
+      CsrAccessPlugin_logic_fsm_READ : begin
+        CsrAccessPlugin_logic_fsm_interface_aluInput <= CsrAccessPlugin_bus_read_toWriteBits;
+        CsrAccessPlugin_logic_fsm_interface_csrValue <= CsrAccessPlugin_logic_fsm_readLogic_csrValue;
+      end
+      CsrAccessPlugin_logic_fsm_WRITE : begin
+      end
+      CsrAccessPlugin_logic_fsm_COMPLETION : begin
+      end
+      default : begin
+        REG_CSR_1952 <= COMB_CSR_1952;
+        REG_CSR_1953 <= COMB_CSR_1953;
+        REG_CSR_1954 <= COMB_CSR_1954;
+        REG_CSR_3857 <= COMB_CSR_3857;
+        REG_CSR_3858 <= COMB_CSR_3858;
+        REG_CSR_3859 <= COMB_CSR_3859;
+        REG_CSR_3860 <= COMB_CSR_3860;
+        REG_CSR_769 <= COMB_CSR_769;
+        REG_CSR_768 <= COMB_CSR_768;
+        REG_CSR_834 <= COMB_CSR_834;
+        REG_CSR_836 <= COMB_CSR_836;
+        REG_CSR_772 <= COMB_CSR_772;
+        REG_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_tvecFilter <= COMB_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_tvecFilter;
+        REG_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_epcFilter <= COMB_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_epcFilter;
+        REG_CSR_CsrRamPlugin_csrMapper_selFilter <= COMB_CSR_CsrRamPlugin_csrMapper_selFilter;
+        REG_CSR_CsrAccessPlugin_logic_trapNextOnWriteFilter <= COMB_CSR_CsrAccessPlugin_logic_trapNextOnWriteFilter;
+      end
+    endcase
   end
 
 
@@ -7365,7 +9180,7 @@ module RegFileMem (
 
 endmodule
 
-module StreamArbiter (
+module StreamArbiter_3 (
   input  wire          io_inputs_0_valid,
   output wire          io_inputs_0_ready,
   input  wire [31:0]   io_inputs_0_payload_pcOnLastSlice,
@@ -7434,6 +9249,261 @@ module StreamArbiter (
       if(io_output_valid) begin
         maskLocked_0 <= maskRouted_0;
       end
+    end
+  end
+
+
+endmodule
+
+module StreamArbiter_2 (
+  input  wire          io_inputs_0_valid,
+  output wire          io_inputs_0_ready,
+  input  wire [2:0]    io_inputs_0_payload_op,
+  input  wire [31:0]   io_inputs_0_payload_address,
+  input  wire [1:0]    io_inputs_0_payload_size,
+  input  wire          io_inputs_0_payload_load,
+  input  wire          io_inputs_0_payload_store,
+  input  wire          io_inputs_0_payload_atomic,
+  input  wire [11:0]   io_inputs_0_payload_storeId,
+  input  wire          io_inputs_1_valid,
+  output wire          io_inputs_1_ready,
+  input  wire [2:0]    io_inputs_1_payload_op,
+  input  wire [31:0]   io_inputs_1_payload_address,
+  input  wire [1:0]    io_inputs_1_payload_size,
+  input  wire          io_inputs_1_payload_load,
+  input  wire          io_inputs_1_payload_store,
+  input  wire          io_inputs_1_payload_atomic,
+  input  wire [11:0]   io_inputs_1_payload_storeId,
+  output wire          io_output_valid,
+  input  wire          io_output_ready,
+  output wire [2:0]    io_output_payload_op,
+  output wire [31:0]   io_output_payload_address,
+  output wire [1:0]    io_output_payload_size,
+  output wire          io_output_payload_load,
+  output wire          io_output_payload_store,
+  output wire          io_output_payload_atomic,
+  output wire [11:0]   io_output_payload_storeId,
+  output wire [0:0]    io_chosen,
+  output wire [1:0]    io_chosenOH,
+  input  wire          clk,
+  input  wire          reset
+);
+  localparam LsuL1CmdOpcode_LSU = 3'd0;
+  localparam LsuL1CmdOpcode_ACCESS_1 = 3'd1;
+  localparam LsuL1CmdOpcode_STORE_BUFFER = 3'd2;
+  localparam LsuL1CmdOpcode_FLUSH = 3'd3;
+  localparam LsuL1CmdOpcode_PREFETCH = 3'd4;
+
+  wire       [1:0]    _zz_maskProposal_1_1;
+  wire       [1:0]    _zz_maskProposal_1_2;
+  wire                locked;
+  wire                maskProposal_0;
+  wire                maskProposal_1;
+  reg                 maskLocked_0;
+  reg                 maskLocked_1;
+  wire                maskRouted_0;
+  wire                maskRouted_1;
+  wire       [1:0]    _zz_maskProposal_1;
+  wire       [2:0]    _zz_io_output_payload_op;
+  wire                _zz_io_chosen;
+  `ifndef SYNTHESIS
+  reg [95:0] io_inputs_0_payload_op_string;
+  reg [95:0] io_inputs_1_payload_op_string;
+  reg [95:0] io_output_payload_op_string;
+  reg [95:0] _zz_io_output_payload_op_string;
+  `endif
+
+
+  assign _zz_maskProposal_1_1 = (_zz_maskProposal_1 & (~ _zz_maskProposal_1_2));
+  assign _zz_maskProposal_1_2 = (_zz_maskProposal_1 - 2'b01);
+  `ifndef SYNTHESIS
+  always @(*) begin
+    case(io_inputs_0_payload_op)
+      LsuL1CmdOpcode_LSU : io_inputs_0_payload_op_string = "LSU         ";
+      LsuL1CmdOpcode_ACCESS_1 : io_inputs_0_payload_op_string = "ACCESS_1    ";
+      LsuL1CmdOpcode_STORE_BUFFER : io_inputs_0_payload_op_string = "STORE_BUFFER";
+      LsuL1CmdOpcode_FLUSH : io_inputs_0_payload_op_string = "FLUSH       ";
+      LsuL1CmdOpcode_PREFETCH : io_inputs_0_payload_op_string = "PREFETCH    ";
+      default : io_inputs_0_payload_op_string = "????????????";
+    endcase
+  end
+  always @(*) begin
+    case(io_inputs_1_payload_op)
+      LsuL1CmdOpcode_LSU : io_inputs_1_payload_op_string = "LSU         ";
+      LsuL1CmdOpcode_ACCESS_1 : io_inputs_1_payload_op_string = "ACCESS_1    ";
+      LsuL1CmdOpcode_STORE_BUFFER : io_inputs_1_payload_op_string = "STORE_BUFFER";
+      LsuL1CmdOpcode_FLUSH : io_inputs_1_payload_op_string = "FLUSH       ";
+      LsuL1CmdOpcode_PREFETCH : io_inputs_1_payload_op_string = "PREFETCH    ";
+      default : io_inputs_1_payload_op_string = "????????????";
+    endcase
+  end
+  always @(*) begin
+    case(io_output_payload_op)
+      LsuL1CmdOpcode_LSU : io_output_payload_op_string = "LSU         ";
+      LsuL1CmdOpcode_ACCESS_1 : io_output_payload_op_string = "ACCESS_1    ";
+      LsuL1CmdOpcode_STORE_BUFFER : io_output_payload_op_string = "STORE_BUFFER";
+      LsuL1CmdOpcode_FLUSH : io_output_payload_op_string = "FLUSH       ";
+      LsuL1CmdOpcode_PREFETCH : io_output_payload_op_string = "PREFETCH    ";
+      default : io_output_payload_op_string = "????????????";
+    endcase
+  end
+  always @(*) begin
+    case(_zz_io_output_payload_op)
+      LsuL1CmdOpcode_LSU : _zz_io_output_payload_op_string = "LSU         ";
+      LsuL1CmdOpcode_ACCESS_1 : _zz_io_output_payload_op_string = "ACCESS_1    ";
+      LsuL1CmdOpcode_STORE_BUFFER : _zz_io_output_payload_op_string = "STORE_BUFFER";
+      LsuL1CmdOpcode_FLUSH : _zz_io_output_payload_op_string = "FLUSH       ";
+      LsuL1CmdOpcode_PREFETCH : _zz_io_output_payload_op_string = "PREFETCH    ";
+      default : _zz_io_output_payload_op_string = "????????????";
+    endcase
+  end
+  `endif
+
+  assign locked = 1'b0;
+  assign maskRouted_0 = (locked ? maskLocked_0 : maskProposal_0);
+  assign maskRouted_1 = (locked ? maskLocked_1 : maskProposal_1);
+  assign _zz_maskProposal_1 = {io_inputs_1_valid,io_inputs_0_valid};
+  assign maskProposal_0 = io_inputs_0_valid;
+  assign maskProposal_1 = _zz_maskProposal_1_1[1];
+  assign io_output_valid = ((io_inputs_0_valid && maskRouted_0) || (io_inputs_1_valid && maskRouted_1));
+  assign _zz_io_output_payload_op = (maskRouted_0 ? io_inputs_0_payload_op : io_inputs_1_payload_op);
+  assign io_output_payload_op = _zz_io_output_payload_op;
+  assign io_output_payload_address = (maskRouted_0 ? io_inputs_0_payload_address : io_inputs_1_payload_address);
+  assign io_output_payload_size = (maskRouted_0 ? io_inputs_0_payload_size : io_inputs_1_payload_size);
+  assign io_output_payload_load = (maskRouted_0 ? io_inputs_0_payload_load : io_inputs_1_payload_load);
+  assign io_output_payload_store = (maskRouted_0 ? io_inputs_0_payload_store : io_inputs_1_payload_store);
+  assign io_output_payload_atomic = (maskRouted_0 ? io_inputs_0_payload_atomic : io_inputs_1_payload_atomic);
+  assign io_output_payload_storeId = (maskRouted_0 ? io_inputs_0_payload_storeId : io_inputs_1_payload_storeId);
+  assign io_inputs_0_ready = (maskRouted_0 && io_output_ready);
+  assign io_inputs_1_ready = (maskRouted_1 && io_output_ready);
+  assign io_chosenOH = {maskRouted_1,maskRouted_0};
+  assign _zz_io_chosen = io_chosenOH[1];
+  assign io_chosen = _zz_io_chosen;
+  always @(posedge clk) begin
+    if(io_output_valid) begin
+      maskLocked_0 <= maskRouted_0;
+      maskLocked_1 <= maskRouted_1;
+    end
+  end
+
+
+endmodule
+
+module StreamArbiter_1 (
+  input  wire          io_inputs_0_valid,
+  output wire          io_inputs_0_ready,
+  output wire          io_output_valid,
+  input  wire          io_output_ready,
+  output wire [0:0]    io_chosenOH,
+  input  wire          clk,
+  input  wire          reset
+);
+
+  reg                 locked;
+  wire                maskProposal_0;
+  reg                 maskLocked_0;
+  wire                maskRouted_0;
+  wire                io_output_fire;
+
+  assign maskRouted_0 = (locked ? maskLocked_0 : maskProposal_0);
+  assign maskProposal_0 = io_inputs_0_valid;
+  assign io_output_fire = (io_output_valid && io_output_ready);
+  assign io_output_valid = (io_inputs_0_valid && maskRouted_0);
+  assign io_inputs_0_ready = (maskRouted_0 && io_output_ready);
+  assign io_chosenOH = maskRouted_0;
+  always @(posedge clk or posedge reset) begin
+    if(reset) begin
+      locked <= 1'b0;
+    end else begin
+      if(io_output_valid) begin
+        locked <= 1'b1;
+      end
+      if(io_output_fire) begin
+        locked <= 1'b0;
+      end
+    end
+  end
+
+  always @(posedge clk) begin
+    if(io_output_valid) begin
+      maskLocked_0 <= maskRouted_0;
+    end
+  end
+
+
+endmodule
+
+module StreamArbiter (
+  input  wire          io_inputs_0_valid,
+  output wire          io_inputs_0_ready,
+  input  wire          io_inputs_0_payload_last,
+  input  wire          io_inputs_0_payload_fragment_write,
+  input  wire [31:0]   io_inputs_0_payload_fragment_address,
+  input  wire          io_inputs_1_valid,
+  output wire          io_inputs_1_ready,
+  input  wire          io_inputs_1_payload_last,
+  input  wire          io_inputs_1_payload_fragment_write,
+  input  wire [31:0]   io_inputs_1_payload_fragment_address,
+  output wire          io_output_valid,
+  input  wire          io_output_ready,
+  output wire          io_output_payload_last,
+  output wire          io_output_payload_fragment_write,
+  output wire [31:0]   io_output_payload_fragment_address,
+  output wire [0:0]    io_chosen,
+  output wire [1:0]    io_chosenOH,
+  input  wire          clk,
+  input  wire          reset
+);
+
+  wire       [1:0]    _zz_maskProposal_1_1;
+  wire       [1:0]    _zz_maskProposal_1_2;
+  reg                 locked;
+  wire                maskProposal_0;
+  wire                maskProposal_1;
+  reg                 maskLocked_0;
+  reg                 maskLocked_1;
+  wire                maskRouted_0;
+  wire                maskRouted_1;
+  wire       [1:0]    _zz_maskProposal_1;
+  wire                io_output_fire;
+  wire                when_Stream_l710;
+  wire                _zz_io_chosen;
+
+  assign _zz_maskProposal_1_1 = (_zz_maskProposal_1 & (~ _zz_maskProposal_1_2));
+  assign _zz_maskProposal_1_2 = (_zz_maskProposal_1 - 2'b01);
+  assign maskRouted_0 = (locked ? maskLocked_0 : maskProposal_0);
+  assign maskRouted_1 = (locked ? maskLocked_1 : maskProposal_1);
+  assign _zz_maskProposal_1 = {io_inputs_1_valid,io_inputs_0_valid};
+  assign maskProposal_0 = io_inputs_0_valid;
+  assign maskProposal_1 = _zz_maskProposal_1_1[1];
+  assign io_output_fire = (io_output_valid && io_output_ready);
+  assign when_Stream_l710 = (io_output_fire && io_output_payload_last);
+  assign io_output_valid = ((io_inputs_0_valid && maskRouted_0) || (io_inputs_1_valid && maskRouted_1));
+  assign io_output_payload_last = (maskRouted_0 ? io_inputs_0_payload_last : io_inputs_1_payload_last);
+  assign io_output_payload_fragment_write = (maskRouted_0 ? io_inputs_0_payload_fragment_write : io_inputs_1_payload_fragment_write);
+  assign io_output_payload_fragment_address = (maskRouted_0 ? io_inputs_0_payload_fragment_address : io_inputs_1_payload_fragment_address);
+  assign io_inputs_0_ready = (maskRouted_0 && io_output_ready);
+  assign io_inputs_1_ready = (maskRouted_1 && io_output_ready);
+  assign io_chosenOH = {maskRouted_1,maskRouted_0};
+  assign _zz_io_chosen = io_chosenOH[1];
+  assign io_chosen = _zz_io_chosen;
+  always @(posedge clk or posedge reset) begin
+    if(reset) begin
+      locked <= 1'b0;
+    end else begin
+      if(io_output_valid) begin
+        locked <= 1'b1;
+      end
+      if(when_Stream_l710) begin
+        locked <= 1'b0;
+      end
+    end
+  end
+
+  always @(posedge clk) begin
+    if(io_output_valid) begin
+      maskLocked_0 <= maskRouted_0;
+      maskLocked_1 <= maskRouted_1;
     end
   end
 
