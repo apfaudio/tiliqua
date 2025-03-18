@@ -26,6 +26,7 @@ class BitstreamArchiver:
 
     """Class for building and writing bitstream archives."""
 
+    build_path: str
     name: str
     sha: str
     hw_rev: TiliquaRevision
@@ -33,15 +34,14 @@ class BitstreamArchiver:
     video: Optional[str] = None
     external_pll_config: Optional[ExternalPLLConfig] = None
 
-    _build_path: str = "build"
     _regions: List[MemoryRegion] = field(default_factory=list)
     _manifest: Optional[BitstreamManifest] = None
     _firmware_bin_path: Optional[str] = None
 
     def __post_init__(self):
         # Ensure build directory exists
-        if not os.path.exists(self._build_path):
-            os.makedirs(self._build_path)
+        if not os.path.exists(self.build_path):
+            os.makedirs(self.build_path)
 
     @property
     def archive_name(self) -> str:
@@ -49,15 +49,15 @@ class BitstreamArchiver:
 
     @property
     def archive_path(self) -> str:
-        return os.path.join(self._build_path, self.archive_name)
+        return os.path.join(self.build_path, self.archive_name)
 
     @property
     def manifest_path(self) -> str:
-        return os.path.join(self._build_path, "manifest.json")
+        return os.path.join(self.build_path, "manifest.json")
 
     @property
     def bitstream_path(self) -> str:
-        return os.path.join(self._build_path, "top.bit")
+        return os.path.join(self.build_path, "top.bit")
 
 
     def add_firmware_region(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> None:
@@ -133,6 +133,7 @@ class BitstreamArchiver:
                 tar.add(self._firmware_bin_path, arcname="firmware.bin")
 
         self._print_archive_info()
+        print(f"\nSaved to '{self.build_path}/{self.archive_name}'")
         return True
 
     def _print_archive_info(self):

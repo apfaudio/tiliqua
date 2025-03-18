@@ -13,6 +13,7 @@ import git
 import os
 import subprocess
 import sys
+import tempfile
 import time
 
 from tiliqua                     import sim, dvi_modeline
@@ -186,11 +187,12 @@ def top_level_cli(
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
 
-    build_path = "build"
+    build_path = tempfile.mkdtemp()
     if not os.path.exists(build_path):
         os.makedirs(build_path)
 
     archiver = BitstreamArchiver(
+        build_path=build_path,
         name=args.name,
         sha=repo_sha,
         hw_rev=args.hw,
@@ -283,6 +285,7 @@ def top_level_cli(
     if args.action == CliAction.Build:
 
         build_flags = {
+            "build_dir": build_path,
             "verbose": args.verbose,
             "debug_verilog": args.debug_verilog,
             "nextpnr_opts": "--timing-allow-fail",
