@@ -124,9 +124,9 @@ class VexRiscv(Component):
             i_reset                  = ResetSignal("sync") | self.ext_reset,
 
             # interrupts
-            i_PrivilegedPlugin_logic_harts_0_int_m_software = self.irq_external,
+            i_PrivilegedPlugin_logic_harts_0_int_m_software = self.irq_software,
             i_PrivilegedPlugin_logic_harts_0_int_m_timer         = self.irq_timer,
-            i_PrivilegedPlugin_logic_harts_0_int_m_external      = self.irq_software,
+            i_PrivilegedPlugin_logic_harts_0_int_m_external      = self.irq_external,
 
             # instruction bus
             o_FetchL1WishbonePlugin_logic_bus_ADR       = self.ibus.adr,
