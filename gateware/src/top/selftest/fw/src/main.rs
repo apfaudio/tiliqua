@@ -390,8 +390,6 @@ fn main() -> ! {
                               pac::Interrupt::TIMER0);
 
         loop {
-            timer0_handler(&app);
-
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
                 // Single-shot commit: when 'write' is selected and the encoder
