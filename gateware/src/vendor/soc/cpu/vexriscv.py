@@ -123,17 +123,17 @@ class VexRiscv(Component):
             i_PrivilegedPlugin_logic_harts_0_int_m_external      = self.irq_software,
 
             # instruction bus
-            o_FetchCachelessWishbonePlugin_logic_bridge_bus_ADR       = self.ibus.adr,
-            o_FetchCachelessWishbonePlugin_logic_bridge_bus_DAT_MOSI  = self.ibus.dat_w,
-            o_FetchCachelessWishbonePlugin_logic_bridge_bus_SEL       = self.ibus.sel,
-            o_FetchCachelessWishbonePlugin_logic_bridge_bus_CYC       = self.ibus.cyc,
-            o_FetchCachelessWishbonePlugin_logic_bridge_bus_STB       = self.ibus.stb,
-            o_FetchCachelessWishbonePlugin_logic_bridge_bus_WE        = self.ibus.we,
-            o_FetchCachelessWishbonePlugin_logic_bridge_bus_CTI       = self.ibus.cti,
-            o_FetchCachelessWishbonePlugin_logic_bridge_bus_BTE       = self.ibus.bte,
-            i_FetchCachelessWishbonePlugin_logic_bridge_bus_DAT_MISO  = self.ibus.dat_r,
-            i_FetchCachelessWishbonePlugin_logic_bridge_bus_ACK       = self.ibus.ack,
-            i_FetchCachelessWishbonePlugin_logic_bridge_bus_ERR       = self.ibus.err,
+            o_FetchL1WishbonePlugin_logic_bus_ADR       = self.ibus.adr,
+            o_FetchL1WishbonePlugin_logic_bus_DAT_MOSI  = self.ibus.dat_w,
+            o_FetchL1WishbonePlugin_logic_bus_SEL       = self.ibus.sel,
+            o_FetchL1WishbonePlugin_logic_bus_CYC       = self.ibus.cyc,
+            o_FetchL1WishbonePlugin_logic_bus_STB       = self.ibus.stb,
+            o_FetchL1WishbonePlugin_logic_bus_WE        = self.ibus.we,
+            o_FetchL1WishbonePlugin_logic_bus_CTI       = self.ibus.cti,
+            o_FetchL1WishbonePlugin_logic_bus_BTE       = self.ibus.bte,
+            i_FetchL1WishbonePlugin_logic_bus_DAT_MISO  = self.ibus.dat_r,
+            i_FetchL1WishbonePlugin_logic_bus_ACK       = self.ibus.ack,
+            i_FetchL1WishbonePlugin_logic_bus_ERR       = self.ibus.err,
 
             # data bus
             o_LsuCachelessWishbonePlugin_logic_bridge_down_ADR       = self.dbus.adr,
