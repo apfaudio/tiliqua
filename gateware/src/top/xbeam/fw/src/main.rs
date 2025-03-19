@@ -10,7 +10,7 @@ use core::cell::RefCell;
 
 use tiliqua_fw::*;
 use tiliqua_lib::*;
-use tiliqua_lib::generated_constants::*;
+use pac::constants::*;
 use tiliqua_lib::calibration::*;
 use tiliqua_hal::video::Video;
 

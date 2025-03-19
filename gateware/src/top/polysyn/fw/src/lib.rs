@@ -4,7 +4,7 @@
 pub use tiliqua_pac as pac;
 pub use tiliqua_hal as hal;
 
-use tiliqua_lib::generated_constants::N_VOICES;
+use pac::constants::N_VOICES;
 
 hal::impl_tiliqua_soc_pac!();
 
