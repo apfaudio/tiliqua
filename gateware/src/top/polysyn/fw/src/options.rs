@@ -34,7 +34,7 @@ int_params!(PageNumParams<u16>    { step: 1, min: 0, max: 0 });
 int_params!(DriveParams<u16>      { step: 2048, min: 0, max: 32768 });
 int_params!(ResoParams<u16>       { step: 2048, min: 8192, max: 32768 });
 int_params!(DiffuseParams<u16>    { step: 2048, min: 0, max: 32768 });
-int_params!(PersistParams<u16>    { step: 256, min: 256, max: 32768 });
+int_params!(PersistParams<u16>    { step: 64, min: 64, max: 4096 });
 int_params!(DecayParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
 int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
@@ -71,7 +71,7 @@ pub struct VectorOpts {
 
 #[derive(OptionPage, Clone)]
 pub struct BeamOpts {
-    #[option(512)]
+    #[option(128)]
     pub persist: IntOption<PersistParams>,
     #[option(1)]
     pub decay: IntOption<DecayParams>,
