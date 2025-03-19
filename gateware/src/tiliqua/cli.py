@@ -148,10 +148,13 @@ def top_level_cli(
         audio_clock.to_192khz() if args.fs_192khz else audio_clock,
         default_modeline=default_modeline if video_core else None)
 
+    build_path = tempfile.mkdtemp()
+    if not os.path.exists(build_path):
+        os.makedirs(build_path)
+
     if issubclass(fragment, TiliquaSoc):
         rust_fw_bin  = "firmware.bin"
-        rust_fw_root = os.path.join(path, "fw")
-        kwargs["firmware_bin_path"] = os.path.join(rust_fw_root, rust_fw_bin)
+        kwargs["firmware_bin_path"] = os.path.join(build_path, rust_fw_bin)
         kwargs["fw_location"] = args.fw_location
         if args.fw_offset is None:
             match args.fw_location:
@@ -186,10 +189,6 @@ def top_level_cli(
 
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
-
-    build_path = tempfile.mkdtemp()
-    if not os.path.exists(build_path):
-        os.makedirs(build_path)
 
     archiver = BitstreamArchiver(
         build_path=build_path,
@@ -232,7 +231,8 @@ def top_level_cli(
 
     if isinstance(fragment, TiliquaSoc):
         # Generate SVD
-        svd_path = os.path.join(rust_fw_root, "soc.svd")
+        rust_fw_root = os.path.join(path, "fw")
+        svd_path = os.path.join(build_path, "soc.svd")
         fragment.gensvd(svd_path)
         if args.svd_only:
             sys.exit(0)
@@ -246,7 +246,7 @@ def top_level_cli(
         # Finally, build our stripped firmware image.
         fragment.genmem(os.path.join(rust_fw_root, "memory.x"))
         fragment.genconst("src/rs/lib/src/generated_constants.rs")
-        TiliquaSoc.compile_firmware(rust_fw_root, rust_fw_bin)
+        TiliquaSoc.compile_firmware(rust_fw_root, build_path)
 
         # If necessary, add firmware region to bitstream archive.
         archiver.add_firmware_region(
