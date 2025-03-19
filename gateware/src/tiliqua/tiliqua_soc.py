@@ -540,19 +540,10 @@ class TiliquaSoc(Component):
 
         print("Rust PAC updated at ...", pac_dir)
 
-    def compile_firmware(rust_fw_root, target_dir, triple="riscv32im-unknown-none-elf"):
-
-        # Compile the firmware itself
+    def compile_firmware(rust_fw_root, firmware_bin_path):
         subprocess.check_call([
-            "cargo", "build", "--release",
-            "--config", f'build.target="{triple}"',
-            "--config", f'target.{triple}.rustflags=["-C", "link-arg=-Tmemory.x", "-C", "link-arg=-Tlink.x"]',
+            "cargo", "build", "--release"
             ], env=os.environ, cwd=rust_fw_root)
-
-        # Strip down to a flashable binary
-        firmware_elf_path = os.path.join(rust_fw_root, f"target/{triple}/release/tiliqua-fw")
-        firmware_bin_path = os.path.join(target_dir, "firmware.bin")
         subprocess.check_call([
-            "riscv-none-elf-objcopy",
-            "-Obinary", firmware_elf_path, firmware_bin_path
-            ], env=os.environ)
+            "cargo", "objcopy", "--release", "--", "-Obinary", firmware_bin_path
+            ], env=os.environ, cwd=rust_fw_root)

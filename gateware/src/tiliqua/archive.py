@@ -158,12 +158,12 @@ class BitstreamArchiver:
         Returns True if validation passes, False if it fails.
         """
         if not self.bitstream_exists():
-            print("\nERROR: No existing bitstream found at build/top.bit")
+            print(f"\nERROR: No existing bitstream found at {self.bitstream_path}")
             print("You must build the full project at least once before using --fw-only")
             return False
 
         if not os.path.exists(self.manifest_path):
-            print("\nERROR: No manifest found at build/manifest.json")
+            print(f"\nERROR: No manifest found at {self.manifest_path}")
             print("You must build the full project at least once before using --fw-only")
             return False
 
