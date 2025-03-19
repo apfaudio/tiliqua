@@ -57,8 +57,8 @@ Such archives may be flashed as follows:
 .. code-block:: bash
 
    # Flash user bitstreams to the desired slot (0-7)
-   pdm flash archive build/selftest-*.tar.gz --slot 1
-   pdm flash archive build/xbeam-*.tar.gz --slot 2
+   pdm flash archive build/selftest-r4/selftest-*.tar.gz --slot 1
+   pdm flash archive build/xbeam-r4/xbeam-*.tar.gz --slot 2
    pdm flash status # check what is on the Tiliqua
 
 .. note::
@@ -75,9 +75,9 @@ For non-SoC projects that don't require extra firmware, you can also directly fl
 
 .. code-block:: bash
 
-   sudo openFPGALoader -c dirtyJtag build/top.bit
+   sudo openFPGALoader -c dirtyJtag build/dsp-mirror-r4/top.bit
 
-This can be useful for quickly iterating on DSP gateware.
+This flashes much quicker, as we don't have to wait for flash pages to update. This can be useful for quickly iterating on DSP gateware. In the future, this will be possible with SoC bitstreams as well, but requires an extra bridge to directly stream debug firmware to the PSRAM from the host, which isn't implemented yet.
 
 Simulating DSP cores
 --------------------
