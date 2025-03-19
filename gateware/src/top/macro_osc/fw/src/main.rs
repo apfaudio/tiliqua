@@ -172,9 +172,6 @@ fn main() -> ! {
 
     // FIXME: doesn't seem to be needed any more?
 
-    pac::cpu::vexriscv::flush_icache();
-    pac::cpu::vexriscv::flush_dcache();
-
     let peripherals = pac::Peripherals::take().unwrap();
 
     // initialize logging
@@ -186,9 +183,11 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua MACRO-OSCILLATOR!");
 
+    /*
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+    */
 
     let mut display = DMADisplay {
         framebuffer_base: PSRAM_FB_BASE as *mut u32,
@@ -213,8 +212,6 @@ fn main() -> ! {
 
     info!("heap usage {} KiB", HEAP.used()/1024);
 
-    /*
-     * NOTE: uncomment this for some basic benchmarking
     critical_section::with(|cs| {
         let mut app = app.borrow_ref_mut(cs);
 
@@ -243,8 +240,11 @@ fn main() -> ! {
             let sysclk = pac::clock::sysclk();
             info!("engine {} speed {} samples/sec", engine, ((sysclk as u64) * ((BLOCK_SIZE * 8) as u64) / (read_ticks as u64)));
         }
+
+        timer.disable();
+        use embedded_hal::delay::DelayNs;
+        timer.delay_ns(0);
     });
-    */
 
     handler!(timer0 = || timer0_handler(&app));
 
