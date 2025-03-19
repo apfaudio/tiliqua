@@ -514,7 +514,7 @@ fn main() -> ! {
         let mut display = DMADisplay {
             framebuffer_base: PSRAM_FB_BASE as *mut u32,
         };
-        video.set_persist(1024);
+        video.set_persist(256);
 
         let stroke = PrimitiveStyleBuilder::new()
             .stroke_color(Gray8::new(0xB0))

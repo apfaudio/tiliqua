@@ -364,7 +364,7 @@ fn main() -> ! {
     };
 
     palette::ColorPalette::default().write_to_hardware(&mut video);
-    video.set_persist(512);
+    video.set_persist(128);
 
     let mut opts = Opts::default();
 

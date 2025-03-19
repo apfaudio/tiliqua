@@ -199,7 +199,7 @@ fn main() -> ! {
     let hue = 5u8;
 
     palette::ColorPalette::default().write_to_hardware(&mut video);
-    video.set_persist(512);
+    video.set_persist(128);
 
     handler!(timer0 = || timer0_handler(&app));
 

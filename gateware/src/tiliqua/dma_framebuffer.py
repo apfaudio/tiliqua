@@ -47,7 +47,7 @@ class DMAFramebuffer(wiring.Component):
             })
 
     def __init__(self, *, fb_base_default=0, addr_width=22,
-                 fifo_depth=1024, bytes_per_pixel=1, burst_threshold_words=128,
+                 fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=64,
                  fixed_modeline: DVIModeline = None):
 
         self.fixed_modeline = fixed_modeline
@@ -129,6 +129,7 @@ class DMAFramebuffer(wiring.Component):
                 with m.If(fifo.w_level >= (self.fifo_depth-1)):
                     m.d.comb += bus.cti.eq(
                             wishbone.CycleType.END_OF_BURST)
+                    m.next = 'WAIT'
                 with m.If(bus.stb & bus.ack & fifo.w_rdy):
                     with m.If(dma_addr < (fb_size_words-1)):
                         m.d.sync += dma_addr.eq(dma_addr + 1)

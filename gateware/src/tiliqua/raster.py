@@ -33,7 +33,7 @@ class Persistance(wiring.Component):
     """
 
     def __init__(self, *, fb: DMAFramebuffer,
-                 fifo_depth=128, holdoff_default=1024):
+                 fifo_depth=32, holdoff_default=256):
 
         self.fb = fb
         self.fifo_depth = fifo_depth
@@ -118,7 +118,7 @@ class Persistance(wiring.Component):
                 # Outgoing pixel array (write to bus)
                 pixb = Signal(data.ArrayLayout(unsigned(8), 4))
 
-                m.d.comb += [
+                m.d.sync += [
                     pixa.eq(wr_source),
                 ]
 
@@ -140,11 +140,9 @@ class Persistance(wiring.Component):
                     bus.sel.eq(2**(bus.data_width//8)-1),
                     bus.adr.eq(self.fb.fb_base + dma_addr_out),
                     wr_source.eq(pnext),
+                    bus.dat_w.eq(pixb),
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST)
-                ]
-                m.d.sync += [
-                    bus.dat_w.eq(pixb)
                 ]
                 with m.If(bus.stb & bus.ack):
                     m.d.comb += self.fifo.r_en.eq(1)
