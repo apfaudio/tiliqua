@@ -244,7 +244,7 @@ def top_level_cli(
 
         # Generate memory.x and some extra constants
         # Finally, build our stripped firmware image.
-        fragment.genmem(os.path.join(rust_fw_root, "memory.x"))
+        fragment.genmem(os.path.join(build_path, "memory.x"))
         fragment.genconst("src/rs/lib/src/generated_constants.rs")
         TiliquaSoc.compile_firmware(rust_fw_root, build_path)
 

@@ -545,8 +545,9 @@ class TiliquaSoc(Component):
         subprocess.check_call([
             "cargo", "build", "--release",
             "--manifest-path", manifest_path,
-            "--config", config_path,
-            "--target-dir", target_dir
+            "--target-dir", target_dir,
+            "--config", 'build.target="riscv32im-unknown-none-elf"',
+            "--config", f'target.riscv32im-unknown-none-elf.rustflags=["-C", "link-arg=-T{target_dir}/memory.x", "-C", "link-arg=-Tlink.x"]',
             ], env=os.environ)
         subprocess.check_call([
             "riscv-none-elf-objcopy",
