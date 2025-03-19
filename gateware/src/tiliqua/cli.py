@@ -131,7 +131,10 @@ def top_level_cli(
     if args.action != CliAction.Build:
         assert args.flash == False, "--flash requires 'build' action"
 
-    kwargs = {}
+    if argparse_fragment:
+        kwargs = argparse_fragment(args)
+    else:
+        kwargs = {}
 
     if video_core:
         modelines = dvi_modeline.DVIModeline.all_timings()
@@ -171,9 +174,6 @@ def top_level_cli(
         kwargs["ui_name"] = args.name
         kwargs["ui_sha"]  = repo_sha
         kwargs["platform_class"] = platform_class
-
-    if argparse_fragment:
-        kwargs = kwargs | argparse_fragment(args)
 
     assert callable(fragment)
     fragment = fragment(**kwargs)

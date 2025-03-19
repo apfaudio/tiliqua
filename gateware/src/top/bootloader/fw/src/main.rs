@@ -15,7 +15,7 @@ use core::str::FromStr;
 use core::fmt::Write;
 
 use tiliqua_lib::*;
-use tiliqua_lib::generated_constants::*;
+use pac::constants::*;
 use tiliqua_fw::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::video::Video;
