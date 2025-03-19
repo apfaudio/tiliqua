@@ -33,6 +33,7 @@ TODO: describe each peripheral in detail
 import enum
 import shutil
 import subprocess
+import tempfile
 import os
 
 from amaranth                                    import *
@@ -494,13 +495,12 @@ class TiliquaSoc(Component):
             for l in self.extra_rust_constants:
                 f.write(l)
 
-    def regenerate_pac_from_svd(svd_path):
+    def generate_pac_from_svd(self, pac_dir, svd_path):
         """
         Generate Rust PAC from an SVD.
-        Currently all SoC reuse the same `pac_dir`, however this
-        should become local to each SoC at some point.
         """
-        pac_dir = "src/rs/pac"
+        # Copy out the template and modify it for our SoC.
+        shutil.copytree("src/rs/template/pac", pac_dir)
         pac_build_dir = os.path.join(pac_dir, "build")
         pac_gen_dir   = os.path.join(pac_dir, "src/generated")
         src_genrs     = os.path.join(pac_dir, "src/generated.rs")
@@ -531,24 +531,40 @@ class TiliquaSoc(Component):
 
         shutil.move(os.path.join(pac_gen_dir, "lib.rs"), src_genrs)
 
+        self.genconst(os.path.join(pac_gen_dir, "constants.rs"))
+
         subprocess.check_call([
             "cargo", "fmt", "--", "--emit", "files"
             ], env=os.environ, cwd=pac_dir)
 
         print("Rust PAC updated at ...", pac_dir)
 
-    def compile_firmware(rust_fw_root, target_dir, triple="riscv32im-unknown-none-elf"):
-        manifest_path = os.path.join(rust_fw_root, "Cargo.toml")
-        config_path = os.path.join(rust_fw_root, ".cargo/config.toml")
-        firmware_elf_path = os.path.join(target_dir, f"{triple}/release/tiliqua-fw")
-        firmware_bin_path = os.path.join(target_dir, "firmware.bin")
+    def compile_firmware(rust_fw_root, target_dir, pac_dir, triple="riscv32im-unknown-none-elf"):
+
+        # Copy out firmware tree
+        fw_dst = os.path.join(target_dir, "fw")
+        shutil.copytree(rust_fw_root, fw_dst)
+
+        # Modify manifest to inject temporary PAC that was just generated
+        manifest_path = os.path.join(fw_dst, "Cargo.toml")
+        with open(manifest_path, "rb") as manifest:
+            contents = manifest.read()
+        contents = contents.replace(
+                b"[dependencies]",
+                f'[dependencies]\ntiliqua-pac={{path="{pac_dir}",default-features=false,features=["critical-section","vexriscv"]}}'.encode())
+        with open(manifest_path, "wb") as manifest:
+            manifest.write(contents)
+
+        # Compile the firmware itself
         subprocess.check_call([
             "cargo", "build", "--release",
-            "--manifest-path", manifest_path,
-            "--target-dir", target_dir,
             "--config", f'build.target="{triple}"',
             "--config", f'target.{triple}.rustflags=["-C", "link-arg=-T{target_dir}/memory.x", "-C", "link-arg=-Tlink.x"]',
-            ], env=os.environ)
+            ], env=os.environ, cwd=fw_dst)
+
+        # Strip down to a flashable binary
+        firmware_elf_path = os.path.join(target_dir, f"{triple}/release/tiliqua-fw")
+        firmware_bin_path = os.path.join(target_dir, "firmware.bin")
         subprocess.check_call([
             "riscv-none-elf-objcopy",
             "-Obinary", firmware_elf_path, firmware_bin_path

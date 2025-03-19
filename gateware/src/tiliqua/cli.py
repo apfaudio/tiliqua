@@ -231,22 +231,22 @@ def top_level_cli(
 
     if isinstance(fragment, TiliquaSoc):
         # Generate SVD
-        rust_fw_root = os.path.join(path, "fw")
         svd_path = os.path.join(build_path, "soc.svd")
         fragment.gensvd(svd_path)
         if args.svd_only:
             sys.exit(0)
 
         # (re)-generate PAC (from SVD)
-        TiliquaSoc.regenerate_pac_from_svd(svd_path)
+        pac_dir = os.path.join(build_path, "pac")
+        fragment.generate_pac_from_svd(pac_dir=pac_dir, svd_path=svd_path)
         if args.pac_only:
             sys.exit(0)
 
         # Generate memory.x and some extra constants
         # Finally, build our stripped firmware image.
         fragment.genmem(os.path.join(build_path, "memory.x"))
-        fragment.genconst("src/rs/lib/src/generated_constants.rs")
-        TiliquaSoc.compile_firmware(rust_fw_root, build_path)
+        rust_fw_root = os.path.join(path, "fw")
+        TiliquaSoc.compile_firmware(rust_fw_root, build_path, pac_dir)
 
         # If necessary, add firmware region to bitstream archive.
         archiver.add_firmware_region(
