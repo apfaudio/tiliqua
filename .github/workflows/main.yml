@@ -59,7 +59,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.config.name }}-${{ matrix.hw_rev }}.zip
-          path: gateware/build/*-*-*.tar.gz
+          path: gateware/build/*/*-*-*.tar.gz
           retention-days: 1
 
   build-soc-bitstream:
@@ -99,7 +99,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.config.name }}-${{ matrix.hw_rev }}.zip
-          path: gateware/build/*-*-*.tar.gz
+          path: gateware/build/*/*-*-*.tar.gz
           retention-days: 1
 
   build-bitstream:
@@ -133,7 +133,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.config.name }}-${{ matrix.hw_rev }}.zip
-          path: gateware/build/*-*-*.tar.gz
+          path: gateware/build/*/*-*-*.tar.gz
           retention-days: 1
 
   sim-bitstream:
