@@ -492,9 +492,11 @@ class SimpleUSBMIDIHost(Elaboratable):
                     m.next = f'{state_id}-WAIT-ACK'
 
                 with m.State(f'{state_id}-WAIT-ACK'):
-                    # FIXME: detect ZLP ACK failure
+                    # FIXME: detect lack of token packet (timeout failure)
                     with m.If(handshake_detector.detected.ack):
                         m.next = next_state_id
+                    with m.If(handshake_detector.detected.nak):
+                        m.next = state_id
 
             def fsm_sequence_rx_in_stage_ignore(state_id, state_ok, state_err, addr=0, endp=0):
                 """
