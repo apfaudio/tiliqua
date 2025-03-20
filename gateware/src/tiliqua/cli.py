@@ -49,6 +49,8 @@ def top_level_cli(
     # Parse arguments
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('--skip-build', action='store_true',
+                        help="Perform design elaboration but do not actually build the bitstream.")
     parser.add_argument('--flash', action='store_true',
                         help="Flash bitstream (and firmware if needed) after building it.")
     parser.add_argument('--fs-192khz', action='store_true',
@@ -306,7 +308,7 @@ def top_level_cli(
 
         print("Building bitstream for", hw_platform.name)
 
-        hw_platform.build(fragment, **build_flags)
+        hw_platform.build(fragment, do_build=not args.skip_build, **build_flags)
 
         archiver.create_archive()
 

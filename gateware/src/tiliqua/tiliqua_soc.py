@@ -99,7 +99,6 @@ class VideoPeripheral(wiring.Component):
         m = Module()
         m.submodules.bridge = self._bridge
         m.submodules.persist = self.persist
-
         connect(m, flipped(self.bus), self._bridge.bus)
 
         m.d.comb += self.persist.enable.eq(self.en)
