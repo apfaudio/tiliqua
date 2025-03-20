@@ -30,6 +30,14 @@ pub enum UsbHost {
     Enable,
 }
 
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
+pub enum UsbMidiSerialDebug {
+    #[default]
+    Off,
+    On,
+}
+
 int_params!(PageNumParams<u16>    { step: 1, min: 0, max: 0 });
 int_params!(DriveParams<u16>      { step: 2048, min: 0, max: 32768 });
 int_params!(ResoParams<u16>       { step: 2048, min: 8192, max: 32768 });
@@ -91,6 +99,8 @@ pub struct UsbOpts {
     pub cfg_id: IntOption<CfgIdParams>,
     #[option(2)]
     pub endpt_id: IntOption<EndptIdParams>,
+    #[option]
+    pub serial_debug: EnumOption<UsbMidiSerialDebug>,
 }
 
 #[derive(Options, Clone, Default)]

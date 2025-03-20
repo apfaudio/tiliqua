@@ -167,8 +167,9 @@ class MidiDecode(wiring.Component):
                     m.d.sync += self.o.payload.as_value()[16:24].eq(self.i.payload)
                     m.next = 'WAIT-READY'
             with m.State('WAIT-READY'):
-                # TODO: skip if it's a command we don't know how to parse.
-                m.d.comb += self.o.valid.eq(1),
+                # Skip if it's a command we don't know how to parse.
+                with m.If(self.o.payload.midi_type != MessageType.SYSEX):
+                    m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
                     m.next = 'WAIT-VALID'
 
@@ -249,8 +250,14 @@ class MidiVoiceTracker(wiring.Component):
                     m.d.sync += msg.eq(self.i.payload)
                     with m.Switch(self.i.payload.midi_type):
                         with m.Case(MessageType.NOTE_ON):
-                            m.d.sync += voice_ix_write.eq(0)
-                            m.next = 'NOTE-ON-SELECT'
+                            with m.If(self.i.payload.midi_payload.note_on.velocity == 0):
+                                # According to the MIDI standard, a device may transmit a
+                                # NOTE_ON with velocity=0, and this should be treated exactly
+                                # the same as a note OFF.
+                                m.next = 'NOTE-OFF'
+                            with m.Else():
+                                m.d.sync += voice_ix_write.eq(0)
+                                m.next = 'NOTE-ON-SELECT'
                         with m.Case(MessageType.NOTE_OFF):
                             m.next = 'NOTE-OFF'
                         with m.Case(MessageType.CONTROL_CHANGE):
@@ -259,6 +266,8 @@ class MidiVoiceTracker(wiring.Component):
                             m.next = 'PITCH-BEND'
                         with m.Case(MessageType.POLY_PRESSURE):
                             m.next = 'POLY-PRESSURE'
+                        with m.Default():
+                            m.next = 'WAIT-VALID'
 
             with m.State('NOTE-ON-SELECT'):
                 # find an empty note slot to write to
@@ -310,7 +319,8 @@ class MidiVoiceTracker(wiring.Component):
                 m.next = 'UPDATE'
 
             with m.State('CONTROL-CHANGE'):
-                with m.If(msg.midi_payload.control_change.controller_number == 1):
+                with m.If((msg.midi_payload.control_change.controller_number == 1) &
+                          (msg.midi_payload.control_change.data != 0)):
                     m.d.sync += last_cc1.eq(msg.midi_payload.control_change.data)
                 with m.If(msg.midi_payload.control_change.controller_number == 123):
                     # all stop
