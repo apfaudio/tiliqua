@@ -46,16 +46,31 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         //
 
         app.ui.update();
+        let opts = app.ui.opts.clone();
 
-        if app.synth.midi_read() != 0 {
-            app.ui.midi_activity()
+        //
+        // Check for TRS/USB MIDI traffic
+        // (this is forwarded by the hardware to the synth
+        //  for minimum possible latency, here we peek
+        //  the FIFO contents for debugging purposes)
+        //
+
+        let midi_word = app.synth.midi_read();
+        if midi_word != 0 {
+            // Blink MIDI activity LED on TRS port
+            app.ui.midi_activity();
+            // Optionally dump raw MIDI messages out serial port.
+            if opts.usb.serial_debug.value == UsbMidiSerialDebug::On {
+                info!("midi: 0x{:x} 0x{:x} 0x{:x}",
+                      midi_word&0xff,
+                      (midi_word>>8)&0xff,
+                      (midi_word>>16)&0xff);
+            }
         }
 
         //
         // Update synthesizer
         //
-
-        let opts = app.ui.opts.clone();
 
         let drive_smooth = app.drive_smoother.proc_u16(opts.poly.drive.value);
         app.synth.set_drive(drive_smooth);
