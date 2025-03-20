@@ -23,7 +23,7 @@ use heapless::String;
 use tiliqua_pac as pac;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
-use tiliqua_lib::generated_constants::*;
+use pac::constants::*;
 use tiliqua_lib::draw;
 use tiliqua_lib::calibration::*;
 use tiliqua_fw::options::*;

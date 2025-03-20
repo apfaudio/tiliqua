@@ -20,7 +20,7 @@ use tiliqua_pac as pac;
 use tiliqua_hal as hal;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
-use tiliqua_lib::generated_constants::*;
+use pac::constants::*;
 use tiliqua_hal::video::Video;
 use options::*;
 use hal::pca9635::*;

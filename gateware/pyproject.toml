@@ -36,19 +36,21 @@ docs = [
 _.env_file = ".env.toolchain"
 # Top-level bitstreams
 bootloader         = "src/top/bootloader/top.py"
-dsp                = "src/top/dsp/top.py"
-selftest           = "src/top/selftest/top.py"
-vectorscope_no_soc = "src/top/vectorscope_no_soc/top.py"
-bootstub           = "src/top/bootstub/top.py"
+# (SoC bitstreams)
 polysyn            = "src/top/polysyn/top.py"
-usb_audio          = "src/top/usb_audio/top.py"
-usb_host           = "src/top/usb_host/top.py"
+selftest           = "src/top/selftest/top.py"
 xbeam              = "src/top/xbeam/top.py"
 macro_osc          = "src/top/macro_osc/top.py"
 sid                = "src/top/sid/top.py"
+# (Non-SoC bitstreams)
+dsp                = "src/top/dsp/top.py"
+vectorscope_no_soc = "src/top/vectorscope_no_soc/top.py"
+bootstub           = "src/top/bootstub/top.py"
+usb_audio          = "src/top/usb_audio/top.py"
+usb_host           = "src/top/usb_host/top.py"
 # Additional utilities
 test               = { cmd = "pytest" }
-colors_vectorscope = { call = "example_vectorscope.top:colors()" }
+colors_vectorscope = { call = "top.vectorscope_no_soc.top:colors()" }
 # Documentation
 document.cmd = "sphinx-build docs/ docs/_build/ -W --keep-going"
 document-live.cmd = "sphinx-autobuild docs/ docs/_build/ --watch ."

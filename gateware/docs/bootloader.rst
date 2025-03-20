@@ -21,7 +21,7 @@ The bitstream selector consists of 2 key components that work together:
 First-time setup
 ^^^^^^^^^^^^^^^^
 
-1. Flash the RP2040. Use the latest pre-built binaries `found here <https://github.com/apfaudio/apfbug/releases>`_. To flash them, hold RP2040 BOOTSEL before applying power, then copy the :code:`build/*.uf2` to the usb storage device and power cycle Tiliqua again.
+1. Flash the RP2040. Use the latest pre-built binaries `found here <https://github.com/apfaudio/apfbug/releases>`_. To flash them, hold RP2040 BOOTSEL (golden button on the Tiliqua motherboard) before applying power, then copy the :code:`build/*.uf2` to the usb storage device and power cycle Tiliqua again. If you don't want to remove Tiliqua from your rack, you can also enter the RP2040 bootloader by opening a serial port at 1200 baud.
 
 2. Build and flash the bootloader bitstream using the built-in flash tool (alternatively just download the latest bootloader archive from the CI artifacts):
 
@@ -30,14 +30,14 @@ First-time setup
     # Flash bootloader to start of flash, build assuming XIP (execute directly from SPI flash, not PSRAM)
     # Be careful to replace `--hw r4` with your hardware revision!
     pdm bootloader build --hw r4 --fw-location=spiflash --resolution 1280x720p60
-    pdm flash archive build/bootloader-*.tar.gz
+    pdm flash archive build/bootloader-r4/bootloader-*.tar.gz
 
 3. Build and flash any other bitstreams you want to slots 0..7 (you can also download these archives from CI artifacts):
 
 .. code-block:: bash
 
    # assuming the archive has already been built / downloaded
-   pdm flash archive build/xbeam-*.tar.gz --slot 2
+   pdm flash archive build/xbeam-r4/xbeam-*.tar.gz --slot 2
 
 2. Check what is currently flashed in each slot (by reading out the flash manifests):
 

@@ -18,7 +18,7 @@ use tiliqua_lib::*;
 use tiliqua_lib::draw;
 use tiliqua_lib::dsp::OnePoleSmoother;
 use tiliqua_lib::midi::MidiTouchController;
-use tiliqua_lib::generated_constants::*;
+use pac::constants::*;
 use tiliqua_fw::*;
 use tiliqua_fw::options::*;
 use tiliqua_hal::pmod::EurorackPmod;

@@ -1,3 +1,2 @@
-*.bin
 fw/memory.x
-*.svd
+pac/

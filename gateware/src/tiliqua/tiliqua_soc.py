@@ -33,6 +33,7 @@ TODO: describe each peripheral in detail
 import enum
 import shutil
 import subprocess
+import tempfile
 import os
 
 from amaranth                                    import *
@@ -98,7 +99,6 @@ class VideoPeripheral(wiring.Component):
         m = Module()
         m.submodules.bridge = self._bridge
         m.submodules.persist = self.persist
-
         connect(m, flipped(self.bus), self._bridge.bus)
 
         m.d.comb += self.persist.enable.eq(self.en)
@@ -494,13 +494,13 @@ class TiliquaSoc(Component):
             for l in self.extra_rust_constants:
                 f.write(l)
 
-    def regenerate_pac_from_svd(svd_path):
+    def generate_pac_from_svd(self, pac_dir, svd_path):
         """
         Generate Rust PAC from an SVD.
-        Currently all SoC reuse the same `pac_dir`, however this
-        should become local to each SoC at some point.
         """
-        pac_dir = "src/rs/pac"
+        # Copy out the template and modify it for our SoC.
+        shutil.rmtree(pac_dir, ignore_errors=True)
+        shutil.copytree("src/rs/template/pac", pac_dir)
         pac_build_dir = os.path.join(pac_dir, "build")
         pac_gen_dir   = os.path.join(pac_dir, "src/generated")
         src_genrs     = os.path.join(pac_dir, "src/generated.rs")
@@ -531,16 +531,18 @@ class TiliquaSoc(Component):
 
         shutil.move(os.path.join(pac_gen_dir, "lib.rs"), src_genrs)
 
+        self.genconst(os.path.join(pac_gen_dir, "../constants.rs"))
+
         subprocess.check_call([
             "cargo", "fmt", "--", "--emit", "files"
             ], env=os.environ, cwd=pac_dir)
 
         print("Rust PAC updated at ...", pac_dir)
 
-    def compile_firmware(rust_fw_root, rust_fw_bin):
+    def compile_firmware(rust_fw_root, firmware_bin_path):
         subprocess.check_call([
             "cargo", "build", "--release"
             ], env=os.environ, cwd=rust_fw_root)
         subprocess.check_call([
-            "cargo", "objcopy", "--release", "--", "-Obinary", rust_fw_bin
+            "cargo", "objcopy", "--release", "--", "-Obinary", firmware_bin_path
             ], env=os.environ, cwd=rust_fw_root)

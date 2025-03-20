@@ -37,7 +37,7 @@ from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer
+from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer, palette
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
@@ -162,7 +162,7 @@ def colors():
     import matplotlib.pyplot as plt
     from matplotlib import colors
     import numpy as np
-    rs, gs, bs = DMAFramebuffer.compute_color_palette()
+    rs, gs, bs = palette.compute_color_palette()
 
     i_levels = 16
     c_levels = 16

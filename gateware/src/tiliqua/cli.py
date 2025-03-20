@@ -49,6 +49,8 @@ def top_level_cli(
     # Parse arguments
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('--skip-build', action='store_true',
+                        help="Perform design elaboration but do not actually build the bitstream.")
     parser.add_argument('--flash', action='store_true',
                         help="Flash bitstream (and firmware if needed) after building it.")
     parser.add_argument('--fs-192khz', action='store_true',
@@ -131,7 +133,10 @@ def top_level_cli(
     if args.action != CliAction.Build:
         assert args.flash == False, "--flash requires 'build' action"
 
-    kwargs = {}
+    if argparse_fragment:
+        kwargs = argparse_fragment(args)
+    else:
+        kwargs = {}
 
     if video_core:
         modelines = dvi_modeline.DVIModeline.all_timings()
@@ -147,10 +152,14 @@ def top_level_cli(
         audio_clock.to_192khz() if args.fs_192khz else audio_clock,
         default_modeline=default_modeline if video_core else None)
 
+    build_path = os.path.abspath(os.path.join(
+        "build", f"{args.name.lower()}-{args.hw.value}"))
+    if not os.path.exists(build_path):
+        os.makedirs(build_path)
+
     if issubclass(fragment, TiliquaSoc):
         rust_fw_bin  = "firmware.bin"
-        rust_fw_root = os.path.join(path, "fw")
-        kwargs["firmware_bin_path"] = os.path.join(rust_fw_root, rust_fw_bin)
+        kwargs["firmware_bin_path"] = os.path.join(build_path, rust_fw_bin)
         kwargs["fw_location"] = args.fw_location
         if args.fw_offset is None:
             match args.fw_location:
@@ -168,9 +177,6 @@ def top_level_cli(
         kwargs["ui_sha"]  = repo_sha
         kwargs["platform_class"] = platform_class
 
-    if argparse_fragment:
-        kwargs = kwargs | argparse_fragment(args)
-
     assert callable(fragment)
     fragment = fragment(**kwargs)
 
@@ -186,11 +192,8 @@ def top_level_cli(
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
 
-    build_path = "build"
-    if not os.path.exists(build_path):
-        os.makedirs(build_path)
-
     archiver = BitstreamArchiver(
+        build_path=build_path,
         name=args.name,
         sha=repo_sha,
         hw_rev=args.hw,
@@ -230,21 +233,22 @@ def top_level_cli(
 
     if isinstance(fragment, TiliquaSoc):
         # Generate SVD
-        svd_path = os.path.join(rust_fw_root, "soc.svd")
+        svd_path = os.path.join(build_path, "soc.svd")
         fragment.gensvd(svd_path)
         if args.svd_only:
             sys.exit(0)
 
         # (re)-generate PAC (from SVD)
-        TiliquaSoc.regenerate_pac_from_svd(svd_path)
+        rust_fw_root = os.path.join(path, "fw")
+        pac_dir = os.path.join(rust_fw_root, "../pac")
+        fragment.generate_pac_from_svd(pac_dir=pac_dir, svd_path=svd_path)
         if args.pac_only:
             sys.exit(0)
 
         # Generate memory.x and some extra constants
         # Finally, build our stripped firmware image.
         fragment.genmem(os.path.join(rust_fw_root, "memory.x"))
-        fragment.genconst("src/rs/lib/src/generated_constants.rs")
-        TiliquaSoc.compile_firmware(rust_fw_root, rust_fw_bin)
+        TiliquaSoc.compile_firmware(rust_fw_root, kwargs["firmware_bin_path"])
 
         # If necessary, add firmware region to bitstream archive.
         archiver.add_firmware_region(
@@ -283,6 +287,7 @@ def top_level_cli(
     if args.action == CliAction.Build:
 
         build_flags = {
+            "build_dir": build_path,
             "verbose": args.verbose,
             "debug_verilog": args.debug_verilog,
             "nextpnr_opts": "--timing-allow-fail",
@@ -303,7 +308,7 @@ def top_level_cli(
 
         print("Building bitstream for", hw_platform.name)
 
-        hw_platform.build(fragment, **build_flags)
+        hw_platform.build(fragment, do_build=not args.skip_build, **build_flags)
 
         archiver.create_archive()
 
