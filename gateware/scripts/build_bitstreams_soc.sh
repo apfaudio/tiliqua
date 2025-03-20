@@ -8,6 +8,6 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm bootloader build --fw-location=spiflash" \
   "pdm polysyn build" \
   "pdm selftest build" \
-  "pdm xbeam build" \
+  "pdm xbeam build --fs-192khz" \
   "pdm macro_osc build" \
   "pdm sid build"

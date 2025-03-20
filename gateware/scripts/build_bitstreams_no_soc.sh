@@ -20,7 +20,7 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm dsp build --dsp-core=sram_diffuser" \
   "pdm dsp build --dsp-core=multi_diffuser" \
   "pdm dsp build --dsp-core=resampler" \
-  "pdm vectorscope_no_soc build" \
+  "pdm vectorscope_no_soc build --fs-192khz" \
   "pdm bootstub build" \
   "pdm usb_audio build" \
   "pdm usb_host build --midi-device=yamaha-cp73"
