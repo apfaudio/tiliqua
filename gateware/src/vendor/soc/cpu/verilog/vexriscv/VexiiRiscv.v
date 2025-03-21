@@ -45,19 +45,19 @@ module VexiiRiscv (
   input  wire          clk,
   input  wire          reset
 );
+  localparam IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 = 2'd0;
+  localparam IntAluPlugin_AluBitwiseCtrlEnum_OR_1 = 2'd1;
+  localparam IntAluPlugin_AluBitwiseCtrlEnum_AND_1 = 2'd2;
+  localparam IntAluPlugin_AluBitwiseCtrlEnum_ZERO = 2'd3;
+  localparam BranchPlugin_BranchCtrlEnum_B = 2'd0;
+  localparam BranchPlugin_BranchCtrlEnum_JAL = 2'd1;
+  localparam BranchPlugin_BranchCtrlEnum_JALR = 2'd2;
   localparam EnvPluginOp_ECALL = 3'd0;
   localparam EnvPluginOp_EBREAK = 3'd1;
   localparam EnvPluginOp_PRIV_RET = 3'd2;
   localparam EnvPluginOp_FENCE_I = 3'd3;
   localparam EnvPluginOp_SFENCE_VMA = 3'd4;
   localparam EnvPluginOp_WFI = 3'd5;
-  localparam BranchPlugin_BranchCtrlEnum_B = 2'd0;
-  localparam BranchPlugin_BranchCtrlEnum_JAL = 2'd1;
-  localparam BranchPlugin_BranchCtrlEnum_JALR = 2'd2;
-  localparam IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 = 2'd0;
-  localparam IntAluPlugin_AluBitwiseCtrlEnum_OR_1 = 2'd1;
-  localparam IntAluPlugin_AluBitwiseCtrlEnum_AND_1 = 2'd2;
-  localparam IntAluPlugin_AluBitwiseCtrlEnum_ZERO = 2'd3;
   localparam LsuL1CmdOpcode_LSU = 3'd0;
   localparam LsuL1CmdOpcode_ACCESS_1 = 3'd1;
   localparam LsuL1CmdOpcode_STORE_BUFFER = 3'd2;
@@ -90,12 +90,20 @@ module VexiiRiscv (
   reg                 integer_RegFilePlugin_logic_regfile_fpga_io_writes_0_valid;
   reg        [4:0]    integer_RegFilePlugin_logic_regfile_fpga_io_writes_0_address;
   reg        [31:0]   integer_RegFilePlugin_logic_regfile_fpga_io_writes_0_data;
+  wire       [29:0]   BtbPlugin_logic_ras_mem_stack_spinal_port0;
   reg        [31:0]   LsuL1Plugin_logic_banks_0_mem_spinal_port1;
+  reg        [31:0]   LsuL1Plugin_logic_banks_1_mem_spinal_port1;
   reg        [21:0]   LsuL1Plugin_logic_ways_0_mem_spinal_port1;
-  reg        [0:0]    LsuL1Plugin_logic_shared_mem_spinal_port1;
+  reg        [21:0]   LsuL1Plugin_logic_ways_1_mem_spinal_port1;
+  reg        [2:0]    LsuL1Plugin_logic_shared_mem_spinal_port1;
   reg        [31:0]   LsuL1Plugin_logic_writeback_victimBuffer_spinal_port1;
   reg        [31:0]   FetchL1Plugin_logic_banks_0_mem_spinal_port1;
+  reg        [31:0]   FetchL1Plugin_logic_banks_1_mem_spinal_port1;
   reg        [21:0]   FetchL1Plugin_logic_ways_0_mem_spinal_port1;
+  reg        [21:0]   FetchL1Plugin_logic_ways_1_mem_spinal_port1;
+  reg        [0:0]    FetchL1Plugin_logic_plru_mem_spinal_port1;
+  reg        [1:0]    GSharePlugin_logic_mem_counter_spinal_port1;
+  reg        [48:0]   BtbPlugin_logic_mem_spinal_port1;
   reg        [31:0]   CsrRamPlugin_logic_mem_spinal_port1;
   wire                early0_DivPlugin_logic_processing_div_io_cmd_ready;
   wire                early0_DivPlugin_logic_processing_div_io_rsp_valid;
@@ -134,7 +142,9 @@ module VexiiRiscv (
   wire                streamArbiter_4_io_output_payload_isPop;
   wire                streamArbiter_4_io_output_payload_wasWrong;
   wire                streamArbiter_4_io_output_payload_badPredictedTarget;
+  wire       [11:0]   streamArbiter_4_io_output_payload_history;
   wire       [15:0]   streamArbiter_4_io_output_payload_uopId;
+  wire       [1:0]    streamArbiter_4_io_output_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
   wire       [0:0]    streamArbiter_4_io_chosenOH;
   wire       [31:0]   integer_RegFilePlugin_logic_regfile_fpga_io_reads_0_data;
   wire       [31:0]   integer_RegFilePlugin_logic_regfile_fpga_io_reads_1_data;
@@ -163,62 +173,98 @@ module VexiiRiscv (
   wire       [9:0]    _zz_early0_BarrelShifterPlugin_logic_shift_patched_6;
   wire       [21:0]   _zz_LsuL1Plugin_logic_ways_0_mem_port;
   wire                _zz_LsuL1Plugin_logic_ways_0_mem_port_1;
+  wire       [21:0]   _zz_LsuL1Plugin_logic_ways_1_mem_port;
+  wire                _zz_LsuL1Plugin_logic_ways_1_mem_port_1;
+  wire       [2:0]    _zz_LsuL1Plugin_logic_shared_mem_port;
+  wire       [0:0]    _zz_LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0_1;
   wire       [3:0]    _zz_LsuL1Plugin_logic_writeback_read_wordIndex;
   wire       [0:0]    _zz_LsuL1Plugin_logic_writeback_read_wordIndex_1;
+  reg        [31:0]   _zz_LsuL1Plugin_logic_writeback_read_readedData;
   wire       [3:0]    _zz_LsuL1Plugin_logic_writeback_victimBuffer_port;
   wire       [3:0]    _zz_LsuL1Plugin_logic_writeback_write_wordIndex;
   wire       [0:0]    _zz_LsuL1Plugin_logic_writeback_write_wordIndex_1;
-  wire       [0:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback;
+  wire       [1:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback;
   wire       [0:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_doWrite;
-  reg        [0:0]    _zz_20;
-  wire       [0:0]    _zz_21;
-  reg        [1:0]    _zz_22;
-  wire       [2:0]    _zz_23;
+  reg        [1:0]    _zz_40;
+  wire       [1:0]    _zz_41;
+  reg        [1:0]    _zz_42;
+  wire       [2:0]    _zz_43;
+  wire       [1:0]    _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty;
   wire       [0:0]    _zz_when;
-  wire       [0:0]    _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty;
-  wire       [32:0]   _zz_execute_ctrl2_down_MUL_SRC1_lane0;
-  wire       [32:0]   _zz_execute_ctrl2_down_MUL_SRC2_lane0;
-  wire       [46:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
-  wire       [33:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_1;
-  wire       [17:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_2;
-  wire       [15:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_3;
-  wire       [46:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
-  wire       [33:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_1;
-  wire       [15:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_2;
-  wire       [17:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_3;
-  wire       [29:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
-  wire       [31:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_1;
-  wire       [15:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_2;
-  wire       [15:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_3;
-  wire       [62:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_3;
-  wire       [62:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_4;
-  wire       [62:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_5;
-  wire       [62:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_6;
-  wire       [4:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_3;
-  wire       [4:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_4;
-  wire       [4:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_5;
-  wire       [4:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_6;
-  wire       [31:0]   _zz_execute_ctrl2_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0;
-  wire       [0:0]    _zz_execute_ctrl2_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0_1;
-  wire       [31:0]   _zz_execute_ctrl2_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0;
-  wire       [0:0]    _zz_execute_ctrl2_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0_1;
-  wire       [31:0]   _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0_1;
-  wire       [31:0]   _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0_2;
-  wire       [0:0]    _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0_3;
+  reg        [19:0]   _zz__zz_LsuL1Plugin_logic_waysWrite_tag_address;
+  reg                 _zz_LsuL1Plugin_logic_waysWrite_tag_fault;
+  reg        [19:0]   _zz_LsuL1Plugin_logic_writeback_push_payload_address;
+  wire       [0:0]    _zz_LsuL1Plugin_logic_shared_write_payload_data_plru_0_1;
+  wire       [32:0]   _zz_execute_ctrl1_down_MUL_SRC1_lane0;
+  wire       [32:0]   _zz_execute_ctrl1_down_MUL_SRC2_lane0;
+  wire       [46:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
+  wire       [33:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_1;
+  wire       [17:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_2;
+  wire       [15:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_3;
+  wire       [46:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
+  wire       [33:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_1;
+  wire       [15:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_2;
+  wire       [17:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_3;
+  wire       [29:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
+  wire       [31:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_1;
+  wire       [15:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_2;
+  wire       [15:0]   _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_3;
+  wire       [62:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_3;
+  wire       [62:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_4;
+  wire       [62:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_5;
+  wire       [62:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_6;
+  wire       [4:0]    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_3;
+  wire       [4:0]    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_4;
+  wire       [4:0]    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_5;
+  wire       [4:0]    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_6;
+  wire       [31:0]   _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0;
+  wire       [0:0]    _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0_1;
+  wire       [31:0]   _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0;
+  wire       [0:0]    _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0_1;
+  wire       [31:0]   _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0_1;
+  wire       [31:0]   _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0_3;
+  wire       [31:0]   _zz_late0_IntAluPlugin_logic_alu_result;
+  wire       [31:0]   _zz_late0_IntAluPlugin_logic_alu_result_1;
+  wire       [31:0]   _zz_late0_IntAluPlugin_logic_alu_result_2;
+  wire       [31:0]   _zz_late0_IntAluPlugin_logic_alu_result_3;
+  wire       [31:0]   _zz_late0_IntAluPlugin_logic_alu_result_4;
+  wire       [0:0]    _zz_late0_IntAluPlugin_logic_alu_result_5;
+  wire       [4:0]    _zz_late0_BarrelShifterPlugin_logic_shift_amplitude;
+  wire       [31:0]   _zz_late0_BarrelShifterPlugin_logic_shift_reversed;
+  wire                _zz_late0_BarrelShifterPlugin_logic_shift_reversed_1;
+  wire       [0:0]    _zz_late0_BarrelShifterPlugin_logic_shift_reversed_2;
+  wire       [20:0]   _zz_late0_BarrelShifterPlugin_logic_shift_reversed_3;
+  wire                _zz_late0_BarrelShifterPlugin_logic_shift_reversed_4;
+  wire       [0:0]    _zz_late0_BarrelShifterPlugin_logic_shift_reversed_5;
+  wire       [9:0]    _zz_late0_BarrelShifterPlugin_logic_shift_reversed_6;
+  wire       [32:0]   _zz_late0_BarrelShifterPlugin_logic_shift_shifted;
+  wire       [32:0]   _zz_late0_BarrelShifterPlugin_logic_shift_shifted_1;
+  wire       [31:0]   _zz_late0_BarrelShifterPlugin_logic_shift_patched;
+  wire                _zz_late0_BarrelShifterPlugin_logic_shift_patched_1;
+  wire       [0:0]    _zz_late0_BarrelShifterPlugin_logic_shift_patched_2;
+  wire       [20:0]   _zz_late0_BarrelShifterPlugin_logic_shift_patched_3;
+  wire                _zz_late0_BarrelShifterPlugin_logic_shift_patched_4;
+  wire       [0:0]    _zz_late0_BarrelShifterPlugin_logic_shift_patched_5;
+  wire       [9:0]    _zz_late0_BarrelShifterPlugin_logic_shift_patched_6;
   wire       [20:0]   _zz_early0_BranchPlugin_pcCalc_target_b;
   wire       [11:0]   _zz_early0_BranchPlugin_pcCalc_target_b_1;
   wire       [12:0]   _zz_early0_BranchPlugin_pcCalc_target_b_2;
   wire       [1:0]    _zz_early0_BranchPlugin_pcCalc_slices;
   wire       [0:0]    _zz_early0_BranchPlugin_pcCalc_slices_1;
-  wire       [31:0]   _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
-  wire       [31:0]   _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
-  wire       [3:0]    _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0_1;
-  wire       [31:0]   _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
-  wire       [1:0]    _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0_1;
+  wire       [31:0]   _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  wire       [31:0]   _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+  wire       [3:0]    _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0_1;
+  wire       [31:0]   _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
+  wire       [1:0]    _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0_1;
+  wire       [0:0]    _zz_AlignerPlugin_logic_extractors_0_redo_2;
   wire       [21:0]   _zz_FetchL1Plugin_logic_ways_0_mem_port;
   wire                _zz_FetchL1Plugin_logic_ways_0_mem_port_1;
+  wire       [21:0]   _zz_FetchL1Plugin_logic_ways_1_mem_port;
+  wire                _zz_FetchL1Plugin_logic_ways_1_mem_port_1;
   wire                _zz_when_1;
   wire       [0:0]    _zz_FetchL1Plugin_logic_ctrl_dataAccessFault;
+  wire       [0:0]    _zz_FetchL1Plugin_logic_plru_write_payload_data_0;
   wire       [11:0]   _zz_LsuPlugin_logic_onAddress0_ls_storeId;
   wire       [0:0]    _zz_LsuPlugin_logic_onAddress0_ls_storeId_1;
   wire       [12:0]   _zz_LsuPlugin_logic_onAddress0_flush_port_payload_address;
@@ -228,7 +274,26 @@ module VexiiRiscv (
   wire       [0:0]    _zz_LsuPlugin_logic_onCtrl_loadData_shited_3;
   wire       [2:0]    _zz_LsuPlugin_logic_trapPort_payload_code;
   wire       [5:0]    _zz_LsuPlugin_logic_flusher_cmdCounter;
+  wire       [1:0]    _zz_GSharePlugin_logic_mem_counter_port;
+  wire                _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_1;
+  wire       [0:0]    _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_2;
+  wire       [5:0]    _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_3;
+  wire       [13:0]   _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_4;
+  wire       [11:0]   _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_5;
+  wire       [1:0]    _zz_BtbPlugin_logic_ras_ptr_push;
+  wire       [1:0]    _zz_BtbPlugin_logic_ras_ptr_push_1;
+  wire       [0:0]    _zz_BtbPlugin_logic_ras_ptr_push_2;
+  wire       [1:0]    _zz_BtbPlugin_logic_ras_ptr_push_3;
+  wire       [0:0]    _zz_BtbPlugin_logic_ras_ptr_push_4;
+  wire       [1:0]    _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue;
+  wire       [1:0]    _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_1;
+  wire       [0:0]    _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_2;
+  wire       [1:0]    _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_3;
+  wire       [0:0]    _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_4;
+  wire       [29:0]   _zz_BtbPlugin_logic_ras_mem_stack_port;
+  wire       [48:0]   _zz_BtbPlugin_logic_mem_port;
   wire       [63:0]   _zz_WhiteboxerPlugin_logic_decodes_0_pc;
+  wire       [12:0]   _zz_early0_BranchPlugin_logic_jumpLogic_history_shifter_1;
   wire       [0:0]    _zz_FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit;
   wire       [0:0]    _zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io_1;
   wire       [25:0]   _zz_FetchL1WishbonePlugin_logic_bus_ADR;
@@ -236,12 +301,18 @@ module VexiiRiscv (
   wire       [0:0]    _zz_LsuPlugin_logic_onPma_cached_rsp_io_1;
   wire       [0:0]    _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit;
   wire       [0:0]    _zz_LsuPlugin_logic_onPma_io_rsp_io;
-  wire       [11:0]   _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
-  wire       [11:0]   _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0_1;
-  wire       [31:0]   _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
-  wire       [31:0]   _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0_1;
-  wire       [31:0]   _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0_2;
-  wire       [0:0]    _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0_3;
+  wire       [11:0]   _zz__zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0;
+  wire       [11:0]   _zz__zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0_1;
+  wire       [31:0]   _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0;
+  wire       [31:0]   _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0_1;
+  wire       [31:0]   _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0_3;
+  wire       [11:0]   _zz__zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0;
+  wire       [31:0]   _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0;
+  wire       [31:0]   _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0_1;
+  wire       [31:0]   _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0_3;
+  wire       [12:0]   _zz_late0_BranchPlugin_logic_jumpLogic_history_shifter_1;
   wire       [3:0]    _zz_early0_EnvPlugin_logic_trapPort_payload_code;
   wire       [0:0]    _zz_decode_ctrls_1_down_RS1_ENABLE_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_RS2_ENABLE_0;
@@ -249,8 +320,8 @@ module VexiiRiscv (
   wire       [31:0]   _zz_decode_ctrls_1_down_RD_ENABLE_0_1;
   wire       [31:0]   _zz_decode_ctrls_1_down_RD_ENABLE_0_2;
   wire       [31:0]   _zz_decode_ctrls_1_down_RD_ENABLE_0_3;
-  wire                _zz_decode_ctrls_1_down_RD_ENABLE_0_4;
-  wire                _zz_decode_ctrls_1_down_RD_ENABLE_0_5;
+  wire       [31:0]   _zz_decode_ctrls_1_down_RD_ENABLE_0_4;
+  wire       [31:0]   _zz_decode_ctrls_1_down_RD_ENABLE_0_5;
   wire       [31:0]   _zz_decode_ctrls_1_down_Decode_LEGAL_0;
   wire       [31:0]   _zz_decode_ctrls_1_down_Decode_LEGAL_0_1;
   wire       [31:0]   _zz_decode_ctrls_1_down_Decode_LEGAL_0_2;
@@ -269,24 +340,23 @@ module VexiiRiscv (
   wire                _zz_decode_ctrls_1_down_Decode_LEGAL_0_15;
   wire       [0:0]    _zz_decode_ctrls_1_down_Decode_LEGAL_0_16;
   wire       [1:0]    _zz_decode_ctrls_1_down_Decode_LEGAL_0_17;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_1;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_2;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_3;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_4;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_5;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_1;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_2;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_3;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_4;
-  wire                _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_5;
+  wire       [0:0]    _zz_DecoderPlugin_logic_laneLogic_0_fixer_isJb;
+  wire       [31:0]   _zz_DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice;
+  wire       [1:0]    _zz_DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice_1;
+  wire                _zz_GSharePlugin_logic_onLearn_hash_1;
+  wire       [0:0]    _zz_GSharePlugin_logic_onLearn_hash_2;
+  wire       [5:0]    _zz_GSharePlugin_logic_onLearn_hash_3;
+  wire       [13:0]   _zz_GSharePlugin_logic_onLearn_hash_4;
+  wire       [11:0]   _zz_GSharePlugin_logic_onLearn_hash_5;
+  wire       [29:0]   _zz_BtbPlugin_logic_memWrite_payload_address;
   wire       [0:0]    _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0_1;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0_1;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0_2;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_2;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0;
@@ -295,14 +365,26 @@ module VexiiRiscv (
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0_1;
-  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0;
-  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1;
-  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_2;
-  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_3;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_2_0;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_2_0_1;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_2;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_3;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_1;
   wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_2;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_0;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_0_1;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_0;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_0_1;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0_1;
+  wire       [0:0]    _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0_2;
+  wire       [29:0]   _zz_BtbPlugin_logic_memWrite_payload_address_1;
+  wire       [29:0]   _zz_BtbPlugin_logic_memRead_cmd_payload;
+  wire       [31:0]   _zz_BtbPlugin_logic_ras_write_payload_data;
+  wire                _zz_decode_logic_flushes_1_onLanes_0_doIt;
+  wire                _zz_decode_logic_flushes_1_onLanes_0_doIt_1;
+  wire                _zz_decode_logic_flushes_1_onLanes_0_doIt_2;
   wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception;
   wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1;
   wire                _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_2;
@@ -320,6 +402,7 @@ module VexiiRiscv (
   wire       [31:0]   _zz_PcPlugin_logic_harts_0_self_pc;
   wire       [2:0]    _zz_PcPlugin_logic_harts_0_self_pc_1;
   wire       [0:0]    _zz_PcPlugin_logic_harts_0_aggregator_fault;
+  wire       [0:0]    _zz_PcPlugin_logic_harts_0_aggregator_fault_1_1;
   wire       [0:0]    _zz_CsrAccessPlugin_logic_fsm_inject_implemented;
   wire       [4:0]    _zz_CsrAccessPlugin_logic_fsm_inject_implemented_1;
   wire       [31:0]   _zz_CsrAccessPlugin_logic_fsm_readLogic_csrValue_5;
@@ -356,97 +439,109 @@ module VexiiRiscv (
   reg        [1:0]    _zz_CsrRamPlugin_logic_readLogic_port_cmd_payload;
   wire       [2:0]    _zz_CsrRamPlugin_logic_flush_counter;
   wire       [0:0]    _zz_CsrRamPlugin_logic_flush_counter_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_1;
-  wire       [31:0]   _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_2;
-  wire       [31:0]   _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_3;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_BranchPlugin_SEL_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_BranchPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_DivPlugin_SEL_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_DivPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_EnvPlugin_SEL_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_EnvPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_SEL_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_6;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_7;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_4;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_2;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_SrcStageables_REVERT_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_SrcStageables_REVERT_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_SrcStageables_ZERO_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_SrcStageables_ZERO_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_1_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_1_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_2_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_2_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_3_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_3_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_2;
-  wire       [0:0]    _zz_execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_MulPlugin_HIGH_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_MulPlugin_HIGH_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0_2;
-  wire       [0:0]    _zz_execute_ctrl1_down_DivPlugin_REM_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_DivPlugin_REM_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0_2;
-  wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_2;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_2;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_STORE_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_STORE_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0_1;
-  wire       [0:0]    _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
-  wire       [0:0]    _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0_1;
-  wire                _zz_when_ExecuteLanePlugin_l307_2;
-  wire                _zz_when_ExecuteLanePlugin_l307_2_1;
-  wire                _zz_when_ExecuteLanePlugin_l307_2_2;
-  wire                _zz_when_ExecuteLanePlugin_l307_2_3;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0_1;
+  wire       [32:0]   _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0_2;
+  wire       [32:0]   _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0_3;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_BranchPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_BranchPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_MulPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_MulPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_DivPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_DivPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_EnvPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_EnvPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_BranchPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_BranchPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_CsrAccessPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_CsrAccessPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_SEL_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl0_down_COMPLETION_AT_1_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_COMPLETION_AT_1_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_COMPLETION_AT_3_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_COMPLETION_AT_3_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_COMPLETION_AT_2_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_COMPLETION_AT_2_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_6;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_4;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_SLTX_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_SLTX_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_SrcStageables_REVERT_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_SrcStageables_REVERT_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_SrcStageables_ZERO_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_SrcStageables_ZERO_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_lane0_IntFormatPlugin_logic_SIGNED_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_BYPASSED_AT_1_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_BYPASSED_AT_1_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_3;
+  wire       [0:0]    _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_2_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_2_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_3;
+  wire       [0:0]    _zz_execute_ctrl0_down_SrcStageables_UNSIGNED_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_SrcStageables_UNSIGNED_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl0_down_BarrelShifterPlugin_SIGNED_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_BarrelShifterPlugin_SIGNED_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_MulPlugin_HIGH_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_MulPlugin_HIGH_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_RsUnsignedPlugin_RS1_SIGNED_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_RsUnsignedPlugin_RS2_SIGNED_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_DivPlugin_REM_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_DivPlugin_REM_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_IMM_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_IMM_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_LOAD_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_LOAD_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_STORE_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_STORE_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_ATOMIC_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_ATOMIC_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_FLOAT_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_AguPlugin_FLOAT_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+  wire       [0:0]    _zz_execute_ctrl0_down_LsuPlugin_logic_LSU_PREFETCH_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0_2;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0_1;
+  wire       [0:0]    _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0_2;
+  wire                _zz_when_ExecuteLanePlugin_l307_1;
+  wire                _zz_when_ExecuteLanePlugin_l307_1_1;
+  wire                _zz_when_ExecuteLanePlugin_l307_1_2;
+  wire                _zz_when_ExecuteLanePlugin_l307_1_3;
+  wire                _zz_when_ExecuteLanePlugin_l307_1_4;
+  wire                _zz_when_ExecuteLanePlugin_l307_1_5;
+  wire                _zz_when_ExecuteLanePlugin_l307_1_6;
   wire       [31:0]   _zz_WhiteboxerPlugin_logic_csr_access_payload_address;
+  wire                _zz_fetch_logic_flushes_0_doIt;
+  wire                _zz_fetch_logic_flushes_0_doIt_1;
+  wire                _zz_fetch_logic_flushes_0_doIt_2;
   reg        [0:0]    _zz_WhiteboxerPlugin_logic_perf_candidatesCount;
   wire       [0:0]    _zz_WhiteboxerPlugin_logic_perf_candidatesCount_1;
   reg        [0:0]    _zz_WhiteboxerPlugin_logic_perf_dispatchFeedCount;
@@ -463,101 +558,77 @@ module VexiiRiscv (
   wire       [0:0]    _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_0_1_1;
   wire       [59:0]   _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1_1;
   wire       [0:0]    _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1_1_1;
+  wire                decode_ctrls_0_up_isValid;
   wire                fetch_logic_ctrls_0_up_isReady;
   wire                fetch_logic_ctrls_0_up_isValid;
-  reg        [31:0]   execute_ctrl5_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
-  reg                 execute_ctrl5_up_COMMIT_lane0;
-  reg        [4:0]    execute_ctrl5_up_RD_PHYS_lane0;
-  wire       [11:0]   execute_ctrl3_down_Decode_STORE_ID_lane0;
-  wire                execute_ctrl3_down_LsuL1_PREFETCH_lane0;
-  wire                execute_ctrl3_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
-  wire                execute_ctrl3_down_AguPlugin_FLOAT_lane0;
-  wire                execute_ctrl3_down_AguPlugin_ATOMIC_lane0;
-  wire                execute_ctrl3_down_AguPlugin_LOAD_lane0;
-  wire                execute_ctrl3_down_MulPlugin_HIGH_lane0;
-  wire                execute_ctrl3_down_BYPASSED_AT_4_lane0;
-  wire       [1:0]    execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-  wire                execute_ctrl3_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-  wire                execute_ctrl3_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-  wire                execute_ctrl3_down_COMPLETION_AT_4_lane0;
-  wire                execute_ctrl3_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-  wire                execute_ctrl3_down_early0_MulPlugin_SEL_lane0;
-  wire       [31:0]   execute_ctrl3_down_integer_RS2_lane0;
-  wire       [1:0]    execute_ctrl3_down_AguPlugin_SIZE_lane0;
-  wire       [4:0]    execute_ctrl3_down_RD_PHYS_lane0;
-  wire       [31:0]   execute_ctrl3_down_PC_lane0;
-  wire       [31:0]   execute_ctrl3_down_Decode_UOP_lane0;
-  reg                 execute_ctrl4_up_MMU_BYPASS_TRANSLATION_lane0;
-  reg                 execute_ctrl4_up_MMU_HAZARD_lane0;
-  reg                 execute_ctrl4_up_MMU_REFILL_lane0;
-  reg                 execute_ctrl4_up_MMU_ACCESS_FAULT_lane0;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_MMU_FAILURE_lane0;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_IO_lane0;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
-  reg        [31:0]   execute_ctrl4_up_MMU_TRANSLATED_lane0;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_onTrigger_HIT_lane0;
-  reg        [4:0]    execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_1_lane0;
-  reg        [62:0]   execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_0_lane0;
-  reg        [0:0]    execute_ctrl4_up_LsuL1Plugin_logic_WAYS_HITS_lane0;
-  reg                 execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
-  reg        [19:0]   execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
-  reg                 execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
-  reg        [31:0]   execute_ctrl4_up_LsuL1_PHYSICAL_ADDRESS_lane0;
-  reg        [1:0]    execute_ctrl4_up_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
-  reg        [31:0]   execute_ctrl4_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
-  reg        [0:0]    execute_ctrl4_up_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
-  reg        [0:0]    execute_ctrl4_up_LsuL1Plugin_logic_SHARED_lane0_dirty;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_FROM_LSU_lane0;
-  reg        [11:0]   execute_ctrl4_up_Decode_STORE_ID_lane0;
-  reg                 execute_ctrl4_up_LsuL1_FLUSH_lane0;
-  reg                 execute_ctrl4_up_LsuL1_PREFETCH_lane0;
-  reg                 execute_ctrl4_up_LsuL1_STORE_lane0;
-  reg                 execute_ctrl4_up_LsuL1_ATOMIC_lane0;
-  reg                 execute_ctrl4_up_LsuL1_LOAD_lane0;
-  reg        [1:0]    execute_ctrl4_up_LsuL1_SIZE_lane0;
-  reg        [3:0]    execute_ctrl4_up_LsuL1_MASK_lane0;
-  reg        [31:0]   execute_ctrl4_up_LsuL1_MIXED_ADDRESS_lane0;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
-  reg                 execute_ctrl4_up_AguPlugin_FLOAT_lane0;
-  reg                 execute_ctrl4_up_AguPlugin_ATOMIC_lane0;
-  reg                 execute_ctrl4_up_AguPlugin_STORE_lane0;
-  reg                 execute_ctrl4_up_AguPlugin_LOAD_lane0;
-  reg                 execute_ctrl4_up_MulPlugin_HIGH_lane0;
-  reg                 execute_ctrl4_up_BYPASSED_AT_4_lane0;
-  reg        [1:0]    execute_ctrl4_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-  reg                 execute_ctrl4_up_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-  reg                 execute_ctrl4_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-  reg                 execute_ctrl4_up_COMPLETION_AT_4_lane0;
-  reg                 execute_ctrl4_up_lane0_integer_WriteBackPlugin_SEL_lane0;
-  reg                 execute_ctrl4_up_LsuPlugin_logic_FENCE_lane0;
-  reg                 execute_ctrl4_up_AguPlugin_SEL_lane0;
-  reg                 execute_ctrl4_up_early0_MulPlugin_SEL_lane0;
-  reg        [1:0]    execute_ctrl4_up_AguPlugin_SIZE_lane0;
-  reg        [15:0]   execute_ctrl4_up_Decode_UOP_ID_lane0;
-  reg        [31:0]   execute_ctrl4_up_PC_lane0;
-  reg        [31:0]   execute_ctrl4_up_Decode_UOP_lane0;
+  reg                 execute_ctrl4_up_COMMIT_lane0;
+  wire       [11:0]   execute_ctrl2_down_Decode_STORE_ID_lane0;
+  wire                execute_ctrl2_down_LsuL1_PREFETCH_lane0;
+  wire       [31:0]   execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
+  wire       [31:0]   execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+  wire       [31:0]   execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  wire       [1:0]    execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  wire                execute_ctrl2_down_late0_IntAluPlugin_ALU_SLTX_lane0;
+  wire                execute_ctrl2_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
   wire                execute_ctrl2_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
   wire                execute_ctrl2_down_AguPlugin_FLOAT_lane0;
+  wire                execute_ctrl2_down_AguPlugin_ATOMIC_lane0;
+  wire                execute_ctrl2_down_AguPlugin_LOAD_lane0;
   wire                execute_ctrl2_down_MulPlugin_HIGH_lane0;
-  wire                execute_ctrl2_down_BYPASSED_AT_4_lane0;
-  wire                execute_ctrl2_down_BYPASSED_AT_3_lane0;
+  wire       [1:0]    execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0;
+  wire                execute_ctrl2_down_BarrelShifterPlugin_SIGNED_lane0;
+  wire                execute_ctrl2_down_BarrelShifterPlugin_LEFT_lane0;
+  wire                execute_ctrl2_down_SrcStageables_UNSIGNED_lane0;
   wire       [1:0]    execute_ctrl2_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
   wire                execute_ctrl2_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-  wire                execute_ctrl2_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+  wire                execute_ctrl2_down_SrcStageables_ZERO_lane0;
+  wire                execute_ctrl2_down_SrcStageables_REVERT_lane0;
   wire                execute_ctrl2_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
   wire                execute_ctrl2_down_COMPLETION_AT_3_lane0;
-  wire                execute_ctrl2_down_COMPLETION_AT_4_lane0;
   wire                execute_ctrl2_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-  wire                execute_ctrl2_down_LsuPlugin_logic_FENCE_lane0;
+  wire                execute_ctrl2_down_late0_BranchPlugin_SEL_lane0;
+  wire                execute_ctrl2_down_late0_BarrelShifterPlugin_SEL_lane0;
+  wire                execute_ctrl2_down_late0_IntAluPlugin_SEL_lane0;
   wire                execute_ctrl2_down_early0_MulPlugin_SEL_lane0;
-  wire       [31:0]   execute_ctrl2_down_integer_RS2_lane0;
+  wire                execute_ctrl2_down_early0_BranchPlugin_SEL_lane0;
+  wire       [1:0]    execute_ctrl2_down_AguPlugin_SIZE_lane0;
+  wire       [11:0]   execute_ctrl2_down_Prediction_BRANCH_HISTORY_lane0;
+  wire       [1:0]    execute_ctrl2_down_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  wire       [31:0]   execute_ctrl2_down_Prediction_ALIGNED_JUMPED_PC_lane0;
+  wire                execute_ctrl2_down_Prediction_ALIGNED_JUMPED_lane0;
+  reg                 execute_ctrl3_up_MMU_BYPASS_TRANSLATION_lane0;
+  reg        [31:0]   execute_ctrl3_up_late0_SrcPlugin_SRC2_lane0;
+  reg        [31:0]   execute_ctrl3_up_late0_SrcPlugin_SRC1_lane0;
+  reg                 execute_ctrl3_up_MMU_HAZARD_lane0;
+  reg                 execute_ctrl3_up_MMU_REFILL_lane0;
+  reg                 execute_ctrl3_up_MMU_ACCESS_FAULT_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_MMU_FAILURE_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_onPma_IO_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
+  reg        [31:0]   execute_ctrl3_up_MMU_TRANSLATED_lane0;
+  reg                 execute_ctrl3_up_LsuPlugin_logic_onTrigger_HIT_lane0;
+  reg        [4:0]    execute_ctrl3_up_early0_MulPlugin_logic_steps_0_adders_1_lane0;
+  reg        [62:0]   execute_ctrl3_up_early0_MulPlugin_logic_steps_0_adders_0_lane0;
+  reg        [1:0]    execute_ctrl3_up_LsuL1Plugin_logic_WAYS_HITS_lane0;
+  reg                 execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
+  reg        [19:0]   execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+  reg                 execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+  reg                 execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded;
+  reg        [19:0]   execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address;
+  reg                 execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault;
+  reg        [31:0]   execute_ctrl3_up_LsuL1_PHYSICAL_ADDRESS_lane0;
+  reg        [1:0]    execute_ctrl3_up_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
+  reg        [31:0]   execute_ctrl3_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
+  reg        [31:0]   execute_ctrl3_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_1;
+  reg        [1:0]    execute_ctrl3_up_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+  reg        [0:0]    execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_plru_0;
+  reg        [1:0]    execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty;
   reg                 execute_ctrl3_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
   reg                 execute_ctrl3_up_LsuPlugin_logic_FROM_LSU_lane0;
   reg        [11:0]   execute_ctrl3_up_Decode_STORE_ID_lane0;
@@ -568,120 +639,233 @@ module VexiiRiscv (
   reg                 execute_ctrl3_up_LsuL1_LOAD_lane0;
   reg        [1:0]    execute_ctrl3_up_LsuL1_SIZE_lane0;
   reg        [3:0]    execute_ctrl3_up_LsuL1_MASK_lane0;
-  reg                 execute_ctrl3_up_LsuPlugin_logic_FROM_ACCESS_lane0;
-  reg        [31:0]   execute_ctrl3_up_DivPlugin_DIV_RESULT_lane0;
-  reg        [29:0]   execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_3_lane0;
-  reg        [46:0]   execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_2_lane0;
-  reg        [46:0]   execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_1_lane0;
-  reg        [33:0]   execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_0_lane0;
-  reg        [0:0]    execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
-  reg                 execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
-  reg        [3:0]    execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
-  reg        [31:0]   execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
-  reg                 execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
-  reg        [0:0]    execute_ctrl3_up_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  reg        [31:0]   execute_ctrl3_up_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
+  reg        [31:0]   execute_ctrl3_up_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+  reg        [31:0]   execute_ctrl3_up_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
   reg        [31:0]   execute_ctrl3_up_LsuL1_MIXED_ADDRESS_lane0;
-  reg        [31:0]   execute_ctrl3_up_early0_SrcPlugin_ADD_SUB_lane0;
-  reg                 execute_ctrl3_up_COMMIT_lane0;
+  reg        [1:0]    execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  reg                 execute_ctrl3_up_late0_IntAluPlugin_ALU_SLTX_lane0;
+  reg                 execute_ctrl3_up_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
   reg                 execute_ctrl3_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
   reg                 execute_ctrl3_up_AguPlugin_FLOAT_lane0;
   reg                 execute_ctrl3_up_AguPlugin_ATOMIC_lane0;
   reg                 execute_ctrl3_up_AguPlugin_STORE_lane0;
   reg                 execute_ctrl3_up_AguPlugin_LOAD_lane0;
   reg                 execute_ctrl3_up_MulPlugin_HIGH_lane0;
-  reg                 execute_ctrl3_up_BYPASSED_AT_4_lane0;
-  reg                 execute_ctrl3_up_BYPASSED_AT_3_lane0;
+  reg        [1:0]    execute_ctrl3_up_BranchPlugin_BRANCH_CTRL_lane0;
+  reg                 execute_ctrl3_up_BarrelShifterPlugin_SIGNED_lane0;
+  reg                 execute_ctrl3_up_BarrelShifterPlugin_LEFT_lane0;
+  reg                 execute_ctrl3_up_SrcStageables_UNSIGNED_lane0;
   reg        [1:0]    execute_ctrl3_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
   reg                 execute_ctrl3_up_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-  reg                 execute_ctrl3_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+  reg                 execute_ctrl3_up_SrcStageables_ZERO_lane0;
+  reg                 execute_ctrl3_up_SrcStageables_REVERT_lane0;
   reg                 execute_ctrl3_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
   reg                 execute_ctrl3_up_COMPLETION_AT_3_lane0;
-  reg                 execute_ctrl3_up_COMPLETION_AT_4_lane0;
   reg                 execute_ctrl3_up_lane0_integer_WriteBackPlugin_SEL_lane0;
   reg                 execute_ctrl3_up_LsuPlugin_logic_FENCE_lane0;
   reg                 execute_ctrl3_up_AguPlugin_SEL_lane0;
-  reg                 execute_ctrl3_up_CsrAccessPlugin_SEL_lane0;
-  reg                 execute_ctrl3_up_early0_DivPlugin_SEL_lane0;
+  reg                 execute_ctrl3_up_late0_BranchPlugin_SEL_lane0;
+  reg                 execute_ctrl3_up_late0_BarrelShifterPlugin_SEL_lane0;
+  reg                 execute_ctrl3_up_late0_IntAluPlugin_SEL_lane0;
   reg                 execute_ctrl3_up_early0_MulPlugin_SEL_lane0;
-  reg        [31:0]   execute_ctrl3_up_integer_RS2_lane0;
+  reg                 execute_ctrl3_up_early0_BranchPlugin_SEL_lane0;
   reg        [1:0]    execute_ctrl3_up_AguPlugin_SIZE_lane0;
+  reg        [4:0]    execute_ctrl3_up_RD_PHYS_lane0;
   reg        [15:0]   execute_ctrl3_up_Decode_UOP_ID_lane0;
-  reg                 execute_ctrl3_up_TRAP_lane0;
   reg        [31:0]   execute_ctrl3_up_PC_lane0;
+  reg        [11:0]   execute_ctrl3_up_Prediction_BRANCH_HISTORY_lane0;
+  reg        [1:0]    execute_ctrl3_up_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  reg        [31:0]   execute_ctrl3_up_Prediction_ALIGNED_JUMPED_PC_lane0;
+  reg                 execute_ctrl3_up_Prediction_ALIGNED_JUMPED_lane0;
   reg        [31:0]   execute_ctrl3_up_Decode_UOP_lane0;
-  wire       [1:0]    execute_ctrl1_down_AguPlugin_SIZE_lane0;
-  wire                execute_ctrl1_down_COMPLETED_lane0;
-  wire       [4:0]    execute_ctrl1_down_RD_PHYS_lane0;
-  wire       [15:0]   execute_ctrl1_down_Decode_UOP_ID_lane0;
-  wire                execute_ctrl1_down_isReady;
-  reg        [2:0]    execute_ctrl2_up_early0_EnvPlugin_OP_lane0;
+  wire       [1:0]    execute_ctrl1_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
+  wire       [0:0]    execute_ctrl1_down_late0_SrcPlugin_logic_SRC1_CTRL_lane0;
+  wire       [1:0]    execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  wire                execute_ctrl1_down_late0_IntAluPlugin_ALU_SLTX_lane0;
+  wire                execute_ctrl1_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  wire                execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+  wire                execute_ctrl1_down_AguPlugin_FLOAT_lane0;
+  wire                execute_ctrl1_down_MulPlugin_HIGH_lane0;
+  wire                execute_ctrl1_down_BYPASSED_AT_2_lane0;
+  wire       [1:0]    execute_ctrl1_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
+  wire                execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+  wire                execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+  wire                execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+  wire                execute_ctrl1_down_COMPLETION_AT_2_lane0;
+  wire                execute_ctrl1_down_COMPLETION_AT_3_lane0;
+  wire                execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+  wire                execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0;
+  wire                execute_ctrl1_down_late0_BranchPlugin_SEL_lane0;
+  wire                execute_ctrl1_down_late0_BarrelShifterPlugin_SEL_lane0;
+  wire                execute_ctrl1_down_late0_IntAluPlugin_SEL_lane0;
+  wire                execute_ctrl1_down_early0_MulPlugin_SEL_lane0;
+  wire       [1:0]    execute_ctrl1_down_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  reg                 execute_ctrl2_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  reg                 execute_ctrl2_up_LsuPlugin_logic_FROM_LSU_lane0;
+  reg        [11:0]   execute_ctrl2_up_Decode_STORE_ID_lane0;
+  reg                 execute_ctrl2_up_LsuL1_FLUSH_lane0;
+  reg                 execute_ctrl2_up_LsuL1_PREFETCH_lane0;
+  reg                 execute_ctrl2_up_LsuL1_STORE_lane0;
+  reg                 execute_ctrl2_up_LsuL1_ATOMIC_lane0;
+  reg                 execute_ctrl2_up_LsuL1_LOAD_lane0;
+  reg        [1:0]    execute_ctrl2_up_LsuL1_SIZE_lane0;
+  reg        [3:0]    execute_ctrl2_up_LsuL1_MASK_lane0;
+  reg                 execute_ctrl2_up_LsuPlugin_logic_FROM_ACCESS_lane0;
+  reg        [31:0]   execute_ctrl2_up_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
+  reg        [31:0]   execute_ctrl2_up_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+  reg        [31:0]   execute_ctrl2_up_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  reg        [31:0]   execute_ctrl2_up_DivPlugin_DIV_RESULT_lane0;
+  reg        [29:0]   execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_3_lane0;
+  reg        [46:0]   execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_2_lane0;
+  reg        [46:0]   execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_1_lane0;
+  reg        [33:0]   execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_0_lane0;
+  reg        [0:0]    execute_ctrl2_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_plru_0;
+  reg        [1:0]    execute_ctrl2_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+  reg                 execute_ctrl2_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
+  reg        [3:0]    execute_ctrl2_up_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
+  reg        [31:0]   execute_ctrl2_up_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
+  reg                 execute_ctrl2_up_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
+  reg        [1:0]    execute_ctrl2_up_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  reg        [31:0]   execute_ctrl2_up_LsuL1_MIXED_ADDRESS_lane0;
+  reg        [31:0]   execute_ctrl2_up_early0_SrcPlugin_ADD_SUB_lane0;
+  reg                 execute_ctrl2_up_COMMIT_lane0;
+  reg        [1:0]    execute_ctrl2_up_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
+  reg        [0:0]    execute_ctrl2_up_late0_SrcPlugin_logic_SRC1_CTRL_lane0;
+  reg        [1:0]    execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  reg                 execute_ctrl2_up_late0_IntAluPlugin_ALU_SLTX_lane0;
+  reg                 execute_ctrl2_up_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
   reg                 execute_ctrl2_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
   reg                 execute_ctrl2_up_AguPlugin_FLOAT_lane0;
   reg                 execute_ctrl2_up_AguPlugin_ATOMIC_lane0;
   reg                 execute_ctrl2_up_AguPlugin_STORE_lane0;
   reg                 execute_ctrl2_up_AguPlugin_LOAD_lane0;
-  reg                 execute_ctrl2_up_CsrAccessPlugin_CSR_CLEAR_lane0;
-  reg                 execute_ctrl2_up_CsrAccessPlugin_CSR_MASK_lane0;
-  reg                 execute_ctrl2_up_CsrAccessPlugin_CSR_IMM_lane0;
-  reg                 execute_ctrl2_up_DivPlugin_REM_lane0;
-  reg                 execute_ctrl2_up_RsUnsignedPlugin_RS2_SIGNED_lane0;
-  reg                 execute_ctrl2_up_RsUnsignedPlugin_RS1_SIGNED_lane0;
   reg                 execute_ctrl2_up_MulPlugin_HIGH_lane0;
   reg        [1:0]    execute_ctrl2_up_BranchPlugin_BRANCH_CTRL_lane0;
   reg                 execute_ctrl2_up_BarrelShifterPlugin_SIGNED_lane0;
   reg                 execute_ctrl2_up_BarrelShifterPlugin_LEFT_lane0;
   reg                 execute_ctrl2_up_SrcStageables_UNSIGNED_lane0;
-  reg                 execute_ctrl2_up_BYPASSED_AT_4_lane0;
-  reg                 execute_ctrl2_up_BYPASSED_AT_3_lane0;
+  reg                 execute_ctrl2_up_MAY_FLUSH_PRECISE_2_lane0;
   reg                 execute_ctrl2_up_BYPASSED_AT_2_lane0;
   reg        [1:0]    execute_ctrl2_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
   reg                 execute_ctrl2_up_lane0_IntFormatPlugin_logic_SIGNED_lane0;
   reg                 execute_ctrl2_up_SrcStageables_ZERO_lane0;
   reg                 execute_ctrl2_up_SrcStageables_REVERT_lane0;
-  reg        [1:0]    execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
-  reg                 execute_ctrl2_up_early0_IntAluPlugin_ALU_SLTX_lane0;
-  reg                 execute_ctrl2_up_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
   reg                 execute_ctrl2_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
   reg                 execute_ctrl2_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-  reg                 execute_ctrl2_up_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
-  reg                 execute_ctrl2_up_COMPLETION_AT_3_lane0;
-  reg                 execute_ctrl2_up_COMPLETION_AT_4_lane0;
   reg                 execute_ctrl2_up_COMPLETION_AT_2_lane0;
+  reg                 execute_ctrl2_up_COMPLETION_AT_3_lane0;
   reg                 execute_ctrl2_up_lane0_integer_WriteBackPlugin_SEL_lane0;
   reg                 execute_ctrl2_up_LsuPlugin_logic_FENCE_lane0;
   reg                 execute_ctrl2_up_AguPlugin_SEL_lane0;
   reg                 execute_ctrl2_up_CsrAccessPlugin_SEL_lane0;
-  reg                 execute_ctrl2_up_early0_EnvPlugin_SEL_lane0;
+  reg                 execute_ctrl2_up_late0_BranchPlugin_SEL_lane0;
+  reg                 execute_ctrl2_up_late0_BarrelShifterPlugin_SEL_lane0;
+  reg                 execute_ctrl2_up_late0_IntAluPlugin_SEL_lane0;
   reg                 execute_ctrl2_up_early0_DivPlugin_SEL_lane0;
   reg                 execute_ctrl2_up_early0_MulPlugin_SEL_lane0;
   reg                 execute_ctrl2_up_early0_BranchPlugin_SEL_lane0;
-  reg                 execute_ctrl2_up_early0_BarrelShifterPlugin_SEL_lane0;
-  reg                 execute_ctrl2_up_early0_IntAluPlugin_SEL_lane0;
-  reg                 execute_ctrl2_up_MAY_FLUSH_PRECISE_3_lane0;
-  reg        [31:0]   execute_ctrl2_up_early0_SrcPlugin_SRC2_lane0;
-  reg        [31:0]   execute_ctrl2_up_early0_SrcPlugin_SRC1_lane0;
   reg        [1:0]    execute_ctrl2_up_AguPlugin_SIZE_lane0;
+  reg        [4:0]    execute_ctrl2_up_RS2_PHYS_lane0;
+  reg        [4:0]    execute_ctrl2_up_RS1_PHYS_lane0;
   reg        [15:0]   execute_ctrl2_up_Decode_UOP_ID_lane0;
+  reg                 execute_ctrl2_up_TRAP_lane0;
   reg        [31:0]   execute_ctrl2_up_PC_lane0;
+  reg        [11:0]   execute_ctrl2_up_Prediction_BRANCH_HISTORY_lane0;
+  reg        [1:0]    execute_ctrl2_up_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  reg        [31:0]   execute_ctrl2_up_Prediction_ALIGNED_JUMPED_PC_lane0;
+  reg                 execute_ctrl2_up_Prediction_ALIGNED_JUMPED_lane0;
   reg        [31:0]   execute_ctrl2_up_Decode_UOP_lane0;
   wire                execute_ctrl0_down_COMPLETED_lane0;
   wire       [4:0]    execute_ctrl0_down_RD_PHYS_lane0;
-  wire                execute_ctrl0_down_TRAP_lane0;
-  wire       [31:0]   execute_ctrl0_down_PC_lane0;
+  wire       [11:0]   execute_ctrl0_down_Prediction_BRANCH_HISTORY_lane0;
+  wire       [1:0]    execute_ctrl0_down_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  wire       [31:0]   execute_ctrl0_down_Prediction_ALIGNED_JUMPED_PC_lane0;
+  wire                execute_ctrl0_down_Prediction_ALIGNED_JUMPED_lane0;
+  reg        [1:0]    execute_ctrl1_up_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
+  reg        [0:0]    execute_ctrl1_up_late0_SrcPlugin_logic_SRC1_CTRL_lane0;
+  reg        [1:0]    execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  reg                 execute_ctrl1_up_late0_IntAluPlugin_ALU_SLTX_lane0;
+  reg                 execute_ctrl1_up_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  reg        [2:0]    execute_ctrl1_up_early0_EnvPlugin_OP_lane0;
+  reg                 execute_ctrl1_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
+  reg                 execute_ctrl1_up_AguPlugin_FLOAT_lane0;
+  reg                 execute_ctrl1_up_AguPlugin_ATOMIC_lane0;
+  reg                 execute_ctrl1_up_AguPlugin_STORE_lane0;
+  reg                 execute_ctrl1_up_AguPlugin_LOAD_lane0;
+  reg                 execute_ctrl1_up_CsrAccessPlugin_CSR_CLEAR_lane0;
+  reg                 execute_ctrl1_up_CsrAccessPlugin_CSR_MASK_lane0;
+  reg                 execute_ctrl1_up_CsrAccessPlugin_CSR_IMM_lane0;
+  reg                 execute_ctrl1_up_DivPlugin_REM_lane0;
+  reg                 execute_ctrl1_up_RsUnsignedPlugin_RS2_SIGNED_lane0;
+  reg                 execute_ctrl1_up_RsUnsignedPlugin_RS1_SIGNED_lane0;
+  reg                 execute_ctrl1_up_MulPlugin_HIGH_lane0;
+  reg        [1:0]    execute_ctrl1_up_BranchPlugin_BRANCH_CTRL_lane0;
+  reg                 execute_ctrl1_up_BarrelShifterPlugin_SIGNED_lane0;
+  reg                 execute_ctrl1_up_BarrelShifterPlugin_LEFT_lane0;
+  reg                 execute_ctrl1_up_SrcStageables_UNSIGNED_lane0;
+  reg                 execute_ctrl1_up_MAY_FLUSH_PRECISE_3_lane0;
+  reg                 execute_ctrl1_up_MAY_FLUSH_PRECISE_2_lane0;
+  reg                 execute_ctrl1_up_BYPASSED_AT_2_lane0;
+  reg                 execute_ctrl1_up_BYPASSED_AT_1_lane0;
+  reg        [1:0]    execute_ctrl1_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
+  reg                 execute_ctrl1_up_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+  reg                 execute_ctrl1_up_SrcStageables_ZERO_lane0;
+  reg                 execute_ctrl1_up_SrcStageables_REVERT_lane0;
+  reg        [1:0]    execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  reg                 execute_ctrl1_up_early0_IntAluPlugin_ALU_SLTX_lane0;
+  reg                 execute_ctrl1_up_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  reg                 execute_ctrl1_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+  reg                 execute_ctrl1_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+  reg                 execute_ctrl1_up_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+  reg                 execute_ctrl1_up_COMPLETION_AT_2_lane0;
+  reg                 execute_ctrl1_up_COMPLETION_AT_3_lane0;
+  reg                 execute_ctrl1_up_COMPLETION_AT_1_lane0;
+  reg                 execute_ctrl1_up_lane0_integer_WriteBackPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_LsuPlugin_logic_FENCE_lane0;
+  reg                 execute_ctrl1_up_AguPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_CsrAccessPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_late0_BranchPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_late0_BarrelShifterPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_late0_IntAluPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_early0_EnvPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_early0_DivPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_early0_MulPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_early0_BranchPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_early0_BarrelShifterPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_early0_IntAluPlugin_SEL_lane0;
+  reg        [31:0]   execute_ctrl1_up_early0_SrcPlugin_SRC2_lane0;
+  reg        [31:0]   execute_ctrl1_up_early0_SrcPlugin_SRC1_lane0;
   reg        [1:0]    execute_ctrl1_up_AguPlugin_SIZE_lane0;
-  reg                 execute_ctrl1_up_COMPLETED_lane0;
   reg        [4:0]    execute_ctrl1_up_RS2_PHYS_lane0;
   reg        [4:0]    execute_ctrl1_up_RS1_PHYS_lane0;
   reg        [15:0]   execute_ctrl1_up_Decode_UOP_ID_lane0;
-  reg                 execute_ctrl1_up_TRAP_lane0;
   reg        [31:0]   execute_ctrl1_up_PC_lane0;
+  reg        [11:0]   execute_ctrl1_up_Prediction_BRANCH_HISTORY_lane0;
+  reg        [1:0]    execute_ctrl1_up_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  reg        [31:0]   execute_ctrl1_up_Prediction_ALIGNED_JUMPED_PC_lane0;
+  reg                 execute_ctrl1_up_Prediction_ALIGNED_JUMPED_lane0;
   reg        [31:0]   execute_ctrl1_up_Decode_UOP_lane0;
   wire                decode_ctrls_1_down_isReady;
+  wire                decode_ctrls_0_down_Prediction_ALIGN_REDO_0;
+  wire       [0:0]    decode_ctrls_0_down_Prediction_ALIGNED_SLICES_TAKEN_0;
+  wire       [0:0]    decode_ctrls_0_down_Prediction_ALIGNED_SLICES_BRANCH_0;
+  wire       [31:0]   decode_ctrls_0_down_Prediction_ALIGNED_JUMPED_PC_0;
+  wire                decode_ctrls_0_down_Prediction_ALIGNED_JUMPED_0;
+  wire       [11:0]   decode_ctrls_0_down_Prediction_BRANCH_HISTORY_0;
+  wire       [1:0]    decode_ctrls_0_down_GSharePlugin_GSHARE_COUNTER_0_0;
   wire       [31:0]   decode_ctrls_0_down_Decode_INSTRUCTION_RAW_0;
   wire                decode_ctrls_0_down_Decode_DECOMPRESSION_FAULT_0;
   wire       [31:0]   decode_ctrls_0_down_Decode_INSTRUCTION_0;
   wire                decode_ctrls_0_down_isValid;
   wire                decode_ctrls_0_down_isReady;
+  reg                 decode_ctrls_1_up_Prediction_ALIGN_REDO_0;
+  reg        [0:0]    decode_ctrls_1_up_Prediction_ALIGNED_SLICES_TAKEN_0;
+  reg        [0:0]    decode_ctrls_1_up_Prediction_ALIGNED_SLICES_BRANCH_0;
+  reg        [31:0]   decode_ctrls_1_up_Prediction_ALIGNED_JUMPED_PC_0;
+  reg                 decode_ctrls_1_up_Prediction_ALIGNED_JUMPED_0;
+  reg        [11:0]   decode_ctrls_1_up_Prediction_BRANCH_HISTORY_0;
+  reg        [1:0]    decode_ctrls_1_up_GSharePlugin_GSHARE_COUNTER_0_0;
   reg        [9:0]    decode_ctrls_1_up_Decode_DOP_ID_0;
   reg        [31:0]   decode_ctrls_1_up_PC_0;
   reg        [31:0]   decode_ctrls_1_up_Decode_INSTRUCTION_RAW_0;
@@ -697,22 +881,40 @@ module VexiiRiscv (
   reg                 fetch_logic_ctrls_2_up_MMU_ALLOW_EXECUTE;
   reg                 fetch_logic_ctrls_2_up_MMU_HAZARD;
   reg                 fetch_logic_ctrls_2_up_MMU_REFILL;
+  reg        [0:0]    fetch_logic_ctrls_2_up_Prediction_WORD_SLICES_TAKEN;
+  reg        [0:0]    fetch_logic_ctrls_2_up_Prediction_WORD_SLICES_BRANCH;
+  reg        [31:0]   fetch_logic_ctrls_2_up_Prediction_WORD_JUMP_PC;
+  reg                 fetch_logic_ctrls_2_up_Prediction_WORD_JUMPED;
+  reg        [1:0]    fetch_logic_ctrls_2_up_GSharePlugin_GSHARE_COUNTER_0;
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HIT;
   reg        [31:0]   fetch_logic_ctrls_2_up_MMU_TRANSLATED;
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_0;
+  reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_1;
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_HAZARD;
   reg        [31:0]   fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_0;
+  reg        [31:0]   fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_1;
+  reg        [0:0]    fetch_logic_ctrls_2_up_FetchL1Plugin_logic_PLRU_BYPASSED_0;
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_error;
   reg        [19:0]   fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+  reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+  reg        [19:0]   fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_address;
+  reg        [11:0]   fetch_logic_ctrls_2_up_Prediction_BRANCH_HISTORY;
   reg        [9:0]    fetch_logic_ctrls_2_up_Fetch_ID;
   reg                 fetch_logic_ctrls_2_up_Fetch_PC_FAULT;
   reg        [31:0]   fetch_logic_ctrls_2_up_Fetch_WORD_PC;
   wire                fetch_logic_ctrls_0_down_Fetch_PC_FAULT;
   wire                fetch_logic_ctrls_0_down_isValid;
-  wire                fetch_logic_ctrls_0_down_isReady;
+  reg        [0:0]    fetch_logic_ctrls_1_up_BtbPlugin_logic_readCmd_HAZARDS;
+  reg                 fetch_logic_ctrls_1_up_GSharePlugin_logic_BYPASS_valid;
+  reg        [13:0]   fetch_logic_ctrls_1_up_GSharePlugin_logic_BYPASS_payload_address;
+  reg        [1:0]    fetch_logic_ctrls_1_up_GSharePlugin_logic_BYPASS_payload_data_0;
+  reg        [11:0]   fetch_logic_ctrls_1_up_Prediction_BRANCH_HISTORY;
+  reg        [13:0]   fetch_logic_ctrls_1_up_GSharePlugin_logic_HASH;
   reg        [5:0]    fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
   reg                 fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
+  reg        [0:0]    fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
   reg                 fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
   reg        [9:0]    fetch_logic_ctrls_1_up_Fetch_ID;
   reg                 fetch_logic_ctrls_1_up_Fetch_PC_FAULT;
@@ -728,29 +930,24 @@ module VexiiRiscv (
   wire                execute_ctrl1_down_ready;
   wire                execute_ctrl2_up_ready;
   wire                execute_ctrl2_down_ready;
-  wire                execute_ctrl3_up_ready;
-  wire                execute_ctrl3_down_ready;
   wire                fetch_logic_ctrls_0_down_ready;
-  wire                execute_ctrl4_up_ready;
+  wire                execute_ctrl3_up_ready;
   wire                decode_ctrls_0_up_ready;
   wire                fetch_logic_ctrls_1_up_cancel;
-  wire                execute_ctrl4_down_ready;
+  wire                execute_ctrl3_down_ready;
   reg                 decode_ctrls_0_down_ready;
   wire                fetch_logic_ctrls_1_down_ready;
-  wire                execute_ctrl5_up_ready;
+  wire                execute_ctrl4_up_ready;
   wire                fetch_logic_ctrls_2_up_ready;
   wire                fetch_logic_ctrls_2_up_cancel;
-  wire                execute_ctrl5_down_ready;
-  wire                execute_ctrl4_down_AguPlugin_ATOMIC_lane0;
-  wire       [11:0]   execute_ctrl4_down_Decode_STORE_ID_lane0;
-  wire       [31:0]   execute_ctrl4_down_MMU_TRANSLATED_lane0;
-  wire       [1:0]    execute_ctrl4_down_AguPlugin_SIZE_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
-  wire                execute_ctrl4_down_AguPlugin_LOAD_lane0;
-  wire       [31:0]   execute_ctrl4_down_Decode_UOP_lane0;
-  wire                execute_ctrl4_down_RD_ENABLE_lane0;
-  reg                 execute_ctrl4_RD_ENABLE_lane0_bypass;
-  reg                 execute_ctrl4_LANE_SEL_lane0_bypass;
+  wire                execute_ctrl4_down_ready;
+  wire                execute_ctrl3_down_AguPlugin_ATOMIC_lane0;
+  wire       [11:0]   execute_ctrl3_down_Decode_STORE_ID_lane0;
+  wire       [31:0]   execute_ctrl3_down_MMU_TRANSLATED_lane0;
+  wire       [1:0]    execute_ctrl3_down_AguPlugin_SIZE_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+  wire                execute_ctrl3_down_AguPlugin_LOAD_lane0;
+  reg                 execute_ctrl4_up_LANE_SEL_lane0;
   wire                execute_ctrl3_down_RD_ENABLE_lane0;
   reg                 execute_ctrl3_RD_ENABLE_lane0_bypass;
   reg                 execute_ctrl3_LANE_SEL_lane0_bypass;
@@ -759,70 +956,86 @@ module VexiiRiscv (
   reg                 execute_ctrl2_LANE_SEL_lane0_bypass;
   wire                execute_ctrl1_down_RD_ENABLE_lane0;
   reg                 execute_ctrl1_RD_ENABLE_lane0_bypass;
-  wire                execute_ctrl1_down_LANE_SEL_lane0;
   reg                 execute_ctrl1_LANE_SEL_lane0_bypass;
   wire                execute_ctrl0_down_RD_ENABLE_lane0;
   reg                 execute_ctrl0_RD_ENABLE_lane0_bypass;
   reg                 execute_ctrl0_LANE_SEL_lane0_bypass;
-  wire                execute_ctrl1_down_TRAP_lane0;
-  wire       [2:0]    execute_ctrl1_down_early0_EnvPlugin_OP_lane0;
-  wire                execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
-  wire                execute_ctrl1_down_AguPlugin_FLOAT_lane0;
-  wire                execute_ctrl1_down_AguPlugin_ATOMIC_lane0;
-  wire                execute_ctrl1_down_AguPlugin_STORE_lane0;
-  wire                execute_ctrl1_down_AguPlugin_LOAD_lane0;
-  wire                execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0;
-  wire                execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0;
-  wire                execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0;
-  wire                execute_ctrl1_down_DivPlugin_REM_lane0;
-  wire                execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
-  wire                execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
-  wire                execute_ctrl1_down_MulPlugin_HIGH_lane0;
-  wire       [1:0]    execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0;
-  wire                execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0;
-  wire                execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0;
-  wire                execute_ctrl1_down_SrcStageables_UNSIGNED_lane0;
-  wire                execute_ctrl1_down_BYPASSED_AT_4_lane0;
-  wire                execute_ctrl1_down_BYPASSED_AT_3_lane0;
-  wire                execute_ctrl1_down_BYPASSED_AT_2_lane0;
-  wire       [1:0]    execute_ctrl1_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-  wire                execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-  wire                execute_ctrl1_down_SrcStageables_ZERO_lane0;
-  wire                execute_ctrl1_down_SrcStageables_REVERT_lane0;
-  wire       [1:0]    execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
-  wire                execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0;
-  wire                execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
-  reg                 execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
-  reg                 execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-  reg                 execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
-  reg                 execute_ctrl1_down_COMPLETION_AT_3_lane0;
-  reg                 execute_ctrl1_down_COMPLETION_AT_4_lane0;
-  reg                 execute_ctrl1_down_COMPLETION_AT_2_lane0;
-  reg                 execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-  reg                 execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0;
-  reg                 execute_ctrl1_down_AguPlugin_SEL_lane0;
-  reg                 execute_ctrl1_down_CsrAccessPlugin_SEL_lane0;
-  reg                 execute_ctrl1_down_early0_EnvPlugin_SEL_lane0;
-  reg                 execute_ctrl1_down_early0_DivPlugin_SEL_lane0;
-  reg                 execute_ctrl1_down_early0_MulPlugin_SEL_lane0;
-  reg                 execute_ctrl1_down_early0_BranchPlugin_SEL_lane0;
-  reg                 execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0;
-  reg                 execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0;
-  wire                execute_ctrl3_down_TRAP_lane0;
-  wire                execute_ctrl3_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
-  wire                execute_ctrl4_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-  wire                execute_ctrl2_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+  wire                execute_ctrl0_down_TRAP_lane0;
+  wire       [1:0]    execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
+  wire       [0:0]    execute_ctrl0_down_late0_SrcPlugin_logic_SRC1_CTRL_lane0;
+  wire       [1:0]    execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  wire                execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0;
+  wire                execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  wire       [2:0]    execute_ctrl0_down_early0_EnvPlugin_OP_lane0;
+  wire                execute_ctrl0_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+  wire                execute_ctrl0_down_AguPlugin_FLOAT_lane0;
+  wire                execute_ctrl0_down_AguPlugin_ATOMIC_lane0;
+  wire                execute_ctrl0_down_AguPlugin_STORE_lane0;
+  wire                execute_ctrl0_down_AguPlugin_LOAD_lane0;
+  wire                execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0;
+  wire                execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0;
+  wire                execute_ctrl0_down_CsrAccessPlugin_CSR_IMM_lane0;
+  wire                execute_ctrl0_down_DivPlugin_REM_lane0;
+  wire                execute_ctrl0_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
+  wire                execute_ctrl0_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
+  wire                execute_ctrl0_down_MulPlugin_HIGH_lane0;
+  wire       [1:0]    execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0;
+  wire                execute_ctrl0_down_BarrelShifterPlugin_SIGNED_lane0;
+  wire                execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0;
+  wire                execute_ctrl0_down_SrcStageables_UNSIGNED_lane0;
+  wire                execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0;
+  wire                execute_ctrl0_down_MAY_FLUSH_PRECISE_2_lane0;
+  wire                execute_ctrl0_down_BYPASSED_AT_2_lane0;
+  wire                execute_ctrl0_down_BYPASSED_AT_1_lane0;
+  wire       [1:0]    execute_ctrl0_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
+  wire                execute_ctrl0_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+  wire                execute_ctrl0_down_SrcStageables_ZERO_lane0;
+  wire                execute_ctrl0_down_SrcStageables_REVERT_lane0;
+  wire       [1:0]    execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  wire                execute_ctrl0_down_early0_IntAluPlugin_ALU_SLTX_lane0;
+  wire                execute_ctrl0_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  reg                 execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+  reg                 execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+  reg                 execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+  reg                 execute_ctrl0_down_COMPLETION_AT_2_lane0;
+  reg                 execute_ctrl0_down_COMPLETION_AT_3_lane0;
+  reg                 execute_ctrl0_down_COMPLETION_AT_1_lane0;
+  reg                 execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0;
+  reg                 execute_ctrl0_down_AguPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_CsrAccessPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_late0_BranchPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_early0_EnvPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_early0_DivPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_early0_MulPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_early0_BranchPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0;
+  reg                 execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0;
+  wire       [0:0]    execute_ctrl0_down_lane0_LAYER_SEL_lane0;
+  wire                execute_ctrl2_down_TRAP_lane0;
+  wire                execute_ctrl2_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+  wire                execute_ctrl3_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+  wire                execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+  reg        [31:0]   execute_ctrl2_up_integer_RS2_lane0;
+  wire       [31:0]   execute_ctrl2_integer_RS2_lane0_bypass;
+  wire       [4:0]    execute_ctrl2_down_RS2_PHYS_lane0;
+  wire       [31:0]   execute_ctrl1_down_integer_RS2_lane0;
+  wire       [31:0]   execute_ctrl1_integer_RS2_lane0_bypass;
   wire       [4:0]    execute_ctrl1_down_RS2_PHYS_lane0;
   wire       [4:0]    execute_ctrl0_down_RS2_PHYS_lane0;
-  wire       [31:0]   execute_ctrl5_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+  reg        [31:0]   execute_ctrl2_up_integer_RS1_lane0;
+  wire       [31:0]   execute_ctrl2_integer_RS1_lane0_bypass;
+  wire       [4:0]    execute_ctrl2_down_RS1_PHYS_lane0;
+  wire       [31:0]   execute_ctrl1_down_integer_RS1_lane0;
+  wire       [31:0]   execute_ctrl1_integer_RS1_lane0_bypass;
   wire       [4:0]    execute_ctrl1_down_RS1_PHYS_lane0;
-  wire       [4:0]    execute_ctrl5_down_RD_PHYS_lane0;
-  reg                 execute_ctrl5_up_RD_ENABLE_lane0;
-  reg                 execute_ctrl5_up_LANE_SEL_lane0;
+  wire       [4:0]    execute_ctrl2_down_RD_PHYS_lane0;
   wire       [4:0]    execute_ctrl0_down_RS1_PHYS_lane0;
   reg                 _zz_1;
-  wire                execute_ctrl3_down_MMU_BYPASS_TRANSLATION_lane0;
-  wire                execute_ctrl3_down_MMU_ALLOW_EXECUTE_lane0;
+  wire                execute_ctrl2_down_MMU_BYPASS_TRANSLATION_lane0;
+  wire                execute_ctrl2_down_MMU_ALLOW_EXECUTE_lane0;
   wire                fetch_logic_ctrls_1_down_MMU_BYPASS_TRANSLATION;
   wire                fetch_logic_ctrls_1_down_MMU_ACCESS_FAULT;
   wire                fetch_logic_ctrls_1_down_MMU_PAGE_FAULT;
@@ -831,53 +1044,73 @@ module VexiiRiscv (
   wire                fetch_logic_ctrls_1_down_MMU_ALLOW_EXECUTE;
   wire                fetch_logic_ctrls_1_down_MMU_HAZARD;
   wire                fetch_logic_ctrls_1_down_MMU_REFILL;
-  wire                execute_ctrl3_down_CsrAccessPlugin_SEL_lane0;
-  wire       [4:0]    execute_ctrl2_down_RD_PHYS_lane0;
-  wire                execute_ctrl2_down_CsrAccessPlugin_CSR_CLEAR_lane0;
-  wire                execute_ctrl2_down_CsrAccessPlugin_CSR_MASK_lane0;
-  wire                execute_ctrl2_down_CsrAccessPlugin_CSR_IMM_lane0;
   wire                execute_ctrl2_down_CsrAccessPlugin_SEL_lane0;
+  wire       [4:0]    execute_ctrl1_down_RD_PHYS_lane0;
+  wire                execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0;
+  wire                execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0;
+  wire                execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0;
+  wire                execute_ctrl1_down_CsrAccessPlugin_SEL_lane0;
   wire                fetch_logic_ctrls_0_up_isFiring;
   reg        [9:0]    fetch_logic_ctrls_0_up_Fetch_ID;
   wire                fetch_logic_ctrls_0_up_Fetch_PC_FAULT;
   wire       [31:0]   fetch_logic_ctrls_0_up_Fetch_WORD_PC;
   reg                 fetch_logic_ctrls_0_up_ready;
   wire                fetch_logic_ctrls_0_up_valid;
-  wire                execute_ctrl5_down_COMMIT_lane0;
-  wire                execute_ctrl5_down_isReady;
-  wire                execute_ctrl5_down_LANE_SEL_lane0;
+  reg                 PcPlugin_logic_harts_0_aggregator_fault_1;
+  reg        [31:0]   PcPlugin_logic_harts_0_aggregator_target_1;
+  wire                execute_ctrl4_down_COMMIT_lane0;
+  wire                execute_ctrl4_down_isReady;
+  wire                execute_ctrl4_down_LANE_SEL_lane0;
   wire                decode_ctrls_0_down_TRAP_0;
   wire                decode_ctrls_1_down_LANE_SEL_0;
   reg                 decode_ctrls_1_LANE_SEL_0_bypass;
   wire                decode_ctrls_0_down_LANE_SEL_0;
   reg                 decode_ctrls_0_LANE_SEL_0_bypass;
   wire                decode_ctrls_0_up_isMoving;
-  wire       [9:0]    fetch_logic_ctrls_2_down_Fetch_ID;
-  wire                fetch_logic_ctrls_2_down_ready;
-  wire                fetch_logic_ctrls_2_down_valid;
-  wire                fetch_logic_ctrls_2_down_isValid;
+  wire       [0:0]    fetch_logic_ctrls_1_down_Prediction_WORD_SLICES_TAKEN;
+  wire       [0:0]    fetch_logic_ctrls_1_down_Prediction_WORD_SLICES_BRANCH;
+  wire       [11:0]   fetch_logic_ctrls_1_down_Prediction_BRANCH_HISTORY;
+  wire       [31:0]   fetch_logic_ctrls_1_down_Prediction_WORD_JUMP_PC;
+  wire                fetch_logic_ctrls_1_down_Prediction_WORD_JUMPED;
+  wire                fetch_logic_ctrls_1_up_isCancel;
+  wire                fetch_logic_ctrls_1_up_isReady;
+  wire                fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_predict_TAKEN;
+  wire       [0:0]    fetch_logic_ctrls_1_down_BtbPlugin_logic_readCmd_HAZARDS;
+  wire                fetch_logic_ctrls_1_up_isValid;
+  wire                fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_hitCalc_HIT;
+  (* keep , syn_keep *) wire       [15:0]   fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_hash /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire       [29:0]   fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_pcTarget /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire                fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isBranch /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire                fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isPush /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire                fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isPop /* synthesis syn_keep = 1 */ ;
+  wire       [0:0]    fetch_logic_ctrls_0_down_BtbPlugin_logic_readCmd_HAZARDS;
   wire       [15:0]   execute_ctrl0_down_Decode_UOP_ID_lane0;
   wire                execute_ctrl0_down_isReady;
   wire                execute_ctrl0_down_LANE_SEL_lane0;
   wire       [9:0]    decode_ctrls_1_down_Decode_DOP_ID_0;
   wire                decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0;
   wire                decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0;
-  wire       [4:0]    execute_ctrl4_down_RD_PHYS_lane0;
-  wire                execute_ctrl4_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-  wire       [31:0]   execute_ctrl4_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
-  wire       [31:0]   execute_ctrl4_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass;
-  reg        [31:0]   execute_ctrl4_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
-  wire       [15:0]   execute_ctrl3_down_Decode_UOP_ID_lane0;
-  wire                execute_ctrl3_down_COMMIT_lane0;
-  wire                execute_ctrl3_down_isReady;
-  wire                execute_ctrl3_down_LANE_SEL_lane0;
+  wire       [4:0]    execute_ctrl3_down_RD_PHYS_lane0;
+  wire                execute_ctrl3_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+  reg                 execute_ctrl3_up_RD_ENABLE_lane0;
   wire       [31:0]   execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
   wire       [31:0]   execute_ctrl3_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass;
   reg        [31:0]   execute_ctrl3_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+  wire       [15:0]   execute_ctrl2_down_Decode_UOP_ID_lane0;
+  wire                execute_ctrl2_down_COMMIT_lane0;
+  wire                execute_ctrl2_down_isReady;
   wire                execute_ctrl2_down_LANE_SEL_lane0;
   wire       [31:0]   execute_ctrl2_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
   wire       [31:0]   execute_ctrl2_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass;
+  reg        [31:0]   execute_ctrl2_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+  wire                execute_ctrl1_down_LANE_SEL_lane0;
+  wire       [31:0]   execute_ctrl1_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+  wire       [31:0]   execute_ctrl1_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass;
+  wire       [0:0]    execute_ctrl0_up_lane0_LAYER_SEL_lane0;
   wire                execute_ctrl0_up_COMPLETED_lane0;
+  wire                execute_ctrl0_up_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_lane0;
+  wire                execute_ctrl0_up_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_lane0;
+  wire                execute_ctrl0_up_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_lane0;
   wire                execute_ctrl0_up_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_lane0;
   wire                execute_ctrl0_up_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_lane0;
   wire       [4:0]    execute_ctrl0_up_RD_PHYS_lane0;
@@ -889,60 +1122,70 @@ module VexiiRiscv (
   wire       [15:0]   execute_ctrl0_up_Decode_UOP_ID_lane0;
   wire                execute_ctrl0_up_TRAP_lane0;
   wire       [31:0]   execute_ctrl0_up_PC_lane0;
-  wire                execute_ctrl0_up_DONT_FLUSH_PRECISE_4_lane0;
   wire                execute_ctrl0_up_DONT_FLUSH_PRECISE_3_lane0;
+  wire                execute_ctrl0_up_DONT_FLUSH_PRECISE_2_lane0;
   wire                execute_ctrl0_up_DispatchPlugin_DONT_FLUSH_FROM_LANES_lane0;
   wire                execute_ctrl0_up_DispatchPlugin_DONT_FLUSH_lane0;
   reg                 execute_ctrl0_up_DispatchPlugin_MAY_FLUSH_lane0;
   wire                execute_ctrl0_up_DispatchPlugin_FENCE_OLDER_lane0;
+  wire       [11:0]   execute_ctrl0_up_Prediction_BRANCH_HISTORY_lane0;
+  wire       [1:0]    execute_ctrl0_up_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  wire       [0:0]    execute_ctrl0_up_Prediction_ALIGNED_SLICES_BRANCH_lane0;
+  wire       [0:0]    execute_ctrl0_up_Prediction_ALIGNED_SLICES_TAKEN_lane0;
+  wire       [31:0]   execute_ctrl0_up_Prediction_ALIGNED_JUMPED_PC_lane0;
+  wire                execute_ctrl0_up_Prediction_ALIGNED_JUMPED_lane0;
   wire       [31:0]   execute_ctrl0_up_Decode_UOP_lane0;
   wire                execute_ctrl0_up_LANE_SEL_lane0;
+  wire                decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0;
+  wire                decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_0;
+  wire                decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_0;
   wire                decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0;
   wire                decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0;
-  wire       [31:0]   decode_ctrls_1_down_PC_0;
-  wire                decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0;
   wire                decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0;
+  wire                decode_ctrls_1_down_DONT_FLUSH_PRECISE_2_0;
   wire                decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0;
   wire                decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0;
   wire                decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0;
   wire                decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0;
+  wire       [11:0]   decode_ctrls_1_down_Prediction_BRANCH_HISTORY_0;
+  wire       [1:0]    decode_ctrls_1_down_GSharePlugin_GSHARE_COUNTER_0_0;
+  wire       [0:0]    decode_ctrls_1_down_Prediction_ALIGNED_SLICES_BRANCH_0;
+  wire       [0:0]    decode_ctrls_1_down_Prediction_ALIGNED_SLICES_TAKEN_0;
+  wire       [31:0]   decode_ctrls_1_down_Prediction_ALIGNED_JUMPED_PC_0;
+  wire                decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0;
   wire                decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0;
   wire                decode_ctrls_1_up_isValid;
   reg                 decode_ctrls_1_down_ready;
-  wire                execute_ctrl2_down_MAY_FLUSH_PRECISE_3_lane0;
-  wire                execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0;
+  wire                execute_ctrl2_down_MAY_FLUSH_PRECISE_2_lane0;
   wire                execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0;
-  wire                execute_ctrl4_down_BYPASSED_AT_4_lane0;
-  reg        [4:0]    execute_ctrl4_up_RD_PHYS_lane0;
-  reg                 execute_ctrl4_up_RD_ENABLE_lane0;
-  wire                execute_ctrl3_down_BYPASSED_AT_3_lane0;
-  reg        [4:0]    execute_ctrl3_up_RD_PHYS_lane0;
-  reg                 execute_ctrl3_up_RD_ENABLE_lane0;
+  wire                execute_ctrl1_down_MAY_FLUSH_PRECISE_2_lane0;
   wire                execute_ctrl2_down_BYPASSED_AT_2_lane0;
   reg        [4:0]    execute_ctrl2_up_RD_PHYS_lane0;
   reg                 execute_ctrl2_up_RD_ENABLE_lane0;
   wire                execute_ctrl1_down_BYPASSED_AT_1_lane0;
   reg        [4:0]    execute_ctrl1_up_RD_PHYS_lane0;
   reg                 execute_ctrl1_up_RD_ENABLE_lane0;
-  wire                execute_ctrl3_down_COMPLETION_AT_3_lane0;
-  reg                 execute_ctrl3_up_COMPLETED_lane0;
-  wire                execute_ctrl3_down_COMPLETED_lane0;
-  wire                execute_ctrl3_COMPLETED_lane0_bypass;
-  wire                execute_ctrl4_down_COMPLETION_AT_4_lane0;
-  reg                 execute_ctrl4_up_COMPLETED_lane0;
-  wire                execute_ctrl4_down_COMPLETED_lane0;
-  wire                execute_ctrl4_COMPLETED_lane0_bypass;
   wire                execute_ctrl2_down_COMPLETION_AT_2_lane0;
   reg                 execute_ctrl2_up_COMPLETED_lane0;
   wire                execute_ctrl2_down_COMPLETED_lane0;
   wire                execute_ctrl2_COMPLETED_lane0_bypass;
-  reg                 execute_ctrl1_up_LANE_SEL_lane0;
+  wire                execute_ctrl3_down_COMPLETION_AT_3_lane0;
+  reg                 execute_ctrl3_up_COMPLETED_lane0;
+  wire                execute_ctrl3_down_COMPLETED_lane0;
+  wire                execute_ctrl3_COMPLETED_lane0_bypass;
+  wire                execute_ctrl1_down_COMPLETION_AT_1_lane0;
+  reg                 execute_ctrl1_up_COMPLETED_lane0;
+  wire                execute_ctrl1_down_COMPLETED_lane0;
+  wire                execute_ctrl1_COMPLETED_lane0_bypass;
   wire       [31:0]   decode_ctrls_1_down_Decode_UOP_0;
   reg                 decode_ctrls_1_up_TRAP_0;
   reg                 decode_ctrls_1_TRAP_0_bypass;
   wire       [15:0]   decode_ctrls_1_down_Decode_UOP_ID_0;
   wire                decode_ctrls_1_up_isReady;
   wire                decode_ctrls_1_down_TRAP_0;
+  wire       [31:0]   decode_ctrls_1_down_PC_0;
+  wire                decode_ctrls_1_down_Prediction_ALIGN_REDO_0;
+  wire                decode_ctrls_1_down_Prediction_ALIGNED_JUMPED_0;
   reg                 decode_ctrls_1_up_LANE_SEL_0;
   wire       [31:0]   decode_ctrls_1_down_Decode_INSTRUCTION_RAW_0;
   wire                decode_ctrls_1_down_Decode_DECOMPRESSION_FAULT_0;
@@ -958,138 +1201,186 @@ module VexiiRiscv (
   wire                decode_ctrls_1_up_ready;
   reg                 decode_ctrls_1_up_valid;
   wire                decode_ctrls_1_up_isMoving;
-  wire                execute_ctrl2_down_early0_EnvPlugin_SEL_lane0;
-  wire       [1:0]    execute_ctrl4_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-  wire                execute_ctrl4_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-  wire                execute_ctrl2_down_SrcStageables_UNSIGNED_lane0;
-  wire                execute_ctrl2_down_SrcStageables_ZERO_lane0;
-  wire                execute_ctrl2_down_SrcStageables_REVERT_lane0;
-  wire       [31:0]   execute_ctrl1_down_PC_lane0;
-  wire       [31:0]   execute_ctrl1_down_integer_RS2_lane0;
-  wire       [1:0]    execute_ctrl1_down_early0_SrcPlugin_logic_SRC2_CTRL_lane0;
-  wire       [31:0]   execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
-  wire       [31:0]   execute_ctrl1_down_integer_RS1_lane0;
-  wire       [0:0]    execute_ctrl1_down_early0_SrcPlugin_logic_SRC1_CTRL_lane0;
-  wire       [31:0]   execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
-  wire       [31:0]   execute_ctrl1_down_Decode_UOP_lane0;
-  wire                execute_ctrl2_down_LsuPlugin_logic_pmpPort_logic_NEED_HIT_lane0;
+  wire                execute_ctrl1_down_early0_EnvPlugin_SEL_lane0;
+  wire       [1:0]    execute_ctrl3_down_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  wire       [31:0]   execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
+  wire                execute_ctrl3_down_early0_BranchPlugin_SEL_lane0;
+  wire                execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0;
+  wire                execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_IS_JAL_lane0;
+  wire                execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0;
+  reg        [11:0]   late0_BranchPlugin_logic_jumpLogic_history_shifter_1;
+  wire       [11:0]   execute_ctrl3_down_Prediction_BRANCH_HISTORY_lane0;
+  wire                execute_ctrl3_down_late0_BranchPlugin_SEL_lane0;
+  wire                execute_ctrl3_down_Prediction_ALIGNED_JUMPED_lane0;
+  wire       [31:0]   execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_btb_REAL_TARGET_lane0;
+  wire       [31:0]   execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+  wire                execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0;
+  wire       [31:0]   execute_ctrl3_down_Decode_UOP_lane0;
+  wire                execute_ctrl3_down_late0_BranchPlugin_logic_alu_MSB_FAILED_lane0;
+  wire       [1:0]    execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0;
+  wire                execute_ctrl3_down_late0_BranchPlugin_logic_alu_btb_BAD_TARGET_lane0;
+  wire       [31:0]   execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  wire       [31:0]   execute_ctrl3_down_Prediction_ALIGNED_JUMPED_PC_lane0;
+  wire                execute_ctrl3_down_late0_BranchPlugin_logic_alu_EQ_lane0;
+  wire                execute_ctrl3_down_SrcStageables_UNSIGNED_lane0;
+  wire                execute_ctrl3_down_SrcStageables_ZERO_lane0;
+  wire                execute_ctrl3_down_SrcStageables_REVERT_lane0;
+  wire       [31:0]   execute_ctrl2_down_PC_lane0;
+  wire       [31:0]   execute_ctrl2_down_integer_RS2_lane0;
+  wire       [1:0]    execute_ctrl2_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
+  wire       [31:0]   execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0;
+  wire       [31:0]   execute_ctrl2_down_integer_RS1_lane0;
+  wire       [0:0]    execute_ctrl2_down_late0_SrcPlugin_logic_SRC1_CTRL_lane0;
+  wire       [31:0]   execute_ctrl2_down_late0_SrcPlugin_SRC1_lane0;
+  wire       [31:0]   execute_ctrl2_down_Decode_UOP_lane0;
+  wire       [1:0]    execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
+  wire                execute_ctrl3_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+  wire                execute_ctrl1_down_SrcStageables_UNSIGNED_lane0;
+  wire                execute_ctrl1_down_SrcStageables_ZERO_lane0;
+  wire                execute_ctrl1_down_SrcStageables_REVERT_lane0;
+  wire       [31:0]   execute_ctrl0_down_PC_lane0;
+  wire       [31:0]   execute_ctrl0_down_integer_RS2_lane0;
+  wire       [1:0]    execute_ctrl0_down_early0_SrcPlugin_logic_SRC2_CTRL_lane0;
+  wire       [31:0]   execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0;
+  wire       [31:0]   execute_ctrl0_down_integer_RS1_lane0;
+  wire       [0:0]    execute_ctrl0_down_early0_SrcPlugin_logic_SRC1_CTRL_lane0;
+  wire       [31:0]   execute_ctrl0_down_early0_SrcPlugin_SRC1_lane0;
+  wire                execute_ctrl1_down_LsuPlugin_logic_pmpPort_logic_NEED_HIT_lane0;
   wire                fetch_logic_ctrls_0_down_FetchL1Plugin_logic_pmpPort_logic_NEED_HIT;
-  wire       [2:0]    execute_ctrl2_down_early0_EnvPlugin_OP_lane0;
-  wire                execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0;
-  wire                execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_IS_JAL_lane0;
-  wire                execute_ctrl2_up_COMMIT_lane0;
-  wire                execute_ctrl2_down_COMMIT_lane0;
-  reg                 execute_ctrl2_COMMIT_lane0_bypass;
-  reg                 execute_ctrl2_up_TRAP_lane0;
-  wire                execute_ctrl2_down_TRAP_lane0;
-  reg                 execute_ctrl2_TRAP_lane0_bypass;
-  wire                execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0;
-  wire       [15:0]   execute_ctrl2_down_Decode_UOP_ID_lane0;
-  wire                execute_ctrl2_down_early0_BranchPlugin_SEL_lane0;
-  wire                execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0;
-  wire                execute_ctrl2_down_early0_BranchPlugin_logic_alu_MSB_FAILED_lane0;
-  wire                execute_ctrl2_down_early0_BranchPlugin_logic_alu_EQ_lane0;
+  wire       [2:0]    execute_ctrl1_down_early0_EnvPlugin_OP_lane0;
+  wire                execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0;
+  wire                execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_IS_JAL_lane0;
+  wire                execute_ctrl1_up_COMMIT_lane0;
+  wire                execute_ctrl1_down_COMMIT_lane0;
+  reg                 execute_ctrl1_COMMIT_lane0_bypass;
+  reg                 execute_ctrl1_up_TRAP_lane0;
+  wire                execute_ctrl1_down_TRAP_lane0;
+  reg                 execute_ctrl1_TRAP_lane0_bypass;
+  wire                execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0;
+  wire       [15:0]   execute_ctrl1_down_Decode_UOP_ID_lane0;
+  reg        [11:0]   early0_BranchPlugin_logic_jumpLogic_history_shifter_1;
+  wire       [11:0]   execute_ctrl1_down_Prediction_BRANCH_HISTORY_lane0;
+  wire                execute_ctrl1_down_early0_BranchPlugin_SEL_lane0;
+  wire                execute_ctrl1_down_Prediction_ALIGNED_JUMPED_lane0;
+  wire       [31:0]   execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_btb_REAL_TARGET_lane0;
+  wire                execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0;
+  wire                execute_ctrl1_down_early0_BranchPlugin_logic_alu_MSB_FAILED_lane0;
+  wire                execute_ctrl1_down_early0_BranchPlugin_logic_alu_btb_BAD_TARGET_lane0;
+  wire       [31:0]   execute_ctrl1_down_Prediction_ALIGNED_JUMPED_PC_lane0;
+  wire                execute_ctrl1_down_early0_BranchPlugin_logic_alu_EQ_lane0;
   wire                decode_ctrls_1_lane0_upIsCancel;
   wire                decode_ctrls_1_lane0_downIsCancel;
   wire       [9:0]    decode_ctrls_0_down_Fetch_ID_0;
   wire       [31:0]   decode_ctrls_0_down_PC_0;
   wire       [9:0]    fetch_logic_ctrls_0_down_Fetch_ID;
-  wire                execute_ctrl4_down_AguPlugin_FLOAT_lane0;
-  wire       [31:0]   execute_ctrl4_down_PC_lane0;
-  wire                execute_ctrl4_down_isReady;
-  wire                execute_ctrl4_down_LANE_SEL_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_MMU_FAILURE_lane0;
-  reg                 execute_ctrl4_up_COMMIT_lane0;
-  wire                execute_ctrl4_down_COMMIT_lane0;
-  reg                 execute_ctrl4_COMMIT_lane0_bypass;
-  reg                 execute_ctrl4_up_TRAP_lane0;
-  wire                execute_ctrl4_down_TRAP_lane0;
-  reg                 execute_ctrl4_TRAP_lane0_bypass;
-  wire                execute_ctrl4_down_AguPlugin_SEL_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
-  wire                execute_ctrl4_down_MMU_BYPASS_TRANSLATION_lane0;
-  wire                execute_ctrl4_down_AguPlugin_STORE_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
-  wire                execute_ctrl4_down_MMU_HAZARD_lane0;
-  wire                execute_ctrl4_down_MMU_REFILL_lane0;
-  wire                execute_ctrl4_down_MMU_ACCESS_FAULT_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
-  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
-  wire                execute_ctrl4_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
-  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
-  wire                execute_ctrl4_down_LsuPlugin_logic_onCtrl_SC_MISS_lane0;
-  wire       [31:0]   execute_ctrl4_down_LsuPlugin_logic_onCtrl_loadData_RESULT_lane0;
-  wire       [15:0]   execute_ctrl4_down_Decode_UOP_ID_lane0;
-  wire       [1:0]    execute_ctrl4_down_LsuL1_SIZE_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0;
-  reg        [31:0]   execute_ctrl4_up_integer_RS2_lane0;
+  reg                 _zz_2;
+  reg        [1:0]    BtbPlugin_logic_ras_ptr_pop_aheadValue;
+  wire       [13:0]   fetch_logic_ctrls_1_down_GSharePlugin_logic_HASH;
+  wire                fetch_logic_ctrls_1_down_GSharePlugin_logic_BYPASS_valid;
+  wire       [13:0]   fetch_logic_ctrls_1_down_GSharePlugin_logic_BYPASS_payload_address;
+  wire       [1:0]    fetch_logic_ctrls_1_down_GSharePlugin_logic_BYPASS_payload_data_0;
+  wire                fetch_logic_ctrls_0_down_isReady;
+  (* keep , syn_keep *) reg        [1:0]    fetch_logic_ctrls_1_down_GSharePlugin_GSHARE_COUNTER_0 /* synthesis syn_keep = 1 */ ;
+  wire                fetch_logic_ctrls_0_down_GSharePlugin_logic_BYPASS_valid;
+  wire       [13:0]   fetch_logic_ctrls_0_down_GSharePlugin_logic_BYPASS_payload_address;
+  wire       [1:0]    fetch_logic_ctrls_0_down_GSharePlugin_logic_BYPASS_payload_data_0;
+  wire       [11:0]   fetch_logic_ctrls_0_down_Prediction_BRANCH_HISTORY;
+  wire       [13:0]   fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH;
+  reg                 _zz_3;
+  wire                execute_ctrl3_down_AguPlugin_FLOAT_lane0;
+  wire       [31:0]   execute_ctrl3_down_PC_lane0;
+  wire                execute_ctrl3_down_isReady;
+  wire                execute_ctrl3_down_LANE_SEL_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0;
+  reg                 execute_ctrl3_up_COMMIT_lane0;
+  wire                execute_ctrl3_down_COMMIT_lane0;
+  reg                 execute_ctrl3_COMMIT_lane0_bypass;
+  reg                 execute_ctrl3_up_TRAP_lane0;
+  wire                execute_ctrl3_down_TRAP_lane0;
+  reg                 execute_ctrl3_TRAP_lane0_bypass;
+  wire                execute_ctrl3_down_AguPlugin_SEL_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
+  wire                execute_ctrl3_down_MMU_BYPASS_TRANSLATION_lane0;
+  wire                execute_ctrl3_down_AguPlugin_STORE_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
   wire                execute_ctrl3_down_MMU_HAZARD_lane0;
   wire                execute_ctrl3_down_MMU_REFILL_lane0;
   wire                execute_ctrl3_down_MMU_ACCESS_FAULT_lane0;
-  wire                execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0;
-  wire                execute_ctrl3_down_MMU_ALLOW_READ_lane0;
-  wire                execute_ctrl3_down_MMU_ALLOW_WRITE_lane0;
-  wire                execute_ctrl3_down_AguPlugin_STORE_lane0;
-  wire                execute_ctrl3_down_MMU_PAGE_FAULT_lane0;
   wire                execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
-  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
-  wire       [31:0]   execute_ctrl3_down_early0_SrcPlugin_ADD_SUB_lane0;
-  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0;
-  wire                execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
-  wire                execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0;
-  wire                execute_ctrl3_down_LsuPlugin_logic_FROM_ACCESS_lane0;
-  reg                 execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
   wire                execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+  wire                execute_ctrl3_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0;
   wire                execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
   wire                execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
-  wire                execute_ctrl3_down_LsuPlugin_logic_preCtrl_IS_AMO_lane0;
-  wire                execute_ctrl3_down_LsuL1_ATOMIC_lane0;
-  wire                execute_ctrl3_down_AguPlugin_SEL_lane0;
-  wire                execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
-  reg                 execute_ctrl4_LsuL1_SEL_lane0_bypass;
-  reg                 execute_ctrl4_up_LANE_SEL_lane0;
-  wire                execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0;
-  reg                 execute_ctrl4_up_LsuL1_SEL_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onCtrl_SC_MISS_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuPlugin_logic_onCtrl_loadData_RESULT_lane0;
+  wire       [15:0]   execute_ctrl3_down_Decode_UOP_ID_lane0;
+  wire       [1:0]    execute_ctrl3_down_LsuL1_SIZE_lane0;
+  wire                execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0;
+  reg        [31:0]   execute_ctrl3_up_integer_RS2_lane0;
+  wire                execute_ctrl2_down_MMU_HAZARD_lane0;
+  wire                execute_ctrl2_down_MMU_REFILL_lane0;
+  wire                execute_ctrl2_down_MMU_ACCESS_FAULT_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_MMU_FAILURE_lane0;
+  wire                execute_ctrl2_down_MMU_ALLOW_READ_lane0;
+  wire                execute_ctrl2_down_MMU_ALLOW_WRITE_lane0;
+  wire                execute_ctrl2_down_AguPlugin_STORE_lane0;
+  wire                execute_ctrl2_down_MMU_PAGE_FAULT_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
+  wire       [31:0]   execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_onPma_IO_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_FENCE_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0;
+  reg                 execute_ctrl2_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+  wire                execute_ctrl2_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+  wire                execute_ctrl2_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
+  wire                execute_ctrl2_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
+  wire                execute_ctrl2_down_LsuPlugin_logic_preCtrl_IS_AMO_lane0;
+  wire                execute_ctrl2_down_LsuL1_ATOMIC_lane0;
+  wire                execute_ctrl2_down_AguPlugin_SEL_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
   reg                 execute_ctrl3_LsuL1_SEL_lane0_bypass;
   reg                 execute_ctrl3_up_LANE_SEL_lane0;
   wire                execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0;
   reg                 execute_ctrl3_up_LsuL1_SEL_lane0;
-  wire       [31:0]   execute_ctrl3_down_MMU_TRANSLATED_lane0;
-  wire                execute_ctrl2_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  reg                 execute_ctrl2_LsuL1_SEL_lane0_bypass;
+  reg                 execute_ctrl2_up_LANE_SEL_lane0;
   wire                execute_ctrl2_down_LsuPlugin_logic_FROM_LSU_lane0;
-  wire       [11:0]   execute_ctrl2_down_Decode_STORE_ID_lane0;
-  wire                execute_ctrl2_down_LsuL1_FLUSH_lane0;
-  wire                execute_ctrl2_down_LsuL1_PREFETCH_lane0;
-  wire                execute_ctrl2_down_LsuL1_STORE_lane0;
-  wire                execute_ctrl2_down_LsuL1_ATOMIC_lane0;
-  wire                execute_ctrl2_down_LsuL1_LOAD_lane0;
+  reg                 execute_ctrl2_up_LsuL1_SEL_lane0;
+  wire       [31:0]   execute_ctrl2_down_MMU_TRANSLATED_lane0;
+  wire                execute_ctrl1_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  wire                execute_ctrl1_down_LsuPlugin_logic_FROM_LSU_lane0;
+  wire       [11:0]   execute_ctrl1_down_Decode_STORE_ID_lane0;
+  wire                execute_ctrl1_down_LsuL1_FLUSH_lane0;
+  wire                execute_ctrl1_down_LsuL1_PREFETCH_lane0;
+  wire                execute_ctrl1_down_LsuL1_STORE_lane0;
+  wire                execute_ctrl1_down_LsuL1_ATOMIC_lane0;
+  wire                execute_ctrl1_down_LsuL1_LOAD_lane0;
+  wire       [1:0]    execute_ctrl1_down_LsuL1_SIZE_lane0;
+  wire       [3:0]    execute_ctrl1_down_LsuL1_MASK_lane0;
+  wire                execute_ctrl1_down_LsuL1_SEL_lane0;
+  wire                execute_ctrl1_down_AguPlugin_ATOMIC_lane0;
+  wire                execute_ctrl1_down_AguPlugin_STORE_lane0;
+  wire                execute_ctrl1_down_AguPlugin_LOAD_lane0;
+  wire       [1:0]    execute_ctrl1_down_AguPlugin_SIZE_lane0;
+  wire                execute_ctrl1_down_AguPlugin_SEL_lane0;
+  wire                execute_ctrl1_down_LsuPlugin_logic_FROM_WB_lane0;
+  wire                execute_ctrl1_down_LsuPlugin_logic_FROM_ACCESS_lane0;
+  wire                execute_ctrl1_down_LsuPlugin_logic_FORCE_PHYSICAL_lane0;
+  wire                execute_ctrl2_down_LsuPlugin_logic_onTrigger_HIT_lane0;
   wire       [1:0]    execute_ctrl2_down_LsuL1_SIZE_lane0;
-  wire       [3:0]    execute_ctrl2_down_LsuL1_MASK_lane0;
+  wire                execute_ctrl2_down_LsuL1_STORE_lane0;
+  wire                execute_ctrl2_down_LsuL1_LOAD_lane0;
+  wire                execute_ctrl2_down_LsuL1_FLUSH_lane0;
   wire                execute_ctrl2_down_LsuL1_SEL_lane0;
-  wire                execute_ctrl2_down_AguPlugin_ATOMIC_lane0;
-  wire                execute_ctrl2_down_AguPlugin_STORE_lane0;
-  wire                execute_ctrl2_down_AguPlugin_LOAD_lane0;
-  wire       [1:0]    execute_ctrl2_down_AguPlugin_SIZE_lane0;
-  wire                execute_ctrl2_down_AguPlugin_SEL_lane0;
-  wire                execute_ctrl2_down_LsuPlugin_logic_FROM_WB_lane0;
-  wire                execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0;
-  wire                execute_ctrl2_down_LsuPlugin_logic_FORCE_PHYSICAL_lane0;
-  wire                execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0;
-  wire       [1:0]    execute_ctrl3_down_LsuL1_SIZE_lane0;
-  wire                execute_ctrl3_down_LsuL1_STORE_lane0;
-  wire                execute_ctrl3_down_LsuL1_LOAD_lane0;
-  wire                execute_ctrl3_down_LsuL1_FLUSH_lane0;
-  wire                execute_ctrl3_down_LsuL1_SEL_lane0;
   wire       [31:0]   execute_ctrl0_down_Decode_UOP_lane0;
   wire       [1:0]    execute_ctrl0_down_AguPlugin_SIZE_lane0;
   wire                fetch_logic_ctrls_2_up_isCanceling;
-  wire                fetch_logic_ctrls_2_down_isReady;
-  wire                fetch_logic_ctrls_2_down_TRAP;
   wire                fetch_logic_ctrls_2_down_MMU_BYPASS_TRANSLATION;
   wire                fetch_logic_ctrls_2_down_Fetch_PC_FAULT;
   wire                fetch_logic_ctrls_2_down_MMU_HAZARD;
@@ -1104,37 +1395,77 @@ module VexiiRiscv (
   wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
   wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_error;
   wire       [19:0]   fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+  wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+  wire       [19:0]   fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_address;
   wire                fetch_logic_ctrls_2_up_isReady;
-  wire                fetch_logic_ctrls_2_up_isValid;
+  wire       [0:0]    fetch_logic_ctrls_2_down_FetchL1Plugin_logic_PLRU_BYPASSED_0;
   wire       [31:0]   fetch_logic_ctrls_2_down_MMU_TRANSLATED;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT;
   wire       [31:0]   fetch_logic_ctrls_1_down_MMU_TRANSLATED;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0;
+  wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_1;
   wire       [5:0]    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_HAZARD;
   wire       [31:0]   fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_0;
+  wire       [31:0]   fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_1;
   wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0;
-  wire       [31:0]   fetch_logic_ctrls_2_down_Fetch_WORD;
+  wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1;
   wire       [31:0]   fetch_logic_ctrls_1_down_Fetch_WORD_PC;
   wire       [31:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_0;
+  wire       [31:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_1;
+  wire       [0:0]    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
+  reg        [0:0]    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_BYPASSED_0;
   wire       [5:0]    fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
   wire                fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
+  wire       [0:0]    fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
   wire                fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
   reg                 fetch_logic_ctrls_1_up_valid;
   wire                fetch_logic_ctrls_1_up_ready;
   wire       [31:0]   fetch_logic_ctrls_0_down_Fetch_WORD_PC;
   reg                 _zz_fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l217;
+  wire       [0:0]    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_READ_0;
+  reg                 _zz_4;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_error;
   wire       [19:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+  wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+  wire       [19:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_address;
+  reg                 _zz_5;
   wire       [31:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_0;
-  reg                 _zz_2;
+  wire       [31:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_1;
+  reg                 _zz_6;
+  wire       [31:0]   fetch_logic_ctrls_2_down_Prediction_WORD_JUMP_PC;
+  wire       [0:0]    fetch_logic_ctrls_2_down_Prediction_WORD_SLICES_TAKEN;
+  wire       [0:0]    fetch_logic_ctrls_2_down_Prediction_WORD_SLICES_BRANCH;
+  wire       [11:0]   fetch_logic_ctrls_2_down_Prediction_BRANCH_HISTORY;
+  wire       [1:0]    fetch_logic_ctrls_2_down_GSharePlugin_GSHARE_COUNTER_0;
+  wire       [9:0]    fetch_logic_ctrls_2_down_Fetch_ID;
+  wire                fetch_logic_ctrls_2_down_TRAP;
+  wire                fetch_logic_ctrls_2_down_isCancel;
+  wire                fetch_logic_ctrls_2_down_isReady;
+  wire                fetch_logic_ctrls_2_down_isValid;
+  wire                fetch_logic_ctrls_2_down_ready;
+  wire                decode_ctrls_0_up_isCancel;
   wire                decode_ctrls_0_up_isReady;
-  wire                decode_ctrls_0_up_isValid;
+  wire                fetch_logic_ctrls_2_down_valid;
+  wire       [31:0]   fetch_logic_ctrls_2_down_Fetch_WORD;
   wire                decode_ctrls_0_up_valid;
+  wire                decode_ctrls_0_up_Prediction_ALIGN_REDO_0;
+  wire       [0:0]    decode_ctrls_0_up_Prediction_ALIGNED_SLICES_TAKEN_0;
+  wire       [0:0]    decode_ctrls_0_up_Prediction_ALIGNED_SLICES_BRANCH_0;
+  wire       [31:0]   decode_ctrls_0_up_Prediction_ALIGNED_JUMPED_PC_0;
+  wire                decode_ctrls_0_up_Prediction_ALIGNED_JUMPED_0;
   wire                decode_ctrls_0_up_TRAP_0;
+  wire                decode_ctrls_0_up_Prediction_WORD_JUMPED_0;
+  wire       [31:0]   decode_ctrls_0_up_Prediction_WORD_JUMP_PC_0;
+  wire       [0:0]    decode_ctrls_0_up_Prediction_WORD_SLICES_TAKEN_0;
+  wire       [0:0]    decode_ctrls_0_up_Prediction_WORD_SLICES_BRANCH_0;
+  wire       [11:0]   decode_ctrls_0_up_Prediction_BRANCH_HISTORY_0;
+  wire       [1:0]    decode_ctrls_0_up_GSharePlugin_GSHARE_COUNTER_0_0;
   wire       [9:0]    decode_ctrls_0_up_Fetch_ID_0;
   wire       [9:0]    decode_ctrls_0_up_Decode_DOP_ID_0;
   wire       [31:0]   decode_ctrls_0_up_PC_0;
@@ -1146,136 +1477,166 @@ module VexiiRiscv (
   wire                decode_ctrls_0_lane0_upIsCancel;
   wire                decode_ctrls_0_lane0_downIsCancel;
   wire                decode_ctrls_0_up_isFiring;
+  wire                fetch_logic_ctrls_2_up_isValid;
   wire       [0:0]    fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_LAST;
+  wire                fetch_logic_ctrls_2_down_Prediction_WORD_JUMPED;
   wire       [31:0]   fetch_logic_ctrls_2_down_Fetch_WORD_PC;
   wire       [0:0]    fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_MASK;
-  (* keep , syn_keep *) wire       [31:0]   execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 /* synthesis syn_keep = 1 */ ;
-  (* keep , syn_keep *) wire       [31:0]   execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 /* synthesis syn_keep = 1 */ ;
-  (* keep , syn_keep *) reg        [31:0]   execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 /* synthesis syn_keep = 1 */ ;
-  wire       [31:0]   execute_ctrl2_down_PC_lane0;
-  wire       [1:0]    execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0;
-  wire       [31:0]   execute_ctrl2_down_Decode_UOP_lane0;
+  (* keep , syn_keep *) wire       [31:0]   execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire       [31:0]   execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) reg        [31:0]   execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 /* synthesis syn_keep = 1 */ ;
+  wire       [31:0]   execute_ctrl1_down_PC_lane0;
+  wire       [1:0]    execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0;
+  wire       [31:0]   execute_ctrl1_down_Decode_UOP_lane0;
   wire                fetch_logic_ctrls_0_down_isFiring;
-  wire       [31:0]   execute_ctrl3_down_DivPlugin_DIV_RESULT_lane0;
-  wire                execute_ctrl3_down_early0_DivPlugin_SEL_lane0;
+  wire                execute_ctrl3_down_late0_BarrelShifterPlugin_SEL_lane0;
+  wire       [31:0]   execute_ctrl3_down_late0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
+  wire                execute_ctrl3_down_BarrelShifterPlugin_SIGNED_lane0;
+  wire                execute_ctrl3_down_BarrelShifterPlugin_LEFT_lane0;
+  wire                execute_ctrl3_down_late0_IntAluPlugin_SEL_lane0;
+  wire       [31:0]   execute_ctrl3_down_late0_IntAluPlugin_ALU_RESULT_lane0;
+  wire                execute_ctrl3_down_late0_IntAluPlugin_ALU_SLTX_lane0;
+  wire                execute_ctrl3_down_late0_SrcPlugin_LESS_lane0;
+  wire                execute_ctrl3_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  wire       [31:0]   execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0;
+  wire       [31:0]   execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0;
+  wire       [31:0]   execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0;
+  wire       [1:0]    execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
   wire       [31:0]   execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0;
   wire                execute_ctrl2_down_early0_DivPlugin_SEL_lane0;
-  reg                 execute_ctrl2_up_LANE_SEL_lane0;
-  wire                execute_ctrl2_down_isReady;
-  wire                execute_ctrl2_down_DivPlugin_REM_lane0;
-  wire       [31:0]   execute_ctrl2_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0;
-  wire       [31:0]   execute_ctrl2_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0;
-  wire                execute_ctrl2_down_RsUnsignedPlugin_RS2_REVERT_lane0;
-  wire                execute_ctrl2_down_RsUnsignedPlugin_RS1_REVERT_lane0;
-  wire       [31:0]   execute_ctrl2_down_RsUnsignedPlugin_RS2_FORMATED_lane0;
-  wire       [31:0]   execute_ctrl2_down_RsUnsignedPlugin_RS1_FORMATED_lane0;
-  wire                execute_ctrl4_down_MulPlugin_HIGH_lane0;
-  wire                execute_ctrl4_down_early0_MulPlugin_SEL_lane0;
-  wire       [65:0]   execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0;
-  wire       [4:0]    execute_ctrl4_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
-  wire       [62:0]   execute_ctrl4_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
+  wire       [31:0]   execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0;
+  wire                execute_ctrl1_down_early0_DivPlugin_SEL_lane0;
+  reg                 execute_ctrl1_up_LANE_SEL_lane0;
+  wire                execute_ctrl1_down_isReady;
+  wire                execute_ctrl1_down_DivPlugin_REM_lane0;
+  wire       [31:0]   execute_ctrl1_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0;
+  wire       [31:0]   execute_ctrl1_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0;
+  wire                execute_ctrl1_down_RsUnsignedPlugin_RS2_REVERT_lane0;
+  wire                execute_ctrl1_down_RsUnsignedPlugin_RS1_REVERT_lane0;
+  wire       [31:0]   execute_ctrl1_down_RsUnsignedPlugin_RS2_FORMATED_lane0;
+  wire       [31:0]   execute_ctrl1_down_RsUnsignedPlugin_RS1_FORMATED_lane0;
+  wire                execute_ctrl3_down_MulPlugin_HIGH_lane0;
+  wire                execute_ctrl3_down_early0_MulPlugin_SEL_lane0;
+  wire       [65:0]   execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0;
   wire       [4:0]    execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
   wire       [62:0]   execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
-  wire       [46:0]   execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
-  wire       [46:0]   execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
-  wire       [29:0]   execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
-  wire       [33:0]   execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_0_lane0;
-  wire       [29:0]   execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
+  wire       [4:0]    execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
+  wire       [62:0]   execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
   wire       [46:0]   execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
   wire       [46:0]   execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
+  wire       [29:0]   execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
   wire       [33:0]   execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_0_lane0;
-  wire                execute_ctrl2_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
-  wire       [32:0]   execute_ctrl2_down_MUL_SRC2_lane0;
-  wire                execute_ctrl2_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
-  wire       [32:0]   execute_ctrl2_down_MUL_SRC1_lane0;
-  reg        [31:0]   execute_ctrl2_up_integer_RS2_lane0;
-  reg        [31:0]   execute_ctrl2_up_integer_RS1_lane0;
-  wire       [31:0]   execute_ctrl4_down_LsuL1_READ_DATA_lane0;
-  wire       [31:0]   execute_ctrl4_down_LsuL1Plugin_logic_BYPASSED_DATA_lane0;
-  wire       [31:0]   execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_DATA_lane0;
-  wire                execute_ctrl4_down_LsuL1_FLUSH_HIT_lane0;
-  wire       [3:0]    execute_ctrl4_down_LsuL1_MASK_lane0;
-  wire       [31:0]   execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
-  wire       [31:0]   execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0;
-  wire                execute_ctrl4_down_LsuL1_ABORD_lane0;
-  wire       [0:0]    execute_ctrl4_down_LsuL1_WAIT_WRITEBACK_lane0;
-  wire       [0:0]    execute_ctrl4_down_LsuL1_WAIT_REFILL_lane0;
-  wire                execute_ctrl4_down_LsuL1_SKIP_WRITE_lane0;
-  wire                execute_ctrl4_down_LsuL1_SEL_lane0;
-  wire                execute_ctrl4_down_LsuL1_REFILL_HIT_lane0;
-  wire                execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0;
-  wire                execute_ctrl4_down_LsuL1_FAULT_lane0;
-  wire                execute_ctrl4_down_LsuL1_MISS_lane0;
-  wire                execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0;
-  wire                execute_ctrl4_down_LsuL1_HAZARD_lane0;
-  wire                execute_ctrl4_down_LsuL1Plugin_logic_HAZARD_FORCED_lane0;
-  wire                execute_ctrl4_down_LsuL1_FLUSH_lane0;
-  wire                execute_ctrl4_down_LsuL1_PREFETCH_lane0;
-  wire                execute_ctrl4_down_LsuL1_LOAD_lane0;
-  wire       [0:0]    execute_ctrl4_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
-  wire       [1:0]    execute_ctrl4_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
-  wire       [31:0]   execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
-  wire                execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
-  wire       [19:0]   execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
-  wire                execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
-  wire       [0:0]    execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty;
-  wire                execute_ctrl4_down_LsuL1_ATOMIC_lane0;
-  wire                execute_ctrl4_down_LsuL1_STORE_lane0;
-  wire                execute_ctrl4_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0;
-  wire                execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0;
-  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0;
-  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty;
-  wire       [0:0]    execute_ctrl3_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty;
-  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
-  wire                execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
+  wire       [29:0]   execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
+  wire       [46:0]   execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
+  wire       [46:0]   execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
+  wire       [33:0]   execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_0_lane0;
+  wire                execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
+  wire       [32:0]   execute_ctrl1_down_MUL_SRC2_lane0;
+  wire                execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
+  wire       [32:0]   execute_ctrl1_down_MUL_SRC1_lane0;
+  reg        [31:0]   execute_ctrl1_up_integer_RS2_lane0;
+  reg        [31:0]   execute_ctrl1_up_integer_RS1_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1_READ_DATA_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_BYPASSED_DATA_lane0;
+  wire       [31:0]   execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_DATA_lane0;
+  wire                execute_ctrl3_down_LsuL1_FLUSH_HIT_lane0;
+  wire       [3:0]    execute_ctrl3_down_LsuL1_MASK_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1_WRITE_DATA_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
+  wire                execute_ctrl3_down_LsuL1_ABORD_lane0;
+  wire       [0:0]    execute_ctrl3_down_LsuL1_WAIT_WRITEBACK_lane0;
+  wire       [0:0]    execute_ctrl3_down_LsuL1_WAIT_REFILL_lane0;
+  wire                execute_ctrl3_down_LsuL1_SKIP_WRITE_lane0;
+  wire                execute_ctrl3_down_LsuL1_SEL_lane0;
+  wire                execute_ctrl3_down_LsuL1_REFILL_HIT_lane0;
+  wire                execute_ctrl3_down_LsuL1_MISS_UNIQUE_lane0;
+  wire                execute_ctrl3_down_LsuL1_FAULT_lane0;
+  wire                execute_ctrl3_down_LsuL1_MISS_lane0;
+  wire                execute_ctrl3_down_LsuL1_FLUSH_HAZARD_lane0;
+  wire                execute_ctrl3_down_LsuL1_HAZARD_lane0;
+  wire                execute_ctrl3_down_LsuL1Plugin_logic_HAZARD_FORCED_lane0;
+  wire                execute_ctrl3_down_LsuL1_FLUSH_lane0;
+  wire                execute_ctrl3_down_LsuL1_PREFETCH_lane0;
+  wire                execute_ctrl3_down_LsuL1_LOAD_lane0;
+  wire       [1:0]    execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+  wire       [1:0]    execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0;
   wire                execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
   wire       [19:0]   execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
   wire                execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
-  reg        [0:0]    execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty;
-  wire       [0:0]    execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+  wire                execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded;
+  wire       [19:0]   execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address;
+  wire                execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault;
+  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_plru_0;
+  wire       [1:0]    execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty;
+  wire                execute_ctrl3_down_LsuL1_ATOMIC_lane0;
+  wire                execute_ctrl3_down_LsuL1_STORE_lane0;
+  wire                execute_ctrl3_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0;
+  wire                execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HIT_lane0;
+  reg        [1:0]    execute_ctrl2_down_LsuL1Plugin_logic_WAYS_HITS_lane0;
+  wire       [0:0]    execute_ctrl2_down_LsuL1Plugin_logic_SHARED_lane0_plru_0;
+  wire       [1:0]    execute_ctrl2_down_LsuL1Plugin_logic_SHARED_lane0_dirty;
+  wire       [0:0]    execute_ctrl2_LsuL1Plugin_logic_SHARED_lane0_bypass_plru_0;
+  wire       [1:0]    execute_ctrl2_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty;
+  wire       [0:0]    execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_plru_0;
+  wire       [1:0]    execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
   wire                execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
-  wire       [3:0]    execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
-  wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
-  wire                execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
-  wire       [3:0]    execute_ctrl3_down_LsuL1_MASK_lane0;
+  wire                execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
+  wire       [19:0]   execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+  wire                execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+  wire                execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded;
+  wire       [19:0]   execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address;
+  wire                execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault;
+  reg        [0:0]    execute_ctrl2_up_LsuL1Plugin_logic_SHARED_lane0_plru_0;
+  reg        [1:0]    execute_ctrl2_up_LsuL1Plugin_logic_SHARED_lane0_dirty;
+  wire       [0:0]    execute_ctrl1_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_plru_0;
+  wire       [1:0]    execute_ctrl1_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+  wire                execute_ctrl1_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
   wire       [3:0]    execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
-  wire       [31:0]   execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0;
   wire       [31:0]   execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
   wire                execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
-  reg        [1:0]    execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
-  wire       [31:0]   execute_ctrl4_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
-  wire       [0:0]    execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0;
-  wire       [31:0]   execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
-  wire       [31:0]   execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
+  wire       [3:0]    execute_ctrl2_down_LsuL1_MASK_lane0;
+  wire       [3:0]    execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
+  wire       [31:0]   execute_ctrl2_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  wire       [31:0]   execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
+  wire                execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
+  reg        [1:0]    execute_ctrl2_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
   wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
-  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
-  wire       [0:0]    execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
-  wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0;
-  wire       [0:0]    execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_1;
+  wire       [1:0]    execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0;
+  wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
   wire       [31:0]   execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0;
-  reg                 _zz_3;
-  reg                 _zz_4;
-  wire                execute_ctrl2_down_early0_BarrelShifterPlugin_SEL_lane0;
-  wire       [31:0]   execute_ctrl2_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
-  wire                execute_ctrl2_down_BarrelShifterPlugin_SIGNED_lane0;
-  wire                execute_ctrl2_down_BarrelShifterPlugin_LEFT_lane0;
-  wire                execute_ctrl2_down_early0_IntAluPlugin_SEL_lane0;
-  wire       [31:0]   execute_ctrl2_down_early0_IntAluPlugin_ALU_RESULT_lane0;
-  wire                execute_ctrl2_down_early0_IntAluPlugin_ALU_SLTX_lane0;
-  wire                execute_ctrl2_down_early0_SrcPlugin_LESS_lane0;
-  wire                execute_ctrl2_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
-  wire       [31:0]   execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
-  wire       [31:0]   execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0;
-  wire       [31:0]   execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0;
-  wire       [1:0]    execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  wire       [31:0]   execute_ctrl2_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
+  wire       [31:0]   execute_ctrl2_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_1;
+  wire       [1:0]    execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  reg        [1:0]    execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+  wire       [31:0]   execute_ctrl2_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0;
+  wire       [31:0]   execute_ctrl2_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_1;
+  reg        [1:0]    execute_ctrl1_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  wire       [31:0]   execute_ctrl1_down_LsuL1_MIXED_ADDRESS_lane0;
+  reg                 _zz_7;
+  reg                 _zz_8;
+  wire                execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0;
+  wire       [31:0]   execute_ctrl1_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
+  wire                execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0;
+  wire                execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0;
+  wire                execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0;
+  wire       [31:0]   execute_ctrl1_down_early0_IntAluPlugin_ALU_RESULT_lane0;
+  wire                execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0;
+  wire                execute_ctrl1_down_early0_SrcPlugin_LESS_lane0;
+  wire                execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  wire       [31:0]   execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0;
+  wire       [31:0]   execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
+  wire       [31:0]   execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
+  wire       [1:0]    execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
   wire                AlignerPlugin_api_singleFetch;
   wire                AlignerPlugin_api_downMoving;
   wire                AlignerPlugin_api_haltIt;
   reg                 DispatchPlugin_api_haltDispatch;
   wire                execute_freeze_valid;
   wire       [0:0]    execute_lane0_api_hartsInflight;
-  wire                execute_lane0_ctrls_2_upIsCancel;
-  wire                execute_lane0_ctrls_2_downIsCancel;
+  wire                execute_lane0_ctrls_1_upIsCancel;
+  wire                execute_lane0_ctrls_1_downIsCancel;
   wire                CsrRamPlugin_api_holdRead;
   wire                CsrRamPlugin_api_holdWrite;
   reg                 CsrAccessPlugin_bus_decode_exception;
@@ -1295,6 +1656,14 @@ module VexiiRiscv (
   reg                 TrapPlugin_api_harts_0_askWake;
   reg                 TrapPlugin_api_harts_0_rvTrap;
   wire                TrapPlugin_api_harts_0_fsmBusy;
+  wire                BtbPlugin_logic_pcPort_valid;
+  wire                BtbPlugin_logic_pcPort_payload_fault;
+  wire       [31:0]   BtbPlugin_logic_pcPort_payload_pc;
+  wire                PcPlugin_logic_harts_0_aggregator_sortedByPriority_3_laneValid;
+  wire                BtbPlugin_logic_historyPort_valid;
+  wire       [11:0]   BtbPlugin_logic_historyPort_payload_history;
+  wire                BtbPlugin_logic_flushPort_valid;
+  wire                BtbPlugin_logic_flushPort_payload_self;
   wire                FetchL1Plugin_logic_bus_cmd_valid;
   wire                FetchL1Plugin_logic_bus_cmd_ready;
   wire       [31:0]   FetchL1Plugin_logic_bus_cmd_payload_address;
@@ -1307,6 +1676,8 @@ module VexiiRiscv (
   reg                 FetchL1Plugin_logic_trapPort_payload_exception;
   wire       [31:0]   FetchL1Plugin_logic_trapPort_payload_tval;
   wire       [0:0]    decode_logic_trapPending;
+  reg                 DecoderPlugin_logic_forgetPort_valid;
+  reg        [31:0]   DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice;
   wire       [0:0]    DispatchPlugin_logic_trapPendings;
   wire       [0:0]    execute_lane0_logic_trapPending;
   wire                early0_IntAluPlugin_logic_wb_valid;
@@ -1324,7 +1695,9 @@ module VexiiRiscv (
   wire                early0_BranchPlugin_logic_pcPort_valid;
   wire                early0_BranchPlugin_logic_pcPort_payload_fault;
   wire       [31:0]   early0_BranchPlugin_logic_pcPort_payload_pc;
-  wire                PcPlugin_logic_harts_0_aggregator_sortedByPriority_1_laneValid;
+  wire                PcPlugin_logic_harts_0_aggregator_sortedByPriority_2_laneValid;
+  wire                early0_BranchPlugin_logic_historyPort_valid;
+  wire       [11:0]   early0_BranchPlugin_logic_historyPort_payload_history;
   wire                early0_BranchPlugin_logic_flushPort_valid;
   reg                 LsuPlugin_logic_trapPort_valid;
   reg                 LsuPlugin_logic_trapPort_payload_exception;
@@ -1348,11 +1721,11 @@ module VexiiRiscv (
   wire                LsuL1Plugin_logic_bus_write_rsp_payload_error;
   reg        [0:0]    LsuL1Plugin_logic_refillCompletions;
   wire                LsuL1Plugin_logic_writebackBusy;
-  reg        [0:0]    LsuL1Plugin_logic_banksWrite_mask;
+  reg        [1:0]    LsuL1Plugin_logic_banksWrite_mask;
   reg        [9:0]    LsuL1Plugin_logic_banksWrite_address;
   reg        [31:0]   LsuL1Plugin_logic_banksWrite_writeData;
   reg        [3:0]    LsuL1Plugin_logic_banksWrite_writeMask;
-  reg        [0:0]    LsuL1Plugin_logic_waysWrite_mask;
+  reg        [1:0]    LsuL1Plugin_logic_waysWrite_mask;
   reg        [5:0]    LsuL1Plugin_logic_waysWrite_address;
   reg                 LsuL1Plugin_logic_waysWrite_tag_loaded;
   reg        [19:0]   LsuL1Plugin_logic_waysWrite_tag_address;
@@ -1366,21 +1739,39 @@ module VexiiRiscv (
   reg                 LsuL1Plugin_logic_banks_0_read_cmd_valid;
   reg        [9:0]    LsuL1Plugin_logic_banks_0_read_cmd_payload;
   (* keep , syn_keep *) wire       [31:0]   LsuL1Plugin_logic_banks_0_read_rsp /* synthesis syn_keep = 1 */ ;
+  wire                LsuL1Plugin_logic_banks_1_usedByWriteback;
+  wire                LsuL1Plugin_logic_banks_1_write_valid;
+  wire       [9:0]    LsuL1Plugin_logic_banks_1_write_payload_address;
+  wire       [31:0]   LsuL1Plugin_logic_banks_1_write_payload_data;
+  wire       [3:0]    LsuL1Plugin_logic_banks_1_write_payload_mask;
+  reg                 LsuL1Plugin_logic_banks_1_read_cmd_valid;
+  reg        [9:0]    LsuL1Plugin_logic_banks_1_read_cmd_payload;
+  (* keep , syn_keep *) wire       [31:0]   LsuL1Plugin_logic_banks_1_read_rsp /* synthesis syn_keep = 1 */ ;
   wire                LsuL1Plugin_logic_ways_0_lsuRead_cmd_valid;
   wire       [5:0]    LsuL1Plugin_logic_ways_0_lsuRead_cmd_payload;
   (* keep , syn_keep *) wire                LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded /* synthesis syn_keep = 1 */ ;
   (* keep , syn_keep *) wire       [19:0]   LsuL1Plugin_logic_ways_0_lsuRead_rsp_address /* synthesis syn_keep = 1 */ ;
   (* keep , syn_keep *) wire                LsuL1Plugin_logic_ways_0_lsuRead_rsp_fault /* synthesis syn_keep = 1 */ ;
   wire       [21:0]   _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded;
+  wire                LsuL1Plugin_logic_ways_1_lsuRead_cmd_valid;
+  wire       [5:0]    LsuL1Plugin_logic_ways_1_lsuRead_cmd_payload;
+  (* keep , syn_keep *) wire                LsuL1Plugin_logic_ways_1_lsuRead_rsp_loaded /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire       [19:0]   LsuL1Plugin_logic_ways_1_lsuRead_rsp_address /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire                LsuL1Plugin_logic_ways_1_lsuRead_rsp_fault /* synthesis syn_keep = 1 */ ;
+  wire       [21:0]   _zz_LsuL1Plugin_logic_ways_1_lsuRead_rsp_loaded;
   reg                 LsuL1Plugin_logic_shared_write_valid;
   reg        [5:0]    LsuL1Plugin_logic_shared_write_payload_address;
-  reg        [0:0]    LsuL1Plugin_logic_shared_write_payload_data_dirty;
+  reg        [0:0]    LsuL1Plugin_logic_shared_write_payload_data_plru_0;
+  reg        [1:0]    LsuL1Plugin_logic_shared_write_payload_data_dirty;
   wire                LsuL1Plugin_logic_shared_lsuRead_cmd_valid;
   wire       [5:0]    LsuL1Plugin_logic_shared_lsuRead_cmd_payload;
-  (* keep , syn_keep *) wire       [0:0]    LsuL1Plugin_logic_shared_lsuRead_rsp_dirty /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire       [0:0]    LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0 /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire       [1:0]    LsuL1Plugin_logic_shared_lsuRead_rsp_dirty /* synthesis syn_keep = 1 */ ;
+  wire       [2:0]    _zz_LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0;
   reg                 LsuL1Plugin_logic_refill_slots_0_valid;
   reg                 LsuL1Plugin_logic_refill_slots_0_dirty;
   reg        [31:0]   LsuL1Plugin_logic_refill_slots_0_address;
+  reg        [0:0]    LsuL1Plugin_logic_refill_slots_0_way;
   reg                 LsuL1Plugin_logic_refill_slots_0_cmdSent;
   reg                 LsuL1Plugin_logic_refill_slots_0_loadedSet;
   reg                 LsuL1Plugin_logic_refill_slots_0_loaded;
@@ -1393,6 +1784,7 @@ module VexiiRiscv (
   wire                LsuL1Plugin_logic_refill_full;
   reg                 LsuL1Plugin_logic_refill_push_valid;
   wire       [31:0]   LsuL1Plugin_logic_refill_push_payload_address;
+  reg        [0:0]    LsuL1Plugin_logic_refill_push_payload_way;
   reg        [0:0]    LsuL1Plugin_logic_refill_push_payload_victim;
   wire                LsuL1Plugin_logic_refill_push_payload_dirty;
   wire                LsuL1Plugin_logic_refill_push_payload_unique;
@@ -1410,9 +1802,10 @@ module VexiiRiscv (
   wire       [31:0]   LsuL1Plugin_logic_refill_read_cmdAddress;
   wire       [31:0]   LsuL1Plugin_logic_refill_read_rspAddress;
   wire                LsuL1Plugin_logic_refill_read_dirty;
+  wire       [0:0]    LsuL1Plugin_logic_refill_read_way;
   (* keep , syn_keep *) reg        [3:0]    LsuL1Plugin_logic_refill_read_wordIndex /* synthesis syn_keep = 1 */ ;
   wire                LsuL1Plugin_logic_refill_read_rspWithData;
-  wire       [0:0]    LsuL1Plugin_logic_refill_read_bankWriteNotif;
+  reg        [1:0]    LsuL1Plugin_logic_refill_read_bankWriteNotif;
   wire                LsuL1Plugin_logic_refill_read_writeReservation_win;
   reg                 LsuL1Plugin_logic_refill_read_writeReservation_take;
   reg                 LsuL1Plugin_logic_refill_read_hadError;
@@ -1427,6 +1820,7 @@ module VexiiRiscv (
   reg                 LsuL1Plugin_logic_writeback_slots_0_valid;
   reg                 LsuL1Plugin_logic_writeback_slots_0_busy;
   reg        [31:0]   LsuL1Plugin_logic_writeback_slots_0_address;
+  reg        [0:0]    LsuL1Plugin_logic_writeback_slots_0_way;
   reg                 LsuL1Plugin_logic_writeback_slots_0_readCmdDone;
   reg                 LsuL1Plugin_logic_writeback_slots_0_readRspDone;
   reg                 LsuL1Plugin_logic_writeback_slots_0_victimBufferReady;
@@ -1440,6 +1834,7 @@ module VexiiRiscv (
   wire                LsuL1Plugin_logic_writeback_full;
   reg                 LsuL1Plugin_logic_writeback_push_valid;
   reg        [31:0]   LsuL1Plugin_logic_writeback_push_payload_address;
+  reg        [0:0]    LsuL1Plugin_logic_writeback_push_payload_way;
   wire                when_LsuL1Plugin_l556;
   wire                when_LsuL1Plugin_l561;
   wire                LsuL1Plugin_logic_writeback_read_arbiter_slotsWithId_0_0;
@@ -1449,14 +1844,17 @@ module VexiiRiscv (
   reg        [0:0]    LsuL1Plugin_logic_writeback_read_arbiter_lock;
   wire                when_LsuL1Plugin_l301_1;
   wire       [31:0]   LsuL1Plugin_logic_writeback_read_address;
+  wire       [0:0]    LsuL1Plugin_logic_writeback_read_way;
   (* keep , syn_keep *) reg        [3:0]    LsuL1Plugin_logic_writeback_read_wordIndex /* synthesis syn_keep = 1 */ ;
   wire                LsuL1Plugin_logic_writeback_read_slotRead_valid;
   wire                LsuL1Plugin_logic_writeback_read_slotRead_payload_last;
   wire       [3:0]    LsuL1Plugin_logic_writeback_read_slotRead_payload_wordIndex;
+  wire       [0:0]    LsuL1Plugin_logic_writeback_read_slotRead_payload_way;
   wire                when_LsuL1Plugin_l605;
   reg                 LsuL1Plugin_logic_writeback_read_slotReadLast_valid;
   reg                 LsuL1Plugin_logic_writeback_read_slotReadLast_payload_last;
   reg        [3:0]    LsuL1Plugin_logic_writeback_read_slotReadLast_payload_wordIndex;
+  reg        [0:0]    LsuL1Plugin_logic_writeback_read_slotReadLast_payload_way;
   wire       [31:0]   LsuL1Plugin_logic_writeback_read_readedData;
   wire                LsuL1Plugin_logic_writeback_write_arbiter_slotsWithId_0_0;
   wire       [0:0]    LsuL1Plugin_logic_writeback_write_arbiter_hits;
@@ -1485,25 +1883,37 @@ module VexiiRiscv (
   wire       [9:0]    LsuL1Plugin_logic_lsu_rb0_readAddress;
   wire                when_LsuL1Plugin_l718;
   wire                when_LsuL1Plugin_l719;
-  wire                execute_lane0_ctrls_3_upIsCancel;
-  wire                execute_lane0_ctrls_3_downIsCancel;
+  wire                when_LsuL1Plugin_l718_1;
+  wire                when_LsuL1Plugin_l719_1;
+  wire                execute_lane0_ctrls_2_upIsCancel;
+  wire                execute_lane0_ctrls_2_downIsCancel;
   reg                 LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg;
   wire                when_LsuL1Plugin_l735;
-  wire                execute_lane0_ctrls_4_upIsCancel;
-  wire                execute_lane0_ctrls_4_downIsCancel;
-  wire                _zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
+  reg                 LsuL1Plugin_logic_lsu_rb1_onBanks_1_busyReg;
+  wire                when_LsuL1Plugin_l735_1;
+  wire                execute_lane0_ctrls_3_upIsCancel;
+  wire                execute_lane0_ctrls_3_downIsCancel;
+  wire                _zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
+  wire                _zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0_1;
   wire                LsuL1Plugin_logic_lsu_sharedBypassers_0_hit;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_context_state_0;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_evict_id;
+  reg        [0:0]    LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_update_id;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_update_state_0;
+  wire                LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_evict_sel_0;
+  wire                LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_evict_logic_0_state;
   wire                LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win;
   reg                 LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_take;
   wire                LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win;
   wire                LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_take;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_refillWayWithoutUpdate;
   wire                LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback;
   wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_refillHazards;
   wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_writebackHazards;
   wire                LsuL1Plugin_logic_lsu_ctrl_refillHazard;
   wire                LsuL1Plugin_logic_lsu_ctrl_writebackHazard;
   wire                LsuL1Plugin_logic_lsu_ctrl_wasDirty;
-  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_loadedDirties;
+  wire       [1:0]    LsuL1Plugin_logic_lsu_ctrl_loadedDirties;
   wire                LsuL1Plugin_logic_lsu_ctrl_refillWayWasDirty;
   wire                LsuL1Plugin_logic_lsu_ctrl_writeToReadHazard;
   wire                LsuL1Plugin_logic_lsu_ctrl_bankNotRead;
@@ -1515,10 +1925,14 @@ module VexiiRiscv (
   reg                 LsuL1Plugin_logic_lsu_ctrl_flushHazardReg;
   wire                LsuL1Plugin_logic_lsu_ctrl_canRefill;
   wire                LsuL1Plugin_logic_lsu_ctrl_canFlush;
-  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_needFlushs;
+  wire       [1:0]    LsuL1Plugin_logic_lsu_ctrl_needFlushs;
+  wire       [1:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0;
   wire                LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0;
-  wire       [0:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushOh;
-  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_needFlushOh;
+  wire                LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_1;
+  reg        [1:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushOh;
+  wire       [1:0]    LsuL1Plugin_logic_lsu_ctrl_needFlushOh;
+  wire                _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushSel;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_needFlushSel;
   wire                LsuL1Plugin_logic_lsu_ctrl_isAccess;
   wire                LsuL1Plugin_logic_lsu_ctrl_askRefill;
   wire                LsuL1Plugin_logic_lsu_ctrl_askUpgrade;
@@ -1527,26 +1941,30 @@ module VexiiRiscv (
   wire                LsuL1Plugin_logic_lsu_ctrl_doUpgrade;
   wire                LsuL1Plugin_logic_lsu_ctrl_doFlush;
   wire                LsuL1Plugin_logic_lsu_ctrl_doWrite;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_wayId;
+  wire       [0:0]    LsuL1Plugin_logic_lsu_ctrl_targetWay;
   wire                LsuL1Plugin_logic_lsu_ctrl_doRefillPush;
   wire                when_LsuL1Plugin_l912;
-  wire       [2:0]    _zz_13;
+  wire       [2:0]    _zz_21;
   wire                when_LsuL1Plugin_l926;
+  wire                when_LsuL1Plugin_l926_1;
   wire       [19:0]   _zz_LsuL1Plugin_logic_waysWrite_tag_address;
   wire                when_LsuL1Plugin_l991;
   wire                LsuL1Plugin_logic_lsu_ctrl_preventSideEffects;
   reg        [6:0]    LsuL1Plugin_logic_initializer_counter;
   wire                LsuL1Plugin_logic_initializer_done;
   wire                when_LsuL1Plugin_l1192;
+  wire       [2:0]    _zz_LsuL1Plugin_logic_shared_write_payload_data_plru_0;
   wire                early0_MulPlugin_logic_formatBus_valid;
   wire       [31:0]   early0_MulPlugin_logic_formatBus_payload;
-  reg        [60:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
-  reg        [60:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_1;
-  reg        [60:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_2;
-  reg        [2:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
-  reg        [2:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_1;
-  reg        [2:0]    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_2;
-  reg        [65:0]   _zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0;
-  reg        [65:0]   _zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0_1;
+  reg        [60:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
+  reg        [60:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_1;
+  reg        [60:0]   _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_2;
+  reg        [2:0]    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
+  reg        [2:0]    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_1;
+  reg        [2:0]    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_2;
+  reg        [65:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0;
+  reg        [65:0]   _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0_1;
   wire                early0_DivPlugin_logic_formatBus_valid;
   wire       [31:0]   early0_DivPlugin_logic_formatBus_payload;
   reg                 early0_DivPlugin_logic_processing_divRevertResult;
@@ -1558,7 +1976,7 @@ module VexiiRiscv (
   reg                 early0_DivPlugin_logic_processing_unscheduleRequest;
   wire                early0_DivPlugin_logic_processing_freeze;
   wire       [31:0]   early0_DivPlugin_logic_processing_selected;
-  wire       [31:0]   _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0;
+  wire       [31:0]   _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0;
   wire                CsrAccessPlugin_logic_wbWi_valid;
   wire       [31:0]   CsrAccessPlugin_logic_wbWi_payload;
   reg                 CsrAccessPlugin_logic_flushPort_valid;
@@ -1602,6 +2020,25 @@ module VexiiRiscv (
   reg        [3:0]    early0_EnvPlugin_logic_trapPort_payload_code;
   reg        [1:0]    early0_EnvPlugin_logic_trapPort_payload_arg;
   reg                 early0_EnvPlugin_logic_flushPort_valid;
+  wire                late0_IntAluPlugin_logic_wb_valid;
+  wire       [31:0]   late0_IntAluPlugin_logic_wb_payload;
+  (* keep , syn_keep *) reg        [31:0]   late0_IntAluPlugin_logic_alu_bitwise /* synthesis syn_keep = 1 */ ;
+  wire       [31:0]   late0_IntAluPlugin_logic_alu_result;
+  wire                late0_BarrelShifterPlugin_logic_wb_valid;
+  wire       [31:0]   late0_BarrelShifterPlugin_logic_wb_payload;
+  wire       [4:0]    late0_BarrelShifterPlugin_logic_shift_amplitude;
+  wire       [31:0]   late0_BarrelShifterPlugin_logic_shift_reversed;
+  wire       [31:0]   late0_BarrelShifterPlugin_logic_shift_shifted;
+  wire       [31:0]   late0_BarrelShifterPlugin_logic_shift_patched;
+  wire                late0_BranchPlugin_logic_wb_valid;
+  wire       [31:0]   late0_BranchPlugin_logic_wb_payload;
+  wire                late0_BranchPlugin_logic_pcPort_valid;
+  wire                late0_BranchPlugin_logic_pcPort_payload_fault;
+  wire       [31:0]   late0_BranchPlugin_logic_pcPort_payload_pc;
+  wire                PcPlugin_logic_harts_0_aggregator_sortedByPriority_1_laneValid;
+  wire                late0_BranchPlugin_logic_historyPort_valid;
+  wire       [11:0]   late0_BranchPlugin_logic_historyPort_payload_history;
+  wire                late0_BranchPlugin_logic_flushPort_valid;
   wire                WhiteboxerPlugin_logic_fetch_fire;
   reg        [31:0]   early0_BranchPlugin_pcCalc_target_a;
   reg        [31:0]   early0_BranchPlugin_pcCalc_target_b;
@@ -1609,10 +2046,12 @@ module VexiiRiscv (
   wire       [0:0]    AlignerPlugin_logic_maskGen_frontMasks_0;
   wire       [0:0]    AlignerPlugin_logic_maskGen_backMasks_0;
   wire       [31:0]   AlignerPlugin_logic_slices_data_0;
-  wire       [0:0]    AlignerPlugin_logic_slices_mask;
-  wire       [0:0]    AlignerPlugin_logic_slices_last;
+  wire       [31:0]   AlignerPlugin_logic_slices_data_1;
+  wire       [1:0]    AlignerPlugin_logic_slices_mask;
+  wire       [1:0]    AlignerPlugin_logic_slices_last;
   wire       [31:0]   AlignerPlugin_logic_slicesInstructions_0;
-  reg        [0:0]    AlignerPlugin_logic_scanners_0_usageMask;
+  wire       [31:0]   AlignerPlugin_logic_slicesInstructions_1;
+  reg        [1:0]    AlignerPlugin_logic_scanners_0_usageMask;
   wire                AlignerPlugin_logic_scanners_0_checker_0_required;
   wire                AlignerPlugin_logic_scanners_0_checker_0_last;
   wire                AlignerPlugin_logic_scanners_0_checker_0_redo;
@@ -1620,29 +2059,64 @@ module VexiiRiscv (
   wire                AlignerPlugin_logic_scanners_0_checker_0_valid;
   wire                AlignerPlugin_logic_scanners_0_redo;
   wire                AlignerPlugin_logic_scanners_0_valid;
-  wire       [0:0]    AlignerPlugin_logic_usedMask_0;
-  wire       [0:0]    AlignerPlugin_logic_usedMask_1;
+  reg        [1:0]    AlignerPlugin_logic_scanners_1_usageMask;
+  wire                AlignerPlugin_logic_scanners_1_checker_0_required;
+  wire                AlignerPlugin_logic_scanners_1_checker_0_last;
+  wire                AlignerPlugin_logic_scanners_1_checker_0_redo;
+  wire                AlignerPlugin_logic_scanners_1_checker_0_present;
+  wire                AlignerPlugin_logic_scanners_1_checker_0_valid;
+  wire                AlignerPlugin_logic_scanners_1_redo;
+  wire                AlignerPlugin_logic_scanners_1_valid;
+  wire       [1:0]    AlignerPlugin_logic_usedMask_0;
+  wire       [1:0]    AlignerPlugin_logic_usedMask_1;
   wire                AlignerPlugin_logic_extractors_0_first;
-  wire       [0:0]    AlignerPlugin_logic_extractors_0_usableMask;
+  wire       [1:0]    AlignerPlugin_logic_extractors_0_usableMask;
+  wire       [1:0]    _zz_AlignerPlugin_logic_extractors_0_usableMask_bools_0;
   wire                AlignerPlugin_logic_extractors_0_usableMask_bools_0;
-  wire       [0:0]    _zz_AlignerPlugin_logic_extractors_0_slicesOh;
-  wire       [0:0]    AlignerPlugin_logic_extractors_0_slicesOh;
+  wire                AlignerPlugin_logic_extractors_0_usableMask_bools_1;
+  reg        [1:0]    _zz_AlignerPlugin_logic_extractors_0_slicesOh;
+  wire       [1:0]    AlignerPlugin_logic_extractors_0_slicesOh;
+  wire                _zz_AlignerPlugin_logic_extractors_0_redo;
+  wire                _zz_AlignerPlugin_logic_extractors_0_redo_1;
   reg                 AlignerPlugin_logic_extractors_0_redo;
   wire       [0:0]    AlignerPlugin_logic_extractors_0_localMask;
-  reg        [0:0]    AlignerPlugin_logic_extractors_0_usageMask;
+  wire       [1:0]    AlignerPlugin_logic_extractors_0_usageMask;
   reg                 AlignerPlugin_logic_extractors_0_valid;
   wire       [31:0]   AlignerPlugin_logic_extractors_0_ctx_pc;
   wire       [31:0]   AlignerPlugin_logic_extractors_0_ctx_instruction;
   wire       [9:0]    AlignerPlugin_logic_extractors_0_ctx_hm_Fetch_ID;
+  wire       [1:0]    AlignerPlugin_logic_extractors_0_ctx_hm_GSharePlugin_GSHARE_COUNTER_0;
+  wire       [11:0]   AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_BRANCH_HISTORY;
+  wire       [0:0]    AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_SLICES_BRANCH;
+  wire       [0:0]    AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_SLICES_TAKEN;
+  wire       [31:0]   AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_JUMP_PC;
+  wire                AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_JUMPED;
   wire                AlignerPlugin_logic_extractors_0_ctx_trap;
   wire                when_AlignerPlugin_l160;
   reg        [9:0]    AlignerPlugin_logic_feeder_harts_0_dopId;
   wire                when_AlignerPlugin_l171;
   wire                AlignerPlugin_logic_feeder_lanes_0_valid;
   wire                AlignerPlugin_logic_feeder_lanes_0_isRvc;
-  reg        [0:0]    AlignerPlugin_logic_nobuffer_mask;
-  wire       [0:0]    AlignerPlugin_logic_nobuffer_remaningMask;
-  wire                when_AlignerPlugin_l292;
+  wire                AlignerPlugin_logic_feeder_lanes_0_onBtb_didPrediction;
+  reg        [31:0]   AlignerPlugin_logic_buffer_data;
+  reg        [0:0]    AlignerPlugin_logic_buffer_mask;
+  reg        [0:0]    AlignerPlugin_logic_buffer_last;
+  reg        [31:0]   AlignerPlugin_logic_buffer_pc;
+  reg                 AlignerPlugin_logic_buffer_trap;
+  reg        [9:0]    AlignerPlugin_logic_buffer_hm_Fetch_ID;
+  reg        [1:0]    AlignerPlugin_logic_buffer_hm_GSharePlugin_GSHARE_COUNTER_0;
+  reg        [11:0]   AlignerPlugin_logic_buffer_hm_Prediction_BRANCH_HISTORY;
+  reg        [0:0]    AlignerPlugin_logic_buffer_hm_Prediction_WORD_SLICES_BRANCH;
+  reg        [0:0]    AlignerPlugin_logic_buffer_hm_Prediction_WORD_SLICES_TAKEN;
+  reg        [31:0]   AlignerPlugin_logic_buffer_hm_Prediction_WORD_JUMP_PC;
+  reg                 AlignerPlugin_logic_buffer_hm_Prediction_WORD_JUMPED;
+  wire       [63:0]   _zz_AlignerPlugin_logic_slices_data_0;
+  wire                when_AlignerPlugin_l240;
+  wire                when_AlignerPlugin_l241;
+  wire                AlignerPlugin_logic_buffer_downFire;
+  wire       [1:0]    AlignerPlugin_logic_buffer_usedMask;
+  wire                AlignerPlugin_logic_buffer_haltUp;
+  wire                when_AlignerPlugin_l256;
   wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_valid;
   wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_ready;
   wire                LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_last;
@@ -1693,7 +2167,13 @@ module VexiiRiscv (
   wire                FetchL1Plugin_logic_banks_0_read_cmd_valid;
   wire       [9:0]    FetchL1Plugin_logic_banks_0_read_cmd_payload;
   (* keep , syn_keep *) wire       [31:0]   FetchL1Plugin_logic_banks_0_read_rsp /* synthesis syn_keep = 1 */ ;
-  reg        [0:0]    FetchL1Plugin_logic_waysWrite_mask;
+  wire                FetchL1Plugin_logic_banks_1_write_valid;
+  wire       [9:0]    FetchL1Plugin_logic_banks_1_write_payload_address;
+  wire       [31:0]   FetchL1Plugin_logic_banks_1_write_payload_data;
+  wire                FetchL1Plugin_logic_banks_1_read_cmd_valid;
+  wire       [9:0]    FetchL1Plugin_logic_banks_1_read_cmd_payload;
+  (* keep , syn_keep *) wire       [31:0]   FetchL1Plugin_logic_banks_1_read_rsp /* synthesis syn_keep = 1 */ ;
+  reg        [1:0]    FetchL1Plugin_logic_waysWrite_mask;
   reg        [5:0]    FetchL1Plugin_logic_waysWrite_address;
   reg                 FetchL1Plugin_logic_waysWrite_tag_loaded;
   reg                 FetchL1Plugin_logic_waysWrite_tag_error;
@@ -1704,10 +2184,18 @@ module VexiiRiscv (
   (* keep , syn_keep *) wire                FetchL1Plugin_logic_ways_0_read_rsp_error /* synthesis syn_keep = 1 */ ;
   (* keep , syn_keep *) wire       [19:0]   FetchL1Plugin_logic_ways_0_read_rsp_address /* synthesis syn_keep = 1 */ ;
   wire       [21:0]   _zz_FetchL1Plugin_logic_ways_0_read_rsp_loaded;
+  wire                FetchL1Plugin_logic_ways_1_read_cmd_valid;
+  wire       [5:0]    FetchL1Plugin_logic_ways_1_read_cmd_payload;
+  (* keep , syn_keep *) wire                FetchL1Plugin_logic_ways_1_read_rsp_loaded /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire                FetchL1Plugin_logic_ways_1_read_rsp_error /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire       [19:0]   FetchL1Plugin_logic_ways_1_read_rsp_address /* synthesis syn_keep = 1 */ ;
+  wire       [21:0]   _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded;
   reg                 FetchL1Plugin_logic_plru_write_valid;
   reg        [5:0]    FetchL1Plugin_logic_plru_write_payload_address;
+  reg        [0:0]    FetchL1Plugin_logic_plru_write_payload_data_0;
   wire                FetchL1Plugin_logic_plru_read_cmd_valid;
   wire       [5:0]    FetchL1Plugin_logic_plru_read_cmd_payload;
+  (* keep , syn_keep *) wire       [0:0]    FetchL1Plugin_logic_plru_read_rsp_0 /* synthesis syn_keep = 1 */ ;
   wire                FetchL1Plugin_logic_invalidate_cmd_valid;
   wire                FetchL1Plugin_logic_invalidate_cmd_ready;
   reg                 FetchL1Plugin_logic_invalidate_canStart;
@@ -1722,11 +2210,13 @@ module VexiiRiscv (
   wire                fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l217;
   reg                 FetchL1Plugin_logic_refill_start_valid;
   wire       [31:0]   FetchL1Plugin_logic_refill_start_address;
+  wire       [0:0]    FetchL1Plugin_logic_refill_start_wayToAllocate;
   wire                FetchL1Plugin_logic_refill_start_isIo;
   reg                 FetchL1Plugin_logic_refill_slots_0_valid;
   reg                 FetchL1Plugin_logic_refill_slots_0_cmdSent;
   (* keep , syn_keep *) reg        [31:0]   FetchL1Plugin_logic_refill_slots_0_address /* synthesis syn_keep = 1 */ ;
   reg                 FetchL1Plugin_logic_refill_slots_0_isIo;
+  reg        [0:0]    FetchL1Plugin_logic_refill_slots_0_wayToAllocate;
   reg        [0:0]    FetchL1Plugin_logic_refill_slots_0_priority;
   wire                FetchL1Plugin_logic_refill_slots_0_askCmd;
   reg        [31:0]   FetchL1Plugin_logic_refill_pushCounter;
@@ -1743,6 +2233,7 @@ module VexiiRiscv (
   wire                fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l297;
   reg                 FetchL1Plugin_logic_refill_onRsp_firstCycle;
   wire                FetchL1Plugin_logic_bus_rsp_fire;
+  wire       [0:0]    FetchL1Plugin_logic_refill_onRsp_wayToAllocate;
   wire       [31:0]   FetchL1Plugin_logic_refill_onRsp_address;
   wire                when_FetchL1Plugin_l304;
   wire                when_FetchL1Plugin_l330;
@@ -1750,10 +2241,18 @@ module VexiiRiscv (
   wire       [31:0]   FetchL1Plugin_logic_ctrl_pmaPort_cmd_address;
   wire                FetchL1Plugin_logic_ctrl_pmaPort_rsp_fault;
   wire                FetchL1Plugin_logic_ctrl_pmaPort_rsp_io;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_core_io_context_state_0;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_core_io_evict_id;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_id;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_state_0;
+  wire                FetchL1Plugin_logic_ctrl_plruLogic_core_evict_sel_0;
+  wire                FetchL1Plugin_logic_ctrl_plruLogic_core_evict_logic_0_state;
   wire                FetchL1Plugin_logic_ctrl_plruLogic_buffer_valid;
   wire       [5:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_data_0;
   reg                 FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_valid;
   reg        [5:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_address;
+  reg        [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_data_0;
   wire                FetchL1Plugin_logic_ctrl_dataAccessFault;
   reg                 FetchL1Plugin_logic_ctrl_trapSent;
   reg                 FetchL1Plugin_logic_ctrl_allowRefill;
@@ -1825,7 +2324,7 @@ module VexiiRiscv (
   wire                LsuPlugin_logic_onAddress0_flush_port_payload_atomic;
   wire       [11:0]   LsuPlugin_logic_onAddress0_flush_port_payload_storeId;
   wire                LsuPlugin_logic_onAddress0_flush_port_fire;
-  reg        [3:0]    _zz_execute_ctrl2_down_LsuL1_MASK_lane0;
+  reg        [3:0]    _zz_execute_ctrl1_down_LsuL1_MASK_lane0;
   wire                when_LsuPlugin_l497;
   wire                when_LsuPlugin_l497_1;
   wire       [31:0]   LsuPlugin_logic_onPma_cached_cmd_address;
@@ -1872,7 +2371,7 @@ module VexiiRiscv (
   wire       [31:0]   LsuPlugin_logic_onCtrl_storeData_mapping_0_1;
   wire       [31:0]   LsuPlugin_logic_onCtrl_storeData_mapping_1_1;
   wire       [31:0]   LsuPlugin_logic_onCtrl_storeData_mapping_2_1;
-  reg        [31:0]   _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
+  reg        [31:0]   _zz_execute_ctrl3_down_LsuL1_WRITE_DATA_lane0;
   wire                LsuPlugin_logic_onCtrl_traps_accessFault;
   wire                LsuPlugin_logic_onCtrl_traps_l1Failed;
   wire                LsuPlugin_logic_onCtrl_traps_pmaFault;
@@ -1888,6 +2387,51 @@ module VexiiRiscv (
   wire                when_LsuPlugin_l226;
   wire                LsuPlugin_logic_onWb_storeFire;
   wire                LsuPlugin_logic_onWb_storeBroadcast;
+  wire                GSharePlugin_logic_mem_write_valid;
+  wire       [13:0]   GSharePlugin_logic_mem_write_payload_address;
+  wire       [1:0]    GSharePlugin_logic_mem_write_payload_data_0;
+  wire       [13:0]   _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH;
+  wire                when_GSharePlugin_l88;
+  reg        [1:0]    BtbPlugin_logic_ras_ptr_push;
+  reg        [1:0]    BtbPlugin_logic_ras_ptr_pop;
+  reg                 BtbPlugin_logic_ras_ptr_pushIt;
+  reg                 BtbPlugin_logic_ras_ptr_popIt;
+  wire                BtbPlugin_logic_ras_readIt;
+  reg        [29:0]   BtbPlugin_logic_ras_read;
+  wire                BtbPlugin_logic_ras_write_valid;
+  wire       [1:0]    BtbPlugin_logic_ras_write_payload_address;
+  reg        [29:0]   BtbPlugin_logic_ras_write_payload_data;
+  reg                 BtbPlugin_logic_memWrite_valid;
+  reg        [8:0]    BtbPlugin_logic_memWrite_payload_address;
+  reg        [15:0]   BtbPlugin_logic_memWrite_payload_data_0_hash;
+  wire       [29:0]   BtbPlugin_logic_memWrite_payload_data_0_pcTarget;
+  reg                 BtbPlugin_logic_memWrite_payload_data_0_isBranch;
+  reg                 BtbPlugin_logic_memWrite_payload_data_0_isPush;
+  reg                 BtbPlugin_logic_memWrite_payload_data_0_isPop;
+  reg        [0:0]    BtbPlugin_logic_memWrite_payload_mask;
+  wire                BtbPlugin_logic_memRead_cmd_valid;
+  wire       [8:0]    BtbPlugin_logic_memRead_cmd_payload;
+  wire       [15:0]   BtbPlugin_logic_memRead_rsp_0_hash;
+  wire       [29:0]   BtbPlugin_logic_memRead_rsp_0_pcTarget;
+  wire                BtbPlugin_logic_memRead_rsp_0_isBranch;
+  wire                BtbPlugin_logic_memRead_rsp_0_isPush;
+  wire                BtbPlugin_logic_memRead_rsp_0_isPop;
+  wire                BtbPlugin_logic_memDp_wp_valid;
+  wire       [8:0]    BtbPlugin_logic_memDp_wp_payload_address;
+  wire       [15:0]   BtbPlugin_logic_memDp_wp_payload_data_0_hash;
+  wire       [29:0]   BtbPlugin_logic_memDp_wp_payload_data_0_pcTarget;
+  wire                BtbPlugin_logic_memDp_wp_payload_data_0_isBranch;
+  wire                BtbPlugin_logic_memDp_wp_payload_data_0_isPush;
+  wire                BtbPlugin_logic_memDp_wp_payload_data_0_isPop;
+  wire       [0:0]    BtbPlugin_logic_memDp_wp_payload_mask;
+  wire                BtbPlugin_logic_memDp_rp_cmd_valid;
+  wire       [8:0]    BtbPlugin_logic_memDp_rp_cmd_payload;
+  wire       [15:0]   BtbPlugin_logic_memDp_rp_rsp_0_hash;
+  wire       [29:0]   BtbPlugin_logic_memDp_rp_rsp_0_pcTarget;
+  wire                BtbPlugin_logic_memDp_rp_rsp_0_isBranch;
+  wire                BtbPlugin_logic_memDp_rp_rsp_0_isPush;
+  wire                BtbPlugin_logic_memDp_rp_rsp_0_isPop;
+  wire       [48:0]   _zz_BtbPlugin_logic_memDp_rp_rsp_0_hash;
   wire       [9:0]    WhiteboxerPlugin_logic_fetch_fetchId;
   wire                WhiteboxerPlugin_logic_decodes_0_fire;
   reg                 decode_ctrls_0_up_LANE_SEL_0_regNext;
@@ -1905,25 +2449,19 @@ module VexiiRiscv (
   wire       [1:0]    early0_BranchPlugin_logic_trapPort_payload_arg;
   wire                early0_BranchPlugin_logic_alu_expectedMsb;
   wire       [2:0]    switch_Misc_l242;
-  reg                 _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0;
-  reg                 _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1;
+  reg                 _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0;
+  reg                 _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1;
+  wire                early0_BranchPlugin_logic_jumpLogic_wrongCond;
   wire                early0_BranchPlugin_logic_jumpLogic_needFix;
   wire                early0_BranchPlugin_logic_jumpLogic_doIt;
+  wire       [11:0]   early0_BranchPlugin_logic_jumpLogic_history_fetched;
+  wire       [11:0]   early0_BranchPlugin_logic_jumpLogic_history_next;
+  wire       [11:0]   early0_BranchPlugin_logic_jumpLogic_history_shifter;
+  wire                when_BranchPlugin_l218;
   wire                when_BranchPlugin_l251;
   wire                early0_BranchPlugin_logic_jumpLogic_rdLink;
   wire                early0_BranchPlugin_logic_jumpLogic_rs1Link;
   wire                early0_BranchPlugin_logic_jumpLogic_rdEquRs1;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_valid;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_ready;
-  wire       [31:0]   early0_BranchPlugin_logic_jumpLogic_learn_payload_pcOnLastSlice;
-  wire       [31:0]   early0_BranchPlugin_logic_jumpLogic_learn_payload_pcTarget;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_payload_taken;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_payload_isBranch;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_payload_isPush;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_payload_isPop;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_payload_wasWrong;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_payload_badPredictedTarget;
-  wire       [15:0]   early0_BranchPlugin_logic_jumpLogic_learn_payload_uopId;
   wire       [15:0]   CsrAccessPlugin_logic_flushPort_payload_uopId;
   wire                CsrAccessPlugin_logic_flushPort_payload_self;
   reg                 CsrAccessPlugin_logic_trapPort_valid;
@@ -1933,6 +2471,13 @@ module VexiiRiscv (
   wire       [1:0]    CsrAccessPlugin_logic_trapPort_payload_arg;
   wire       [15:0]   early0_EnvPlugin_logic_flushPort_payload_uopId;
   wire                early0_EnvPlugin_logic_flushPort_payload_self;
+  wire       [15:0]   late0_BranchPlugin_logic_flushPort_payload_uopId;
+  wire                late0_BranchPlugin_logic_flushPort_payload_self;
+  reg                 late0_BranchPlugin_logic_trapPort_valid;
+  wire                late0_BranchPlugin_logic_trapPort_payload_exception;
+  wire       [31:0]   late0_BranchPlugin_logic_trapPort_payload_tval;
+  wire       [3:0]    late0_BranchPlugin_logic_trapPort_payload_code;
+  wire       [1:0]    late0_BranchPlugin_logic_trapPort_payload_arg;
   wire       [1:0]    PrivilegedPlugin_logic_defaultTrap_csrPrivilege;
   wire                PrivilegedPlugin_logic_defaultTrap_csrReadOnly;
   wire                when_PrivilegedPlugin_l689;
@@ -1988,10 +2533,8 @@ module VexiiRiscv (
   wire                LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit;
   wire                LsuPlugin_pmaBuilder_io_onTransfers_0_hit;
   wire                _zz_LsuPlugin_logic_onPma_io_rsp_fault;
-  wire                execute_lane0_ctrls_1_upIsCancel;
-  wire                execute_lane0_ctrls_1_downIsCancel;
-  reg        [31:0]   _zz_execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
-  reg        [31:0]   _zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
+  reg        [31:0]   _zz_execute_ctrl0_down_early0_SrcPlugin_SRC1_lane0;
+  reg        [31:0]   _zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0;
   reg        [31:0]   early0_SrcPlugin_logic_addsub_combined_rs2Patched;
   wire                lane0_IntFormatPlugin_logic_stages_0_wb_valid;
   wire       [31:0]   lane0_IntFormatPlugin_logic_stages_0_wb_payload;
@@ -1999,7 +2542,7 @@ module VexiiRiscv (
   wire       [31:0]   lane0_IntFormatPlugin_logic_stages_0_raw;
   wire                lane0_IntFormatPlugin_logic_stages_1_wb_valid;
   reg        [31:0]   lane0_IntFormatPlugin_logic_stages_1_wb_payload;
-  wire       [1:0]    lane0_IntFormatPlugin_logic_stages_1_hits;
+  wire       [3:0]    lane0_IntFormatPlugin_logic_stages_1_hits;
   wire       [31:0]   lane0_IntFormatPlugin_logic_stages_1_raw;
   wire                lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_sels_0;
   reg                 _zz_lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_value;
@@ -2014,6 +2557,46 @@ module VexiiRiscv (
   wire       [31:0]   lane0_IntFormatPlugin_logic_stages_2_wb_payload;
   wire       [1:0]    lane0_IntFormatPlugin_logic_stages_2_hits;
   wire       [31:0]   lane0_IntFormatPlugin_logic_stages_2_raw;
+  reg        [31:0]   _zz_execute_ctrl2_down_late0_SrcPlugin_SRC1_lane0;
+  reg        [31:0]   _zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0;
+  reg        [31:0]   late0_SrcPlugin_logic_addsub_combined_rs2Patched;
+  wire                late0_BranchPlugin_logic_alu_expectedMsb;
+  wire       [2:0]    switch_Misc_l242_1;
+  reg                 _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0;
+  reg                 _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0_1;
+  wire                late0_BranchPlugin_logic_jumpLogic_wrongCond;
+  wire                late0_BranchPlugin_logic_jumpLogic_needFix;
+  wire                late0_BranchPlugin_logic_jumpLogic_doIt;
+  wire       [11:0]   late0_BranchPlugin_logic_jumpLogic_history_fetched;
+  wire       [11:0]   late0_BranchPlugin_logic_jumpLogic_history_next;
+  wire       [11:0]   late0_BranchPlugin_logic_jumpLogic_history_shifter;
+  wire                when_BranchPlugin_l218_1;
+  wire                when_BranchPlugin_l251_1;
+  wire                late0_BranchPlugin_logic_jumpLogic_rdLink;
+  wire                late0_BranchPlugin_logic_jumpLogic_rs1Link;
+  wire                late0_BranchPlugin_logic_jumpLogic_rdEquRs1;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_valid;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_ready;
+  wire       [31:0]   late0_BranchPlugin_logic_jumpLogic_learn_payload_pcOnLastSlice;
+  wire       [31:0]   late0_BranchPlugin_logic_jumpLogic_learn_payload_pcTarget;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_payload_taken;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_payload_isBranch;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_payload_isPush;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_payload_isPop;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_payload_wasWrong;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_payload_badPredictedTarget;
+  wire       [11:0]   late0_BranchPlugin_logic_jumpLogic_learn_payload_history;
+  wire       [15:0]   late0_BranchPlugin_logic_jumpLogic_learn_payload_uopId;
+  wire       [1:0]    late0_BranchPlugin_logic_jumpLogic_learn_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
+  wire       [1:0]    early0_EnvPlugin_logic_exe_privilege;
+  wire       [1:0]    early0_EnvPlugin_logic_exe_xretPriv;
+  reg                 early0_EnvPlugin_logic_exe_commit;
+  wire                early0_EnvPlugin_logic_exe_retKo;
+  wire                early0_EnvPlugin_logic_exe_vmaKo;
+  wire                when_EnvPlugin_l86;
+  wire                when_EnvPlugin_l95;
+  wire                when_EnvPlugin_l119;
+  wire                when_EnvPlugin_l123;
   wire                LearnPlugin_logic_learn_valid;
   wire       [31:0]   LearnPlugin_logic_learn_payload_pcOnLastSlice;
   wire       [31:0]   LearnPlugin_logic_learn_payload_pcTarget;
@@ -2023,7 +2606,9 @@ module VexiiRiscv (
   wire                LearnPlugin_logic_learn_payload_isPop;
   wire                LearnPlugin_logic_learn_payload_wasWrong;
   wire                LearnPlugin_logic_learn_payload_badPredictedTarget;
+  wire       [11:0]   LearnPlugin_logic_learn_payload_history;
   wire       [15:0]   LearnPlugin_logic_learn_payload_uopId;
+  wire       [1:0]    LearnPlugin_logic_learn_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
   wire                LearnPlugin_logic_buffered_0_valid;
   wire                LearnPlugin_logic_buffered_0_ready;
   wire       [31:0]   LearnPlugin_logic_buffered_0_payload_pcOnLastSlice;
@@ -2034,7 +2619,9 @@ module VexiiRiscv (
   wire                LearnPlugin_logic_buffered_0_payload_isPop;
   wire                LearnPlugin_logic_buffered_0_payload_wasWrong;
   wire                LearnPlugin_logic_buffered_0_payload_badPredictedTarget;
+  wire       [11:0]   LearnPlugin_logic_buffered_0_payload_history;
   wire       [15:0]   LearnPlugin_logic_buffered_0_payload_uopId;
+  wire       [1:0]    LearnPlugin_logic_buffered_0_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
   wire                LearnPlugin_logic_arbitrated_valid;
   wire                LearnPlugin_logic_arbitrated_ready;
   wire       [31:0]   LearnPlugin_logic_arbitrated_payload_pcOnLastSlice;
@@ -2045,7 +2632,9 @@ module VexiiRiscv (
   wire                LearnPlugin_logic_arbitrated_payload_isPop;
   wire                LearnPlugin_logic_arbitrated_payload_wasWrong;
   wire                LearnPlugin_logic_arbitrated_payload_badPredictedTarget;
+  wire       [11:0]   LearnPlugin_logic_arbitrated_payload_history;
   wire       [15:0]   LearnPlugin_logic_arbitrated_payload_uopId;
+  wire       [1:0]    LearnPlugin_logic_arbitrated_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
   wire                LearnPlugin_logic_arbitrated_toFlow_valid;
   wire       [31:0]   LearnPlugin_logic_arbitrated_toFlow_payload_pcOnLastSlice;
   wire       [31:0]   LearnPlugin_logic_arbitrated_toFlow_payload_pcTarget;
@@ -2055,16 +2644,9 @@ module VexiiRiscv (
   wire                LearnPlugin_logic_arbitrated_toFlow_payload_isPop;
   wire                LearnPlugin_logic_arbitrated_toFlow_payload_wasWrong;
   wire                LearnPlugin_logic_arbitrated_toFlow_payload_badPredictedTarget;
+  wire       [11:0]   LearnPlugin_logic_arbitrated_toFlow_payload_history;
   wire       [15:0]   LearnPlugin_logic_arbitrated_toFlow_payload_uopId;
-  wire       [1:0]    early0_EnvPlugin_logic_exe_privilege;
-  wire       [1:0]    early0_EnvPlugin_logic_exe_xretPriv;
-  reg                 early0_EnvPlugin_logic_exe_commit;
-  wire                early0_EnvPlugin_logic_exe_retKo;
-  wire                early0_EnvPlugin_logic_exe_vmaKo;
-  wire                when_EnvPlugin_l86;
-  wire                when_EnvPlugin_l95;
-  wire                when_EnvPlugin_l119;
-  wire                when_EnvPlugin_l123;
+  wire       [1:0]    LearnPlugin_logic_arbitrated_toFlow_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
   wire                CsrRamPlugin_setup_initPort_valid;
   wire                CsrRamPlugin_setup_initPort_ready;
   wire       [1:0]    CsrRamPlugin_setup_initPort_address;
@@ -2075,6 +2657,7 @@ module VexiiRiscv (
   wire                when_DecoderPlugin_l146;
   reg        [0:0]    DecoderPlugin_logic_interrupt_buffered;
   wire                _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0;
+  wire                _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0;
   wire                DecoderPlugin_logic_laneLogic_0_interruptPending;
   reg                 DecoderPlugin_logic_laneLogic_0_trapPort_valid;
   reg                 DecoderPlugin_logic_laneLogic_0_trapPort_payload_exception;
@@ -2082,6 +2665,8 @@ module VexiiRiscv (
   reg        [3:0]    DecoderPlugin_logic_laneLogic_0_trapPort_payload_code;
   wire       [1:0]    DecoderPlugin_logic_laneLogic_0_trapPort_payload_arg;
   wire       [0:0]    DecoderPlugin_logic_laneLogic_0_trapPort_payload_laneAge;
+  wire                DecoderPlugin_logic_laneLogic_0_fixer_isJb;
+  wire                DecoderPlugin_logic_laneLogic_0_fixer_doIt;
   wire                DecoderPlugin_logic_laneLogic_0_completionPort_valid;
   wire       [15:0]   DecoderPlugin_logic_laneLogic_0_completionPort_payload_uopId;
   wire                DecoderPlugin_logic_laneLogic_0_completionPort_payload_trap;
@@ -2094,6 +2679,13 @@ module VexiiRiscv (
   wire                DecoderPlugin_logic_laneLogic_0_flushPort_payload_self;
   wire                when_DecoderPlugin_l240;
   wire       [15:0]   DecoderPlugin_logic_laneLogic_0_uopIdBase;
+  wire       [13:0]   _zz_GSharePlugin_logic_onLearn_hash;
+  wire       [13:0]   GSharePlugin_logic_onLearn_hash;
+  wire       [1:0]    GSharePlugin_logic_onLearn_updated_0;
+  wire       [1:0]    GSharePlugin_logic_onLearn_incrValue;
+  reg                 GSharePlugin_logic_onLearn_overflow;
+  wire                when_GSharePlugin_l107;
+  wire       [15:0]   BtbPlugin_logic_onLearn_hash;
   wire                CsrRamPlugin_csrMapper_read_valid;
   wire                CsrRamPlugin_csrMapper_read_ready;
   wire       [1:0]    CsrRamPlugin_csrMapper_read_address;
@@ -2103,14 +2695,20 @@ module VexiiRiscv (
   wire       [1:0]    CsrRamPlugin_csrMapper_write_address;
   wire       [31:0]   CsrRamPlugin_csrMapper_write_data;
   wire                DispatchPlugin_logic_candidates_0_ctx_valid;
-  reg        [0:0]    DispatchPlugin_logic_candidates_0_ctx_laneLayerHits;
+  reg        [1:0]    DispatchPlugin_logic_candidates_0_ctx_laneLayerHits;
   wire       [31:0]   DispatchPlugin_logic_candidates_0_ctx_uop;
+  wire                DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_JUMPED;
+  wire       [31:0]   DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_JUMPED_PC;
+  wire       [0:0]    DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_SLICES_TAKEN;
+  wire       [0:0]    DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_SLICES_BRANCH;
+  wire       [1:0]    DispatchPlugin_logic_candidates_0_ctx_hm_GSharePlugin_GSHARE_COUNTER_0;
+  wire       [11:0]   DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_BRANCH_HISTORY;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_FENCE_OLDER;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_MAY_FLUSH;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH_FROM_LANES;
+  wire                DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_2;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3;
-  wire                DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_4;
   wire       [31:0]   DispatchPlugin_logic_candidates_0_ctx_hm_PC;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_TRAP;
   wire       [15:0]   DispatchPlugin_logic_candidates_0_ctx_hm_Decode_UOP_ID;
@@ -2122,16 +2720,22 @@ module VexiiRiscv (
   wire       [4:0]    DispatchPlugin_logic_candidates_0_ctx_hm_RD_PHYS;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0;
   wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0;
+  wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1;
+  wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0;
+  wire                DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0;
   wire                DispatchPlugin_logic_candidates_0_fire;
   wire                DispatchPlugin_logic_candidates_0_cancel;
-  wire       [0:0]    DispatchPlugin_logic_candidates_0_rsHazards;
-  wire       [0:0]    DispatchPlugin_logic_candidates_0_reservationHazards;
+  reg        [1:0]    DispatchPlugin_logic_candidates_0_rsHazards;
+  reg        [1:0]    DispatchPlugin_logic_candidates_0_reservationHazards;
   wire                DispatchPlugin_logic_candidates_0_flushHazards;
   wire                DispatchPlugin_logic_candidates_0_fenceOlderHazards;
   wire                DispatchPlugin_logic_candidates_0_moving;
   wire                DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard;
   wire                DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard;
+  wire                DispatchPlugin_logic_rsHazardChecker_0_onLl_1_onRs_0_hazard;
+  wire                DispatchPlugin_logic_rsHazardChecker_0_onLl_1_onRs_1_hazard;
   wire                DispatchPlugin_logic_reservationChecker_0_onLl_0_hit;
+  wire                DispatchPlugin_logic_reservationChecker_0_onLl_1_hit;
   wire                DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_0;
   wire                DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_1;
   wire                DispatchPlugin_logic_flushChecker_0_oldersHazard;
@@ -2144,17 +2748,23 @@ module VexiiRiscv (
   wire       [0:0]    DispatchPlugin_logic_scheduler_hartFree_0;
   wire       [0:0]    DispatchPlugin_logic_scheduler_hartFree_1;
   wire                DispatchPlugin_logic_scheduler_arbiters_0_candHazard;
-  wire       [0:0]    DispatchPlugin_logic_scheduler_arbiters_0_layersHits;
+  wire       [1:0]    DispatchPlugin_logic_scheduler_arbiters_0_layersHits;
+  wire       [1:0]    _zz_DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0;
   wire                DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0;
-  wire       [0:0]    _zz_DispatchPlugin_logic_scheduler_arbiters_0_layerOh;
-  wire       [0:0]    DispatchPlugin_logic_scheduler_arbiters_0_layerOh;
+  wire                DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_1;
+  reg        [1:0]    _zz_DispatchPlugin_logic_scheduler_arbiters_0_layerOh;
+  wire       [1:0]    DispatchPlugin_logic_scheduler_arbiters_0_layerOh;
   wire       [0:0]    DispatchPlugin_logic_scheduler_arbiters_0_eusOh;
   wire                DispatchPlugin_logic_scheduler_arbiters_0_doIt;
   wire       [0:0]    DispatchPlugin_logic_inserter_0_oh;
   wire                DispatchPlugin_logic_inserter_0_trap;
   wire                when_DispatchPlugin_l439;
-  wire       [0:0]    DispatchPlugin_logic_inserter_0_layerOhUnfiltred;
+  wire       [1:0]    DispatchPlugin_logic_inserter_0_layerOhUnfiltred;
+  wire       [0:0]    DispatchPlugin_logic_inserter_0_layer_0_0;
   wire                DispatchPlugin_logic_inserter_0_layer_0_1;
+  wire       [0:0]    DispatchPlugin_logic_inserter_0_layer_1_0;
+  wire                DispatchPlugin_logic_inserter_0_layer_1_1;
+  wire       [1:0]    _zz_execute_ctrl0_up_lane0_LAYER_SEL_lane0;
   wire       [1:0]    lane0_integer_WriteBackPlugin_logic_stages_0_hits;
   wire       [31:0]   lane0_integer_WriteBackPlugin_logic_stages_0_muxed;
   wire                lane0_integer_WriteBackPlugin_logic_stages_0_write_valid;
@@ -2166,7 +2776,7 @@ module VexiiRiscv (
   wire                lane0_integer_WriteBackPlugin_logic_stages_1_write_valid;
   wire       [15:0]   lane0_integer_WriteBackPlugin_logic_stages_1_write_payload_uopId;
   wire       [31:0]   lane0_integer_WriteBackPlugin_logic_stages_1_write_payload_data;
-  wire       [0:0]    lane0_integer_WriteBackPlugin_logic_stages_2_hits;
+  wire       [1:0]    lane0_integer_WriteBackPlugin_logic_stages_2_hits;
   wire       [31:0]   lane0_integer_WriteBackPlugin_logic_stages_2_muxed;
   wire       [31:0]   lane0_integer_WriteBackPlugin_logic_stages_2_merged;
   wire                lane0_integer_WriteBackPlugin_logic_stages_2_write_valid;
@@ -2184,9 +2794,10 @@ module VexiiRiscv (
   reg                 CsrRamPlugin_csrMapper_fired;
   wire                when_CsrRamPlugin_l92;
   wire                when_CsrRamPlugin_l96;
+  wire                _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0;
   wire                _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0;
-  wire                _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0;
-  wire                _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1;
+  wire                _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0;
+  wire                _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1;
   wire                TrapPlugin_logic_initHold;
   reg                 decode_ctrls_1_up_LANE_SEL_0_regNext_1;
   wire                when_CtrlLaneApi_l50_2;
@@ -2198,7 +2809,7 @@ module VexiiRiscv (
   wire                when_CtrlLaneApi_l50_3;
   wire                WhiteboxerPlugin_logic_dispatches_0_fire;
   wire       [15:0]   WhiteboxerPlugin_logic_dispatches_0_microOpId;
-  reg                 execute_ctrl2_down_LANE_SEL_lane0_regNext;
+  reg                 execute_ctrl1_down_LANE_SEL_lane0_regNext;
   wire                when_CtrlLaneApi_l50_4;
   wire                WhiteboxerPlugin_logic_executes_0_fire;
   wire       [15:0]   WhiteboxerPlugin_logic_executes_0_microOpId;
@@ -2209,12 +2820,38 @@ module VexiiRiscv (
   wire       [31:0]   WhiteboxerPlugin_logic_csr_access_payload_read;
   wire                WhiteboxerPlugin_logic_csr_access_payload_writeDone;
   wire                WhiteboxerPlugin_logic_csr_access_payload_readDone;
+  wire       [15:0]   BtbPlugin_logic_onForget_hash;
+  wire                fetch_logic_ctrls_0_haltRequest_BtbPlugin_l200;
+  wire       [0:0]    BtbPlugin_logic_predictions;
+  wire       [0:0]    BtbPlugin_logic_applyIt_chunksMask;
+  wire       [0:0]    BtbPlugin_logic_applyIt_chunksTakenOh;
+  wire                BtbPlugin_logic_applyIt_needIt;
+  reg                 BtbPlugin_logic_applyIt_correctionSent;
+  wire                when_BtbPlugin_l233;
+  wire                BtbPlugin_logic_applyIt_doIt;
+  wire       [15:0]   BtbPlugin_logic_applyIt_entry_hash;
+  wire       [29:0]   BtbPlugin_logic_applyIt_entry_pcTarget;
+  wire                BtbPlugin_logic_applyIt_entry_isBranch;
+  wire                BtbPlugin_logic_applyIt_entry_isPush;
+  wire                BtbPlugin_logic_applyIt_entry_isPop;
+  reg        [29:0]   BtbPlugin_logic_applyIt_pcTarget;
+  wire                BtbPlugin_logic_applyIt_rasLogic_pushValid;
+  wire       [31:0]   BtbPlugin_logic_applyIt_rasLogic_pushPc;
+  wire                when_BtbPlugin_l246;
+  wire       [11:0]   BtbPlugin_logic_applyIt_history_layers_0_history;
+  wire                BtbPlugin_logic_applyIt_history_layers_0_valid;
+  wire       [11:0]   BtbPlugin_logic_applyIt_history_layers_1_history;
+  wire                BtbPlugin_logic_applyIt_history_layers_1_valid;
+  wire                BtbPlugin_logic_applyIt_history_layersLogic_0_doIt;
+  wire       [11:0]   BtbPlugin_logic_applyIt_history_layersLogic_0_shifted;
   reg                 TrapPlugin_logic_harts_0_crsPorts_read_valid;
   wire                TrapPlugin_logic_harts_0_crsPorts_read_ready;
   reg        [1:0]    TrapPlugin_logic_harts_0_crsPorts_read_address;
   wire       [31:0]   TrapPlugin_logic_harts_0_crsPorts_read_data;
-  wire                AlignerPlugin_logic_nobuffer_flushIt;
-  wire                when_AlignerPlugin_l298;
+  wire                AlignerPlugin_logic_buffer_flushIt;
+  wire                AlignerPlugin_logic_buffer_readers_0_firstFromBuffer;
+  wire                AlignerPlugin_logic_buffer_readers_0_lastFromBuffer;
+  wire       [1:0]    _zz_AlignerPlugin_logic_extractors_0_ctx_instruction;
   wire                decode_logic_flushes_0_onLanes_0_doIt;
   wire                decode_logic_flushes_1_onLanes_0_doIt;
   reg                 TrapPlugin_logic_harts_0_crsPorts_write_valid;
@@ -2236,12 +2873,15 @@ module VexiiRiscv (
   wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid;
   wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1;
   wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2;
+  wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1;
   wire                _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception;
   wire       [31:0]   TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_tval;
   wire       [3:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_code;
   wire       [1:0]    TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_arg;
+  wire       [1:0]    _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception;
+  wire       [38:0]   _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid;
   wire                TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception;
   wire       [31:0]   TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_tval;
@@ -2276,19 +2916,22 @@ module VexiiRiscv (
   reg        [3:0]    TrapPlugin_logic_harts_0_trap_pending_state_code;
   reg        [1:0]    TrapPlugin_logic_harts_0_trap_pending_state_arg;
   reg        [31:0]   TrapPlugin_logic_harts_0_trap_pending_pc;
+  reg        [11:0]   TrapPlugin_logic_harts_0_trap_pending_history;
   reg        [0:0]    TrapPlugin_logic_harts_0_trap_pending_slices;
   wire       [1:0]    TrapPlugin_logic_harts_0_trap_pending_xret_sourcePrivilege;
   wire       [1:0]    TrapPlugin_logic_harts_0_trap_pending_xret_targetPrivilege;
   wire       [1:0]    TrapPlugin_logic_harts_0_trap_exception_exceptionTargetPrivilegeUncapped;
   wire       [3:0]    TrapPlugin_logic_harts_0_trap_exception_code;
   wire       [1:0]    TrapPlugin_logic_harts_0_trap_exception_targetPrivilege;
-  wire                execute_lane0_ctrls_5_upIsCancel;
-  wire                execute_lane0_ctrls_5_downIsCancel;
+  wire                execute_lane0_ctrls_4_upIsCancel;
+  wire                execute_lane0_ctrls_4_downIsCancel;
   wire       [0:0]    TrapPlugin_logic_harts_0_trap_trigger_oh;
   wire                TrapPlugin_logic_harts_0_trap_trigger_valid;
   reg                 TrapPlugin_logic_harts_0_trap_whitebox_trap;
   reg                 TrapPlugin_logic_harts_0_trap_whitebox_interrupt;
   reg        [3:0]    TrapPlugin_logic_harts_0_trap_whitebox_code;
+  reg                 TrapPlugin_logic_harts_0_trap_historyPort_valid;
+  wire       [11:0]   TrapPlugin_logic_harts_0_trap_historyPort_payload_history;
   reg                 TrapPlugin_logic_harts_0_trap_pcPort_valid;
   wire                TrapPlugin_logic_harts_0_trap_pcPort_payload_fault;
   reg        [31:0]   TrapPlugin_logic_harts_0_trap_pcPort_payload_pc;
@@ -2321,7 +2964,7 @@ module VexiiRiscv (
   wire                PcPlugin_logic_harts_0_self_flow_valid;
   wire                PcPlugin_logic_harts_0_self_flow_payload_fault;
   wire       [31:0]   PcPlugin_logic_harts_0_self_flow_payload_pc;
-  wire                PcPlugin_logic_harts_0_aggregator_sortedByPriority_2_laneValid;
+  wire                PcPlugin_logic_harts_0_aggregator_sortedByPriority_4_laneValid;
   reg                 PcPlugin_logic_harts_0_self_increment;
   reg                 PcPlugin_logic_harts_0_self_fault;
   reg        [31:0]   PcPlugin_logic_harts_0_self_state;
@@ -2329,16 +2972,23 @@ module VexiiRiscv (
   wire                PcPlugin_logic_harts_0_aggregator_valids_0;
   wire                PcPlugin_logic_harts_0_aggregator_valids_1;
   wire                PcPlugin_logic_harts_0_aggregator_valids_2;
-  wire       [2:0]    _zz_PcPlugin_logic_harts_0_aggregator_oh;
+  wire                PcPlugin_logic_harts_0_aggregator_valids_3;
+  wire                PcPlugin_logic_harts_0_aggregator_valids_4;
+  wire       [4:0]    _zz_PcPlugin_logic_harts_0_aggregator_oh;
   wire                _zz_PcPlugin_logic_harts_0_aggregator_oh_1;
   wire                _zz_PcPlugin_logic_harts_0_aggregator_oh_2;
-  reg        [2:0]    _zz_PcPlugin_logic_harts_0_aggregator_oh_3;
-  wire       [2:0]    PcPlugin_logic_harts_0_aggregator_oh;
-  wire       [31:0]   PcPlugin_logic_harts_0_aggregator_target;
+  wire                _zz_PcPlugin_logic_harts_0_aggregator_oh_3;
+  wire                _zz_PcPlugin_logic_harts_0_aggregator_oh_4;
+  reg        [4:0]    _zz_PcPlugin_logic_harts_0_aggregator_oh_5;
+  wire       [4:0]    PcPlugin_logic_harts_0_aggregator_oh;
+  (* keep , syn_keep *) wire       [31:0]   PcPlugin_logic_harts_0_aggregator_target /* synthesis syn_keep = 1 */ ;
   wire                PcPlugin_logic_harts_0_aggregator_fault;
   wire                _zz_PcPlugin_logic_harts_0_aggregator_target;
   wire                _zz_PcPlugin_logic_harts_0_aggregator_target_1;
   wire                _zz_PcPlugin_logic_harts_0_aggregator_target_2;
+  wire                _zz_PcPlugin_logic_harts_0_aggregator_target_3;
+  wire                _zz_PcPlugin_logic_harts_0_aggregator_fault_1;
+  wire                when_PcPlugin_l80;
   wire                PcPlugin_logic_harts_0_holdComb;
   reg                 PcPlugin_logic_harts_0_holdReg;
   wire                PcPlugin_logic_harts_0_output_valid;
@@ -2429,10 +3079,16 @@ module VexiiRiscv (
   wire                when_CsrAccessPlugin_l343;
   wire                when_CsrAccessPlugin_l343_1;
   wire                when_CsrAccessPlugin_l343_2;
-  wire                fetch_logic_flushes_0_doIt;
-  wire                fetch_logic_ctrls_1_throwWhen_FetchPipelinePlugin_l48;
-  wire                fetch_logic_flushes_1_doIt;
-  wire                fetch_logic_ctrls_2_forgetsSingleRequest_FetchPipelinePlugin_l50;
+  reg        [11:0]   HistoryPlugin_logic_onFetch_value;
+  reg        [11:0]   HistoryPlugin_logic_onFetch_valueNext;
+  wire                HistoryPlugin_logic_onFetch_ports_0_valid;
+  wire       [11:0]   HistoryPlugin_logic_onFetch_ports_0_payload_history;
+  wire                HistoryPlugin_logic_onFetch_ports_1_valid;
+  wire       [11:0]   HistoryPlugin_logic_onFetch_ports_1_payload_history;
+  wire                HistoryPlugin_logic_onFetch_ports_2_valid;
+  wire       [11:0]   HistoryPlugin_logic_onFetch_ports_2_payload_history;
+  wire                HistoryPlugin_logic_onFetch_ports_3_valid;
+  wire       [11:0]   HistoryPlugin_logic_onFetch_ports_3_payload_history;
   wire       [2:0]    CsrRamPlugin_logic_writeLogic_hits;
   wire                CsrRamPlugin_logic_writeLogic_hit;
   wire       [2:0]    CsrRamPlugin_logic_writeLogic_hits_ohFirst_input;
@@ -2461,21 +3117,57 @@ module VexiiRiscv (
   wire                execute_lane0_bypasser_integer_RS1_port_valid;
   wire       [4:0]    execute_lane0_bypasser_integer_RS1_port_address;
   wire       [31:0]   execute_lane0_bypasser_integer_RS1_port_data;
-  reg        [1:0]    execute_lane0_bypasser_integer_RS1_bypassEnables;
-  wire       [1:0]    _zz_execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0;
+  reg        [3:0]    execute_lane0_bypasser_integer_RS1_bypassEnables;
+  wire       [3:0]    _zz_execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0;
   wire                execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0;
   wire                execute_lane0_bypasser_integer_RS1_bypassEnables_bools_1;
-  reg        [1:0]    _zz_execute_lane0_bypasser_integer_RS1_sel;
-  wire       [1:0]    execute_lane0_bypasser_integer_RS1_sel;
+  wire                execute_lane0_bypasser_integer_RS1_bypassEnables_bools_2;
+  wire                execute_lane0_bypasser_integer_RS1_bypassEnables_bools_3;
+  reg        [3:0]    _zz_execute_lane0_bypasser_integer_RS1_sel;
+  wire                execute_lane0_bypasser_integer_RS1_bypassEnables_range_0_to_1;
+  wire                execute_lane0_bypasser_integer_RS1_bypassEnables_range_0_to_2;
+  wire       [3:0]    execute_lane0_bypasser_integer_RS1_sel;
+  wire       [2:0]    _zz_execute_ctrl0_down_integer_RS1_lane0;
+  (* keep , syn_keep *) reg        [31:0]   _zz_execute_ctrl0_down_integer_RS1_lane0_1 /* synthesis syn_keep = 1 */ ;
+  wire                when_ExecuteLanePlugin_l197;
+  wire                execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_0_selfHit;
+  wire                execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_0_youngerHits_0;
+  wire                execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_0_hit;
+  wire                execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_1_selfHit;
+  wire                execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_1_hit;
+  wire       [1:0]    execute_lane0_bypasser_integer_RS1_along_bypasses_0_hits;
+  wire       [2:0]    _zz_execute_ctrl1_integer_RS1_lane0_bypass;
+  wire                execute_lane0_bypasser_integer_RS1_along_bypasses_1_checks_0_selfHit;
+  wire                execute_lane0_bypasser_integer_RS1_along_bypasses_1_checks_0_hit;
+  wire       [0:0]    execute_lane0_bypasser_integer_RS1_along_bypasses_1_hits;
+  wire       [1:0]    _zz_execute_ctrl2_integer_RS1_lane0_bypass;
   wire                execute_lane0_bypasser_integer_RS2_port_valid;
   wire       [4:0]    execute_lane0_bypasser_integer_RS2_port_address;
   wire       [31:0]   execute_lane0_bypasser_integer_RS2_port_data;
-  reg        [1:0]    execute_lane0_bypasser_integer_RS2_bypassEnables;
-  wire       [1:0]    _zz_execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0;
+  reg        [3:0]    execute_lane0_bypasser_integer_RS2_bypassEnables;
+  wire       [3:0]    _zz_execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0;
   wire                execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0;
   wire                execute_lane0_bypasser_integer_RS2_bypassEnables_bools_1;
-  reg        [1:0]    _zz_execute_lane0_bypasser_integer_RS2_sel;
-  wire       [1:0]    execute_lane0_bypasser_integer_RS2_sel;
+  wire                execute_lane0_bypasser_integer_RS2_bypassEnables_bools_2;
+  wire                execute_lane0_bypasser_integer_RS2_bypassEnables_bools_3;
+  reg        [3:0]    _zz_execute_lane0_bypasser_integer_RS2_sel;
+  wire                execute_lane0_bypasser_integer_RS2_bypassEnables_range_0_to_1;
+  wire                execute_lane0_bypasser_integer_RS2_bypassEnables_range_0_to_2;
+  wire       [3:0]    execute_lane0_bypasser_integer_RS2_sel;
+  wire       [2:0]    _zz_execute_ctrl0_down_integer_RS2_lane0;
+  (* keep , syn_keep *) reg        [31:0]   _zz_execute_ctrl0_down_integer_RS2_lane0_1 /* synthesis syn_keep = 1 */ ;
+  wire                when_ExecuteLanePlugin_l197_1;
+  wire                execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_0_selfHit;
+  wire                execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_0_youngerHits_0;
+  wire                execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_0_hit;
+  wire                execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_1_selfHit;
+  wire                execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_1_hit;
+  wire       [1:0]    execute_lane0_bypasser_integer_RS2_along_bypasses_0_hits;
+  wire       [2:0]    _zz_execute_ctrl1_integer_RS2_lane0_bypass;
+  wire                execute_lane0_bypasser_integer_RS2_along_bypasses_1_checks_0_selfHit;
+  wire                execute_lane0_bypasser_integer_RS2_along_bypasses_1_checks_0_hit;
+  wire       [0:0]    execute_lane0_bypasser_integer_RS2_along_bypasses_1_hits;
+  wire       [1:0]    _zz_execute_ctrl2_integer_RS2_lane0_bypass;
   wire                execute_lane0_logic_completions_onCtrl_0_port_valid;
   wire       [15:0]   execute_lane0_logic_completions_onCtrl_0_port_payload_uopId;
   wire                execute_lane0_logic_completions_onCtrl_0_port_payload_trap;
@@ -2488,40 +3180,49 @@ module VexiiRiscv (
   wire       [15:0]   execute_lane0_logic_completions_onCtrl_2_port_payload_uopId;
   wire                execute_lane0_logic_completions_onCtrl_2_port_payload_trap;
   wire                execute_lane0_logic_completions_onCtrl_2_port_payload_commit;
-  wire       [31:0]   execute_lane0_logic_decoding_decodingBits;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1;
-  wire                _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5;
-  wire                _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2;
-  wire                _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
-  wire                _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
-  wire                _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0;
-  wire                _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0;
-  wire       [1:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
-  wire       [1:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1;
-  wire       [1:0]    _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2;
-  wire                _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0;
-  wire       [1:0]    _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0;
-  wire       [1:0]    _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1;
-  wire       [1:0]    _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2;
-  wire                _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0;
-  wire       [2:0]    _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1;
-  wire       [2:0]    _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2;
-  wire       [2:0]    _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3;
+  wire       [32:0]   execute_lane0_logic_decoding_decodingBits;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1;
+  wire                _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2;
+  wire                _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_1;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+  wire                _zz_execute_ctrl0_down_AguPlugin_LOAD_lane0;
+  wire                _zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4;
+  wire                _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1;
+  wire                _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2;
+  wire                _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  wire                _zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
+  wire                _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0;
+  wire                _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  wire                _zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0;
+  wire                _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0;
+  wire       [1:0]    _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  wire       [1:0]    _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1;
+  wire       [1:0]    _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2;
+  wire                _zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0_1;
+  wire                _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0;
+  wire                _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_1;
+  wire       [1:0]    _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0;
+  wire       [1:0]    _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_1;
+  wire       [1:0]    _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_2;
+  wire                _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0;
+  wire       [2:0]    _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1;
+  wire       [2:0]    _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2;
+  wire       [2:0]    _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3;
+  wire       [1:0]    _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1;
+  wire       [1:0]    _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2;
+  wire       [1:0]    _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3;
   wire                when_ExecuteLanePlugin_l307;
   wire                when_ExecuteLanePlugin_l307_1;
   wire                when_ExecuteLanePlugin_l307_2;
   wire                when_ExecuteLanePlugin_l307_3;
-  wire                when_ExecuteLanePlugin_l307_4;
   wire                WhiteboxerPlugin_logic_csr_port_valid;
   wire       [15:0]   WhiteboxerPlugin_logic_csr_port_payload_uopId;
   wire       [11:0]   WhiteboxerPlugin_logic_csr_port_payload_address;
@@ -2559,7 +3260,6 @@ module VexiiRiscv (
   wire       [31:0]   WhiteboxerPlugin_logic_commits_ports_0_pc;
   wire       [31:0]   WhiteboxerPlugin_logic_commits_ports_0_uop;
   wire                WhiteboxerPlugin_logic_reschedules_flushes_0_valid;
-  wire       [15:0]   WhiteboxerPlugin_logic_reschedules_flushes_0_payload_uopId;
   wire                WhiteboxerPlugin_logic_reschedules_flushes_0_payload_self;
   wire                WhiteboxerPlugin_logic_reschedules_flushes_1_valid;
   wire       [15:0]   WhiteboxerPlugin_logic_reschedules_flushes_1_payload_uopId;
@@ -2573,16 +3273,24 @@ module VexiiRiscv (
   wire                WhiteboxerPlugin_logic_reschedules_flushes_4_valid;
   wire       [15:0]   WhiteboxerPlugin_logic_reschedules_flushes_4_payload_uopId;
   wire                WhiteboxerPlugin_logic_reschedules_flushes_4_payload_self;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_asFlow_valid;
-  wire       [31:0]   early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcOnLastSlice;
-  wire       [31:0]   early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcTarget;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_taken;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isBranch;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPush;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPop;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_wasWrong;
-  wire                early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_badPredictedTarget;
-  wire       [15:0]   early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_uopId;
+  wire                WhiteboxerPlugin_logic_reschedules_flushes_5_valid;
+  wire       [15:0]   WhiteboxerPlugin_logic_reschedules_flushes_5_payload_uopId;
+  wire                WhiteboxerPlugin_logic_reschedules_flushes_5_payload_self;
+  wire                WhiteboxerPlugin_logic_reschedules_flushes_6_valid;
+  wire       [15:0]   WhiteboxerPlugin_logic_reschedules_flushes_6_payload_uopId;
+  wire                WhiteboxerPlugin_logic_reschedules_flushes_6_payload_self;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_asFlow_valid;
+  wire       [31:0]   late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcOnLastSlice;
+  wire       [31:0]   late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcTarget;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_taken;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isBranch;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPush;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPop;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_wasWrong;
+  wire                late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_badPredictedTarget;
+  wire       [11:0]   late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_history;
+  wire       [15:0]   late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_uopId;
+  wire       [1:0]    late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
   wire                WhiteboxerPlugin_logic_prediction_learns_0_valid;
   wire       [31:0]   WhiteboxerPlugin_logic_prediction_learns_0_payload_pcOnLastSlice;
   wire       [31:0]   WhiteboxerPlugin_logic_prediction_learns_0_payload_pcTarget;
@@ -2592,7 +3300,9 @@ module VexiiRiscv (
   wire                WhiteboxerPlugin_logic_prediction_learns_0_payload_isPop;
   wire                WhiteboxerPlugin_logic_prediction_learns_0_payload_wasWrong;
   wire                WhiteboxerPlugin_logic_prediction_learns_0_payload_badPredictedTarget;
+  wire       [11:0]   WhiteboxerPlugin_logic_prediction_learns_0_payload_history;
   wire       [15:0]   WhiteboxerPlugin_logic_prediction_learns_0_payload_uopId;
+  wire       [1:0]    WhiteboxerPlugin_logic_prediction_learns_0_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
   wire                WhiteboxerPlugin_logic_loadExecute_fire;
   wire       [15:0]   WhiteboxerPlugin_logic_loadExecute_uopId;
   wire       [1:0]    WhiteboxerPlugin_logic_loadExecute_size;
@@ -2610,6 +3320,10 @@ module VexiiRiscv (
   wire                WhiteboxerPlugin_logic_storeConditional_miss;
   wire                WhiteboxerPlugin_logic_storeBroadcast_fire;
   wire       [11:0]   WhiteboxerPlugin_logic_storeBroadcast_storeId;
+  wire                fetch_logic_flushes_0_doIt;
+  wire                fetch_logic_ctrls_1_throwWhen_FetchPipelinePlugin_l48;
+  wire                fetch_logic_flushes_1_doIt;
+  wire                fetch_logic_ctrls_2_forgetsSingleRequest_FetchPipelinePlugin_l50;
   wire                integer_RegFilePlugin_logic_writeMerges_0_bus_valid;
   wire       [4:0]    integer_RegFilePlugin_logic_writeMerges_0_bus_address;
   wire       [31:0]   integer_RegFilePlugin_logic_writeMerges_0_bus_data;
@@ -2717,26 +3431,40 @@ module VexiiRiscv (
   wire                CsrAccessPlugin_logic_fsm_onEntry_WRITE;
   wire                CsrAccessPlugin_logic_fsm_onEntry_COMPLETION;
   `ifndef SYNTHESIS
-  reg [79:0] execute_ctrl2_up_early0_EnvPlugin_OP_lane0_string;
+  reg [39:0] execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [31:0] execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string;
+  reg [39:0] execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [31:0] execute_ctrl3_up_BranchPlugin_BRANCH_CTRL_lane0_string;
+  reg [39:0] execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [39:0] execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
   reg [31:0] execute_ctrl2_up_BranchPlugin_BRANCH_CTRL_lane0_string;
-  reg [39:0] execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [39:0] execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [79:0] execute_ctrl1_up_early0_EnvPlugin_OP_lane0_string;
+  reg [31:0] execute_ctrl1_up_BranchPlugin_BRANCH_CTRL_lane0_string;
+  reg [39:0] execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [39:0] execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [79:0] execute_ctrl0_down_early0_EnvPlugin_OP_lane0_string;
+  reg [31:0] execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string;
+  reg [39:0] execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [31:0] execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0_string;
   reg [79:0] execute_ctrl1_down_early0_EnvPlugin_OP_lane0_string;
   reg [31:0] execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_string;
+  reg [39:0] execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
   reg [39:0] execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
-  reg [79:0] execute_ctrl2_down_early0_EnvPlugin_OP_lane0_string;
-  reg [31:0] execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string;
-  reg [39:0] execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
   reg [95:0] LsuPlugin_logic_onAddress0_ls_port_payload_op_string;
   reg [95:0] LsuPlugin_logic_onAddress0_flush_port_payload_op_string;
-  reg [39:0] _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
-  reg [39:0] _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string;
-  reg [39:0] _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string;
-  reg [31:0] _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_string;
-  reg [31:0] _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1_string;
-  reg [31:0] _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2_string;
-  reg [79:0] _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1_string;
-  reg [79:0] _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2_string;
-  reg [79:0] _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3_string;
+  reg [39:0] _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string;
+  reg [39:0] _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string;
+  reg [39:0] _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string;
+  reg [31:0] _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string;
+  reg [31:0] _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_1_string;
+  reg [31:0] _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_2_string;
+  reg [79:0] _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1_string;
+  reg [79:0] _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2_string;
+  reg [79:0] _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3_string;
+  reg [39:0] _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string;
+  reg [39:0] _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string;
+  reg [39:0] _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3_string;
   reg [79:0] LsuPlugin_logic_flusher_stateReg_string;
   reg [79:0] LsuPlugin_logic_flusher_stateNext_string;
   reg [87:0] TrapPlugin_logic_harts_0_trap_fsm_stateReg_string;
@@ -2745,6 +3473,7 @@ module VexiiRiscv (
   reg [79:0] CsrAccessPlugin_logic_fsm_stateNext_string;
   `endif
 
+  (* ram_style = "distributed" *) reg [29:0] BtbPlugin_logic_ras_mem_stack [0:3];
   reg [7:0] LsuL1Plugin_logic_banks_0_mem_symbol0 [0:1023];
   reg [7:0] LsuL1Plugin_logic_banks_0_mem_symbol1 [0:1023];
   reg [7:0] LsuL1Plugin_logic_banks_0_mem_symbol2 [0:1023];
@@ -2753,11 +3482,25 @@ module VexiiRiscv (
   reg [7:0] _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_1;
   reg [7:0] _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_2;
   reg [7:0] _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_3;
+  reg [7:0] LsuL1Plugin_logic_banks_1_mem_symbol0 [0:1023];
+  reg [7:0] LsuL1Plugin_logic_banks_1_mem_symbol1 [0:1023];
+  reg [7:0] LsuL1Plugin_logic_banks_1_mem_symbol2 [0:1023];
+  reg [7:0] LsuL1Plugin_logic_banks_1_mem_symbol3 [0:1023];
+  reg [7:0] _zz_LsuL1Plugin_logic_banks_1_memsymbol_read;
+  reg [7:0] _zz_LsuL1Plugin_logic_banks_1_memsymbol_read_1;
+  reg [7:0] _zz_LsuL1Plugin_logic_banks_1_memsymbol_read_2;
+  reg [7:0] _zz_LsuL1Plugin_logic_banks_1_memsymbol_read_3;
   reg [21:0] LsuL1Plugin_logic_ways_0_mem [0:63];
-  reg [0:0] LsuL1Plugin_logic_shared_mem [0:63];
+  reg [21:0] LsuL1Plugin_logic_ways_1_mem [0:63];
+  reg [2:0] LsuL1Plugin_logic_shared_mem [0:63];
   reg [31:0] LsuL1Plugin_logic_writeback_victimBuffer [0:15];
   reg [31:0] FetchL1Plugin_logic_banks_0_mem [0:1023];
+  reg [31:0] FetchL1Plugin_logic_banks_1_mem [0:1023];
   reg [21:0] FetchL1Plugin_logic_ways_0_mem [0:63];
+  reg [21:0] FetchL1Plugin_logic_ways_1_mem [0:63];
+  reg [0:0] FetchL1Plugin_logic_plru_mem [0:63];
+  reg [1:0] GSharePlugin_logic_mem_counter [0:16383];
+  (* ram_style = "block" *) reg [48:0] BtbPlugin_logic_mem [0:511];
   reg [31:0] CsrRamPlugin_logic_mem [0:3];
   function [1:0] zz_FetchL1Plugin_logic_trapPort_payload_arg(input dummy);
     begin
@@ -2765,74 +3508,102 @@ module VexiiRiscv (
       zz_FetchL1Plugin_logic_trapPort_payload_arg[1 : 0] = 2'b10;
     end
   endfunction
-  wire [1:0] _zz_24;
+  wire [1:0] _zz_44;
 
   assign _zz_when_1 = (! FetchL1Plugin_logic_refill_slots_0_valid);
   assign _zz_early0_IntAluPlugin_logic_alu_result = (early0_IntAluPlugin_logic_alu_bitwise | _zz_early0_IntAluPlugin_logic_alu_result_1);
-  assign _zz_early0_IntAluPlugin_logic_alu_result_1 = (execute_ctrl2_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 ? execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0 : 32'h0);
-  assign _zz_early0_IntAluPlugin_logic_alu_result_2 = (execute_ctrl2_down_early0_IntAluPlugin_ALU_SLTX_lane0 ? _zz_early0_IntAluPlugin_logic_alu_result_3 : 32'h0);
+  assign _zz_early0_IntAluPlugin_logic_alu_result_1 = (execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 ? execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0 : 32'h0);
+  assign _zz_early0_IntAluPlugin_logic_alu_result_2 = (execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0 ? _zz_early0_IntAluPlugin_logic_alu_result_3 : 32'h0);
   assign _zz_early0_IntAluPlugin_logic_alu_result_3 = _zz_early0_IntAluPlugin_logic_alu_result_4;
-  assign _zz_early0_IntAluPlugin_logic_alu_result_5 = execute_ctrl2_down_early0_SrcPlugin_LESS_lane0;
+  assign _zz_early0_IntAluPlugin_logic_alu_result_5 = execute_ctrl1_down_early0_SrcPlugin_LESS_lane0;
   assign _zz_early0_IntAluPlugin_logic_alu_result_4 = {31'd0, _zz_early0_IntAluPlugin_logic_alu_result_5};
-  assign _zz_early0_BarrelShifterPlugin_logic_shift_amplitude = execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0[4 : 0];
-  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed = {execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[0],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[1],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[2],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[3],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[4],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[5],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[6],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[7],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[8],{_zz_early0_BarrelShifterPlugin_logic_shift_reversed_1,{_zz_early0_BarrelShifterPlugin_logic_shift_reversed_2,_zz_early0_BarrelShifterPlugin_logic_shift_reversed_3}}}}}}}}}}};
+  assign _zz_early0_BarrelShifterPlugin_logic_shift_amplitude = execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0[4 : 0];
+  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed = {execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[0],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[1],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[2],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[3],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[4],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[5],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[6],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[7],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[8],{_zz_early0_BarrelShifterPlugin_logic_shift_reversed_1,{_zz_early0_BarrelShifterPlugin_logic_shift_reversed_2,_zz_early0_BarrelShifterPlugin_logic_shift_reversed_3}}}}}}}}}}};
   assign _zz_early0_BarrelShifterPlugin_logic_shift_shifted = ($signed(_zz_early0_BarrelShifterPlugin_logic_shift_shifted_1) >>> early0_BarrelShifterPlugin_logic_shift_amplitude);
-  assign _zz_early0_BarrelShifterPlugin_logic_shift_shifted_1 = {(execute_ctrl2_down_BarrelShifterPlugin_SIGNED_lane0 && execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[31]),early0_BarrelShifterPlugin_logic_shift_reversed};
+  assign _zz_early0_BarrelShifterPlugin_logic_shift_shifted_1 = {(execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0 && execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[31]),early0_BarrelShifterPlugin_logic_shift_reversed};
   assign _zz_early0_BarrelShifterPlugin_logic_shift_patched = {early0_BarrelShifterPlugin_logic_shift_shifted[0],{early0_BarrelShifterPlugin_logic_shift_shifted[1],{early0_BarrelShifterPlugin_logic_shift_shifted[2],{early0_BarrelShifterPlugin_logic_shift_shifted[3],{early0_BarrelShifterPlugin_logic_shift_shifted[4],{early0_BarrelShifterPlugin_logic_shift_shifted[5],{early0_BarrelShifterPlugin_logic_shift_shifted[6],{early0_BarrelShifterPlugin_logic_shift_shifted[7],{early0_BarrelShifterPlugin_logic_shift_shifted[8],{_zz_early0_BarrelShifterPlugin_logic_shift_patched_1,{_zz_early0_BarrelShifterPlugin_logic_shift_patched_2,_zz_early0_BarrelShifterPlugin_logic_shift_patched_3}}}}}}}}}}};
+  assign _zz_LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0_1 = _zz_LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0[0 : 0];
   assign _zz_LsuL1Plugin_logic_writeback_read_wordIndex_1 = LsuL1Plugin_logic_writeback_read_slotRead_valid;
   assign _zz_LsuL1Plugin_logic_writeback_read_wordIndex = {3'd0, _zz_LsuL1Plugin_logic_writeback_read_wordIndex_1};
   assign _zz_LsuL1Plugin_logic_writeback_write_wordIndex_1 = (LsuL1Plugin_logic_writeback_write_bufferRead_fire && 1'b1);
   assign _zz_LsuL1Plugin_logic_writeback_write_wordIndex = {3'd0, _zz_LsuL1Plugin_logic_writeback_write_wordIndex_1};
-  assign _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback = (execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded & execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty);
-  assign _zz_LsuL1Plugin_logic_lsu_ctrl_doWrite = (_zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0 ? (1'b1 && (! execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault)) : 1'b0);
+  assign _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback = ({execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded,execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded} & execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty);
+  assign _zz_LsuL1Plugin_logic_lsu_ctrl_doWrite = ((_zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0 ? (1'b1 && (! execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault)) : 1'b0) | (_zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0_1 ? (1'b1 && (! execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault)) : 1'b0));
+  assign _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty = (2'b01 <<< LsuL1Plugin_logic_lsu_ctrl_refillWayWithoutUpdate);
   assign _zz_when = 1'b1;
-  assign _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty = 1'b0;
-  assign _zz_execute_ctrl2_down_MUL_SRC1_lane0 = {(execute_ctrl2_down_RsUnsignedPlugin_RS1_SIGNED_lane0 && execute_ctrl2_up_integer_RS1_lane0[31]),execute_ctrl2_up_integer_RS1_lane0};
-  assign _zz_execute_ctrl2_down_MUL_SRC2_lane0 = {(execute_ctrl2_down_RsUnsignedPlugin_RS2_SIGNED_lane0 && execute_ctrl2_up_integer_RS2_lane0[31]),execute_ctrl2_up_integer_RS2_lane0};
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_1 = ($signed(_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_2) * $signed(_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_3));
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0 = {{13{_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_1[33]}}, _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_1};
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_2 = {1'b0,execute_ctrl2_down_MUL_SRC1_lane0[16 : 0]};
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_3 = execute_ctrl2_down_MUL_SRC2_lane0[32 : 17];
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_1 = ($signed(_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_2) * $signed(_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_3));
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0 = {{13{_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_1[33]}}, _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_1};
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_2 = execute_ctrl2_down_MUL_SRC1_lane0[32 : 17];
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_3 = {1'b0,execute_ctrl2_down_MUL_SRC2_lane0[16 : 0]};
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_1 = ($signed(_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_2) * $signed(_zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_3));
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0 = _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_1[29:0];
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_2 = execute_ctrl2_down_MUL_SRC1_lane0[32 : 17];
-  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_3 = execute_ctrl2_down_MUL_SRC2_lane0[32 : 17];
-  assign _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_3 = (_zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_4 + _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_5);
-  assign _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_4 = {2'd0, _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0};
-  assign _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_5 = {2'd0, _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_1};
-  assign _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_6 = {2'd0, _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_2};
-  assign _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_3 = (_zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_4 + _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_5);
-  assign _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_4 = {2'd0, _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0};
-  assign _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_5 = {2'd0, _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_1};
-  assign _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_6 = {2'd0, _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_2};
-  assign _zz_execute_ctrl2_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0_1 = execute_ctrl2_down_RsUnsignedPlugin_RS1_REVERT_lane0;
-  assign _zz_execute_ctrl2_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0 = {31'd0, _zz_execute_ctrl2_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0_1};
-  assign _zz_execute_ctrl2_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0_1 = execute_ctrl2_down_RsUnsignedPlugin_RS2_REVERT_lane0;
-  assign _zz_execute_ctrl2_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0 = {31'd0, _zz_execute_ctrl2_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0_1};
-  assign _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0_1 = ((early0_DivPlugin_logic_processing_divRevertResult ? (~ _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0) : _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0) + _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0_2);
-  assign _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0_3 = early0_DivPlugin_logic_processing_divRevertResult;
-  assign _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0_2 = {31'd0, _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0_3};
-  assign _zz_early0_BranchPlugin_pcCalc_target_b = {{{{execute_ctrl2_down_Decode_UOP_lane0[31],execute_ctrl2_down_Decode_UOP_lane0[19 : 12]},execute_ctrl2_down_Decode_UOP_lane0[20]},execute_ctrl2_down_Decode_UOP_lane0[30 : 21]},1'b0};
-  assign _zz_early0_BranchPlugin_pcCalc_target_b_1 = execute_ctrl2_down_Decode_UOP_lane0[31 : 20];
-  assign _zz_early0_BranchPlugin_pcCalc_target_b_2 = {{{{execute_ctrl2_down_Decode_UOP_lane0[31],execute_ctrl2_down_Decode_UOP_lane0[7]},execute_ctrl2_down_Decode_UOP_lane0[30 : 25]},execute_ctrl2_down_Decode_UOP_lane0[11 : 8]},1'b0};
+  assign _zz_LsuL1Plugin_logic_shared_write_payload_data_plru_0_1 = _zz_LsuL1Plugin_logic_shared_write_payload_data_plru_0[0 : 0];
+  assign _zz_execute_ctrl1_down_MUL_SRC1_lane0 = {(execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0 && execute_ctrl1_up_integer_RS1_lane0[31]),execute_ctrl1_up_integer_RS1_lane0};
+  assign _zz_execute_ctrl1_down_MUL_SRC2_lane0 = {(execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0 && execute_ctrl1_up_integer_RS2_lane0[31]),execute_ctrl1_up_integer_RS2_lane0};
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_1 = ($signed(_zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_2) * $signed(_zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_3));
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0 = {{13{_zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_1[33]}}, _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_1};
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_2 = {1'b0,execute_ctrl1_down_MUL_SRC1_lane0[16 : 0]};
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0_3 = execute_ctrl1_down_MUL_SRC2_lane0[32 : 17];
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_1 = ($signed(_zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_2) * $signed(_zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_3));
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0 = {{13{_zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_1[33]}}, _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_1};
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_2 = execute_ctrl1_down_MUL_SRC1_lane0[32 : 17];
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0_3 = {1'b0,execute_ctrl1_down_MUL_SRC2_lane0[16 : 0]};
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_1 = ($signed(_zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_2) * $signed(_zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_3));
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0 = _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_1[29:0];
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_2 = execute_ctrl1_down_MUL_SRC1_lane0[32 : 17];
+  assign _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0_3 = execute_ctrl1_down_MUL_SRC2_lane0[32 : 17];
+  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_3 = (_zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_4 + _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_5);
+  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_4 = {2'd0, _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0};
+  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_5 = {2'd0, _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_1};
+  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_6 = {2'd0, _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_2};
+  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_3 = (_zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_4 + _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_5);
+  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_4 = {2'd0, _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0};
+  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_5 = {2'd0, _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_1};
+  assign _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_6 = {2'd0, _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_2};
+  assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0_1 = execute_ctrl1_down_RsUnsignedPlugin_RS1_REVERT_lane0;
+  assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0 = {31'd0, _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0_1};
+  assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0_1 = execute_ctrl1_down_RsUnsignedPlugin_RS2_REVERT_lane0;
+  assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0 = {31'd0, _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0_1};
+  assign _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0_1 = ((early0_DivPlugin_logic_processing_divRevertResult ? (~ _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0) : _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0) + _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0_2);
+  assign _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0_3 = early0_DivPlugin_logic_processing_divRevertResult;
+  assign _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0_2 = {31'd0, _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0_3};
+  assign _zz_late0_IntAluPlugin_logic_alu_result = (late0_IntAluPlugin_logic_alu_bitwise | _zz_late0_IntAluPlugin_logic_alu_result_1);
+  assign _zz_late0_IntAluPlugin_logic_alu_result_1 = (execute_ctrl3_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0 ? execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0 : 32'h0);
+  assign _zz_late0_IntAluPlugin_logic_alu_result_2 = (execute_ctrl3_down_late0_IntAluPlugin_ALU_SLTX_lane0 ? _zz_late0_IntAluPlugin_logic_alu_result_3 : 32'h0);
+  assign _zz_late0_IntAluPlugin_logic_alu_result_3 = _zz_late0_IntAluPlugin_logic_alu_result_4;
+  assign _zz_late0_IntAluPlugin_logic_alu_result_5 = execute_ctrl3_down_late0_SrcPlugin_LESS_lane0;
+  assign _zz_late0_IntAluPlugin_logic_alu_result_4 = {31'd0, _zz_late0_IntAluPlugin_logic_alu_result_5};
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_amplitude = execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0[4 : 0];
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_reversed = {execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[0],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[1],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[2],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[3],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[4],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[5],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[6],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[7],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[8],{_zz_late0_BarrelShifterPlugin_logic_shift_reversed_1,{_zz_late0_BarrelShifterPlugin_logic_shift_reversed_2,_zz_late0_BarrelShifterPlugin_logic_shift_reversed_3}}}}}}}}}}};
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_shifted = ($signed(_zz_late0_BarrelShifterPlugin_logic_shift_shifted_1) >>> late0_BarrelShifterPlugin_logic_shift_amplitude);
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_shifted_1 = {(execute_ctrl3_down_BarrelShifterPlugin_SIGNED_lane0 && execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[31]),late0_BarrelShifterPlugin_logic_shift_reversed};
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_patched = {late0_BarrelShifterPlugin_logic_shift_shifted[0],{late0_BarrelShifterPlugin_logic_shift_shifted[1],{late0_BarrelShifterPlugin_logic_shift_shifted[2],{late0_BarrelShifterPlugin_logic_shift_shifted[3],{late0_BarrelShifterPlugin_logic_shift_shifted[4],{late0_BarrelShifterPlugin_logic_shift_shifted[5],{late0_BarrelShifterPlugin_logic_shift_shifted[6],{late0_BarrelShifterPlugin_logic_shift_shifted[7],{late0_BarrelShifterPlugin_logic_shift_shifted[8],{_zz_late0_BarrelShifterPlugin_logic_shift_patched_1,{_zz_late0_BarrelShifterPlugin_logic_shift_patched_2,_zz_late0_BarrelShifterPlugin_logic_shift_patched_3}}}}}}}}}}};
+  assign _zz_early0_BranchPlugin_pcCalc_target_b = {{{{execute_ctrl1_down_Decode_UOP_lane0[31],execute_ctrl1_down_Decode_UOP_lane0[19 : 12]},execute_ctrl1_down_Decode_UOP_lane0[20]},execute_ctrl1_down_Decode_UOP_lane0[30 : 21]},1'b0};
+  assign _zz_early0_BranchPlugin_pcCalc_target_b_1 = execute_ctrl1_down_Decode_UOP_lane0[31 : 20];
+  assign _zz_early0_BranchPlugin_pcCalc_target_b_2 = {{{{execute_ctrl1_down_Decode_UOP_lane0[31],execute_ctrl1_down_Decode_UOP_lane0[7]},execute_ctrl1_down_Decode_UOP_lane0[30 : 25]},execute_ctrl1_down_Decode_UOP_lane0[11 : 8]},1'b0};
   assign _zz_early0_BranchPlugin_pcCalc_slices_1 = 1'b0;
   assign _zz_early0_BranchPlugin_pcCalc_slices = {1'd0, _zz_early0_BranchPlugin_pcCalc_slices_1};
-  assign _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 = ($signed(early0_BranchPlugin_pcCalc_target_a) + $signed(early0_BranchPlugin_pcCalc_target_b));
-  assign _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0_1 = ({2'd0,early0_BranchPlugin_pcCalc_slices} <<< 2'd2);
-  assign _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 = {28'd0, _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0_1};
-  assign _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0_1 = 2'b00;
-  assign _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 = {30'd0, _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0_1};
-  assign _zz_FetchL1Plugin_logic_ctrl_dataAccessFault = (fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_error : 1'b0);
+  assign _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 = ($signed(early0_BranchPlugin_pcCalc_target_a) + $signed(early0_BranchPlugin_pcCalc_target_b));
+  assign _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0_1 = ({2'd0,early0_BranchPlugin_pcCalc_slices} <<< 2'd2);
+  assign _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 = {28'd0, _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0_1};
+  assign _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0_1 = 2'b00;
+  assign _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 = {30'd0, _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0_1};
+  assign _zz_AlignerPlugin_logic_extractors_0_redo_2 = ((_zz_AlignerPlugin_logic_extractors_0_redo ? AlignerPlugin_logic_scanners_0_redo : 1'b0) | (_zz_AlignerPlugin_logic_extractors_0_redo_1 ? AlignerPlugin_logic_scanners_1_redo : 1'b0));
+  assign _zz_FetchL1Plugin_logic_ctrl_dataAccessFault = ((fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_error : 1'b0) | (fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_error : 1'b0));
+  assign _zz_FetchL1Plugin_logic_plru_write_payload_data_0 = 1'b0;
   assign _zz_LsuPlugin_logic_onAddress0_ls_storeId_1 = LsuPlugin_logic_onAddress0_ls_port_fire;
   assign _zz_LsuPlugin_logic_onAddress0_ls_storeId = {11'd0, _zz_LsuPlugin_logic_onAddress0_ls_storeId_1};
   assign _zz_LsuPlugin_logic_onAddress0_flush_port_payload_address = ({6'd0,LsuPlugin_logic_flusher_cmdCounter} <<< 3'd6);
-  assign _zz_LsuPlugin_logic_trapPort_payload_code = (execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 ? (execute_ctrl4_down_LsuL1_STORE_lane0 ? 3'b110 : 3'b100) : 3'b000);
-  assign _zz_LsuPlugin_logic_flusher_cmdCounter = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+  assign _zz_LsuPlugin_logic_trapPort_payload_code = (execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 ? (execute_ctrl3_down_LsuL1_STORE_lane0 ? 3'b110 : 3'b100) : 3'b000);
+  assign _zz_LsuPlugin_logic_flusher_cmdCounter = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+  assign _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_5 = fetch_logic_ctrls_0_down_Prediction_BRANCH_HISTORY;
+  assign _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_4 = {2'd0, _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_5};
+  assign _zz_BtbPlugin_logic_ras_ptr_push = (BtbPlugin_logic_ras_ptr_push + _zz_BtbPlugin_logic_ras_ptr_push_1);
+  assign _zz_BtbPlugin_logic_ras_ptr_push_2 = BtbPlugin_logic_ras_ptr_pushIt;
+  assign _zz_BtbPlugin_logic_ras_ptr_push_1 = {1'd0, _zz_BtbPlugin_logic_ras_ptr_push_2};
+  assign _zz_BtbPlugin_logic_ras_ptr_push_4 = BtbPlugin_logic_ras_ptr_popIt;
+  assign _zz_BtbPlugin_logic_ras_ptr_push_3 = {1'd0, _zz_BtbPlugin_logic_ras_ptr_push_4};
+  assign _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue = (BtbPlugin_logic_ras_ptr_pop + _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_1);
+  assign _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_2 = BtbPlugin_logic_ras_ptr_pushIt;
+  assign _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_1 = {1'd0, _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_2};
+  assign _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_4 = BtbPlugin_logic_ras_ptr_popIt;
+  assign _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_3 = {1'd0, _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_4};
   assign _zz_WhiteboxerPlugin_logic_decodes_0_pc = {32'd0, decode_ctrls_0_down_PC_0};
+  assign _zz_early0_BranchPlugin_logic_jumpLogic_history_shifter_1 = {early0_BranchPlugin_logic_jumpLogic_history_shifter,execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0};
   assign _zz_FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit = (|_zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io);
   assign _zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io_1 = (|_zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io);
   assign _zz_FetchL1WishbonePlugin_logic_bus_ADR = (FetchL1Plugin_logic_bus_cmd_payload_address >>> 3'd6);
@@ -2840,43 +3611,67 @@ module VexiiRiscv (
   assign _zz_LsuPlugin_logic_onPma_cached_rsp_io_1 = (|_zz_LsuPlugin_logic_onPma_cached_rsp_io);
   assign _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit = (|((LsuPlugin_pmaBuilder_io_addressBits & 32'h0) == 32'h0));
   assign _zz_LsuPlugin_logic_onPma_io_rsp_io = (|_zz_LsuPlugin_logic_onPma_io_rsp_fault);
-  assign _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl1_down_Decode_UOP_lane0[31 : 20];
-  assign _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0_1 = {execute_ctrl1_down_Decode_UOP_lane0[31 : 25],execute_ctrl1_down_Decode_UOP_lane0[11 : 7]};
-  assign _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0 = ($signed(execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0) + $signed(early0_SrcPlugin_logic_addsub_combined_rs2Patched));
-  assign _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0_1 = _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0_2;
-  assign _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0_3 = execute_ctrl2_down_SrcStageables_REVERT_lane0;
-  assign _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0_2 = {31'd0, _zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0_3};
+  assign _zz__zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl0_down_Decode_UOP_lane0[31 : 20];
+  assign _zz__zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0_1 = {execute_ctrl0_down_Decode_UOP_lane0[31 : 25],execute_ctrl0_down_Decode_UOP_lane0[11 : 7]};
+  assign _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0 = ($signed(execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0) + $signed(early0_SrcPlugin_logic_addsub_combined_rs2Patched));
+  assign _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0_1 = _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0_2;
+  assign _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0_3 = execute_ctrl1_down_SrcStageables_REVERT_lane0;
+  assign _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0_2 = {31'd0, _zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0_3};
+  assign _zz__zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0 = execute_ctrl2_down_Decode_UOP_lane0[31 : 20];
+  assign _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0 = ($signed(execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0) + $signed(late0_SrcPlugin_logic_addsub_combined_rs2Patched));
+  assign _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0_1 = _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0_2;
+  assign _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0_3 = execute_ctrl3_down_SrcStageables_REVERT_lane0;
+  assign _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0_2 = {31'd0, _zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0_3};
+  assign _zz_late0_BranchPlugin_logic_jumpLogic_history_shifter_1 = {late0_BranchPlugin_logic_jumpLogic_history_shifter,execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0};
   assign _zz_early0_EnvPlugin_logic_trapPort_payload_code = {2'd0, early0_EnvPlugin_logic_exe_privilege};
   assign _zz_decode_ctrls_1_down_RS1_ENABLE_0 = (|{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000044) == 32'h0),{_zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0,{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00006004) == 32'h00002000),((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00005004) == 32'h00001000)}}});
   assign _zz_decode_ctrls_1_down_RS2_ENABLE_0 = (|{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000034) == 32'h00000020),((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000064) == 32'h00000020)});
-  assign _zz_decode_ctrls_1_down_RD_ENABLE_0 = (|{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000048) == 32'h00000048),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001010) == 32'h00001010),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & _zz_decode_ctrls_1_down_RD_ENABLE_0_1) == 32'h00002010),{(_zz_decode_ctrls_1_down_RD_ENABLE_0_2 == _zz_decode_ctrls_1_down_RD_ENABLE_0_3),{_zz_decode_ctrls_1_down_RD_ENABLE_0_4,_zz_decode_ctrls_1_down_RD_ENABLE_0_5}}}}});
+  assign _zz_decode_ctrls_1_down_RD_ENABLE_0 = (|{_zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0,{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001010) == 32'h00001010),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00002010) == 32'h00002010),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & _zz_decode_ctrls_1_down_RD_ENABLE_0_1) == 32'h00000010),{(_zz_decode_ctrls_1_down_RD_ENABLE_0_2 == _zz_decode_ctrls_1_down_RD_ENABLE_0_3),(_zz_decode_ctrls_1_down_RD_ENABLE_0_4 == _zz_decode_ctrls_1_down_RD_ENABLE_0_5)}}}}});
+  assign _zz_DecoderPlugin_logic_laneLogic_0_fixer_isJb = (|((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000050) == 32'h00000040));
+  assign _zz_DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice_1 = ((! decode_ctrls_1_down_Prediction_ALIGN_REDO_0) ? 2'b00 : 2'b00);
+  assign _zz_DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice = {30'd0, _zz_DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice_1};
+  assign _zz_GSharePlugin_logic_onLearn_hash_5 = LearnPlugin_logic_learn_payload_history;
+  assign _zz_GSharePlugin_logic_onLearn_hash_4 = {2'd0, _zz_GSharePlugin_logic_onLearn_hash_5};
+  assign _zz_BtbPlugin_logic_memWrite_payload_address = (LearnPlugin_logic_learn_payload_pcOnLastSlice >>> 2'd2);
   assign _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0 = _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0_1[0];
   assign _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0_1 = 1'b0;
   assign _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0 = _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0_1[0];
   assign _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0_1 = 1'b0;
   assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0_1[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0_1 = (|_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0);
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0_1 = (|_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0);
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0_1 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0_2[0];
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0_2 = (|{_zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0,{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000030) == 32'h00000010),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h0000004c) == 32'h00000004),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h02000050) == 32'h00000010),((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000054) == 32'h00000040)}}}});
   assign _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_1 = _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_2[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_2 = (|{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000040) == 32'h00000040),{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001010) == 32'h00001000),_zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0}});
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_2 = (|{_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0,{((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001010) == 32'h00001000),_zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0}});
   assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0_1[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0});
   assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0});
   assign _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0 = _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0_1[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
-  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1[0];
-  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
-  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_2 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_3[0];
-  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_3 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0});
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0});
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_2_0 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_2_0_1[0];
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_2_0_1 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0});
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_2 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_3[0];
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_3 = (|{_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1,_zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0});
   assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0_1[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0_1 = (|_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0);
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0_1 = (|_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0);
   assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_1 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_2[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_2 = (|_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0);
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_2 = (|{_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0,((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000010) == 32'h00000010)});
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_0_1[0];
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_0_1 = (|_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0);
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_0_1[0];
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_0_1 = (|_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0);
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0_1 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0_2[0];
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0_2 = (|_zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0);
+  assign _zz_BtbPlugin_logic_memWrite_payload_address_1 = (DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice >>> 2'd2);
+  assign _zz_BtbPlugin_logic_memRead_cmd_payload = (fetch_logic_ctrls_0_down_Fetch_WORD_PC >>> 2'd2);
+  assign _zz_BtbPlugin_logic_ras_write_payload_data = (BtbPlugin_logic_applyIt_rasLogic_pushPc + 32'h00000004);
   assign _zz_TrapPlugin_logic_harts_0_trap_fsm_jumpTarget_1 = ({2'd0,TrapPlugin_logic_harts_0_trap_fsm_jumpOffset} <<< 2'd2);
   assign _zz_TrapPlugin_logic_harts_0_trap_fsm_jumpTarget = {29'd0, _zz_TrapPlugin_logic_harts_0_trap_fsm_jumpTarget_1};
   assign _zz_PcPlugin_logic_harts_0_self_pc_1 = (PcPlugin_logic_harts_0_self_increment ? 3'b100 : 3'b000);
   assign _zz_PcPlugin_logic_harts_0_self_pc = {29'd0, _zz_PcPlugin_logic_harts_0_self_pc_1};
-  assign _zz_PcPlugin_logic_harts_0_aggregator_fault = (((_zz_PcPlugin_logic_harts_0_aggregator_target ? TrapPlugin_logic_harts_0_trap_pcPort_payload_fault : 1'b0) | (_zz_PcPlugin_logic_harts_0_aggregator_target_1 ? early0_BranchPlugin_logic_pcPort_payload_fault : 1'b0)) | (_zz_PcPlugin_logic_harts_0_aggregator_target_2 ? PcPlugin_logic_harts_0_self_flow_payload_fault : 1'b0));
+  assign _zz_PcPlugin_logic_harts_0_aggregator_fault = (((_zz_PcPlugin_logic_harts_0_aggregator_target ? TrapPlugin_logic_harts_0_trap_pcPort_payload_fault : 1'b0) | (_zz_PcPlugin_logic_harts_0_aggregator_target_1 ? late0_BranchPlugin_logic_pcPort_payload_fault : 1'b0)) | ((_zz_PcPlugin_logic_harts_0_aggregator_target_2 ? early0_BranchPlugin_logic_pcPort_payload_fault : 1'b0) | (_zz_PcPlugin_logic_harts_0_aggregator_target_3 ? PcPlugin_logic_harts_0_self_flow_payload_fault : 1'b0)));
+  assign _zz_PcPlugin_logic_harts_0_aggregator_fault_1_1 = (_zz_PcPlugin_logic_harts_0_aggregator_fault_1 ? BtbPlugin_logic_pcPort_payload_fault : 1'b0);
   assign _zz_CsrAccessPlugin_logic_fsm_readLogic_csrValue_6 = ((_zz_CsrAccessPlugin_logic_fsm_readLogic_csrValue && REG_CSR_3858) ? 6'h2e : 6'h0);
   assign _zz_CsrAccessPlugin_logic_fsm_readLogic_csrValue_5 = {26'd0, _zz_CsrAccessPlugin_logic_fsm_readLogic_csrValue_6};
   assign _zz_CsrAccessPlugin_logic_fsm_readLogic_csrValue_9 = ({7'd0,(_zz_CsrAccessPlugin_logic_fsm_readLogic_csrValue_1 ? PrivilegedPlugin_logic_harts_0_m_status_mpie : 1'b0)} <<< 3'd7);
@@ -2909,90 +3704,96 @@ module VexiiRiscv (
   assign _zz_CsrRamPlugin_logic_readLogic_hits_ohFirst_masked = (CsrRamPlugin_logic_readLogic_hits_ohFirst_input - 2'b01);
   assign _zz_CsrRamPlugin_logic_flush_counter_1 = (! CsrRamPlugin_logic_flush_done);
   assign _zz_CsrRamPlugin_logic_flush_counter = {2'd0, _zz_CsrRamPlugin_logic_flush_counter_1};
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00002030) == 32'h00002010),{((execute_lane0_logic_decoding_decodingBits & 32'h0000004c) == 32'h00000004),{((execute_lane0_logic_decoding_decodingBits & 32'h00001030) == 32'h00000010),{((execute_lane0_logic_decoding_decodingBits & _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_2) == 32'h00002010),((execute_lane0_logic_decoding_decodingBits & _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_3) == 32'h00000010)}}}});
-  assign _zz_execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00003034) == 32'h00001010),((execute_lane0_logic_decoding_decodingBits & 32'h02003054) == 32'h00001010)});
-  assign _zz_execute_ctrl1_down_early0_BranchPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_BranchPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_early0_BranchPlugin_SEL_lane0_1 = (|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0);
-  assign _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h02004074) == 32'h02000030));
-  assign _zz_execute_ctrl1_down_early0_DivPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_DivPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_early0_DivPlugin_SEL_lane0_1 = (|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0);
-  assign _zz_execute_ctrl1_down_early0_EnvPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_EnvPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_early0_EnvPlugin_SEL_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00001048) == 32'h00001008),((execute_lane0_logic_decoding_decodingBits & 32'h00003050) == 32'h00000050)});
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1});
-  assign _zz_execute_ctrl1_down_AguPlugin_SEL_lane0 = _zz_execute_ctrl1_down_AguPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_AguPlugin_SEL_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0});
-  assign _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0 = _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0_1[0];
-  assign _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00001048) == 32'h00000008));
-  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0 = _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_1[0];
-  assign _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00000048) == 32'h00000048),{((execute_lane0_logic_decoding_decodingBits & 32'h00001010) == 32'h00001010),{((execute_lane0_logic_decoding_decodingBits & 32'h00002010) == 32'h00002010),{((execute_lane0_logic_decoding_decodingBits & 32'h00000050) == 32'h00000010),{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1,_zz_execute_ctrl1_down_AguPlugin_LOAD_lane0}}}}});
-  assign _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0_1[0];
-  assign _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2}}}}});
-  assign _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0_1[0];
-  assign _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2}});
-  assign _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0_1[0];
-  assign _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0_1 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0}});
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_6 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_7[0];
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_7 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2}}}}});
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_4[0];
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_4 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2}});
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4[0];
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4 = (|{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,{_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1,_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0}});
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_1 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_2[0];
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_2 = (|{_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0,_zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0});
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0_1[0];
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00006004) == 32'h00002000));
-  assign _zz_execute_ctrl1_down_SrcStageables_REVERT_lane0 = _zz_execute_ctrl1_down_SrcStageables_REVERT_lane0_1[0];
-  assign _zz_execute_ctrl1_down_SrcStageables_REVERT_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00000040) == 32'h00000040),{((execute_lane0_logic_decoding_decodingBits & 32'h00002014) == 32'h00002010),((execute_lane0_logic_decoding_decodingBits & 32'h40000034) == 32'h40000030)}});
-  assign _zz_execute_ctrl1_down_SrcStageables_ZERO_lane0 = _zz_execute_ctrl1_down_SrcStageables_ZERO_lane0_1[0];
-  assign _zz_execute_ctrl1_down_SrcStageables_ZERO_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00000024) == 32'h00000024));
-  assign _zz_execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 = _zz_execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0_1[0];
-  assign _zz_execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00004010) == 32'h0));
-  assign _zz_execute_ctrl1_down_BYPASSED_AT_1_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_1_lane0_1[0];
-  assign _zz_execute_ctrl1_down_BYPASSED_AT_1_lane0_1 = 1'b0;
-  assign _zz_execute_ctrl1_down_BYPASSED_AT_2_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_2_lane0_1[0];
-  assign _zz_execute_ctrl1_down_BYPASSED_AT_2_lane0_1 = 1'b0;
-  assign _zz_execute_ctrl1_down_BYPASSED_AT_3_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_3_lane0_1[0];
-  assign _zz_execute_ctrl1_down_BYPASSED_AT_3_lane0_1 = 1'b0;
-  assign _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0_1[0];
-  assign _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0_1 = 1'b0;
-  assign _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0 = _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0_1[0];
-  assign _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0_1 = (|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0);
-  assign _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0 = _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0_1[0];
-  assign _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0_1 = (|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0);
-  assign _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0 = _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0_1[0];
-  assign _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00002010) == 32'h00002000),((execute_lane0_logic_decoding_decodingBits & 32'h00005000) == 32'h00001000)});
-  assign _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_1 = _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_2[0];
-  assign _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_2 = (|_zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0);
-  assign _zz_execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0 = _zz_execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0_1[0];
-  assign _zz_execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h40000000) == 32'h40000000));
-  assign _zz_execute_ctrl1_down_MulPlugin_HIGH_lane0 = _zz_execute_ctrl1_down_MulPlugin_HIGH_lane0_1[0];
-  assign _zz_execute_ctrl1_down_MulPlugin_HIGH_lane0_1 = (|{_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0,_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0});
-  assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0 = _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0_1[0];
-  assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00001000) == 32'h0),_zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0});
-  assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0_1 = _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0_2[0];
-  assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0_2 = (|{((execute_lane0_logic_decoding_decodingBits & 32'h00005000) == 32'h00004000),_zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0});
-  assign _zz_execute_ctrl1_down_DivPlugin_REM_lane0 = _zz_execute_ctrl1_down_DivPlugin_REM_lane0_1[0];
-  assign _zz_execute_ctrl1_down_DivPlugin_REM_lane0_1 = (|_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0);
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0_1[0];
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00004000) == 32'h00004000));
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0_1 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0_2[0];
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0_2 = (|_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0);
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_1 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_2[0];
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_2 = (|_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0);
-  assign _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_1 = _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_2[0];
-  assign _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_2 = (|_zz_execute_ctrl1_down_AguPlugin_LOAD_lane0);
-  assign _zz_execute_ctrl1_down_AguPlugin_STORE_lane0 = _zz_execute_ctrl1_down_AguPlugin_STORE_lane0_1[0];
-  assign _zz_execute_ctrl1_down_AguPlugin_STORE_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00000020) == 32'h00000020));
-  assign _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0 = _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0_1[0];
-  assign _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0_1 = 1'b0;
-  assign _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0 = _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0_1[0];
-  assign _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0_1 = 1'b0;
-  assign _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0_1[0];
-  assign _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0_1 = 1'b0;
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 33'h100002030) == 33'h100002010),{((execute_lane0_logic_decoding_decodingBits & 33'h10000004c) == 33'h100000004),{((execute_lane0_logic_decoding_decodingBits & 33'h100001030) == 33'h100000010),{((execute_lane0_logic_decoding_decodingBits & _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0_2) == 33'h100002010),((execute_lane0_logic_decoding_decodingBits & _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0_3) == 33'h100000010)}}}});
+  assign _zz_execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 33'h100003034) == 33'h100001010),((execute_lane0_logic_decoding_decodingBits & 33'h102003054) == 33'h100001010)});
+  assign _zz_execute_ctrl0_down_early0_BranchPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_BranchPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_early0_BranchPlugin_SEL_lane0_1 = (|_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0);
+  assign _zz_execute_ctrl0_down_early0_MulPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_MulPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_early0_MulPlugin_SEL_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 33'h002004074) == 33'h002000030));
+  assign _zz_execute_ctrl0_down_early0_DivPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_DivPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_early0_DivPlugin_SEL_lane0_1 = (|_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0);
+  assign _zz_execute_ctrl0_down_early0_EnvPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_EnvPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_early0_EnvPlugin_SEL_lane0_1 = (|{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1,((execute_lane0_logic_decoding_decodingBits & 33'h000003050) == 33'h000000050)});
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0 = _zz_execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 33'h100000044) == 33'h000000004),{((execute_lane0_logic_decoding_decodingBits & 33'h100002040) == 33'h000002000),((execute_lane0_logic_decoding_decodingBits & 33'h100001040) == 33'h0)}});
+  assign _zz_execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0 = _zz_execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 33'h100003044) == 33'h000001000));
+  assign _zz_execute_ctrl0_down_late0_BranchPlugin_SEL_lane0 = _zz_execute_ctrl0_down_late0_BranchPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_late0_BranchPlugin_SEL_lane0_1 = (|_zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0);
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_SEL_lane0 = _zz_execute_ctrl0_down_CsrAccessPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_SEL_lane0_1 = (|{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1});
+  assign _zz_execute_ctrl0_down_AguPlugin_SEL_lane0 = _zz_execute_ctrl0_down_AguPlugin_SEL_lane0_1[0];
+  assign _zz_execute_ctrl0_down_AguPlugin_SEL_lane0_1 = (|{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0,_zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_1});
+  assign _zz_execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0 = _zz_execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0_1[0];
+  assign _zz_execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 33'h000001048) == 33'h000000008));
+  assign _zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0_1 = _zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0_2[0];
+  assign _zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0_2 = (|{((execute_lane0_logic_decoding_decodingBits & 33'h000000048) == 33'h000000048),{((execute_lane0_logic_decoding_decodingBits & 33'h000001010) == 33'h000001010),{((execute_lane0_logic_decoding_decodingBits & 33'h000002010) == 33'h000002010),{((execute_lane0_logic_decoding_decodingBits & 33'h000000050) == 33'h000000010),{_zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0,_zz_execute_ctrl0_down_AguPlugin_LOAD_lane0}}}}});
+  assign _zz_execute_ctrl0_down_COMPLETION_AT_1_lane0 = _zz_execute_ctrl0_down_COMPLETION_AT_1_lane0_1[0];
+  assign _zz_execute_ctrl0_down_COMPLETION_AT_1_lane0_1 = (|{_zz_execute_ctrl0_down_BYPASSED_AT_2_lane0,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3,_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2}}}}});
+  assign _zz_execute_ctrl0_down_COMPLETION_AT_3_lane0 = _zz_execute_ctrl0_down_COMPLETION_AT_3_lane0_1[0];
+  assign _zz_execute_ctrl0_down_COMPLETION_AT_3_lane0_1 = (|{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0,{_zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_1,_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1}}});
+  assign _zz_execute_ctrl0_down_COMPLETION_AT_2_lane0 = _zz_execute_ctrl0_down_COMPLETION_AT_2_lane0_1[0];
+  assign _zz_execute_ctrl0_down_COMPLETION_AT_2_lane0_1 = (|{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1,_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0}});
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5 = _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_6[0];
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_6 = (|{_zz_execute_ctrl0_down_BYPASSED_AT_2_lane0,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3,_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2}}}}});
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3 = _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_4[0];
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_4 = (|{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0,{_zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_1,_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1}}});
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3 = _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4[0];
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_4 = (|{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2,{_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1,_zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0}});
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 = _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_1[0];
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_1 = (|{_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0,_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0});
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_SLTX_lane0 = _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_SLTX_lane0_1[0];
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_SLTX_lane0_1 = (|_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0);
+  assign _zz_execute_ctrl0_down_SrcStageables_REVERT_lane0 = _zz_execute_ctrl0_down_SrcStageables_REVERT_lane0_1[0];
+  assign _zz_execute_ctrl0_down_SrcStageables_REVERT_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 33'h000000040) == 33'h000000040),{((execute_lane0_logic_decoding_decodingBits & 33'h000002014) == 33'h000002010),((execute_lane0_logic_decoding_decodingBits & 33'h040000034) == 33'h040000030)}});
+  assign _zz_execute_ctrl0_down_SrcStageables_ZERO_lane0 = _zz_execute_ctrl0_down_SrcStageables_ZERO_lane0_1[0];
+  assign _zz_execute_ctrl0_down_SrcStageables_ZERO_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 33'h000000024) == 33'h000000024));
+  assign _zz_execute_ctrl0_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 = _zz_execute_ctrl0_down_lane0_IntFormatPlugin_logic_SIGNED_lane0_1[0];
+  assign _zz_execute_ctrl0_down_lane0_IntFormatPlugin_logic_SIGNED_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 33'h000004010) == 33'h0));
+  assign _zz_execute_ctrl0_down_BYPASSED_AT_1_lane0 = _zz_execute_ctrl0_down_BYPASSED_AT_1_lane0_1[0];
+  assign _zz_execute_ctrl0_down_BYPASSED_AT_1_lane0_1 = (|{_zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_1,{_zz_execute_ctrl0_down_BYPASSED_AT_2_lane0,((execute_lane0_logic_decoding_decodingBits & 33'h102000060) == 33'h100000020)}});
+  assign _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_2 = _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_3[0];
+  assign _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_3 = (|{((execute_lane0_logic_decoding_decodingBits & 33'h100000040) == 33'h100000040),{_zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_1,{((execute_lane0_logic_decoding_decodingBits & 33'h100004010) == 33'h100004010),{_zz_execute_ctrl0_down_BYPASSED_AT_2_lane0,((execute_lane0_logic_decoding_decodingBits & 33'h102000020) == 33'h100000020)}}}});
+  assign _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_2_lane0 = _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_2_lane0_1[0];
+  assign _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_2_lane0_1 = (|{_zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0,_zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_1});
+  assign _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_2 = _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_3[0];
+  assign _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_3 = (|{_zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0,_zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_1});
+  assign _zz_execute_ctrl0_down_SrcStageables_UNSIGNED_lane0 = _zz_execute_ctrl0_down_SrcStageables_UNSIGNED_lane0_1[0];
+  assign _zz_execute_ctrl0_down_SrcStageables_UNSIGNED_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 33'h000002010) == 33'h000002000),((execute_lane0_logic_decoding_decodingBits & 33'h000005000) == 33'h000001000)});
+  assign _zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0_1 = _zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0_2[0];
+  assign _zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0_2 = (|_zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0);
+  assign _zz_execute_ctrl0_down_BarrelShifterPlugin_SIGNED_lane0 = _zz_execute_ctrl0_down_BarrelShifterPlugin_SIGNED_lane0_1[0];
+  assign _zz_execute_ctrl0_down_BarrelShifterPlugin_SIGNED_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 33'h040000000) == 33'h040000000));
+  assign _zz_execute_ctrl0_down_MulPlugin_HIGH_lane0 = _zz_execute_ctrl0_down_MulPlugin_HIGH_lane0_1[0];
+  assign _zz_execute_ctrl0_down_MulPlugin_HIGH_lane0_1 = (|{_zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0,_zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0});
+  assign _zz_execute_ctrl0_down_RsUnsignedPlugin_RS1_SIGNED_lane0 = _zz_execute_ctrl0_down_RsUnsignedPlugin_RS1_SIGNED_lane0_1[0];
+  assign _zz_execute_ctrl0_down_RsUnsignedPlugin_RS1_SIGNED_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 33'h000001000) == 33'h0),_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0});
+  assign _zz_execute_ctrl0_down_RsUnsignedPlugin_RS2_SIGNED_lane0 = _zz_execute_ctrl0_down_RsUnsignedPlugin_RS2_SIGNED_lane0_1[0];
+  assign _zz_execute_ctrl0_down_RsUnsignedPlugin_RS2_SIGNED_lane0_1 = (|{((execute_lane0_logic_decoding_decodingBits & 33'h000005000) == 33'h000004000),_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0});
+  assign _zz_execute_ctrl0_down_DivPlugin_REM_lane0 = _zz_execute_ctrl0_down_DivPlugin_REM_lane0_1[0];
+  assign _zz_execute_ctrl0_down_DivPlugin_REM_lane0_1 = (|_zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0);
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_IMM_lane0 = _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_IMM_lane0_1[0];
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_IMM_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 33'h000004000) == 33'h000004000));
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0_1 = _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0_2[0];
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0_2 = (|_zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0);
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0_1 = _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0_2[0];
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0_2 = (|_zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0);
+  assign _zz_execute_ctrl0_down_AguPlugin_LOAD_lane0_1 = _zz_execute_ctrl0_down_AguPlugin_LOAD_lane0_2[0];
+  assign _zz_execute_ctrl0_down_AguPlugin_LOAD_lane0_2 = (|_zz_execute_ctrl0_down_AguPlugin_LOAD_lane0);
+  assign _zz_execute_ctrl0_down_AguPlugin_STORE_lane0 = _zz_execute_ctrl0_down_AguPlugin_STORE_lane0_1[0];
+  assign _zz_execute_ctrl0_down_AguPlugin_STORE_lane0_1 = (|((execute_lane0_logic_decoding_decodingBits & 33'h000000020) == 33'h000000020));
+  assign _zz_execute_ctrl0_down_AguPlugin_ATOMIC_lane0 = _zz_execute_ctrl0_down_AguPlugin_ATOMIC_lane0_1[0];
+  assign _zz_execute_ctrl0_down_AguPlugin_ATOMIC_lane0_1 = 1'b0;
+  assign _zz_execute_ctrl0_down_AguPlugin_FLOAT_lane0 = _zz_execute_ctrl0_down_AguPlugin_FLOAT_lane0_1[0];
+  assign _zz_execute_ctrl0_down_AguPlugin_FLOAT_lane0_1 = 1'b0;
+  assign _zz_execute_ctrl0_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = _zz_execute_ctrl0_down_LsuPlugin_logic_LSU_PREFETCH_lane0_1[0];
+  assign _zz_execute_ctrl0_down_LsuPlugin_logic_LSU_PREFETCH_lane0_1 = 1'b0;
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0_1 = _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0_2[0];
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0_2 = (|{_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0,_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0});
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0_1 = _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0_2[0];
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0_2 = (|_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0);
   assign _zz_WhiteboxerPlugin_logic_csr_access_payload_address = CsrAccessPlugin_logic_fsm_interface_uop;
   assign _zz__zz_WhiteboxerPlugin_logic_perf_executeFreezedCounter_1_1 = _zz_WhiteboxerPlugin_logic_perf_executeFreezedCounter;
   assign _zz__zz_WhiteboxerPlugin_logic_perf_executeFreezedCounter_1 = {59'd0, _zz__zz_WhiteboxerPlugin_logic_perf_executeFreezedCounter_1_1};
@@ -3006,34 +3807,57 @@ module VexiiRiscv (
   assign _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_0_1 = {59'd0, _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_0_1_1};
   assign _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1_1_1 = _zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1;
   assign _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1_1 = {59'd0, _zz__zz_WhiteboxerPlugin_logic_perf_dispatchFeedCounters_1_1_1};
+  assign _zz_BtbPlugin_logic_ras_mem_stack_port = BtbPlugin_logic_ras_write_payload_data;
   assign _zz_LsuL1Plugin_logic_ways_0_mem_port = {LsuL1Plugin_logic_waysWrite_tag_fault,{LsuL1Plugin_logic_waysWrite_tag_address,LsuL1Plugin_logic_waysWrite_tag_loaded}};
   assign _zz_LsuL1Plugin_logic_ways_0_mem_port_1 = LsuL1Plugin_logic_waysWrite_mask[0];
+  assign _zz_LsuL1Plugin_logic_ways_1_mem_port = {LsuL1Plugin_logic_waysWrite_tag_fault,{LsuL1Plugin_logic_waysWrite_tag_address,LsuL1Plugin_logic_waysWrite_tag_loaded}};
+  assign _zz_LsuL1Plugin_logic_ways_1_mem_port_1 = LsuL1Plugin_logic_waysWrite_mask[1];
+  assign _zz_LsuL1Plugin_logic_shared_mem_port = {LsuL1Plugin_logic_shared_write_payload_data_dirty,LsuL1Plugin_logic_shared_write_payload_data_plru_0};
   assign _zz_LsuL1Plugin_logic_writeback_victimBuffer_port = LsuL1Plugin_logic_writeback_read_slotReadLast_payload_wordIndex;
   assign _zz_FetchL1Plugin_logic_ways_0_mem_port = {FetchL1Plugin_logic_waysWrite_tag_address,{FetchL1Plugin_logic_waysWrite_tag_error,FetchL1Plugin_logic_waysWrite_tag_loaded}};
   assign _zz_FetchL1Plugin_logic_ways_0_mem_port_1 = FetchL1Plugin_logic_waysWrite_mask[0];
-  assign _zz_21 = _zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
-  assign _zz_23 = {_zz_13[2],{_zz_13[1],_zz_13[0]}};
-  assign _zz_LsuPlugin_logic_onCtrl_loadData_shited_1 = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[1 : 0];
-  assign _zz_LsuPlugin_logic_onCtrl_loadData_shited_3 = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[1 : 1];
+  assign _zz_FetchL1Plugin_logic_ways_1_mem_port = {FetchL1Plugin_logic_waysWrite_tag_address,{FetchL1Plugin_logic_waysWrite_tag_error,FetchL1Plugin_logic_waysWrite_tag_loaded}};
+  assign _zz_FetchL1Plugin_logic_ways_1_mem_port_1 = FetchL1Plugin_logic_waysWrite_mask[1];
+  assign _zz_GSharePlugin_logic_mem_counter_port = GSharePlugin_logic_mem_write_payload_data_0;
+  assign _zz_BtbPlugin_logic_mem_port = {BtbPlugin_logic_memDp_wp_payload_data_0_isPop,{BtbPlugin_logic_memDp_wp_payload_data_0_isPush,{BtbPlugin_logic_memDp_wp_payload_data_0_isBranch,{BtbPlugin_logic_memDp_wp_payload_data_0_pcTarget,BtbPlugin_logic_memDp_wp_payload_data_0_hash}}}};
+  assign _zz_41 = {_zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0_1,_zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0};
+  assign _zz_43 = {_zz_21[2],{_zz_21[1],_zz_21[0]}};
+  assign _zz_LsuPlugin_logic_onCtrl_loadData_shited_1 = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[1 : 0];
+  assign _zz_LsuPlugin_logic_onCtrl_loadData_shited_3 = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[1 : 1];
   assign _zz_WhiteboxerPlugin_logic_perf_candidatesCount_1 = DispatchPlugin_logic_candidates_0_ctx_valid;
   assign _zz_WhiteboxerPlugin_logic_perf_dispatchFeedCount_1 = decode_ctrls_1_up_LANE_SEL_0;
-  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_1 = execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[9];
-  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_2 = execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[10];
-  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_3 = {execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[11],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[12],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[13],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[14],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[15],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[16],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[17],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[18],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[19],{_zz_early0_BarrelShifterPlugin_logic_shift_reversed_4,{_zz_early0_BarrelShifterPlugin_logic_shift_reversed_5,_zz_early0_BarrelShifterPlugin_logic_shift_reversed_6}}}}}}}}}}};
-  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_4 = execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[20];
-  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_5 = execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[21];
-  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_6 = {execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[22],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[23],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[24],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[25],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[26],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[27],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[28],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[29],{execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[30],execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[31]}}}}}}}}};
+  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_1 = execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[9];
+  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_2 = execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[10];
+  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_3 = {execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[11],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[12],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[13],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[14],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[15],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[16],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[17],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[18],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[19],{_zz_early0_BarrelShifterPlugin_logic_shift_reversed_4,{_zz_early0_BarrelShifterPlugin_logic_shift_reversed_5,_zz_early0_BarrelShifterPlugin_logic_shift_reversed_6}}}}}}}}}}};
+  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_4 = execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[20];
+  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_5 = execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[21];
+  assign _zz_early0_BarrelShifterPlugin_logic_shift_reversed_6 = {execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[22],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[23],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[24],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[25],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[26],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[27],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[28],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[29],{execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[30],execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[31]}}}}}}}}};
   assign _zz_early0_BarrelShifterPlugin_logic_shift_patched_1 = early0_BarrelShifterPlugin_logic_shift_shifted[9];
   assign _zz_early0_BarrelShifterPlugin_logic_shift_patched_2 = early0_BarrelShifterPlugin_logic_shift_shifted[10];
   assign _zz_early0_BarrelShifterPlugin_logic_shift_patched_3 = {early0_BarrelShifterPlugin_logic_shift_shifted[11],{early0_BarrelShifterPlugin_logic_shift_shifted[12],{early0_BarrelShifterPlugin_logic_shift_shifted[13],{early0_BarrelShifterPlugin_logic_shift_shifted[14],{early0_BarrelShifterPlugin_logic_shift_shifted[15],{early0_BarrelShifterPlugin_logic_shift_shifted[16],{early0_BarrelShifterPlugin_logic_shift_shifted[17],{early0_BarrelShifterPlugin_logic_shift_shifted[18],{early0_BarrelShifterPlugin_logic_shift_shifted[19],{_zz_early0_BarrelShifterPlugin_logic_shift_patched_4,{_zz_early0_BarrelShifterPlugin_logic_shift_patched_5,_zz_early0_BarrelShifterPlugin_logic_shift_patched_6}}}}}}}}}}};
   assign _zz_early0_BarrelShifterPlugin_logic_shift_patched_4 = early0_BarrelShifterPlugin_logic_shift_shifted[20];
   assign _zz_early0_BarrelShifterPlugin_logic_shift_patched_5 = early0_BarrelShifterPlugin_logic_shift_shifted[21];
   assign _zz_early0_BarrelShifterPlugin_logic_shift_patched_6 = {early0_BarrelShifterPlugin_logic_shift_shifted[22],{early0_BarrelShifterPlugin_logic_shift_shifted[23],{early0_BarrelShifterPlugin_logic_shift_shifted[24],{early0_BarrelShifterPlugin_logic_shift_shifted[25],{early0_BarrelShifterPlugin_logic_shift_shifted[26],{early0_BarrelShifterPlugin_logic_shift_shifted[27],{early0_BarrelShifterPlugin_logic_shift_shifted[28],{early0_BarrelShifterPlugin_logic_shift_shifted[29],{early0_BarrelShifterPlugin_logic_shift_shifted[30],early0_BarrelShifterPlugin_logic_shift_shifted[31]}}}}}}}}};
-  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_1 = 32'h00002010;
-  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_2 = (decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000050);
-  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_3 = 32'h00000010;
-  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_4 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h0000000c) == 32'h00000004);
-  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_5 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000028) == 32'h0);
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_reversed_1 = execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[9];
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_reversed_2 = execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[10];
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_reversed_3 = {execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[11],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[12],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[13],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[14],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[15],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[16],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[17],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[18],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[19],{_zz_late0_BarrelShifterPlugin_logic_shift_reversed_4,{_zz_late0_BarrelShifterPlugin_logic_shift_reversed_5,_zz_late0_BarrelShifterPlugin_logic_shift_reversed_6}}}}}}}}}}};
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_reversed_4 = execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[20];
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_reversed_5 = execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[21];
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_reversed_6 = {execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[22],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[23],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[24],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[25],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[26],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[27],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[28],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[29],{execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[30],execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[31]}}}}}}}}};
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_patched_1 = late0_BarrelShifterPlugin_logic_shift_shifted[9];
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_patched_2 = late0_BarrelShifterPlugin_logic_shift_shifted[10];
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_patched_3 = {late0_BarrelShifterPlugin_logic_shift_shifted[11],{late0_BarrelShifterPlugin_logic_shift_shifted[12],{late0_BarrelShifterPlugin_logic_shift_shifted[13],{late0_BarrelShifterPlugin_logic_shift_shifted[14],{late0_BarrelShifterPlugin_logic_shift_shifted[15],{late0_BarrelShifterPlugin_logic_shift_shifted[16],{late0_BarrelShifterPlugin_logic_shift_shifted[17],{late0_BarrelShifterPlugin_logic_shift_shifted[18],{late0_BarrelShifterPlugin_logic_shift_shifted[19],{_zz_late0_BarrelShifterPlugin_logic_shift_patched_4,{_zz_late0_BarrelShifterPlugin_logic_shift_patched_5,_zz_late0_BarrelShifterPlugin_logic_shift_patched_6}}}}}}}}}}};
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_patched_4 = late0_BarrelShifterPlugin_logic_shift_shifted[20];
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_patched_5 = late0_BarrelShifterPlugin_logic_shift_shifted[21];
+  assign _zz_late0_BarrelShifterPlugin_logic_shift_patched_6 = {late0_BarrelShifterPlugin_logic_shift_shifted[22],{late0_BarrelShifterPlugin_logic_shift_shifted[23],{late0_BarrelShifterPlugin_logic_shift_shifted[24],{late0_BarrelShifterPlugin_logic_shift_shifted[25],{late0_BarrelShifterPlugin_logic_shift_shifted[26],{late0_BarrelShifterPlugin_logic_shift_shifted[27],{late0_BarrelShifterPlugin_logic_shift_shifted[28],{late0_BarrelShifterPlugin_logic_shift_shifted[29],{late0_BarrelShifterPlugin_logic_shift_shifted[30],late0_BarrelShifterPlugin_logic_shift_shifted[31]}}}}}}}}};
+  assign _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_1 = _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[6];
+  assign _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_2 = _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[7];
+  assign _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_3 = {_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[8],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[9],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[10],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[11],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[12],_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[13]}}}}};
+  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_1 = 32'h00000050;
+  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_2 = (decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h0000000c);
+  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_3 = 32'h00000004;
+  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_4 = (decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000028);
+  assign _zz_decode_ctrls_1_down_RD_ENABLE_0_5 = 32'h0;
   assign _zz_decode_ctrls_1_down_Decode_LEGAL_0 = 32'h0000107f;
   assign _zz_decode_ctrls_1_down_Decode_LEGAL_0_1 = (decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h0000207f);
   assign _zz_decode_ctrls_1_down_Decode_LEGAL_0_2 = 32'h00002073;
@@ -3052,18 +3876,12 @@ module VexiiRiscv (
   assign _zz_decode_ctrls_1_down_Decode_LEGAL_0_15 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'hbe00707f) == 32'h00000033);
   assign _zz_decode_ctrls_1_down_Decode_LEGAL_0_16 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'hffefffff) == 32'h00000073);
   assign _zz_decode_ctrls_1_down_Decode_LEGAL_0_17 = {((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'hffffffff) == 32'h10500073),((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'hffffffff) == 32'h30200073)};
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard = (DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0 && execute_ctrl3_up_RD_ENABLE_lane0);
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_1 = (execute_ctrl3_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS1_PHYS);
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_2 = ((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS1_PHYS));
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_3 = 1'b1;
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_4 = ((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0 && execute_ctrl1_up_RD_ENABLE_lane0) && (execute_ctrl1_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS1_PHYS));
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_5 = 1'b1;
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard = (DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0 && execute_ctrl3_up_RD_ENABLE_lane0);
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_1 = (execute_ctrl3_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS2_PHYS);
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_2 = ((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS2_PHYS));
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_3 = 1'b1;
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_4 = ((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0 && execute_ctrl1_up_RD_ENABLE_lane0) && (execute_ctrl1_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS2_PHYS));
-  assign _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_5 = 1'b1;
+  assign _zz_GSharePlugin_logic_onLearn_hash_1 = _zz_GSharePlugin_logic_onLearn_hash[6];
+  assign _zz_GSharePlugin_logic_onLearn_hash_2 = _zz_GSharePlugin_logic_onLearn_hash[7];
+  assign _zz_GSharePlugin_logic_onLearn_hash_3 = {_zz_GSharePlugin_logic_onLearn_hash[8],{_zz_GSharePlugin_logic_onLearn_hash[9],{_zz_GSharePlugin_logic_onLearn_hash[10],{_zz_GSharePlugin_logic_onLearn_hash[11],{_zz_GSharePlugin_logic_onLearn_hash[12],_zz_GSharePlugin_logic_onLearn_hash[13]}}}}};
+  assign _zz_decode_logic_flushes_1_onLanes_0_doIt = 1'b1;
+  assign _zz_decode_logic_flushes_1_onLanes_0_doIt_1 = (early0_BranchPlugin_logic_flushPort_valid && 1'b1);
+  assign _zz_decode_logic_flushes_1_onLanes_0_doIt_2 = (LsuPlugin_logic_flushPort_valid && 1'b1);
   assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception = 1'b0;
   assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1 = 1'b0;
   assign _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_2 = (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2 && 1'b0);
@@ -3079,12 +3897,25 @@ module VexiiRiscv (
   assign _zz_CsrAccessPlugin_logic_fsm_inject_implemented = COMB_CSR_3859;
   assign _zz_CsrAccessPlugin_logic_fsm_inject_implemented_1 = {COMB_CSR_3858,{COMB_CSR_3857,{COMB_CSR_1954,{COMB_CSR_1953,COMB_CSR_1952}}}};
   assign _zz_CsrAccessPlugin_logic_fsm_readLogic_csrValue_7 = 32'h40001100;
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_2 = 32'h02002050;
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0_3 = 32'h02001050;
-  assign _zz_when_ExecuteLanePlugin_l307_2 = 1'b1;
-  assign _zz_when_ExecuteLanePlugin_l307_2_1 = 1'b1;
-  assign _zz_when_ExecuteLanePlugin_l307_2_2 = 1'b0;
-  assign _zz_when_ExecuteLanePlugin_l307_2_3 = (1'b1 && early0_BranchPlugin_logic_flushPort_payload_self);
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0_2 = 33'h102002050;
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0_3 = 33'h102001050;
+  assign _zz_when_ExecuteLanePlugin_l307_1 = 1'b1;
+  assign _zz_when_ExecuteLanePlugin_l307_1_1 = 1'b1;
+  assign _zz_when_ExecuteLanePlugin_l307_1_2 = 1'b0;
+  assign _zz_when_ExecuteLanePlugin_l307_1_3 = (1'b1 && CsrAccessPlugin_logic_flushPort_payload_self);
+  assign _zz_when_ExecuteLanePlugin_l307_1_4 = (early0_BranchPlugin_logic_flushPort_valid && 1'b1);
+  assign _zz_when_ExecuteLanePlugin_l307_1_5 = (1'b0 || (1'b1 && early0_BranchPlugin_logic_flushPort_payload_self));
+  assign _zz_when_ExecuteLanePlugin_l307_1_6 = 1'b1;
+  assign _zz_fetch_logic_flushes_0_doIt = 1'b1;
+  assign _zz_fetch_logic_flushes_0_doIt_1 = (BtbPlugin_logic_flushPort_valid && 1'b1);
+  assign _zz_fetch_logic_flushes_0_doIt_2 = (1'b0 || (1'b1 && BtbPlugin_logic_flushPort_payload_self));
+  assign BtbPlugin_logic_ras_mem_stack_spinal_port0 = BtbPlugin_logic_ras_mem_stack[BtbPlugin_logic_ras_ptr_pop_aheadValue];
+  always @(posedge clk) begin
+    if(_zz_2) begin
+      BtbPlugin_logic_ras_mem_stack[BtbPlugin_logic_ras_write_payload_address] <= _zz_BtbPlugin_logic_ras_mem_stack_port;
+    end
+  end
+
   always @(*) begin
     LsuL1Plugin_logic_banks_0_mem_spinal_port1 = {_zz_LsuL1Plugin_logic_banks_0_memsymbol_read_3, _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_2, _zz_LsuL1Plugin_logic_banks_0_memsymbol_read_1, _zz_LsuL1Plugin_logic_banks_0_memsymbol_read};
   end
@@ -3112,6 +3943,33 @@ module VexiiRiscv (
     end
   end
 
+  always @(*) begin
+    LsuL1Plugin_logic_banks_1_mem_spinal_port1 = {_zz_LsuL1Plugin_logic_banks_1_memsymbol_read_3, _zz_LsuL1Plugin_logic_banks_1_memsymbol_read_2, _zz_LsuL1Plugin_logic_banks_1_memsymbol_read_1, _zz_LsuL1Plugin_logic_banks_1_memsymbol_read};
+  end
+  always @(posedge clk) begin
+    if(LsuL1Plugin_logic_banks_1_write_payload_mask[0] && LsuL1Plugin_logic_banks_1_write_valid) begin
+      LsuL1Plugin_logic_banks_1_mem_symbol0[LsuL1Plugin_logic_banks_1_write_payload_address] <= LsuL1Plugin_logic_banks_1_write_payload_data[7 : 0];
+    end
+    if(LsuL1Plugin_logic_banks_1_write_payload_mask[1] && LsuL1Plugin_logic_banks_1_write_valid) begin
+      LsuL1Plugin_logic_banks_1_mem_symbol1[LsuL1Plugin_logic_banks_1_write_payload_address] <= LsuL1Plugin_logic_banks_1_write_payload_data[15 : 8];
+    end
+    if(LsuL1Plugin_logic_banks_1_write_payload_mask[2] && LsuL1Plugin_logic_banks_1_write_valid) begin
+      LsuL1Plugin_logic_banks_1_mem_symbol2[LsuL1Plugin_logic_banks_1_write_payload_address] <= LsuL1Plugin_logic_banks_1_write_payload_data[23 : 16];
+    end
+    if(LsuL1Plugin_logic_banks_1_write_payload_mask[3] && LsuL1Plugin_logic_banks_1_write_valid) begin
+      LsuL1Plugin_logic_banks_1_mem_symbol3[LsuL1Plugin_logic_banks_1_write_payload_address] <= LsuL1Plugin_logic_banks_1_write_payload_data[31 : 24];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(LsuL1Plugin_logic_banks_1_read_cmd_valid) begin
+      _zz_LsuL1Plugin_logic_banks_1_memsymbol_read <= LsuL1Plugin_logic_banks_1_mem_symbol0[LsuL1Plugin_logic_banks_1_read_cmd_payload];
+      _zz_LsuL1Plugin_logic_banks_1_memsymbol_read_1 <= LsuL1Plugin_logic_banks_1_mem_symbol1[LsuL1Plugin_logic_banks_1_read_cmd_payload];
+      _zz_LsuL1Plugin_logic_banks_1_memsymbol_read_2 <= LsuL1Plugin_logic_banks_1_mem_symbol2[LsuL1Plugin_logic_banks_1_read_cmd_payload];
+      _zz_LsuL1Plugin_logic_banks_1_memsymbol_read_3 <= LsuL1Plugin_logic_banks_1_mem_symbol3[LsuL1Plugin_logic_banks_1_read_cmd_payload];
+    end
+  end
+
   always @(posedge clk) begin
     if(_zz_LsuL1Plugin_logic_ways_0_mem_port_1) begin
       LsuL1Plugin_logic_ways_0_mem[LsuL1Plugin_logic_waysWrite_address] <= _zz_LsuL1Plugin_logic_ways_0_mem_port;
@@ -3125,8 +3983,20 @@ module VexiiRiscv (
   end
 
   always @(posedge clk) begin
-    if(_zz_4) begin
-      LsuL1Plugin_logic_shared_mem[LsuL1Plugin_logic_shared_write_payload_address] <= LsuL1Plugin_logic_shared_write_payload_data_dirty;
+    if(_zz_LsuL1Plugin_logic_ways_1_mem_port_1) begin
+      LsuL1Plugin_logic_ways_1_mem[LsuL1Plugin_logic_waysWrite_address] <= _zz_LsuL1Plugin_logic_ways_1_mem_port;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(LsuL1Plugin_logic_ways_1_lsuRead_cmd_valid) begin
+      LsuL1Plugin_logic_ways_1_mem_spinal_port1 <= LsuL1Plugin_logic_ways_1_mem[LsuL1Plugin_logic_ways_1_lsuRead_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_8) begin
+      LsuL1Plugin_logic_shared_mem[LsuL1Plugin_logic_shared_write_payload_address] <= _zz_LsuL1Plugin_logic_shared_mem_port;
     end
   end
 
@@ -3137,7 +4007,7 @@ module VexiiRiscv (
   end
 
   always @(posedge clk) begin
-    if(_zz_3) begin
+    if(_zz_7) begin
       LsuL1Plugin_logic_writeback_victimBuffer[_zz_LsuL1Plugin_logic_writeback_victimBuffer_port] <= LsuL1Plugin_logic_writeback_read_readedData;
     end
   end
@@ -3149,7 +4019,7 @@ module VexiiRiscv (
   end
 
   always @(posedge clk) begin
-    if(_zz_2) begin
+    if(_zz_6) begin
       FetchL1Plugin_logic_banks_0_mem[FetchL1Plugin_logic_banks_0_write_payload_address] <= FetchL1Plugin_logic_banks_0_write_payload_data;
     end
   end
@@ -3157,6 +4027,18 @@ module VexiiRiscv (
   always @(posedge clk) begin
     if(FetchL1Plugin_logic_banks_0_read_cmd_valid) begin
       FetchL1Plugin_logic_banks_0_mem_spinal_port1 <= FetchL1Plugin_logic_banks_0_mem[FetchL1Plugin_logic_banks_0_read_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_5) begin
+      FetchL1Plugin_logic_banks_1_mem[FetchL1Plugin_logic_banks_1_write_payload_address] <= FetchL1Plugin_logic_banks_1_write_payload_data;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(FetchL1Plugin_logic_banks_1_read_cmd_valid) begin
+      FetchL1Plugin_logic_banks_1_mem_spinal_port1 <= FetchL1Plugin_logic_banks_1_mem[FetchL1Plugin_logic_banks_1_read_cmd_payload];
     end
   end
 
@@ -3173,6 +4055,54 @@ module VexiiRiscv (
   end
 
   always @(posedge clk) begin
+    if(_zz_FetchL1Plugin_logic_ways_1_mem_port_1) begin
+      FetchL1Plugin_logic_ways_1_mem[FetchL1Plugin_logic_waysWrite_address] <= _zz_FetchL1Plugin_logic_ways_1_mem_port;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(FetchL1Plugin_logic_ways_1_read_cmd_valid) begin
+      FetchL1Plugin_logic_ways_1_mem_spinal_port1 <= FetchL1Plugin_logic_ways_1_mem[FetchL1Plugin_logic_ways_1_read_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_4) begin
+      FetchL1Plugin_logic_plru_mem[FetchL1Plugin_logic_plru_write_payload_address] <= FetchL1Plugin_logic_plru_write_payload_data_0;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(FetchL1Plugin_logic_plru_read_cmd_valid) begin
+      FetchL1Plugin_logic_plru_mem_spinal_port1 <= FetchL1Plugin_logic_plru_mem[FetchL1Plugin_logic_plru_read_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_3) begin
+      GSharePlugin_logic_mem_counter[GSharePlugin_logic_mem_write_payload_address] <= _zz_GSharePlugin_logic_mem_counter_port;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(fetch_logic_ctrls_0_down_isReady) begin
+      GSharePlugin_logic_mem_counter_spinal_port1 <= GSharePlugin_logic_mem_counter[fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(BtbPlugin_logic_memDp_wp_payload_mask[0] && BtbPlugin_logic_memDp_wp_valid) begin
+      BtbPlugin_logic_mem[BtbPlugin_logic_memDp_wp_payload_address] <= _zz_BtbPlugin_logic_mem_port;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(BtbPlugin_logic_memDp_rp_cmd_valid) begin
+      BtbPlugin_logic_mem_spinal_port1 <= BtbPlugin_logic_mem[BtbPlugin_logic_memDp_rp_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
     if(_zz_1) begin
       CsrRamPlugin_logic_mem[CsrRamPlugin_logic_writeLogic_port_payload_address] <= CsrRamPlugin_logic_writeLogic_port_payload_data;
     end
@@ -3185,7 +4115,7 @@ module VexiiRiscv (
   end
 
   DivRadix early0_DivPlugin_logic_processing_div (
-    .io_flush                  (execute_ctrl2_down_isReady                                       ), //i
+    .io_flush                  (execute_ctrl1_down_isReady                                       ), //i
     .io_cmd_valid              (early0_DivPlugin_logic_processing_div_io_cmd_valid               ), //i
     .io_cmd_ready              (early0_DivPlugin_logic_processing_div_io_cmd_ready               ), //o
     .io_cmd_payload_a          (early0_DivPlugin_logic_processing_a[31:0]                        ), //i
@@ -3263,31 +4193,35 @@ module VexiiRiscv (
     .reset                       (reset                                                             )  //i
   );
   StreamArbiter_3 streamArbiter_4 (
-    .io_inputs_0_valid                      (LearnPlugin_logic_buffered_0_valid                      ), //i
-    .io_inputs_0_ready                      (streamArbiter_4_io_inputs_0_ready                       ), //o
-    .io_inputs_0_payload_pcOnLastSlice      (LearnPlugin_logic_buffered_0_payload_pcOnLastSlice[31:0]), //i
-    .io_inputs_0_payload_pcTarget           (LearnPlugin_logic_buffered_0_payload_pcTarget[31:0]     ), //i
-    .io_inputs_0_payload_taken              (LearnPlugin_logic_buffered_0_payload_taken              ), //i
-    .io_inputs_0_payload_isBranch           (LearnPlugin_logic_buffered_0_payload_isBranch           ), //i
-    .io_inputs_0_payload_isPush             (LearnPlugin_logic_buffered_0_payload_isPush             ), //i
-    .io_inputs_0_payload_isPop              (LearnPlugin_logic_buffered_0_payload_isPop              ), //i
-    .io_inputs_0_payload_wasWrong           (LearnPlugin_logic_buffered_0_payload_wasWrong           ), //i
-    .io_inputs_0_payload_badPredictedTarget (LearnPlugin_logic_buffered_0_payload_badPredictedTarget ), //i
-    .io_inputs_0_payload_uopId              (LearnPlugin_logic_buffered_0_payload_uopId[15:0]        ), //i
-    .io_output_valid                        (streamArbiter_4_io_output_valid                         ), //o
-    .io_output_ready                        (LearnPlugin_logic_arbitrated_ready                      ), //i
-    .io_output_payload_pcOnLastSlice        (streamArbiter_4_io_output_payload_pcOnLastSlice[31:0]   ), //o
-    .io_output_payload_pcTarget             (streamArbiter_4_io_output_payload_pcTarget[31:0]        ), //o
-    .io_output_payload_taken                (streamArbiter_4_io_output_payload_taken                 ), //o
-    .io_output_payload_isBranch             (streamArbiter_4_io_output_payload_isBranch              ), //o
-    .io_output_payload_isPush               (streamArbiter_4_io_output_payload_isPush                ), //o
-    .io_output_payload_isPop                (streamArbiter_4_io_output_payload_isPop                 ), //o
-    .io_output_payload_wasWrong             (streamArbiter_4_io_output_payload_wasWrong              ), //o
-    .io_output_payload_badPredictedTarget   (streamArbiter_4_io_output_payload_badPredictedTarget    ), //o
-    .io_output_payload_uopId                (streamArbiter_4_io_output_payload_uopId[15:0]           ), //o
-    .io_chosenOH                            (streamArbiter_4_io_chosenOH                             ), //o
-    .clk                                    (clk                                                     ), //i
-    .reset                                  (reset                                                   )  //i
+    .io_inputs_0_valid                                     (LearnPlugin_logic_buffered_0_valid                                         ), //i
+    .io_inputs_0_ready                                     (streamArbiter_4_io_inputs_0_ready                                          ), //o
+    .io_inputs_0_payload_pcOnLastSlice                     (LearnPlugin_logic_buffered_0_payload_pcOnLastSlice[31:0]                   ), //i
+    .io_inputs_0_payload_pcTarget                          (LearnPlugin_logic_buffered_0_payload_pcTarget[31:0]                        ), //i
+    .io_inputs_0_payload_taken                             (LearnPlugin_logic_buffered_0_payload_taken                                 ), //i
+    .io_inputs_0_payload_isBranch                          (LearnPlugin_logic_buffered_0_payload_isBranch                              ), //i
+    .io_inputs_0_payload_isPush                            (LearnPlugin_logic_buffered_0_payload_isPush                                ), //i
+    .io_inputs_0_payload_isPop                             (LearnPlugin_logic_buffered_0_payload_isPop                                 ), //i
+    .io_inputs_0_payload_wasWrong                          (LearnPlugin_logic_buffered_0_payload_wasWrong                              ), //i
+    .io_inputs_0_payload_badPredictedTarget                (LearnPlugin_logic_buffered_0_payload_badPredictedTarget                    ), //i
+    .io_inputs_0_payload_history                           (LearnPlugin_logic_buffered_0_payload_history[11:0]                         ), //i
+    .io_inputs_0_payload_uopId                             (LearnPlugin_logic_buffered_0_payload_uopId[15:0]                           ), //i
+    .io_inputs_0_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 (LearnPlugin_logic_buffered_0_payload_ctx_GSharePlugin_GSHARE_COUNTER_0[1:0]), //i
+    .io_output_valid                                       (streamArbiter_4_io_output_valid                                            ), //o
+    .io_output_ready                                       (LearnPlugin_logic_arbitrated_ready                                         ), //i
+    .io_output_payload_pcOnLastSlice                       (streamArbiter_4_io_output_payload_pcOnLastSlice[31:0]                      ), //o
+    .io_output_payload_pcTarget                            (streamArbiter_4_io_output_payload_pcTarget[31:0]                           ), //o
+    .io_output_payload_taken                               (streamArbiter_4_io_output_payload_taken                                    ), //o
+    .io_output_payload_isBranch                            (streamArbiter_4_io_output_payload_isBranch                                 ), //o
+    .io_output_payload_isPush                              (streamArbiter_4_io_output_payload_isPush                                   ), //o
+    .io_output_payload_isPop                               (streamArbiter_4_io_output_payload_isPop                                    ), //o
+    .io_output_payload_wasWrong                            (streamArbiter_4_io_output_payload_wasWrong                                 ), //o
+    .io_output_payload_badPredictedTarget                  (streamArbiter_4_io_output_payload_badPredictedTarget                       ), //o
+    .io_output_payload_history                             (streamArbiter_4_io_output_payload_history[11:0]                            ), //o
+    .io_output_payload_uopId                               (streamArbiter_4_io_output_payload_uopId[15:0]                              ), //o
+    .io_output_payload_ctx_GSharePlugin_GSHARE_COUNTER_0   (streamArbiter_4_io_output_payload_ctx_GSharePlugin_GSHARE_COUNTER_0[1:0]   ), //o
+    .io_chosenOH                                           (streamArbiter_4_io_chosenOH                                                ), //o
+    .clk                                                   (clk                                                                        ), //i
+    .reset                                                 (reset                                                                      )  //i
   );
   RegFileMem integer_RegFilePlugin_logic_regfile_fpga (
     .io_writes_0_valid   (integer_RegFilePlugin_logic_regfile_fpga_io_writes_0_valid       ), //i
@@ -3304,22 +4238,51 @@ module VexiiRiscv (
     .reset               (reset                                                            )  //i
   );
   always @(*) begin
-    case(_zz_21)
-      1'b0 : _zz_20 = 1'b0;
-      default : _zz_20 = 1'b1;
+    case(LsuL1Plugin_logic_writeback_read_slotReadLast_payload_way)
+      1'b0 : _zz_LsuL1Plugin_logic_writeback_read_readedData = LsuL1Plugin_logic_banks_0_read_rsp;
+      default : _zz_LsuL1Plugin_logic_writeback_read_readedData = LsuL1Plugin_logic_banks_1_read_rsp;
     endcase
   end
 
   always @(*) begin
-    case(_zz_23)
-      3'b000 : _zz_22 = 2'b00;
-      3'b001 : _zz_22 = 2'b01;
-      3'b010 : _zz_22 = 2'b01;
-      3'b011 : _zz_22 = 2'b10;
-      3'b100 : _zz_22 = 2'b01;
-      3'b101 : _zz_22 = 2'b10;
-      3'b110 : _zz_22 = 2'b10;
-      default : _zz_22 = 2'b11;
+    case(_zz_41)
+      2'b00 : _zz_40 = 2'b00;
+      2'b01 : _zz_40 = 2'b01;
+      2'b10 : _zz_40 = 2'b01;
+      default : _zz_40 = 2'b10;
+    endcase
+  end
+
+  always @(*) begin
+    case(_zz_43)
+      3'b000 : _zz_42 = 2'b00;
+      3'b001 : _zz_42 = 2'b01;
+      3'b010 : _zz_42 = 2'b01;
+      3'b011 : _zz_42 = 2'b10;
+      3'b100 : _zz_42 = 2'b01;
+      3'b101 : _zz_42 = 2'b10;
+      3'b110 : _zz_42 = 2'b10;
+      default : _zz_42 = 2'b11;
+    endcase
+  end
+
+  always @(*) begin
+    case(LsuL1Plugin_logic_lsu_ctrl_needFlushSel)
+      1'b0 : begin
+        _zz__zz_LsuL1Plugin_logic_waysWrite_tag_address = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+        _zz_LsuL1Plugin_logic_waysWrite_tag_fault = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+      end
+      default : begin
+        _zz__zz_LsuL1Plugin_logic_waysWrite_tag_address = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address;
+        _zz_LsuL1Plugin_logic_waysWrite_tag_fault = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault;
+      end
+    endcase
+  end
+
+  always @(*) begin
+    case(LsuL1Plugin_logic_lsu_ctrl_targetWay)
+      1'b0 : _zz_LsuL1Plugin_logic_writeback_push_payload_address = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+      default : _zz_LsuL1Plugin_logic_writeback_push_payload_address = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address;
     endcase
   end
 
@@ -3362,14 +4325,55 @@ module VexiiRiscv (
 
   `ifndef SYNTHESIS
   always @(*) begin
-    case(execute_ctrl2_up_early0_EnvPlugin_OP_lane0)
-      EnvPluginOp_ECALL : execute_ctrl2_up_early0_EnvPlugin_OP_lane0_string = "ECALL     ";
-      EnvPluginOp_EBREAK : execute_ctrl2_up_early0_EnvPlugin_OP_lane0_string = "EBREAK    ";
-      EnvPluginOp_PRIV_RET : execute_ctrl2_up_early0_EnvPlugin_OP_lane0_string = "PRIV_RET  ";
-      EnvPluginOp_FENCE_I : execute_ctrl2_up_early0_EnvPlugin_OP_lane0_string = "FENCE_I   ";
-      EnvPluginOp_SFENCE_VMA : execute_ctrl2_up_early0_EnvPlugin_OP_lane0_string = "SFENCE_VMA";
-      EnvPluginOp_WFI : execute_ctrl2_up_early0_EnvPlugin_OP_lane0_string = "WFI       ";
-      default : execute_ctrl2_up_early0_EnvPlugin_OP_lane0_string = "??????????";
+    case(execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0)
+      BranchPlugin_BranchCtrlEnum_B : execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string = "B   ";
+      BranchPlugin_BranchCtrlEnum_JAL : execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JAL ";
+      BranchPlugin_BranchCtrlEnum_JALR : execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JALR";
+      default : execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string = "????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl3_up_BranchPlugin_BRANCH_CTRL_lane0)
+      BranchPlugin_BranchCtrlEnum_B : execute_ctrl3_up_BranchPlugin_BRANCH_CTRL_lane0_string = "B   ";
+      BranchPlugin_BranchCtrlEnum_JAL : execute_ctrl3_up_BranchPlugin_BRANCH_CTRL_lane0_string = "JAL ";
+      BranchPlugin_BranchCtrlEnum_JALR : execute_ctrl3_up_BranchPlugin_BRANCH_CTRL_lane0_string = "JALR";
+      default : execute_ctrl3_up_BranchPlugin_BRANCH_CTRL_lane0_string = "????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
     endcase
   end
   always @(*) begin
@@ -3381,12 +4385,85 @@ module VexiiRiscv (
     endcase
   end
   always @(*) begin
-    case(execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
-      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
-      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
-      default : execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    case(execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl1_up_early0_EnvPlugin_OP_lane0)
+      EnvPluginOp_ECALL : execute_ctrl1_up_early0_EnvPlugin_OP_lane0_string = "ECALL     ";
+      EnvPluginOp_EBREAK : execute_ctrl1_up_early0_EnvPlugin_OP_lane0_string = "EBREAK    ";
+      EnvPluginOp_PRIV_RET : execute_ctrl1_up_early0_EnvPlugin_OP_lane0_string = "PRIV_RET  ";
+      EnvPluginOp_FENCE_I : execute_ctrl1_up_early0_EnvPlugin_OP_lane0_string = "FENCE_I   ";
+      EnvPluginOp_SFENCE_VMA : execute_ctrl1_up_early0_EnvPlugin_OP_lane0_string = "SFENCE_VMA";
+      EnvPluginOp_WFI : execute_ctrl1_up_early0_EnvPlugin_OP_lane0_string = "WFI       ";
+      default : execute_ctrl1_up_early0_EnvPlugin_OP_lane0_string = "??????????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl1_up_BranchPlugin_BRANCH_CTRL_lane0)
+      BranchPlugin_BranchCtrlEnum_B : execute_ctrl1_up_BranchPlugin_BRANCH_CTRL_lane0_string = "B   ";
+      BranchPlugin_BranchCtrlEnum_JAL : execute_ctrl1_up_BranchPlugin_BRANCH_CTRL_lane0_string = "JAL ";
+      BranchPlugin_BranchCtrlEnum_JALR : execute_ctrl1_up_BranchPlugin_BRANCH_CTRL_lane0_string = "JALR";
+      default : execute_ctrl1_up_BranchPlugin_BRANCH_CTRL_lane0_string = "????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl0_down_early0_EnvPlugin_OP_lane0)
+      EnvPluginOp_ECALL : execute_ctrl0_down_early0_EnvPlugin_OP_lane0_string = "ECALL     ";
+      EnvPluginOp_EBREAK : execute_ctrl0_down_early0_EnvPlugin_OP_lane0_string = "EBREAK    ";
+      EnvPluginOp_PRIV_RET : execute_ctrl0_down_early0_EnvPlugin_OP_lane0_string = "PRIV_RET  ";
+      EnvPluginOp_FENCE_I : execute_ctrl0_down_early0_EnvPlugin_OP_lane0_string = "FENCE_I   ";
+      EnvPluginOp_SFENCE_VMA : execute_ctrl0_down_early0_EnvPlugin_OP_lane0_string = "SFENCE_VMA";
+      EnvPluginOp_WFI : execute_ctrl0_down_early0_EnvPlugin_OP_lane0_string = "WFI       ";
+      default : execute_ctrl0_down_early0_EnvPlugin_OP_lane0_string = "??????????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0)
+      BranchPlugin_BranchCtrlEnum_B : execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string = "B   ";
+      BranchPlugin_BranchCtrlEnum_JAL : execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JAL ";
+      BranchPlugin_BranchCtrlEnum_JALR : execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JALR";
+      default : execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string = "????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    endcase
+  end
+  always @(*) begin
+    case(execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0)
+      BranchPlugin_BranchCtrlEnum_B : execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0_string = "B   ";
+      BranchPlugin_BranchCtrlEnum_JAL : execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JAL ";
+      BranchPlugin_BranchCtrlEnum_JALR : execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JALR";
+      default : execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0_string = "????";
     endcase
   end
   always @(*) begin
@@ -3409,40 +4486,21 @@ module VexiiRiscv (
     endcase
   end
   always @(*) begin
+    case(execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    endcase
+  end
+  always @(*) begin
     case(execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
       IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
       IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
       IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
       IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
       default : execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
-    endcase
-  end
-  always @(*) begin
-    case(execute_ctrl2_down_early0_EnvPlugin_OP_lane0)
-      EnvPluginOp_ECALL : execute_ctrl2_down_early0_EnvPlugin_OP_lane0_string = "ECALL     ";
-      EnvPluginOp_EBREAK : execute_ctrl2_down_early0_EnvPlugin_OP_lane0_string = "EBREAK    ";
-      EnvPluginOp_PRIV_RET : execute_ctrl2_down_early0_EnvPlugin_OP_lane0_string = "PRIV_RET  ";
-      EnvPluginOp_FENCE_I : execute_ctrl2_down_early0_EnvPlugin_OP_lane0_string = "FENCE_I   ";
-      EnvPluginOp_SFENCE_VMA : execute_ctrl2_down_early0_EnvPlugin_OP_lane0_string = "SFENCE_VMA";
-      EnvPluginOp_WFI : execute_ctrl2_down_early0_EnvPlugin_OP_lane0_string = "WFI       ";
-      default : execute_ctrl2_down_early0_EnvPlugin_OP_lane0_string = "??????????";
-    endcase
-  end
-  always @(*) begin
-    case(execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0)
-      BranchPlugin_BranchCtrlEnum_B : execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string = "B   ";
-      BranchPlugin_BranchCtrlEnum_JAL : execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JAL ";
-      BranchPlugin_BranchCtrlEnum_JALR : execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JALR";
-      default : execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0_string = "????";
-    endcase
-  end
-  always @(*) begin
-    case(execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
-      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
-      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
-      default : execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
     endcase
   end
   always @(*) begin
@@ -3466,87 +4524,114 @@ module VexiiRiscv (
     endcase
   end
   always @(*) begin
-    case(_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
-      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
-      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
-      default : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
+    case(_zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "ZERO ";
+      default : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_string = "?????";
     endcase
   end
   always @(*) begin
-    case(_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1)
-      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "XOR_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "OR_1 ";
-      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "AND_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "ZERO ";
-      default : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "?????";
+    case(_zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "ZERO ";
+      default : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "?????";
     endcase
   end
   always @(*) begin
-    case(_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2)
-      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "XOR_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "OR_1 ";
-      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "AND_1";
-      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "ZERO ";
-      default : _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "?????";
+    case(_zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "ZERO ";
+      default : _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "?????";
     endcase
   end
   always @(*) begin
-    case(_zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0)
-      BranchPlugin_BranchCtrlEnum_B : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_string = "B   ";
-      BranchPlugin_BranchCtrlEnum_JAL : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JAL ";
-      BranchPlugin_BranchCtrlEnum_JALR : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JALR";
-      default : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_string = "????";
+    case(_zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0)
+      BranchPlugin_BranchCtrlEnum_B : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string = "B   ";
+      BranchPlugin_BranchCtrlEnum_JAL : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JAL ";
+      BranchPlugin_BranchCtrlEnum_JALR : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string = "JALR";
+      default : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_string = "????";
     endcase
   end
   always @(*) begin
-    case(_zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1)
-      BranchPlugin_BranchCtrlEnum_B : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1_string = "B   ";
-      BranchPlugin_BranchCtrlEnum_JAL : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1_string = "JAL ";
-      BranchPlugin_BranchCtrlEnum_JALR : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1_string = "JALR";
-      default : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1_string = "????";
+    case(_zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_1)
+      BranchPlugin_BranchCtrlEnum_B : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_1_string = "B   ";
+      BranchPlugin_BranchCtrlEnum_JAL : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_1_string = "JAL ";
+      BranchPlugin_BranchCtrlEnum_JALR : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_1_string = "JALR";
+      default : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_1_string = "????";
     endcase
   end
   always @(*) begin
-    case(_zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2)
-      BranchPlugin_BranchCtrlEnum_B : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2_string = "B   ";
-      BranchPlugin_BranchCtrlEnum_JAL : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2_string = "JAL ";
-      BranchPlugin_BranchCtrlEnum_JALR : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2_string = "JALR";
-      default : _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2_string = "????";
+    case(_zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_2)
+      BranchPlugin_BranchCtrlEnum_B : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_2_string = "B   ";
+      BranchPlugin_BranchCtrlEnum_JAL : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_2_string = "JAL ";
+      BranchPlugin_BranchCtrlEnum_JALR : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_2_string = "JALR";
+      default : _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_2_string = "????";
     endcase
   end
   always @(*) begin
-    case(_zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1)
-      EnvPluginOp_ECALL : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1_string = "ECALL     ";
-      EnvPluginOp_EBREAK : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1_string = "EBREAK    ";
-      EnvPluginOp_PRIV_RET : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1_string = "PRIV_RET  ";
-      EnvPluginOp_FENCE_I : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1_string = "FENCE_I   ";
-      EnvPluginOp_SFENCE_VMA : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1_string = "SFENCE_VMA";
-      EnvPluginOp_WFI : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1_string = "WFI       ";
-      default : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1_string = "??????????";
+    case(_zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1)
+      EnvPluginOp_ECALL : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1_string = "ECALL     ";
+      EnvPluginOp_EBREAK : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1_string = "EBREAK    ";
+      EnvPluginOp_PRIV_RET : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1_string = "PRIV_RET  ";
+      EnvPluginOp_FENCE_I : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1_string = "FENCE_I   ";
+      EnvPluginOp_SFENCE_VMA : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1_string = "SFENCE_VMA";
+      EnvPluginOp_WFI : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1_string = "WFI       ";
+      default : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1_string = "??????????";
     endcase
   end
   always @(*) begin
-    case(_zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2)
-      EnvPluginOp_ECALL : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2_string = "ECALL     ";
-      EnvPluginOp_EBREAK : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2_string = "EBREAK    ";
-      EnvPluginOp_PRIV_RET : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2_string = "PRIV_RET  ";
-      EnvPluginOp_FENCE_I : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2_string = "FENCE_I   ";
-      EnvPluginOp_SFENCE_VMA : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2_string = "SFENCE_VMA";
-      EnvPluginOp_WFI : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2_string = "WFI       ";
-      default : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2_string = "??????????";
+    case(_zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2)
+      EnvPluginOp_ECALL : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2_string = "ECALL     ";
+      EnvPluginOp_EBREAK : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2_string = "EBREAK    ";
+      EnvPluginOp_PRIV_RET : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2_string = "PRIV_RET  ";
+      EnvPluginOp_FENCE_I : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2_string = "FENCE_I   ";
+      EnvPluginOp_SFENCE_VMA : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2_string = "SFENCE_VMA";
+      EnvPluginOp_WFI : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2_string = "WFI       ";
+      default : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2_string = "??????????";
     endcase
   end
   always @(*) begin
-    case(_zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3)
-      EnvPluginOp_ECALL : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3_string = "ECALL     ";
-      EnvPluginOp_EBREAK : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3_string = "EBREAK    ";
-      EnvPluginOp_PRIV_RET : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3_string = "PRIV_RET  ";
-      EnvPluginOp_FENCE_I : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3_string = "FENCE_I   ";
-      EnvPluginOp_SFENCE_VMA : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3_string = "SFENCE_VMA";
-      EnvPluginOp_WFI : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3_string = "WFI       ";
-      default : _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3_string = "??????????";
+    case(_zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3)
+      EnvPluginOp_ECALL : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3_string = "ECALL     ";
+      EnvPluginOp_EBREAK : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3_string = "EBREAK    ";
+      EnvPluginOp_PRIV_RET : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3_string = "PRIV_RET  ";
+      EnvPluginOp_FENCE_I : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3_string = "FENCE_I   ";
+      EnvPluginOp_SFENCE_VMA : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3_string = "SFENCE_VMA";
+      EnvPluginOp_WFI : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3_string = "WFI       ";
+      default : _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3_string = "??????????";
+    endcase
+  end
+  always @(*) begin
+    case(_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "ZERO ";
+      default : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1_string = "?????";
+    endcase
+  end
+  always @(*) begin
+    case(_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "ZERO ";
+      default : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2_string = "?????";
+    endcase
+  end
+  always @(*) begin
+    case(_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3)
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3_string = "XOR_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3_string = "OR_1 ";
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3_string = "AND_1";
+      IntAluPlugin_AluBitwiseCtrlEnum_ZERO : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3_string = "ZERO ";
+      default : _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3_string = "?????";
     endcase
   end
   always @(*) begin
@@ -3619,20 +4704,9 @@ module VexiiRiscv (
   end
   `endif
 
-  assign execute_ctrl4_down_RD_ENABLE_lane0 = execute_ctrl4_RD_ENABLE_lane0_bypass;
   always @(*) begin
-    execute_ctrl4_RD_ENABLE_lane0_bypass = execute_ctrl4_up_RD_ENABLE_lane0;
-    if(when_ExecuteLanePlugin_l307_4) begin
-      execute_ctrl4_RD_ENABLE_lane0_bypass = 1'b0;
-    end
-  end
-
-  assign execute_ctrl4_down_LANE_SEL_lane0 = execute_ctrl4_LANE_SEL_lane0_bypass;
-  always @(*) begin
-    execute_ctrl4_LANE_SEL_lane0_bypass = execute_ctrl4_up_LANE_SEL_lane0;
-    if(when_ExecuteLanePlugin_l307_4) begin
-      execute_ctrl4_LANE_SEL_lane0_bypass = 1'b0;
-    end
+    BtbPlugin_logic_ras_ptr_pop_aheadValue = BtbPlugin_logic_ras_ptr_pop;
+    BtbPlugin_logic_ras_ptr_pop_aheadValue = (_zz_BtbPlugin_logic_ras_ptr_pop_aheadValue - _zz_BtbPlugin_logic_ras_ptr_pop_aheadValue_3);
   end
 
   assign execute_ctrl3_down_RD_ENABLE_lane0 = execute_ctrl3_RD_ENABLE_lane0_bypass;
@@ -3699,10 +4773,28 @@ module VexiiRiscv (
     end
   end
 
+  assign execute_ctrl2_down_integer_RS2_lane0 = execute_ctrl2_integer_RS2_lane0_bypass;
+  assign execute_ctrl1_down_integer_RS2_lane0 = execute_ctrl1_integer_RS2_lane0_bypass;
+  assign execute_ctrl2_down_integer_RS1_lane0 = execute_ctrl2_integer_RS1_lane0_bypass;
+  assign execute_ctrl1_down_integer_RS1_lane0 = execute_ctrl1_integer_RS1_lane0_bypass;
   always @(*) begin
     _zz_1 = 1'b0;
     if(CsrRamPlugin_logic_writeLogic_port_valid) begin
       _zz_1 = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    PcPlugin_logic_harts_0_aggregator_fault_1 = PcPlugin_logic_harts_0_aggregator_fault;
+    if(when_PcPlugin_l80) begin
+      PcPlugin_logic_harts_0_aggregator_fault_1 = _zz_PcPlugin_logic_harts_0_aggregator_fault_1_1[0];
+    end
+  end
+
+  always @(*) begin
+    PcPlugin_logic_harts_0_aggregator_target_1 = PcPlugin_logic_harts_0_aggregator_target;
+    if(when_PcPlugin_l80) begin
+      PcPlugin_logic_harts_0_aggregator_target_1 = (_zz_PcPlugin_logic_harts_0_aggregator_fault_1 ? BtbPlugin_logic_pcPort_payload_pc : 32'h0);
     end
   end
 
@@ -3722,12 +4814,12 @@ module VexiiRiscv (
     end
   end
 
-  assign execute_ctrl4_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 = execute_ctrl4_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass;
   assign execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 = execute_ctrl3_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass;
   assign execute_ctrl2_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 = execute_ctrl2_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass;
-  assign execute_ctrl3_down_COMPLETED_lane0 = execute_ctrl3_COMPLETED_lane0_bypass;
-  assign execute_ctrl4_down_COMPLETED_lane0 = execute_ctrl4_COMPLETED_lane0_bypass;
+  assign execute_ctrl1_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 = execute_ctrl1_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass;
   assign execute_ctrl2_down_COMPLETED_lane0 = execute_ctrl2_COMPLETED_lane0_bypass;
+  assign execute_ctrl3_down_COMPLETED_lane0 = execute_ctrl3_COMPLETED_lane0_bypass;
+  assign execute_ctrl1_down_COMPLETED_lane0 = execute_ctrl1_COMPLETED_lane0_bypass;
   assign decode_ctrls_1_down_TRAP_0 = decode_ctrls_1_TRAP_0_bypass;
   always @(*) begin
     decode_ctrls_1_TRAP_0_bypass = decode_ctrls_1_up_TRAP_0;
@@ -3736,15 +4828,22 @@ module VexiiRiscv (
     end
   end
 
-  assign execute_ctrl2_down_COMMIT_lane0 = execute_ctrl2_COMMIT_lane0_bypass;
   always @(*) begin
-    execute_ctrl2_COMMIT_lane0_bypass = execute_ctrl2_up_COMMIT_lane0;
+    late0_BranchPlugin_logic_jumpLogic_history_shifter_1 = late0_BranchPlugin_logic_jumpLogic_history_shifter;
+    if(when_BranchPlugin_l218_1) begin
+      late0_BranchPlugin_logic_jumpLogic_history_shifter_1 = _zz_late0_BranchPlugin_logic_jumpLogic_history_shifter_1[11 : 0];
+    end
+  end
+
+  assign execute_ctrl1_down_COMMIT_lane0 = execute_ctrl1_COMMIT_lane0_bypass;
+  always @(*) begin
+    execute_ctrl1_COMMIT_lane0_bypass = execute_ctrl1_up_COMMIT_lane0;
     if(when_BranchPlugin_l251) begin
-      execute_ctrl2_COMMIT_lane0_bypass = 1'b0;
+      execute_ctrl1_COMMIT_lane0_bypass = 1'b0;
     end
     if(when_EnvPlugin_l119) begin
       if(when_EnvPlugin_l123) begin
-        execute_ctrl2_COMMIT_lane0_bypass = 1'b0;
+        execute_ctrl1_COMMIT_lane0_bypass = 1'b0;
       end
     end
     case(CsrAccessPlugin_logic_fsm_stateReg)
@@ -3758,7 +4857,7 @@ module VexiiRiscv (
         if(CsrAccessPlugin_logic_fsm_inject_onDecodeDo) begin
           if(CsrAccessPlugin_logic_fsm_inject_sampled) begin
             if(CsrAccessPlugin_logic_fsm_inject_trapReg) begin
-              execute_ctrl2_COMMIT_lane0_bypass = 1'b0;
+              execute_ctrl1_COMMIT_lane0_bypass = 1'b0;
             end
           end
         end
@@ -3766,17 +4865,17 @@ module VexiiRiscv (
     endcase
   end
 
-  assign execute_ctrl2_down_TRAP_lane0 = execute_ctrl2_TRAP_lane0_bypass;
+  assign execute_ctrl1_down_TRAP_lane0 = execute_ctrl1_TRAP_lane0_bypass;
   always @(*) begin
-    execute_ctrl2_TRAP_lane0_bypass = execute_ctrl2_up_TRAP_lane0;
+    execute_ctrl1_TRAP_lane0_bypass = execute_ctrl1_up_TRAP_lane0;
     if(when_BranchPlugin_l251) begin
-      execute_ctrl2_TRAP_lane0_bypass = 1'b1;
+      execute_ctrl1_TRAP_lane0_bypass = 1'b1;
     end
     if(when_EnvPlugin_l119) begin
-      execute_ctrl2_TRAP_lane0_bypass = 1'b1;
+      execute_ctrl1_TRAP_lane0_bypass = 1'b1;
     end
     if(CsrAccessPlugin_logic_fsm_inject_flushReg) begin
-      execute_ctrl2_TRAP_lane0_bypass = 1'b1;
+      execute_ctrl1_TRAP_lane0_bypass = 1'b1;
     end
     case(CsrAccessPlugin_logic_fsm_stateReg)
       CsrAccessPlugin_logic_fsm_READ : begin
@@ -3789,10 +4888,10 @@ module VexiiRiscv (
         if(CsrAccessPlugin_logic_fsm_inject_onDecodeDo) begin
           if(CsrAccessPlugin_logic_fsm_inject_sampled) begin
             if(CsrAccessPlugin_logic_fsm_inject_trapReg) begin
-              execute_ctrl2_TRAP_lane0_bypass = 1'b1;
+              execute_ctrl1_TRAP_lane0_bypass = 1'b1;
             end else begin
               if(CsrAccessPlugin_logic_fsm_inject_busTrapReg) begin
-                execute_ctrl2_TRAP_lane0_bypass = 1'b1;
+                execute_ctrl1_TRAP_lane0_bypass = 1'b1;
               end
             end
           end
@@ -3801,39 +4900,66 @@ module VexiiRiscv (
     endcase
   end
 
-  assign execute_ctrl4_down_COMMIT_lane0 = execute_ctrl4_COMMIT_lane0_bypass;
   always @(*) begin
-    execute_ctrl4_COMMIT_lane0_bypass = execute_ctrl4_up_COMMIT_lane0;
-    if(when_LsuPlugin_l788) begin
-      if(LsuPlugin_logic_onCtrl_lsuTrap) begin
-        execute_ctrl4_COMMIT_lane0_bypass = 1'b0;
-      end
+    early0_BranchPlugin_logic_jumpLogic_history_shifter_1 = early0_BranchPlugin_logic_jumpLogic_history_shifter;
+    if(when_BranchPlugin_l218) begin
+      early0_BranchPlugin_logic_jumpLogic_history_shifter_1 = _zz_early0_BranchPlugin_logic_jumpLogic_history_shifter_1[11 : 0];
     end
   end
 
-  assign execute_ctrl4_down_TRAP_lane0 = execute_ctrl4_TRAP_lane0_bypass;
   always @(*) begin
-    execute_ctrl4_TRAP_lane0_bypass = execute_ctrl4_up_TRAP_lane0;
-    if(when_LsuPlugin_l788) begin
-      if(LsuPlugin_logic_onCtrl_lsuTrap) begin
-        execute_ctrl4_TRAP_lane0_bypass = 1'b1;
-      end
+    _zz_2 = 1'b0;
+    if(BtbPlugin_logic_ras_write_valid) begin
+      _zz_2 = 1'b1;
     end
   end
 
-  assign execute_ctrl4_down_LsuL1_SEL_lane0 = execute_ctrl4_LsuL1_SEL_lane0_bypass;
   always @(*) begin
-    execute_ctrl4_LsuL1_SEL_lane0_bypass = execute_ctrl4_up_LsuL1_SEL_lane0;
-    if(when_LsuPlugin_l497_1) begin
-      execute_ctrl4_LsuL1_SEL_lane0_bypass = 1'b0;
+    _zz_3 = 1'b0;
+    if(GSharePlugin_logic_mem_write_valid) begin
+      _zz_3 = 1'b1;
+    end
+  end
+
+  assign execute_ctrl3_down_COMMIT_lane0 = execute_ctrl3_COMMIT_lane0_bypass;
+  always @(*) begin
+    execute_ctrl3_COMMIT_lane0_bypass = execute_ctrl3_up_COMMIT_lane0;
+    if(when_LsuPlugin_l788) begin
+      if(LsuPlugin_logic_onCtrl_lsuTrap) begin
+        execute_ctrl3_COMMIT_lane0_bypass = 1'b0;
+      end
+    end
+    if(when_BranchPlugin_l251_1) begin
+      execute_ctrl3_COMMIT_lane0_bypass = 1'b0;
+    end
+  end
+
+  assign execute_ctrl3_down_TRAP_lane0 = execute_ctrl3_TRAP_lane0_bypass;
+  always @(*) begin
+    execute_ctrl3_TRAP_lane0_bypass = execute_ctrl3_up_TRAP_lane0;
+    if(when_LsuPlugin_l788) begin
+      if(LsuPlugin_logic_onCtrl_lsuTrap) begin
+        execute_ctrl3_TRAP_lane0_bypass = 1'b1;
+      end
+    end
+    if(when_BranchPlugin_l251_1) begin
+      execute_ctrl3_TRAP_lane0_bypass = 1'b1;
     end
   end
 
   assign execute_ctrl3_down_LsuL1_SEL_lane0 = execute_ctrl3_LsuL1_SEL_lane0_bypass;
   always @(*) begin
     execute_ctrl3_LsuL1_SEL_lane0_bypass = execute_ctrl3_up_LsuL1_SEL_lane0;
-    if(when_LsuPlugin_l497) begin
+    if(when_LsuPlugin_l497_1) begin
       execute_ctrl3_LsuL1_SEL_lane0_bypass = 1'b0;
+    end
+  end
+
+  assign execute_ctrl2_down_LsuL1_SEL_lane0 = execute_ctrl2_LsuL1_SEL_lane0_bypass;
+  always @(*) begin
+    execute_ctrl2_LsuL1_SEL_lane0_bypass = execute_ctrl2_up_LsuL1_SEL_lane0;
+    if(when_LsuPlugin_l497) begin
+      execute_ctrl2_LsuL1_SEL_lane0_bypass = 1'b0;
     end
   end
 
@@ -3845,24 +4971,39 @@ module VexiiRiscv (
   end
 
   always @(*) begin
-    _zz_2 = 1'b0;
-    if(FetchL1Plugin_logic_banks_0_write_valid) begin
-      _zz_2 = 1'b1;
-    end
-  end
-
-  assign execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl3_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty;
-  always @(*) begin
-    _zz_3 = 1'b0;
-    if(LsuL1Plugin_logic_writeback_read_slotReadLast_valid) begin
-      _zz_3 = 1'b1;
-    end
-  end
-
-  always @(*) begin
     _zz_4 = 1'b0;
-    if(LsuL1Plugin_logic_shared_write_valid) begin
+    if(FetchL1Plugin_logic_plru_write_valid) begin
       _zz_4 = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    _zz_5 = 1'b0;
+    if(FetchL1Plugin_logic_banks_1_write_valid) begin
+      _zz_5 = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    _zz_6 = 1'b0;
+    if(FetchL1Plugin_logic_banks_0_write_valid) begin
+      _zz_6 = 1'b1;
+    end
+  end
+
+  assign execute_ctrl2_down_LsuL1Plugin_logic_SHARED_lane0_plru_0 = execute_ctrl2_LsuL1Plugin_logic_SHARED_lane0_bypass_plru_0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl2_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty;
+  always @(*) begin
+    _zz_7 = 1'b0;
+    if(LsuL1Plugin_logic_writeback_read_slotReadLast_valid) begin
+      _zz_7 = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    _zz_8 = 1'b0;
+    if(LsuL1Plugin_logic_shared_write_valid) begin
+      _zz_8 = 1'b1;
     end
   end
 
@@ -3971,15 +5112,29 @@ module VexiiRiscv (
   end
 
   always @(*) begin
-    case(execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+    DecoderPlugin_logic_forgetPort_valid = 1'b0;
+    if(DecoderPlugin_logic_laneLogic_0_fixer_doIt) begin
+      DecoderPlugin_logic_forgetPort_valid = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    if(DecoderPlugin_logic_laneLogic_0_fixer_doIt) begin
+      DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice = (decode_ctrls_1_down_PC_0 + _zz_DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice);
+    end
+  end
+
+  always @(*) begin
+    case(execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
       IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : begin
-        early0_IntAluPlugin_logic_alu_bitwise = (execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0 & execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0);
+        early0_IntAluPlugin_logic_alu_bitwise = (execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0 & execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0);
       end
       IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : begin
-        early0_IntAluPlugin_logic_alu_bitwise = (execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0 | execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0);
+        early0_IntAluPlugin_logic_alu_bitwise = (execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0 | execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0);
       end
       IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : begin
-        early0_IntAluPlugin_logic_alu_bitwise = (execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0 ^ execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0);
+        early0_IntAluPlugin_logic_alu_bitwise = (execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0 ^ execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0);
       end
       default : begin
         early0_IntAluPlugin_logic_alu_bitwise = 32'h0;
@@ -3988,16 +5143,16 @@ module VexiiRiscv (
   end
 
   assign early0_IntAluPlugin_logic_alu_result = (_zz_early0_IntAluPlugin_logic_alu_result | _zz_early0_IntAluPlugin_logic_alu_result_2);
-  assign execute_ctrl2_down_early0_IntAluPlugin_ALU_RESULT_lane0 = early0_IntAluPlugin_logic_alu_result;
-  assign early0_IntAluPlugin_logic_wb_valid = execute_ctrl2_down_early0_IntAluPlugin_SEL_lane0;
-  assign early0_IntAluPlugin_logic_wb_payload = execute_ctrl2_down_early0_IntAluPlugin_ALU_RESULT_lane0;
+  assign execute_ctrl1_down_early0_IntAluPlugin_ALU_RESULT_lane0 = early0_IntAluPlugin_logic_alu_result;
+  assign early0_IntAluPlugin_logic_wb_valid = execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0;
+  assign early0_IntAluPlugin_logic_wb_payload = execute_ctrl1_down_early0_IntAluPlugin_ALU_RESULT_lane0;
   assign early0_BarrelShifterPlugin_logic_shift_amplitude = _zz_early0_BarrelShifterPlugin_logic_shift_amplitude;
-  assign early0_BarrelShifterPlugin_logic_shift_reversed = (execute_ctrl2_down_BarrelShifterPlugin_LEFT_lane0 ? _zz_early0_BarrelShifterPlugin_logic_shift_reversed : execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0);
+  assign early0_BarrelShifterPlugin_logic_shift_reversed = (execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0 ? _zz_early0_BarrelShifterPlugin_logic_shift_reversed : execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0);
   assign early0_BarrelShifterPlugin_logic_shift_shifted = _zz_early0_BarrelShifterPlugin_logic_shift_shifted[31:0];
-  assign early0_BarrelShifterPlugin_logic_shift_patched = (execute_ctrl2_down_BarrelShifterPlugin_LEFT_lane0 ? _zz_early0_BarrelShifterPlugin_logic_shift_patched : early0_BarrelShifterPlugin_logic_shift_shifted);
-  assign execute_ctrl2_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0 = early0_BarrelShifterPlugin_logic_shift_patched;
-  assign early0_BarrelShifterPlugin_logic_wb_valid = execute_ctrl2_down_early0_BarrelShifterPlugin_SEL_lane0;
-  assign early0_BarrelShifterPlugin_logic_wb_payload = execute_ctrl2_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
+  assign early0_BarrelShifterPlugin_logic_shift_patched = (execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0 ? _zz_early0_BarrelShifterPlugin_logic_shift_patched : early0_BarrelShifterPlugin_logic_shift_shifted);
+  assign execute_ctrl1_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0 = early0_BarrelShifterPlugin_logic_shift_patched;
+  assign early0_BarrelShifterPlugin_logic_wb_valid = execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0;
+  assign early0_BarrelShifterPlugin_logic_wb_payload = execute_ctrl1_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
   always @(*) begin
     LsuL1_ackUnlock = 1'b0;
     if(LsuPlugin_logic_onCtrl_io_cmdSent) begin
@@ -4009,7 +5164,7 @@ module VexiiRiscv (
     LsuL1Plugin_logic_banksWrite_address = 10'bxxxxxxxxxx;
     LsuL1Plugin_logic_banksWrite_address = {LsuL1Plugin_logic_refill_read_rspAddress[11 : 6],LsuL1Plugin_logic_refill_read_wordIndex};
     if(LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win) begin
-      LsuL1Plugin_logic_banksWrite_address = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0[11 : 2];
+      LsuL1Plugin_logic_banksWrite_address = execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0[11 : 2];
     end
   end
 
@@ -4017,7 +5172,7 @@ module VexiiRiscv (
     LsuL1Plugin_logic_banksWrite_writeData = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
     LsuL1Plugin_logic_banksWrite_writeData = LsuL1Plugin_logic_bus_read_rsp_payload_data;
     if(LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win) begin
-      LsuL1Plugin_logic_banksWrite_writeData[31 : 0] = execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
+      LsuL1Plugin_logic_banksWrite_writeData[31 : 0] = execute_ctrl3_down_LsuL1_WRITE_DATA_lane0;
     end
   end
 
@@ -4027,7 +5182,7 @@ module VexiiRiscv (
     if(LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win) begin
       LsuL1Plugin_logic_banksWrite_writeMask = 4'b0000;
       if(_zz_when[0]) begin
-        LsuL1Plugin_logic_banksWrite_writeMask[3 : 0] = execute_ctrl4_down_LsuL1_MASK_lane0;
+        LsuL1Plugin_logic_banksWrite_writeMask[3 : 0] = execute_ctrl3_down_LsuL1_MASK_lane0;
       end
     end
     if(LsuL1Plugin_logic_lsu_ctrl_preventSideEffects) begin
@@ -4038,10 +5193,10 @@ module VexiiRiscv (
   end
 
   always @(*) begin
-    LsuL1Plugin_logic_waysWrite_mask = 1'b0;
+    LsuL1Plugin_logic_waysWrite_mask = 2'b00;
     if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
       if(when_LsuL1Plugin_l463) begin
-        LsuL1Plugin_logic_waysWrite_mask[0] = 1'b1;
+        LsuL1Plugin_logic_waysWrite_mask[LsuL1Plugin_logic_refill_read_way] = 1'b1;
       end
     end
     if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
@@ -4049,11 +5204,11 @@ module VexiiRiscv (
     end
     if(LsuL1Plugin_logic_lsu_ctrl_preventSideEffects) begin
       if(LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win) begin
-        LsuL1Plugin_logic_waysWrite_mask = 1'b0;
+        LsuL1Plugin_logic_waysWrite_mask = 2'b00;
       end
     end
     if(when_LsuL1Plugin_l1192) begin
-      LsuL1Plugin_logic_waysWrite_mask = 1'b1;
+      LsuL1Plugin_logic_waysWrite_mask = 2'b11;
     end
   end
 
@@ -4065,7 +5220,7 @@ module VexiiRiscv (
       end
     end
     if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
-      LsuL1Plugin_logic_waysWrite_address = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+      LsuL1Plugin_logic_waysWrite_address = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
     end
     if(when_LsuL1Plugin_l1192) begin
       LsuL1Plugin_logic_waysWrite_address = LsuL1Plugin_logic_initializer_counter[5:0];
@@ -4107,7 +5262,7 @@ module VexiiRiscv (
       end
     end
     if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
-      LsuL1Plugin_logic_waysWrite_tag_fault = execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+      LsuL1Plugin_logic_waysWrite_tag_fault = _zz_LsuL1Plugin_logic_waysWrite_tag_fault;
     end
   end
 
@@ -4117,11 +5272,22 @@ module VexiiRiscv (
   assign LsuL1Plugin_logic_banks_0_write_payload_data = LsuL1Plugin_logic_banksWrite_writeData;
   assign LsuL1Plugin_logic_banks_0_write_payload_mask = LsuL1Plugin_logic_banksWrite_writeMask;
   assign LsuL1Plugin_logic_banks_0_read_rsp = LsuL1Plugin_logic_banks_0_mem_spinal_port1;
+  assign LsuL1Plugin_logic_banks_1_write_valid = LsuL1Plugin_logic_banksWrite_mask[1];
+  assign LsuL1Plugin_logic_banks_1_write_payload_address = LsuL1Plugin_logic_banksWrite_address;
+  assign LsuL1Plugin_logic_banks_1_write_payload_data = LsuL1Plugin_logic_banksWrite_writeData;
+  assign LsuL1Plugin_logic_banks_1_write_payload_mask = LsuL1Plugin_logic_banksWrite_writeMask;
+  assign LsuL1Plugin_logic_banks_1_read_rsp = LsuL1Plugin_logic_banks_1_mem_spinal_port1;
   assign _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded = LsuL1Plugin_logic_ways_0_mem_spinal_port1;
   assign LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded = _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded[0];
   assign LsuL1Plugin_logic_ways_0_lsuRead_rsp_address = _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded[20 : 1];
   assign LsuL1Plugin_logic_ways_0_lsuRead_rsp_fault = _zz_LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded[21];
-  assign LsuL1Plugin_logic_shared_lsuRead_rsp_dirty = LsuL1Plugin_logic_shared_mem_spinal_port1[0 : 0];
+  assign _zz_LsuL1Plugin_logic_ways_1_lsuRead_rsp_loaded = LsuL1Plugin_logic_ways_1_mem_spinal_port1;
+  assign LsuL1Plugin_logic_ways_1_lsuRead_rsp_loaded = _zz_LsuL1Plugin_logic_ways_1_lsuRead_rsp_loaded[0];
+  assign LsuL1Plugin_logic_ways_1_lsuRead_rsp_address = _zz_LsuL1Plugin_logic_ways_1_lsuRead_rsp_loaded[20 : 1];
+  assign LsuL1Plugin_logic_ways_1_lsuRead_rsp_fault = _zz_LsuL1Plugin_logic_ways_1_lsuRead_rsp_loaded[21];
+  assign _zz_LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0 = LsuL1Plugin_logic_shared_mem_spinal_port1;
+  assign LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0 = _zz_LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0_1[0 : 0];
+  assign LsuL1Plugin_logic_shared_lsuRead_rsp_dirty = _zz_LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0[2 : 1];
   always @(*) begin
     LsuL1Plugin_logic_refill_slots_0_loadedSet = 1'b0;
     if(LsuL1Plugin_logic_bus_read_rsp_valid) begin
@@ -4155,6 +5321,7 @@ module VexiiRiscv (
   assign LsuL1Plugin_logic_bus_read_cmd_payload_address = LsuL1Plugin_logic_refill_read_cmdAddress;
   assign LsuL1Plugin_logic_refill_read_rspAddress = LsuL1Plugin_logic_refill_slots_0_address;
   assign LsuL1Plugin_logic_refill_read_dirty = LsuL1Plugin_logic_refill_slots_0_dirty;
+  assign LsuL1Plugin_logic_refill_read_way = LsuL1Plugin_logic_refill_slots_0_way;
   assign LsuL1Plugin_logic_refill_read_rspWithData = 1'b1;
   always @(*) begin
     LsuL1Plugin_logic_refill_read_writeReservation_take = 1'b0;
@@ -4163,12 +5330,20 @@ module VexiiRiscv (
     end
   end
 
-  assign LsuL1Plugin_logic_refill_read_bankWriteNotif[0] = ((LsuL1Plugin_logic_bus_read_rsp_valid && LsuL1Plugin_logic_refill_read_rspWithData) && 1'b1);
+  always @(*) begin
+    LsuL1Plugin_logic_refill_read_bankWriteNotif[0] = ((LsuL1Plugin_logic_bus_read_rsp_valid && LsuL1Plugin_logic_refill_read_rspWithData) && (LsuL1Plugin_logic_refill_read_way == 1'b0));
+    LsuL1Plugin_logic_refill_read_bankWriteNotif[1] = ((LsuL1Plugin_logic_bus_read_rsp_valid && LsuL1Plugin_logic_refill_read_rspWithData) && (LsuL1Plugin_logic_refill_read_way == 1'b1));
+  end
+
   always @(*) begin
     LsuL1Plugin_logic_banksWrite_mask[0] = LsuL1Plugin_logic_refill_read_bankWriteNotif[0];
+    LsuL1Plugin_logic_banksWrite_mask[1] = LsuL1Plugin_logic_refill_read_bankWriteNotif[1];
     if(LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win) begin
       if(when_LsuL1Plugin_l926) begin
-        LsuL1Plugin_logic_banksWrite_mask[0] = (1'b1 && LsuL1Plugin_logic_lsu_ctrl_doWrite);
+        LsuL1Plugin_logic_banksWrite_mask[0] = ((1'b0 == LsuL1Plugin_logic_lsu_ctrl_wayId) && LsuL1Plugin_logic_lsu_ctrl_doWrite);
+      end
+      if(when_LsuL1Plugin_l926_1) begin
+        LsuL1Plugin_logic_banksWrite_mask[1] = ((1'b1 == LsuL1Plugin_logic_lsu_ctrl_wayId) && LsuL1Plugin_logic_lsu_ctrl_doWrite);
       end
     end
   end
@@ -4235,10 +5410,20 @@ module VexiiRiscv (
   always @(*) begin
     LsuL1Plugin_logic_writeback_push_payload_address = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
     if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
-      LsuL1Plugin_logic_writeback_push_payload_address = ({6'd0,{_zz_LsuL1Plugin_logic_waysWrite_tag_address,execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]}} <<< 3'd6);
+      LsuL1Plugin_logic_writeback_push_payload_address = ({6'd0,{_zz_LsuL1Plugin_logic_waysWrite_tag_address,execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]}} <<< 3'd6);
     end
     if(LsuL1Plugin_logic_lsu_ctrl_doRefill) begin
-      LsuL1Plugin_logic_writeback_push_payload_address = ({6'd0,{execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address,execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]}} <<< 3'd6);
+      LsuL1Plugin_logic_writeback_push_payload_address = ({6'd0,{_zz_LsuL1Plugin_logic_writeback_push_payload_address,execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]}} <<< 3'd6);
+    end
+  end
+
+  always @(*) begin
+    LsuL1Plugin_logic_writeback_push_payload_way = 1'bx;
+    if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
+      LsuL1Plugin_logic_writeback_push_payload_way = LsuL1Plugin_logic_lsu_ctrl_needFlushSel;
+    end
+    if(LsuL1Plugin_logic_lsu_ctrl_doRefill) begin
+      LsuL1Plugin_logic_writeback_push_payload_way = LsuL1Plugin_logic_lsu_ctrl_targetWay;
     end
   end
 
@@ -4256,8 +5441,10 @@ module VexiiRiscv (
 
   assign when_LsuL1Plugin_l301_1 = (|LsuL1Plugin_logic_writeback_read_arbiter_lock);
   assign LsuL1Plugin_logic_writeback_read_address = LsuL1Plugin_logic_writeback_slots_0_address;
+  assign LsuL1Plugin_logic_writeback_read_way = LsuL1Plugin_logic_writeback_slots_0_way;
   assign LsuL1Plugin_logic_writeback_read_slotRead_valid = LsuL1Plugin_logic_writeback_read_arbiter_hit;
   assign LsuL1Plugin_logic_writeback_read_slotRead_payload_wordIndex = LsuL1Plugin_logic_writeback_read_wordIndex;
+  assign LsuL1Plugin_logic_writeback_read_slotRead_payload_way = LsuL1Plugin_logic_writeback_read_way;
   assign LsuL1Plugin_logic_writeback_read_slotRead_payload_last = (LsuL1Plugin_logic_writeback_read_wordIndex == 4'b1111);
   assign when_LsuL1Plugin_l605 = (LsuL1Plugin_logic_writeback_read_slotRead_valid && LsuL1Plugin_logic_writeback_read_slotRead_payload_last);
   always @(*) begin
@@ -4267,7 +5454,7 @@ module VexiiRiscv (
     end
   end
 
-  assign LsuL1Plugin_logic_banks_0_usedByWriteback = (LsuL1Plugin_logic_writeback_read_slotRead_valid && 1'b1);
+  assign LsuL1Plugin_logic_banks_0_usedByWriteback = (LsuL1Plugin_logic_writeback_read_slotRead_valid && (LsuL1Plugin_logic_writeback_read_way == 1'b0));
   always @(*) begin
     LsuL1Plugin_logic_banks_0_read_cmd_payload = {LsuL1Plugin_logic_writeback_read_address[11 : 6],LsuL1Plugin_logic_writeback_read_wordIndex};
     if(when_LsuL1Plugin_l719) begin
@@ -4275,7 +5462,22 @@ module VexiiRiscv (
     end
   end
 
-  assign LsuL1Plugin_logic_writeback_read_readedData = LsuL1Plugin_logic_banks_0_read_rsp;
+  always @(*) begin
+    LsuL1Plugin_logic_banks_1_read_cmd_valid = LsuL1Plugin_logic_banks_1_usedByWriteback;
+    if(when_LsuL1Plugin_l718_1) begin
+      LsuL1Plugin_logic_banks_1_read_cmd_valid = 1'b1;
+    end
+  end
+
+  assign LsuL1Plugin_logic_banks_1_usedByWriteback = (LsuL1Plugin_logic_writeback_read_slotRead_valid && (LsuL1Plugin_logic_writeback_read_way == 1'b1));
+  always @(*) begin
+    LsuL1Plugin_logic_banks_1_read_cmd_payload = {LsuL1Plugin_logic_writeback_read_address[11 : 6],LsuL1Plugin_logic_writeback_read_wordIndex};
+    if(when_LsuL1Plugin_l719_1) begin
+      LsuL1Plugin_logic_banks_1_read_cmd_payload = LsuL1Plugin_logic_lsu_rb0_readAddress;
+    end
+  end
+
+  assign LsuL1Plugin_logic_writeback_read_readedData = _zz_LsuL1Plugin_logic_writeback_read_readedData;
   assign LsuL1Plugin_logic_writeback_write_arbiter_slotsWithId_0_0 = ((LsuL1Plugin_logic_writeback_slots_0_valid && LsuL1Plugin_logic_writeback_slots_0_victimBufferReady) && (! LsuL1Plugin_logic_writeback_slots_0_writeCmdDone));
   assign LsuL1Plugin_logic_writeback_write_arbiter_hits = LsuL1Plugin_logic_writeback_write_arbiter_slotsWithId_0_0;
   assign LsuL1Plugin_logic_writeback_write_arbiter_hit = (|LsuL1Plugin_logic_writeback_write_arbiter_hits);
@@ -4311,42 +5513,79 @@ module VexiiRiscv (
   assign LsuL1Plugin_logic_bus_write_cmd_payload_fragment_address = LsuL1Plugin_logic_writeback_write_cmd_payload_address;
   assign LsuL1Plugin_logic_bus_write_cmd_payload_fragment_data = LsuL1Plugin_logic_writeback_write_word;
   assign LsuL1Plugin_logic_bus_write_cmd_payload_last = LsuL1Plugin_logic_writeback_write_cmd_payload_last;
-  assign LsuL1Plugin_logic_lsu_rb0_readAddress = execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[11 : 2];
-  assign execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0[0] = LsuL1Plugin_logic_banks_0_usedByWriteback;
+  assign LsuL1Plugin_logic_lsu_rb0_readAddress = execute_ctrl1_down_LsuL1_MIXED_ADDRESS_lane0[11 : 2];
+  always @(*) begin
+    execute_ctrl1_down_LsuL1Plugin_logic_BANK_BUSY_lane0[0] = LsuL1Plugin_logic_banks_0_usedByWriteback;
+    execute_ctrl1_down_LsuL1Plugin_logic_BANK_BUSY_lane0[1] = LsuL1Plugin_logic_banks_1_usedByWriteback;
+  end
+
   assign when_LsuL1Plugin_l718 = (! execute_freeze_valid);
   assign when_LsuL1Plugin_l719 = (! LsuL1Plugin_logic_banks_0_usedByWriteback);
+  assign when_LsuL1Plugin_l718_1 = (! execute_freeze_valid);
+  assign when_LsuL1Plugin_l719_1 = (! LsuL1Plugin_logic_banks_1_usedByWriteback);
   assign when_LsuL1Plugin_l735 = (! execute_freeze_valid);
-  assign execute_ctrl3_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0 = LsuL1Plugin_logic_banks_0_read_rsp;
-  assign execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0[0] = (execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_lane0[0] || LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg);
-  assign execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 = execute_ctrl3_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0[31 : 0];
-  assign _zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0 = execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0[0];
-  assign execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0 = (_zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0 ? execute_ctrl4_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 : 32'h0);
+  assign execute_ctrl2_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0 = LsuL1Plugin_logic_banks_0_read_rsp;
   always @(*) begin
-    execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0[0] = ((execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 && (execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0[31 : 2] == execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 2])) && (|(execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 & execute_ctrl3_down_LsuL1_MASK_lane0)));
-    execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0[1] = ((execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 && (execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0[31 : 2] == execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 2])) && (|(execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 & execute_ctrl3_down_LsuL1_MASK_lane0)));
+    execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0[0] = (execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0[1'b0] || LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg);
+    execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0[1] = (execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0[1'b1] || LsuL1Plugin_logic_lsu_rb1_onBanks_1_busyReg);
+  end
+
+  assign when_LsuL1Plugin_l735_1 = (! execute_freeze_valid);
+  assign execute_ctrl2_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_1 = LsuL1Plugin_logic_banks_1_read_rsp;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 = execute_ctrl2_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0[31 : 0];
+  assign execute_ctrl2_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_1 = execute_ctrl2_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_1[31 : 0];
+  assign _zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0 = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0[0];
+  assign _zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0_1 = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0[1];
+  assign execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0 = ((_zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0 ? execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 : 32'h0) | (_zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0_1 ? execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_1 : 32'h0));
+  always @(*) begin
+    execute_ctrl2_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0[0] = ((execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 && (execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0[31 : 2] == execute_ctrl2_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 2])) && (|(execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 & execute_ctrl2_down_LsuL1_MASK_lane0)));
+    execute_ctrl2_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0[1] = ((execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 && (execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0[31 : 2] == execute_ctrl2_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 2])) && (|(execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 & execute_ctrl2_down_LsuL1_MASK_lane0)));
   end
 
   assign LsuL1Plugin_logic_shared_lsuRead_cmd_valid = (! execute_freeze_valid);
-  assign LsuL1Plugin_logic_shared_lsuRead_cmd_payload = execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
-  assign execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0 = (LsuL1Plugin_logic_shared_write_valid && (LsuL1Plugin_logic_shared_write_payload_address == execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]));
-  assign execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty = LsuL1Plugin_logic_shared_write_payload_data_dirty;
+  assign LsuL1Plugin_logic_shared_lsuRead_cmd_payload = execute_ctrl1_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+  assign execute_ctrl1_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0 = (LsuL1Plugin_logic_shared_write_valid && (LsuL1Plugin_logic_shared_write_payload_address == execute_ctrl1_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]));
+  assign execute_ctrl1_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_plru_0 = LsuL1Plugin_logic_shared_write_payload_data_plru_0;
+  assign execute_ctrl1_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty = LsuL1Plugin_logic_shared_write_payload_data_dirty;
   assign LsuL1Plugin_logic_ways_0_lsuRead_cmd_valid = (! execute_freeze_valid);
-  assign LsuL1Plugin_logic_ways_0_lsuRead_cmd_payload = execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+  assign LsuL1Plugin_logic_ways_0_lsuRead_cmd_payload = execute_ctrl1_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+  assign LsuL1Plugin_logic_ways_1_lsuRead_cmd_valid = (! execute_freeze_valid);
+  assign LsuL1Plugin_logic_ways_1_lsuRead_cmd_payload = execute_ctrl1_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
   always @(*) begin
-    execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty = LsuL1Plugin_logic_shared_lsuRead_rsp_dirty;
-    if(execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0) begin
-      execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+    execute_ctrl2_up_LsuL1Plugin_logic_SHARED_lane0_plru_0 = LsuL1Plugin_logic_shared_lsuRead_rsp_plru_0;
+    if(execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0) begin
+      execute_ctrl2_up_LsuL1Plugin_logic_SHARED_lane0_plru_0 = execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_plru_0;
     end
   end
 
-  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded = LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded;
-  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address = LsuL1Plugin_logic_ways_0_lsuRead_rsp_address;
-  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault = LsuL1Plugin_logic_ways_0_lsuRead_rsp_fault;
-  assign LsuL1Plugin_logic_lsu_sharedBypassers_0_hit = (LsuL1Plugin_logic_shared_write_valid && (LsuL1Plugin_logic_shared_write_payload_address == execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]));
-  assign execute_ctrl3_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty = (LsuL1Plugin_logic_lsu_sharedBypassers_0_hit ? LsuL1Plugin_logic_shared_write_payload_data_dirty : execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty);
-  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0[0] = (execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded && (execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address == execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 12]));
-  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0 = (|execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0);
-  assign execute_ctrl4_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0 = (execute_ctrl4_down_LsuL1_STORE_lane0 || execute_ctrl4_down_LsuL1_ATOMIC_lane0);
+  always @(*) begin
+    execute_ctrl2_up_LsuL1Plugin_logic_SHARED_lane0_dirty = LsuL1Plugin_logic_shared_lsuRead_rsp_dirty;
+    if(execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0) begin
+      execute_ctrl2_up_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+    end
+  end
+
+  assign execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded = LsuL1Plugin_logic_ways_0_lsuRead_rsp_loaded;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address = LsuL1Plugin_logic_ways_0_lsuRead_rsp_address;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault = LsuL1Plugin_logic_ways_0_lsuRead_rsp_fault;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded = LsuL1Plugin_logic_ways_1_lsuRead_rsp_loaded;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address = LsuL1Plugin_logic_ways_1_lsuRead_rsp_address;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault = LsuL1Plugin_logic_ways_1_lsuRead_rsp_fault;
+  assign LsuL1Plugin_logic_lsu_sharedBypassers_0_hit = (LsuL1Plugin_logic_shared_write_valid && (LsuL1Plugin_logic_shared_write_payload_address == execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6]));
+  assign execute_ctrl2_LsuL1Plugin_logic_SHARED_lane0_bypass_plru_0 = (LsuL1Plugin_logic_lsu_sharedBypassers_0_hit ? LsuL1Plugin_logic_shared_write_payload_data_plru_0 : execute_ctrl2_up_LsuL1Plugin_logic_SHARED_lane0_plru_0);
+  assign execute_ctrl2_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty = (LsuL1Plugin_logic_lsu_sharedBypassers_0_hit ? LsuL1Plugin_logic_shared_write_payload_data_dirty : execute_ctrl2_up_LsuL1Plugin_logic_SHARED_lane0_dirty);
+  always @(*) begin
+    execute_ctrl2_down_LsuL1Plugin_logic_WAYS_HITS_lane0[0] = (execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded && (execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address == execute_ctrl2_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 12]));
+    execute_ctrl2_down_LsuL1Plugin_logic_WAYS_HITS_lane0[1] = (execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded && (execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address == execute_ctrl2_down_LsuL1_PHYSICAL_ADDRESS_lane0[31 : 12]));
+  end
+
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HIT_lane0 = (|execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0);
+  assign execute_ctrl3_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0 = (execute_ctrl3_down_LsuL1_STORE_lane0 || execute_ctrl3_down_LsuL1_ATOMIC_lane0);
+  assign LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_evict_logic_0_state = LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_context_state_0[0];
+  assign LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_evict_sel_0 = (! LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_evict_logic_0_state);
+  assign LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_evict_id = LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_evict_sel_0;
+  assign LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_update_state_0[0] = LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_update_id[0];
+  assign LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_context_state_0 = execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_plru_0;
   always @(*) begin
     LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_take = 1'b0;
     if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
@@ -4355,41 +5594,59 @@ module VexiiRiscv (
   end
 
   assign LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_take = 1'b0;
-  assign LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback = _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback[0];
-  assign LsuL1Plugin_logic_lsu_ctrl_refillHazards = (LsuL1Plugin_logic_refill_slots_0_valid && (LsuL1Plugin_logic_refill_slots_0_address[11 : 6] == execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0[11 : 6]));
-  assign LsuL1Plugin_logic_lsu_ctrl_writebackHazards = (LsuL1Plugin_logic_writeback_slots_0_valid && (LsuL1Plugin_logic_writeback_slots_0_address[11 : 6] == execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0[11 : 6]));
+  assign LsuL1Plugin_logic_lsu_ctrl_refillWayWithoutUpdate = LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_evict_id;
+  assign LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback = _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback[LsuL1Plugin_logic_lsu_ctrl_refillWayWithoutUpdate];
+  assign LsuL1Plugin_logic_lsu_ctrl_refillHazards = (LsuL1Plugin_logic_refill_slots_0_valid && (LsuL1Plugin_logic_refill_slots_0_address[11 : 6] == execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0[11 : 6]));
+  assign LsuL1Plugin_logic_lsu_ctrl_writebackHazards = (LsuL1Plugin_logic_writeback_slots_0_valid && (LsuL1Plugin_logic_writeback_slots_0_address[11 : 6] == execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0[11 : 6]));
   assign LsuL1Plugin_logic_lsu_ctrl_refillHazard = (|LsuL1Plugin_logic_lsu_ctrl_refillHazards);
   assign LsuL1Plugin_logic_lsu_ctrl_writebackHazard = (|LsuL1Plugin_logic_lsu_ctrl_writebackHazards);
-  assign LsuL1Plugin_logic_lsu_ctrl_wasDirty = (|(execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty & execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0));
-  assign LsuL1Plugin_logic_lsu_ctrl_loadedDirties = (execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded & execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty);
-  assign LsuL1Plugin_logic_lsu_ctrl_refillWayWasDirty = LsuL1Plugin_logic_lsu_ctrl_loadedDirties[0];
-  assign LsuL1Plugin_logic_lsu_ctrl_writeToReadHazard = (|execute_ctrl4_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0);
-  assign LsuL1Plugin_logic_lsu_ctrl_bankNotRead = (|(execute_ctrl4_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0 & execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0));
-  assign LsuL1Plugin_logic_lsu_ctrl_loadHazard = ((execute_ctrl4_down_LsuL1_LOAD_lane0 && (! execute_ctrl4_down_LsuL1_PREFETCH_lane0)) && (LsuL1Plugin_logic_lsu_ctrl_bankNotRead || LsuL1Plugin_logic_lsu_ctrl_writeToReadHazard));
-  assign LsuL1Plugin_logic_lsu_ctrl_storeHazard = ((execute_ctrl4_down_LsuL1_STORE_lane0 && (! execute_ctrl4_down_LsuL1_PREFETCH_lane0)) && (! LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win));
-  assign LsuL1Plugin_logic_lsu_ctrl_flushHazard = (execute_ctrl4_down_LsuL1_FLUSH_lane0 && (! LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win));
+  assign LsuL1Plugin_logic_lsu_ctrl_wasDirty = (|(execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty & execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0));
+  assign LsuL1Plugin_logic_lsu_ctrl_loadedDirties = ({execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded,execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded} & execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty);
+  assign LsuL1Plugin_logic_lsu_ctrl_refillWayWasDirty = LsuL1Plugin_logic_lsu_ctrl_loadedDirties[LsuL1Plugin_logic_lsu_ctrl_refillWayWithoutUpdate];
+  assign LsuL1Plugin_logic_lsu_ctrl_writeToReadHazard = (|execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0);
+  assign LsuL1Plugin_logic_lsu_ctrl_bankNotRead = (|(execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0 & execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0));
+  assign LsuL1Plugin_logic_lsu_ctrl_loadHazard = ((execute_ctrl3_down_LsuL1_LOAD_lane0 && (! execute_ctrl3_down_LsuL1_PREFETCH_lane0)) && (LsuL1Plugin_logic_lsu_ctrl_bankNotRead || LsuL1Plugin_logic_lsu_ctrl_writeToReadHazard));
+  assign LsuL1Plugin_logic_lsu_ctrl_storeHazard = ((execute_ctrl3_down_LsuL1_STORE_lane0 && (! execute_ctrl3_down_LsuL1_PREFETCH_lane0)) && (! LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win));
+  assign LsuL1Plugin_logic_lsu_ctrl_flushHazard = (execute_ctrl3_down_LsuL1_FLUSH_lane0 && (! LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win));
   assign LsuL1Plugin_logic_lsu_ctrl_coherencyHazard = 1'b0;
-  assign execute_ctrl4_down_LsuL1Plugin_logic_HAZARD_FORCED_lane0 = 1'b0;
-  assign execute_ctrl4_down_LsuL1_HAZARD_lane0 = (((((LsuL1Plugin_logic_lsu_ctrl_hazardReg || LsuL1Plugin_logic_lsu_ctrl_loadHazard) || LsuL1Plugin_logic_lsu_ctrl_refillHazard) || LsuL1Plugin_logic_lsu_ctrl_storeHazard) || LsuL1Plugin_logic_lsu_ctrl_coherencyHazard) || execute_ctrl4_down_LsuL1Plugin_logic_HAZARD_FORCED_lane0);
-  assign execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0 = (LsuL1Plugin_logic_lsu_ctrl_flushHazardReg || LsuL1Plugin_logic_lsu_ctrl_flushHazard);
-  assign execute_ctrl4_down_LsuL1_MISS_lane0 = (! execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0);
-  assign execute_ctrl4_down_LsuL1_FAULT_lane0 = ((execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0 && (|(execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0 & execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault))) && (! execute_ctrl4_down_LsuL1_FLUSH_lane0));
-  assign execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0 = ((execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0 && execute_ctrl4_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0) && 1'b0);
-  assign execute_ctrl4_down_LsuL1_REFILL_HIT_lane0 = LsuL1Plugin_logic_lsu_ctrl_refillHazard;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_HAZARD_FORCED_lane0 = 1'b0;
+  assign execute_ctrl3_down_LsuL1_HAZARD_lane0 = (((((LsuL1Plugin_logic_lsu_ctrl_hazardReg || LsuL1Plugin_logic_lsu_ctrl_loadHazard) || LsuL1Plugin_logic_lsu_ctrl_refillHazard) || LsuL1Plugin_logic_lsu_ctrl_storeHazard) || LsuL1Plugin_logic_lsu_ctrl_coherencyHazard) || execute_ctrl3_down_LsuL1Plugin_logic_HAZARD_FORCED_lane0);
+  assign execute_ctrl3_down_LsuL1_FLUSH_HAZARD_lane0 = (LsuL1Plugin_logic_lsu_ctrl_flushHazardReg || LsuL1Plugin_logic_lsu_ctrl_flushHazard);
+  assign execute_ctrl3_down_LsuL1_MISS_lane0 = (! execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HIT_lane0);
+  assign execute_ctrl3_down_LsuL1_FAULT_lane0 = ((execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HIT_lane0 && (|(execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0 & {execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault,execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault}))) && (! execute_ctrl3_down_LsuL1_FLUSH_lane0));
+  assign execute_ctrl3_down_LsuL1_MISS_UNIQUE_lane0 = ((execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HIT_lane0 && execute_ctrl3_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0) && 1'b0);
+  assign execute_ctrl3_down_LsuL1_REFILL_HIT_lane0 = LsuL1Plugin_logic_lsu_ctrl_refillHazard;
   assign LsuL1Plugin_logic_lsu_ctrl_canRefill = (((! (LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback && LsuL1Plugin_logic_writeback_full)) && (! LsuL1Plugin_logic_refill_full)) && (! LsuL1Plugin_logic_lsu_ctrl_writebackHazard));
   assign LsuL1Plugin_logic_lsu_ctrl_canFlush = (((LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win && (! LsuL1Plugin_logic_writeback_full)) && (! (|LsuL1Plugin_logic_refill_slots_0_valid))) && (! LsuL1Plugin_logic_lsu_ctrl_writebackHazard));
   assign LsuL1Plugin_logic_lsu_ctrl_needFlushs = LsuL1Plugin_logic_lsu_ctrl_loadedDirties;
-  assign LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0 = LsuL1Plugin_logic_lsu_ctrl_needFlushs[0];
-  assign _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushOh[0] = (LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0 && (! 1'b0));
+  assign _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0 = LsuL1Plugin_logic_lsu_ctrl_needFlushs;
+  assign LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0 = _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0[0];
+  assign LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_1 = _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0[1];
+  always @(*) begin
+    _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushOh[0] = (LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0 && (! 1'b0));
+    _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushOh[1] = (LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_1 && (! LsuL1Plugin_logic_lsu_ctrl_needFlushs_bools_0));
+  end
+
   assign LsuL1Plugin_logic_lsu_ctrl_needFlushOh = _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushOh;
-  assign LsuL1Plugin_logic_lsu_ctrl_isAccess = (! execute_ctrl4_down_LsuL1_FLUSH_lane0);
-  assign LsuL1Plugin_logic_lsu_ctrl_askRefill = ((LsuL1Plugin_logic_lsu_ctrl_isAccess && execute_ctrl4_down_LsuL1_MISS_lane0) && LsuL1Plugin_logic_lsu_ctrl_canRefill);
-  assign LsuL1Plugin_logic_lsu_ctrl_askUpgrade = ((LsuL1Plugin_logic_lsu_ctrl_isAccess && execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0) && LsuL1Plugin_logic_lsu_ctrl_canRefill);
-  assign LsuL1Plugin_logic_lsu_ctrl_askFlush = ((execute_ctrl4_down_LsuL1_FLUSH_lane0 && LsuL1Plugin_logic_lsu_ctrl_canFlush) && (|LsuL1Plugin_logic_lsu_ctrl_needFlushs));
-  assign LsuL1Plugin_logic_lsu_ctrl_doRefill = (execute_ctrl4_down_LsuL1_SEL_lane0 && LsuL1Plugin_logic_lsu_ctrl_askRefill);
-  assign LsuL1Plugin_logic_lsu_ctrl_doUpgrade = (execute_ctrl4_down_LsuL1_SEL_lane0 && LsuL1Plugin_logic_lsu_ctrl_askUpgrade);
-  assign LsuL1Plugin_logic_lsu_ctrl_doFlush = (execute_ctrl4_down_LsuL1_SEL_lane0 && LsuL1Plugin_logic_lsu_ctrl_askFlush);
-  assign LsuL1Plugin_logic_lsu_ctrl_doWrite = ((((execute_ctrl4_down_LsuL1_SEL_lane0 && execute_ctrl4_down_LsuL1_STORE_lane0) && execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HIT_lane0) && _zz_LsuL1Plugin_logic_lsu_ctrl_doWrite[0]) && (! execute_ctrl4_down_LsuL1_SKIP_WRITE_lane0));
+  assign _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushSel = LsuL1Plugin_logic_lsu_ctrl_needFlushOh[1];
+  assign LsuL1Plugin_logic_lsu_ctrl_needFlushSel = _zz_LsuL1Plugin_logic_lsu_ctrl_needFlushSel;
+  assign LsuL1Plugin_logic_lsu_ctrl_isAccess = (! execute_ctrl3_down_LsuL1_FLUSH_lane0);
+  assign LsuL1Plugin_logic_lsu_ctrl_askRefill = ((LsuL1Plugin_logic_lsu_ctrl_isAccess && execute_ctrl3_down_LsuL1_MISS_lane0) && LsuL1Plugin_logic_lsu_ctrl_canRefill);
+  assign LsuL1Plugin_logic_lsu_ctrl_askUpgrade = ((LsuL1Plugin_logic_lsu_ctrl_isAccess && execute_ctrl3_down_LsuL1_MISS_UNIQUE_lane0) && LsuL1Plugin_logic_lsu_ctrl_canRefill);
+  assign LsuL1Plugin_logic_lsu_ctrl_askFlush = ((execute_ctrl3_down_LsuL1_FLUSH_lane0 && LsuL1Plugin_logic_lsu_ctrl_canFlush) && (|LsuL1Plugin_logic_lsu_ctrl_needFlushs));
+  assign LsuL1Plugin_logic_lsu_ctrl_doRefill = (execute_ctrl3_down_LsuL1_SEL_lane0 && LsuL1Plugin_logic_lsu_ctrl_askRefill);
+  assign LsuL1Plugin_logic_lsu_ctrl_doUpgrade = (execute_ctrl3_down_LsuL1_SEL_lane0 && LsuL1Plugin_logic_lsu_ctrl_askUpgrade);
+  assign LsuL1Plugin_logic_lsu_ctrl_doFlush = (execute_ctrl3_down_LsuL1_SEL_lane0 && LsuL1Plugin_logic_lsu_ctrl_askFlush);
+  assign LsuL1Plugin_logic_lsu_ctrl_doWrite = ((((execute_ctrl3_down_LsuL1_SEL_lane0 && execute_ctrl3_down_LsuL1_STORE_lane0) && execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HIT_lane0) && _zz_LsuL1Plugin_logic_lsu_ctrl_doWrite[0]) && (! execute_ctrl3_down_LsuL1_SKIP_WRITE_lane0));
+  assign LsuL1Plugin_logic_lsu_ctrl_wayId = _zz_execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0_1;
+  assign LsuL1Plugin_logic_lsu_ctrl_targetWay = (LsuL1Plugin_logic_lsu_ctrl_askUpgrade ? LsuL1Plugin_logic_lsu_ctrl_wayId : LsuL1Plugin_logic_lsu_ctrl_refillWayWithoutUpdate);
+  always @(*) begin
+    LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_update_id = LsuL1Plugin_logic_lsu_ctrl_wayId;
+    if(LsuL1Plugin_logic_lsu_ctrl_doRefill) begin
+      LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_update_id = LsuL1Plugin_logic_lsu_ctrl_targetWay;
+    end
+  end
+
   assign LsuL1Plugin_logic_lsu_ctrl_doRefillPush = (LsuL1Plugin_logic_lsu_ctrl_doRefill || LsuL1Plugin_logic_lsu_ctrl_doUpgrade);
   always @(*) begin
     LsuL1Plugin_logic_refill_push_valid = LsuL1Plugin_logic_lsu_ctrl_doRefillPush;
@@ -4398,9 +5655,16 @@ module VexiiRiscv (
     end
   end
 
-  assign LsuL1Plugin_logic_refill_push_payload_address = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
-  assign LsuL1Plugin_logic_refill_push_payload_unique = execute_ctrl4_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0;
+  assign LsuL1Plugin_logic_refill_push_payload_address = execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  assign LsuL1Plugin_logic_refill_push_payload_unique = execute_ctrl3_down_LsuL1Plugin_logic_NEED_UNIQUE_lane0;
   assign LsuL1Plugin_logic_refill_push_payload_data = LsuL1Plugin_logic_lsu_ctrl_askRefill;
+  always @(*) begin
+    LsuL1Plugin_logic_refill_push_payload_way = LsuL1Plugin_logic_lsu_ctrl_targetWay;
+    if(LsuL1Plugin_logic_lsu_ctrl_askUpgrade) begin
+      LsuL1Plugin_logic_refill_push_payload_way = LsuL1Plugin_logic_lsu_ctrl_wayId;
+    end
+  end
+
   always @(*) begin
     LsuL1Plugin_logic_refill_push_payload_victim = ((LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback && LsuL1Plugin_logic_lsu_ctrl_refillWayWasDirty) ? LsuL1Plugin_logic_writeback_free : 1'b0);
     if(LsuL1Plugin_logic_lsu_ctrl_askUpgrade) begin
@@ -4408,11 +5672,11 @@ module VexiiRiscv (
     end
   end
 
-  assign LsuL1Plugin_logic_refill_push_payload_dirty = execute_ctrl4_down_LsuL1_STORE_lane0;
-  assign execute_ctrl4_down_LsuL1_WAIT_REFILL_lane0 = (LsuL1Plugin_logic_lsu_ctrl_refillHazards | (((! execute_ctrl4_down_LsuL1_HAZARD_lane0) && (LsuL1Plugin_logic_lsu_ctrl_askRefill || LsuL1Plugin_logic_lsu_ctrl_askUpgrade)) ? (LsuL1Plugin_logic_refill_full ? 1'b1 : LsuL1Plugin_logic_refill_free) : 1'b0));
-  assign execute_ctrl4_down_LsuL1_WAIT_WRITEBACK_lane0 = 1'b0;
-  assign when_LsuL1Plugin_l912 = (execute_ctrl4_down_LsuL1_SEL_lane0 && (! execute_ctrl4_down_LsuL1_ABORD_lane0));
-  assign _zz_13 = {LsuL1Plugin_logic_lsu_ctrl_askRefill,{LsuL1Plugin_logic_lsu_ctrl_doUpgrade,LsuL1Plugin_logic_lsu_ctrl_doFlush}};
+  assign LsuL1Plugin_logic_refill_push_payload_dirty = execute_ctrl3_down_LsuL1_STORE_lane0;
+  assign execute_ctrl3_down_LsuL1_WAIT_REFILL_lane0 = (LsuL1Plugin_logic_lsu_ctrl_refillHazards | (((! execute_ctrl3_down_LsuL1_HAZARD_lane0) && (LsuL1Plugin_logic_lsu_ctrl_askRefill || LsuL1Plugin_logic_lsu_ctrl_askUpgrade)) ? (LsuL1Plugin_logic_refill_full ? 1'b1 : LsuL1Plugin_logic_refill_free) : 1'b0));
+  assign execute_ctrl3_down_LsuL1_WAIT_WRITEBACK_lane0 = 1'b0;
+  assign when_LsuL1Plugin_l912 = (execute_ctrl3_down_LsuL1_SEL_lane0 && (! execute_ctrl3_down_LsuL1_ABORD_lane0));
+  assign _zz_21 = {LsuL1Plugin_logic_lsu_ctrl_askRefill,{LsuL1Plugin_logic_lsu_ctrl_doUpgrade,LsuL1Plugin_logic_lsu_ctrl_doFlush}};
   always @(*) begin
     LsuL1Plugin_logic_shared_write_valid = 1'b0;
     if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
@@ -4433,105 +5697,114 @@ module VexiiRiscv (
   end
 
   always @(*) begin
-    LsuL1Plugin_logic_shared_write_payload_address = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
+    LsuL1Plugin_logic_shared_write_payload_address = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[11 : 6];
     if(when_LsuL1Plugin_l1192) begin
       LsuL1Plugin_logic_shared_write_payload_address = LsuL1Plugin_logic_initializer_counter[5:0];
     end
   end
 
   always @(*) begin
-    LsuL1Plugin_logic_shared_write_payload_data_dirty = ((execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty | (LsuL1Plugin_logic_lsu_ctrl_doWrite ? execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0 : 1'b0)) & (~ ((LsuL1Plugin_logic_lsu_ctrl_doRefill ? 1'b1 : 1'b0) | (LsuL1Plugin_logic_lsu_ctrl_doFlush ? LsuL1Plugin_logic_lsu_ctrl_needFlushOh : 1'b0))));
+    LsuL1Plugin_logic_shared_write_payload_data_plru_0 = LsuL1Plugin_logic_lsu_ctrl_plruLogic_core_io_update_state_0;
     if(when_LsuL1Plugin_l1192) begin
-      LsuL1Plugin_logic_shared_write_payload_data_dirty = _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty[0 : 0];
+      LsuL1Plugin_logic_shared_write_payload_data_plru_0 = _zz_LsuL1Plugin_logic_shared_write_payload_data_plru_0_1[0 : 0];
     end
   end
 
-  assign when_LsuL1Plugin_l926 = execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0[0];
-  assign execute_ctrl4_down_LsuL1_FLUSH_HIT_lane0 = (|LsuL1Plugin_logic_lsu_ctrl_needFlushs);
-  assign _zz_LsuL1Plugin_logic_waysWrite_tag_address = execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
-  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 = LsuL1Plugin_logic_lsu_ctrl_doWrite;
-  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0 = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
-  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_DATA_lane0 = execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
-  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 = execute_ctrl4_down_LsuL1_MASK_lane0;
-  assign when_LsuL1Plugin_l991 = ((execute_ctrl4_down_LsuL1_SEL_lane0 && (! execute_ctrl4_down_LsuL1_HAZARD_lane0)) && (! execute_ctrl4_down_LsuL1_MISS_lane0));
-  assign execute_ctrl4_down_LsuL1Plugin_logic_BYPASSED_DATA_lane0 = execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
-  assign execute_ctrl4_down_LsuL1_READ_DATA_lane0 = execute_ctrl4_down_LsuL1Plugin_logic_BYPASSED_DATA_lane0;
-  assign LsuL1Plugin_logic_lsu_ctrl_preventSideEffects = (execute_ctrl4_down_LsuL1_ABORD_lane0 || execute_freeze_valid);
+  always @(*) begin
+    LsuL1Plugin_logic_shared_write_payload_data_dirty = ((execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty | (LsuL1Plugin_logic_lsu_ctrl_doWrite ? execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0 : 2'b00)) & (~ ((LsuL1Plugin_logic_lsu_ctrl_doRefill ? _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty : 2'b00) | (LsuL1Plugin_logic_lsu_ctrl_doFlush ? LsuL1Plugin_logic_lsu_ctrl_needFlushOh : 2'b00))));
+    if(when_LsuL1Plugin_l1192) begin
+      LsuL1Plugin_logic_shared_write_payload_data_dirty = _zz_LsuL1Plugin_logic_shared_write_payload_data_plru_0[2 : 1];
+    end
+  end
+
+  assign when_LsuL1Plugin_l926 = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0[0];
+  assign when_LsuL1Plugin_l926_1 = execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0[1];
+  assign execute_ctrl3_down_LsuL1_FLUSH_HIT_lane0 = (|LsuL1Plugin_logic_lsu_ctrl_needFlushs);
+  assign _zz_LsuL1Plugin_logic_waysWrite_tag_address = _zz__zz_LsuL1Plugin_logic_waysWrite_tag_address;
+  assign execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 = LsuL1Plugin_logic_lsu_ctrl_doWrite;
+  assign execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0 = execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  assign execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_DATA_lane0 = execute_ctrl3_down_LsuL1_WRITE_DATA_lane0;
+  assign execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 = execute_ctrl3_down_LsuL1_MASK_lane0;
+  assign when_LsuL1Plugin_l991 = ((execute_ctrl3_down_LsuL1_SEL_lane0 && (! execute_ctrl3_down_LsuL1_HAZARD_lane0)) && (! execute_ctrl3_down_LsuL1_MISS_lane0));
+  assign execute_ctrl3_down_LsuL1Plugin_logic_BYPASSED_DATA_lane0 = execute_ctrl3_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
+  assign execute_ctrl3_down_LsuL1_READ_DATA_lane0 = execute_ctrl3_down_LsuL1Plugin_logic_BYPASSED_DATA_lane0;
+  assign LsuL1Plugin_logic_lsu_ctrl_preventSideEffects = (execute_ctrl3_down_LsuL1_ABORD_lane0 || execute_freeze_valid);
   assign LsuL1Plugin_logic_initializer_done = LsuL1Plugin_logic_initializer_counter[6];
   assign when_LsuL1Plugin_l1192 = (! LsuL1Plugin_logic_initializer_done);
+  assign _zz_LsuL1Plugin_logic_shared_write_payload_data_plru_0 = 3'b000;
   assign LsuL1Plugin_logic_refill_read_reservation_win = (! 1'b0);
   assign LsuL1Plugin_logic_lsu_ctrl_wayWriteReservation_win = (! (|LsuL1Plugin_logic_refill_read_reservation_take));
   assign LsuL1Plugin_logic_refill_read_writeReservation_win = (! 1'b0);
   assign LsuL1Plugin_logic_lsu_ctrl_bankWriteReservation_win = (! (|LsuL1Plugin_logic_refill_read_writeReservation_take));
-  assign execute_ctrl2_down_MUL_SRC1_lane0 = _zz_execute_ctrl2_down_MUL_SRC1_lane0;
-  assign execute_ctrl2_down_MUL_SRC2_lane0 = _zz_execute_ctrl2_down_MUL_SRC2_lane0;
-  assign execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_0_lane0 = (execute_ctrl2_down_MUL_SRC1_lane0[16 : 0] * execute_ctrl2_down_MUL_SRC2_lane0[16 : 0]);
-  assign execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0 = _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
-  assign execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0 = _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
-  assign execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0 = _zz_execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
+  assign execute_ctrl1_down_MUL_SRC1_lane0 = _zz_execute_ctrl1_down_MUL_SRC1_lane0;
+  assign execute_ctrl1_down_MUL_SRC2_lane0 = _zz_execute_ctrl1_down_MUL_SRC2_lane0;
+  assign execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_0_lane0 = (execute_ctrl1_down_MUL_SRC1_lane0[16 : 0] * execute_ctrl1_down_MUL_SRC2_lane0[16 : 0]);
+  assign execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0 = _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
+  assign execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0 = _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
+  assign execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0 = _zz_execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
   always @(*) begin
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0 = 61'h0;
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0[33 : 0] = execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_0_lane0[33 : 0];
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0[60 : 34] = execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_3_lane0[26 : 0];
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0 = 61'h0;
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0[33 : 0] = execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_0_lane0[33 : 0];
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0[60 : 34] = execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0[26 : 0];
   end
 
   always @(*) begin
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_1 = 61'h0;
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_1[60 : 17] = execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_1_lane0[43 : 0];
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_1 = 61'h0;
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_1[60 : 17] = execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0[43 : 0];
   end
 
   always @(*) begin
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_2 = 61'h0;
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_2[60 : 17] = execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_2_lane0[43 : 0];
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_2 = 61'h0;
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_2[60 : 17] = execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0[43 : 0];
   end
 
   always @(*) begin
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0 = 3'b000;
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0[2 : 0] = execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_3_lane0[29 : 27];
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0 = 3'b000;
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0[2 : 0] = execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0[29 : 27];
   end
 
   always @(*) begin
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_1 = 3'b000;
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_1[2 : 0] = execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_1_lane0[46 : 44];
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_1 = 3'b000;
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_1[2 : 0] = execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0[46 : 44];
   end
 
   always @(*) begin
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_2 = 3'b000;
-    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_2[2 : 0] = execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_2_lane0[46 : 44];
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_2 = 3'b000;
+    _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_2[2 : 0] = execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0[46 : 44];
   end
 
-  assign execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0 = (_zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_3 + _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_6);
-  assign execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0 = (_zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_3 + _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_6);
+  assign execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0 = (_zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_3 + _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0_6);
+  assign execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0 = (_zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_3 + _zz_execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0_6);
   always @(*) begin
-    _zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0 = 66'h0;
-    _zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0[62 : 0] = execute_ctrl4_down_early0_MulPlugin_logic_steps_0_adders_0_lane0[62 : 0];
+    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0 = 66'h0;
+    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0[62 : 0] = execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0[62 : 0];
   end
 
   always @(*) begin
-    _zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0_1 = 66'h0;
-    _zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0_1[65 : 61] = execute_ctrl4_down_early0_MulPlugin_logic_steps_0_adders_1_lane0[4 : 0];
+    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0_1 = 66'h0;
+    _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0_1[65 : 61] = execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0[4 : 0];
   end
 
-  assign execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0 = (_zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0 + _zz_execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0_1);
-  assign early0_MulPlugin_logic_formatBus_valid = execute_ctrl4_down_early0_MulPlugin_SEL_lane0;
-  assign early0_MulPlugin_logic_formatBus_payload = (execute_ctrl4_down_MulPlugin_HIGH_lane0 ? execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0[63 : 32] : execute_ctrl4_down_early0_MulPlugin_logic_steps_1_adders_0_lane0[31 : 0]);
-  assign execute_ctrl2_down_RsUnsignedPlugin_RS1_FORMATED_lane0 = execute_ctrl2_up_integer_RS1_lane0;
-  assign execute_ctrl2_down_RsUnsignedPlugin_RS2_FORMATED_lane0 = execute_ctrl2_up_integer_RS2_lane0;
-  assign execute_ctrl2_down_RsUnsignedPlugin_RS1_REVERT_lane0 = (execute_ctrl2_down_RsUnsignedPlugin_RS1_SIGNED_lane0 && execute_ctrl2_down_RsUnsignedPlugin_RS1_FORMATED_lane0[31]);
-  assign execute_ctrl2_down_RsUnsignedPlugin_RS2_REVERT_lane0 = (execute_ctrl2_down_RsUnsignedPlugin_RS2_SIGNED_lane0 && execute_ctrl2_down_RsUnsignedPlugin_RS2_FORMATED_lane0[31]);
-  assign execute_ctrl2_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0 = ((execute_ctrl2_down_RsUnsignedPlugin_RS1_REVERT_lane0 ? (~ execute_ctrl2_down_RsUnsignedPlugin_RS1_FORMATED_lane0) : execute_ctrl2_down_RsUnsignedPlugin_RS1_FORMATED_lane0) + _zz_execute_ctrl2_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0);
-  assign execute_ctrl2_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0 = ((execute_ctrl2_down_RsUnsignedPlugin_RS2_REVERT_lane0 ? (~ execute_ctrl2_down_RsUnsignedPlugin_RS2_FORMATED_lane0) : execute_ctrl2_down_RsUnsignedPlugin_RS2_FORMATED_lane0) + _zz_execute_ctrl2_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0);
+  assign execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0 = (_zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0 + _zz_execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0_1);
+  assign early0_MulPlugin_logic_formatBus_valid = execute_ctrl3_down_early0_MulPlugin_SEL_lane0;
+  assign early0_MulPlugin_logic_formatBus_payload = (execute_ctrl3_down_MulPlugin_HIGH_lane0 ? execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0[63 : 32] : execute_ctrl3_down_early0_MulPlugin_logic_steps_1_adders_0_lane0[31 : 0]);
+  assign execute_ctrl1_down_RsUnsignedPlugin_RS1_FORMATED_lane0 = execute_ctrl1_up_integer_RS1_lane0;
+  assign execute_ctrl1_down_RsUnsignedPlugin_RS2_FORMATED_lane0 = execute_ctrl1_up_integer_RS2_lane0;
+  assign execute_ctrl1_down_RsUnsignedPlugin_RS1_REVERT_lane0 = (execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0 && execute_ctrl1_down_RsUnsignedPlugin_RS1_FORMATED_lane0[31]);
+  assign execute_ctrl1_down_RsUnsignedPlugin_RS2_REVERT_lane0 = (execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0 && execute_ctrl1_down_RsUnsignedPlugin_RS2_FORMATED_lane0[31]);
+  assign execute_ctrl1_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0 = ((execute_ctrl1_down_RsUnsignedPlugin_RS1_REVERT_lane0 ? (~ execute_ctrl1_down_RsUnsignedPlugin_RS1_FORMATED_lane0) : execute_ctrl1_down_RsUnsignedPlugin_RS1_FORMATED_lane0) + _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0);
+  assign execute_ctrl1_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0 = ((execute_ctrl1_down_RsUnsignedPlugin_RS2_REVERT_lane0 ? (~ execute_ctrl1_down_RsUnsignedPlugin_RS2_FORMATED_lane0) : execute_ctrl1_down_RsUnsignedPlugin_RS2_FORMATED_lane0) + _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0);
   assign io_cmd_fire = (early0_DivPlugin_logic_processing_div_io_cmd_valid && early0_DivPlugin_logic_processing_div_io_cmd_ready);
-  assign early0_DivPlugin_logic_processing_request = (execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_early0_DivPlugin_SEL_lane0);
-  assign early0_DivPlugin_logic_processing_a = execute_ctrl2_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0;
-  assign early0_DivPlugin_logic_processing_b = execute_ctrl2_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0;
+  assign early0_DivPlugin_logic_processing_request = (execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_down_early0_DivPlugin_SEL_lane0);
+  assign early0_DivPlugin_logic_processing_a = execute_ctrl1_down_RsUnsignedPlugin_RS1_UNSIGNED_lane0;
+  assign early0_DivPlugin_logic_processing_b = execute_ctrl1_down_RsUnsignedPlugin_RS2_UNSIGNED_lane0;
   assign early0_DivPlugin_logic_processing_div_io_cmd_valid = (early0_DivPlugin_logic_processing_request && (! early0_DivPlugin_logic_processing_cmdSent));
   assign early0_DivPlugin_logic_processing_freeze = ((early0_DivPlugin_logic_processing_request && (! early0_DivPlugin_logic_processing_div_io_rsp_valid)) && (! early0_DivPlugin_logic_processing_unscheduleRequest));
-  assign early0_DivPlugin_logic_processing_selected = (execute_ctrl2_down_DivPlugin_REM_lane0 ? early0_DivPlugin_logic_processing_div_io_rsp_payload_remain : early0_DivPlugin_logic_processing_div_io_rsp_payload_result);
-  assign _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0 = early0_DivPlugin_logic_processing_selected;
-  assign execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0 = _zz_execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0_1;
-  assign early0_DivPlugin_logic_formatBus_valid = execute_ctrl3_down_early0_DivPlugin_SEL_lane0;
-  assign early0_DivPlugin_logic_formatBus_payload = execute_ctrl3_down_DivPlugin_DIV_RESULT_lane0;
+  assign early0_DivPlugin_logic_processing_selected = (execute_ctrl1_down_DivPlugin_REM_lane0 ? early0_DivPlugin_logic_processing_div_io_rsp_payload_remain : early0_DivPlugin_logic_processing_div_io_rsp_payload_result);
+  assign _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0 = early0_DivPlugin_logic_processing_selected;
+  assign execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0 = _zz_execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0_1;
+  assign early0_DivPlugin_logic_formatBus_valid = execute_ctrl2_down_early0_DivPlugin_SEL_lane0;
+  assign early0_DivPlugin_logic_formatBus_payload = execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0;
   always @(*) begin
     PrivilegedPlugin_logic_harts_0_xretAwayFromMachine = 1'b0;
     case(TrapPlugin_logic_harts_0_trap_fsm_stateReg)
@@ -4586,20 +5859,48 @@ module VexiiRiscv (
   assign _zz_when_TrapPlugin_l207 = (PrivilegedPlugin_logic_harts_0_m_ip_mtip && PrivilegedPlugin_logic_harts_0_m_ie_mtie);
   assign _zz_when_TrapPlugin_l207_1 = (PrivilegedPlugin_logic_harts_0_m_ip_msip && PrivilegedPlugin_logic_harts_0_m_ie_msie);
   assign _zz_when_TrapPlugin_l207_2 = (PrivilegedPlugin_logic_harts_0_m_ip_meip && PrivilegedPlugin_logic_harts_0_m_ie_meie);
-  assign WhiteboxerPlugin_logic_fetch_fire = fetch_logic_ctrls_0_down_isFiring;
   always @(*) begin
-    case(execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0)
-      BranchPlugin_BranchCtrlEnum_JALR : begin
-        early0_BranchPlugin_pcCalc_target_a = execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0;
+    case(execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0)
+      IntAluPlugin_AluBitwiseCtrlEnum_AND_1 : begin
+        late0_IntAluPlugin_logic_alu_bitwise = (execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0 & execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0);
+      end
+      IntAluPlugin_AluBitwiseCtrlEnum_OR_1 : begin
+        late0_IntAluPlugin_logic_alu_bitwise = (execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0 | execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0);
+      end
+      IntAluPlugin_AluBitwiseCtrlEnum_XOR_1 : begin
+        late0_IntAluPlugin_logic_alu_bitwise = (execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0 ^ execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0);
       end
       default : begin
-        early0_BranchPlugin_pcCalc_target_a = execute_ctrl2_down_PC_lane0;
+        late0_IntAluPlugin_logic_alu_bitwise = 32'h0;
+      end
+    endcase
+  end
+
+  assign late0_IntAluPlugin_logic_alu_result = (_zz_late0_IntAluPlugin_logic_alu_result | _zz_late0_IntAluPlugin_logic_alu_result_2);
+  assign execute_ctrl3_down_late0_IntAluPlugin_ALU_RESULT_lane0 = late0_IntAluPlugin_logic_alu_result;
+  assign late0_IntAluPlugin_logic_wb_valid = execute_ctrl3_down_late0_IntAluPlugin_SEL_lane0;
+  assign late0_IntAluPlugin_logic_wb_payload = execute_ctrl3_down_late0_IntAluPlugin_ALU_RESULT_lane0;
+  assign late0_BarrelShifterPlugin_logic_shift_amplitude = _zz_late0_BarrelShifterPlugin_logic_shift_amplitude;
+  assign late0_BarrelShifterPlugin_logic_shift_reversed = (execute_ctrl3_down_BarrelShifterPlugin_LEFT_lane0 ? _zz_late0_BarrelShifterPlugin_logic_shift_reversed : execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0);
+  assign late0_BarrelShifterPlugin_logic_shift_shifted = _zz_late0_BarrelShifterPlugin_logic_shift_shifted[31:0];
+  assign late0_BarrelShifterPlugin_logic_shift_patched = (execute_ctrl3_down_BarrelShifterPlugin_LEFT_lane0 ? _zz_late0_BarrelShifterPlugin_logic_shift_patched : late0_BarrelShifterPlugin_logic_shift_shifted);
+  assign execute_ctrl3_down_late0_BarrelShifterPlugin_SHIFT_RESULT_lane0 = late0_BarrelShifterPlugin_logic_shift_patched;
+  assign late0_BarrelShifterPlugin_logic_wb_valid = execute_ctrl3_down_late0_BarrelShifterPlugin_SEL_lane0;
+  assign late0_BarrelShifterPlugin_logic_wb_payload = execute_ctrl3_down_late0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
+  assign WhiteboxerPlugin_logic_fetch_fire = fetch_logic_ctrls_0_down_isFiring;
+  always @(*) begin
+    case(execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0)
+      BranchPlugin_BranchCtrlEnum_JALR : begin
+        early0_BranchPlugin_pcCalc_target_a = execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
+      end
+      default : begin
+        early0_BranchPlugin_pcCalc_target_a = execute_ctrl1_down_PC_lane0;
       end
     endcase
   end
 
   always @(*) begin
-    case(execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0)
+    case(execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0)
       BranchPlugin_BranchCtrlEnum_JAL : begin
         early0_BranchPlugin_pcCalc_target_b = {{11{_zz_early0_BranchPlugin_pcCalc_target_b[20]}}, _zz_early0_BranchPlugin_pcCalc_target_b};
       end
@@ -4614,19 +5915,20 @@ module VexiiRiscv (
 
   assign early0_BranchPlugin_pcCalc_slices = (_zz_early0_BranchPlugin_pcCalc_slices + {1'b0,1'b1});
   always @(*) begin
-    execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 = _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
-    execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0[0] = 1'b0;
+    execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 = _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+    execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0[0] = 1'b0;
   end
 
-  assign execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 = (execute_ctrl2_down_PC_lane0 + _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0);
-  assign execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 = (execute_ctrl2_down_PC_lane0 + _zz_execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0);
+  assign execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 = (execute_ctrl1_down_PC_lane0 + _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0);
+  assign execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 = (execute_ctrl1_down_PC_lane0 + _zz_execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0);
   assign AlignerPlugin_logic_maskGen_frontMasks_0 = 1'b1;
   assign AlignerPlugin_logic_maskGen_backMasks_0 = 1'b1;
-  assign fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_MASK = AlignerPlugin_logic_maskGen_frontMasks_0;
-  assign fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_LAST = 1'b0;
+  assign fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_MASK = (AlignerPlugin_logic_maskGen_frontMasks_0 & ((! fetch_logic_ctrls_2_down_Prediction_WORD_JUMPED) ? 1'b1 : AlignerPlugin_logic_maskGen_backMasks_0));
+  assign fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_LAST = ((fetch_logic_ctrls_2_up_isValid && fetch_logic_ctrls_2_down_Prediction_WORD_JUMPED) ? 1'b1 : 1'b0);
   assign AlignerPlugin_logic_slicesInstructions_0 = AlignerPlugin_logic_slices_data_0;
+  assign AlignerPlugin_logic_slicesInstructions_1 = AlignerPlugin_logic_slices_data_1;
   always @(*) begin
-    AlignerPlugin_logic_scanners_0_usageMask = 1'b0;
+    AlignerPlugin_logic_scanners_0_usageMask = 2'b00;
     AlignerPlugin_logic_scanners_0_usageMask[0] = AlignerPlugin_logic_scanners_0_checker_0_required;
   end
 
@@ -4637,32 +5939,51 @@ module VexiiRiscv (
   assign AlignerPlugin_logic_scanners_0_checker_0_valid = AlignerPlugin_logic_scanners_0_checker_0_present;
   assign AlignerPlugin_logic_scanners_0_redo = (|AlignerPlugin_logic_scanners_0_checker_0_redo);
   assign AlignerPlugin_logic_scanners_0_valid = (AlignerPlugin_logic_scanners_0_checker_0_valid && (1'b1 || (|AlignerPlugin_logic_scanners_0_checker_0_redo)));
-  assign AlignerPlugin_logic_usedMask_0 = 1'b0;
-  assign AlignerPlugin_logic_extractors_0_first = 1'b1;
-  assign AlignerPlugin_logic_extractors_0_usableMask = (AlignerPlugin_logic_scanners_0_valid && (! AlignerPlugin_logic_usedMask_0[0]));
-  assign AlignerPlugin_logic_extractors_0_usableMask_bools_0 = AlignerPlugin_logic_extractors_0_usableMask[0];
-  assign _zz_AlignerPlugin_logic_extractors_0_slicesOh[0] = (AlignerPlugin_logic_extractors_0_usableMask_bools_0 && (! 1'b0));
-  assign AlignerPlugin_logic_extractors_0_slicesOh = _zz_AlignerPlugin_logic_extractors_0_slicesOh;
   always @(*) begin
-    AlignerPlugin_logic_extractors_0_redo = AlignerPlugin_logic_scanners_0_redo;
+    AlignerPlugin_logic_scanners_1_usageMask = 2'b00;
+    AlignerPlugin_logic_scanners_1_usageMask[1] = AlignerPlugin_logic_scanners_1_checker_0_required;
+  end
+
+  assign AlignerPlugin_logic_scanners_1_checker_0_required = 1'b1;
+  assign AlignerPlugin_logic_scanners_1_checker_0_last = (AlignerPlugin_logic_slices_data_1[1 : 0] != 2'b11);
+  assign AlignerPlugin_logic_scanners_1_checker_0_redo = 1'b0;
+  assign AlignerPlugin_logic_scanners_1_checker_0_present = AlignerPlugin_logic_slices_mask[1];
+  assign AlignerPlugin_logic_scanners_1_checker_0_valid = AlignerPlugin_logic_scanners_1_checker_0_present;
+  assign AlignerPlugin_logic_scanners_1_redo = (|AlignerPlugin_logic_scanners_1_checker_0_redo);
+  assign AlignerPlugin_logic_scanners_1_valid = (AlignerPlugin_logic_scanners_1_checker_0_valid && (1'b1 || (|AlignerPlugin_logic_scanners_1_checker_0_redo)));
+  assign AlignerPlugin_logic_usedMask_0 = 2'b00;
+  assign AlignerPlugin_logic_extractors_0_first = 1'b1;
+  assign AlignerPlugin_logic_extractors_0_usableMask = {(AlignerPlugin_logic_scanners_1_valid && (! AlignerPlugin_logic_usedMask_0[1])),(AlignerPlugin_logic_scanners_0_valid && (! AlignerPlugin_logic_usedMask_0[0]))};
+  assign _zz_AlignerPlugin_logic_extractors_0_usableMask_bools_0 = AlignerPlugin_logic_extractors_0_usableMask;
+  assign AlignerPlugin_logic_extractors_0_usableMask_bools_0 = _zz_AlignerPlugin_logic_extractors_0_usableMask_bools_0[0];
+  assign AlignerPlugin_logic_extractors_0_usableMask_bools_1 = _zz_AlignerPlugin_logic_extractors_0_usableMask_bools_0[1];
+  always @(*) begin
+    _zz_AlignerPlugin_logic_extractors_0_slicesOh[0] = (AlignerPlugin_logic_extractors_0_usableMask_bools_0 && (! 1'b0));
+    _zz_AlignerPlugin_logic_extractors_0_slicesOh[1] = (AlignerPlugin_logic_extractors_0_usableMask_bools_1 && (! AlignerPlugin_logic_extractors_0_usableMask_bools_0));
+  end
+
+  assign AlignerPlugin_logic_extractors_0_slicesOh = _zz_AlignerPlugin_logic_extractors_0_slicesOh;
+  assign _zz_AlignerPlugin_logic_extractors_0_redo = AlignerPlugin_logic_extractors_0_slicesOh[0];
+  assign _zz_AlignerPlugin_logic_extractors_0_redo_1 = AlignerPlugin_logic_extractors_0_slicesOh[1];
+  always @(*) begin
+    AlignerPlugin_logic_extractors_0_redo = _zz_AlignerPlugin_logic_extractors_0_redo_2[0];
     if(when_AlignerPlugin_l160) begin
       AlignerPlugin_logic_extractors_0_redo = 1'b0;
     end
   end
 
-  assign AlignerPlugin_logic_extractors_0_localMask = AlignerPlugin_logic_scanners_0_checker_0_required;
-  always @(*) begin
-    AlignerPlugin_logic_extractors_0_usageMask = AlignerPlugin_logic_scanners_0_usageMask;
-    if(when_AlignerPlugin_l160) begin
-      AlignerPlugin_logic_extractors_0_usageMask = 1'b0;
-    end
-  end
-
+  assign AlignerPlugin_logic_extractors_0_localMask = ((_zz_AlignerPlugin_logic_extractors_0_redo ? AlignerPlugin_logic_scanners_0_checker_0_required : 1'b0) | (_zz_AlignerPlugin_logic_extractors_0_redo_1 ? AlignerPlugin_logic_scanners_1_checker_0_required : 1'b0));
+  assign AlignerPlugin_logic_extractors_0_usageMask = ((_zz_AlignerPlugin_logic_extractors_0_redo ? AlignerPlugin_logic_scanners_0_usageMask : 2'b00) | (_zz_AlignerPlugin_logic_extractors_0_redo_1 ? AlignerPlugin_logic_scanners_1_usageMask : 2'b00));
   assign AlignerPlugin_logic_usedMask_1 = (AlignerPlugin_logic_usedMask_0 | AlignerPlugin_logic_extractors_0_usageMask);
   always @(*) begin
     AlignerPlugin_logic_extractors_0_valid = (|AlignerPlugin_logic_extractors_0_slicesOh);
     if(when_AlignerPlugin_l160) begin
       AlignerPlugin_logic_extractors_0_valid = 1'b0;
+    end
+    if(when_AlignerPlugin_l240) begin
+      if(when_AlignerPlugin_l241) begin
+        AlignerPlugin_logic_extractors_0_valid = 1'b0;
+      end
     end
   end
 
@@ -4683,10 +6004,32 @@ module VexiiRiscv (
   assign decode_ctrls_0_up_PC_0 = AlignerPlugin_logic_extractors_0_ctx_pc;
   assign decode_ctrls_0_up_Decode_DOP_ID_0 = AlignerPlugin_logic_feeder_harts_0_dopId;
   assign decode_ctrls_0_up_Fetch_ID_0 = AlignerPlugin_logic_extractors_0_ctx_hm_Fetch_ID;
+  assign decode_ctrls_0_up_GSharePlugin_GSHARE_COUNTER_0_0 = AlignerPlugin_logic_extractors_0_ctx_hm_GSharePlugin_GSHARE_COUNTER_0;
+  assign decode_ctrls_0_up_Prediction_BRANCH_HISTORY_0 = AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_BRANCH_HISTORY;
+  assign decode_ctrls_0_up_Prediction_WORD_SLICES_BRANCH_0 = AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_SLICES_BRANCH;
+  assign decode_ctrls_0_up_Prediction_WORD_SLICES_TAKEN_0 = AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_SLICES_TAKEN;
+  assign decode_ctrls_0_up_Prediction_WORD_JUMP_PC_0 = AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_JUMP_PC;
+  assign decode_ctrls_0_up_Prediction_WORD_JUMPED_0 = AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_JUMPED;
   assign decode_ctrls_0_up_TRAP_0 = AlignerPlugin_logic_extractors_0_ctx_trap;
+  assign AlignerPlugin_logic_feeder_lanes_0_onBtb_didPrediction = 1'b1;
+  assign decode_ctrls_0_up_Prediction_ALIGNED_JUMPED_0 = (decode_ctrls_0_up_Prediction_WORD_JUMPED_0 && AlignerPlugin_logic_feeder_lanes_0_onBtb_didPrediction);
+  assign decode_ctrls_0_up_Prediction_ALIGNED_JUMPED_PC_0 = decode_ctrls_0_up_Prediction_WORD_JUMP_PC_0;
+  assign decode_ctrls_0_up_Prediction_ALIGNED_SLICES_BRANCH_0 = decode_ctrls_0_up_Prediction_WORD_SLICES_BRANCH_0;
+  assign decode_ctrls_0_up_Prediction_ALIGNED_SLICES_TAKEN_0 = decode_ctrls_0_up_Prediction_WORD_SLICES_TAKEN_0;
+  assign decode_ctrls_0_up_Prediction_ALIGN_REDO_0 = AlignerPlugin_logic_extractors_0_redo;
   assign decode_ctrls_0_up_valid = (|AlignerPlugin_logic_feeder_lanes_0_valid);
-  assign AlignerPlugin_logic_nobuffer_remaningMask = (AlignerPlugin_logic_nobuffer_mask & (~ AlignerPlugin_logic_usedMask_1));
-  assign when_AlignerPlugin_l292 = (decode_ctrls_0_up_isValid && decode_ctrls_0_up_isReady);
+  assign _zz_AlignerPlugin_logic_slices_data_0 = {fetch_logic_ctrls_2_down_Fetch_WORD,AlignerPlugin_logic_buffer_data};
+  assign AlignerPlugin_logic_slices_data_0 = _zz_AlignerPlugin_logic_slices_data_0[31 : 0];
+  assign AlignerPlugin_logic_slices_data_1 = _zz_AlignerPlugin_logic_slices_data_0[63 : 32];
+  assign AlignerPlugin_logic_slices_mask = {fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_MASK,AlignerPlugin_logic_buffer_mask};
+  assign AlignerPlugin_logic_slices_last = {fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_LAST,AlignerPlugin_logic_buffer_last};
+  assign when_AlignerPlugin_l240 = (! fetch_logic_ctrls_2_down_valid);
+  assign when_AlignerPlugin_l241 = (AlignerPlugin_logic_extractors_0_usageMask[1 : 1] != 1'b0);
+  assign AlignerPlugin_logic_buffer_downFire = (decode_ctrls_0_up_isReady || decode_ctrls_0_up_isCancel);
+  assign AlignerPlugin_logic_buffer_usedMask = (AlignerPlugin_logic_extractors_0_valid ? AlignerPlugin_logic_extractors_0_usageMask : 2'b00);
+  assign AlignerPlugin_logic_buffer_haltUp = ((|(AlignerPlugin_logic_buffer_mask & (~ (AlignerPlugin_logic_buffer_downFire ? AlignerPlugin_logic_buffer_usedMask[0 : 0] : 1'b0)))) || AlignerPlugin_api_haltIt);
+  assign fetch_logic_ctrls_2_down_ready = ((! fetch_logic_ctrls_2_down_valid) || (! AlignerPlugin_logic_buffer_haltUp));
+  assign when_AlignerPlugin_l256 = ((fetch_logic_ctrls_2_down_isValid && fetch_logic_ctrls_2_down_isReady) && (! fetch_logic_ctrls_2_down_isCancel));
   assign LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_valid = LsuL1Plugin_logic_bus_read_cmd_valid;
   assign LsuL1Plugin_logic_bus_read_cmd_ready = LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_ready;
   assign LsuL1Plugin_logic_bus_toWishbone_arbiter_readCmd_payload_last = 1'b1;
@@ -4778,14 +6121,16 @@ module VexiiRiscv (
 
   assign FetchL1Plugin_logic_banks_0_read_rsp = FetchL1Plugin_logic_banks_0_mem_spinal_port1;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_0 = FetchL1Plugin_logic_banks_0_read_rsp;
+  assign FetchL1Plugin_logic_banks_1_read_rsp = FetchL1Plugin_logic_banks_1_mem_spinal_port1;
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_1 = FetchL1Plugin_logic_banks_1_read_rsp;
   always @(*) begin
-    FetchL1Plugin_logic_waysWrite_mask = 1'b0;
+    FetchL1Plugin_logic_waysWrite_mask = 2'b00;
     if(when_FetchL1Plugin_l204) begin
-      FetchL1Plugin_logic_waysWrite_mask = 1'b1;
+      FetchL1Plugin_logic_waysWrite_mask = 2'b11;
     end
     if(FetchL1Plugin_logic_invalidate_done) begin
       if(when_FetchL1Plugin_l304) begin
-        FetchL1Plugin_logic_waysWrite_mask[0] = 1'b1;
+        FetchL1Plugin_logic_waysWrite_mask[FetchL1Plugin_logic_refill_onRsp_wayToAllocate] = 1'b1;
       end
     end
   end
@@ -4831,6 +6176,15 @@ module VexiiRiscv (
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded = FetchL1Plugin_logic_ways_0_read_rsp_loaded;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_error = FetchL1Plugin_logic_ways_0_read_rsp_error;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address = FetchL1Plugin_logic_ways_0_read_rsp_address;
+  assign _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded = FetchL1Plugin_logic_ways_1_mem_spinal_port1;
+  assign FetchL1Plugin_logic_ways_1_read_rsp_loaded = _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded[0];
+  assign FetchL1Plugin_logic_ways_1_read_rsp_error = _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded[1];
+  assign FetchL1Plugin_logic_ways_1_read_rsp_address = _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded[21 : 2];
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded = FetchL1Plugin_logic_ways_1_read_rsp_loaded;
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_error = FetchL1Plugin_logic_ways_1_read_rsp_error;
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_address = FetchL1Plugin_logic_ways_1_read_rsp_address;
+  assign FetchL1Plugin_logic_plru_read_rsp_0 = FetchL1Plugin_logic_plru_mem_spinal_port1[0 : 0];
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_READ_0 = FetchL1Plugin_logic_plru_read_rsp_0;
   assign FetchL1Plugin_logic_invalidate_cmd_valid = (|TrapPlugin_logic_fetchL1Invalidate_0_cmd_valid);
   always @(*) begin
     FetchL1Plugin_logic_invalidate_canStart = 1'b1;
@@ -4868,29 +6222,53 @@ module VexiiRiscv (
   assign FetchL1Plugin_logic_refill_onRsp_holdHarts = ((|FetchL1Plugin_logic_waysWrite_mask) || (|((FetchL1Plugin_logic_refill_slots_0_valid && (FetchL1Plugin_logic_refill_slots_0_address[11 : 6] == fetch_logic_ctrls_0_down_Fetch_WORD_PC[11 : 6])) && (! (1'b1 && (fetch_logic_ctrls_0_down_Fetch_WORD_PC[5 : 2] < FetchL1Plugin_logic_refill_onRsp_wordIndex))))));
   assign fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l297 = FetchL1Plugin_logic_refill_onRsp_holdHarts;
   assign FetchL1Plugin_logic_bus_rsp_fire = (FetchL1Plugin_logic_bus_rsp_valid && FetchL1Plugin_logic_bus_rsp_ready);
+  assign FetchL1Plugin_logic_refill_onRsp_wayToAllocate = FetchL1Plugin_logic_refill_slots_0_wayToAllocate;
   assign FetchL1Plugin_logic_refill_onRsp_address = FetchL1Plugin_logic_refill_slots_0_address;
   assign when_FetchL1Plugin_l304 = (FetchL1Plugin_logic_bus_rsp_valid && (FetchL1Plugin_logic_refill_onRsp_firstCycle || FetchL1Plugin_logic_bus_rsp_payload_error));
-  assign FetchL1Plugin_logic_banks_0_write_valid = (FetchL1Plugin_logic_bus_rsp_valid && 1'b1);
+  assign FetchL1Plugin_logic_banks_0_write_valid = (FetchL1Plugin_logic_bus_rsp_valid && (FetchL1Plugin_logic_refill_onRsp_wayToAllocate == 1'b0));
   assign FetchL1Plugin_logic_banks_0_write_payload_address = {FetchL1Plugin_logic_refill_onRsp_address[11 : 6],FetchL1Plugin_logic_refill_onRsp_wordIndex};
   assign FetchL1Plugin_logic_banks_0_write_payload_data = FetchL1Plugin_logic_bus_rsp_payload_data;
+  assign FetchL1Plugin_logic_banks_1_write_valid = (FetchL1Plugin_logic_bus_rsp_valid && (FetchL1Plugin_logic_refill_onRsp_wayToAllocate == 1'b1));
+  assign FetchL1Plugin_logic_banks_1_write_payload_address = {FetchL1Plugin_logic_refill_onRsp_address[11 : 6],FetchL1Plugin_logic_refill_onRsp_wordIndex};
+  assign FetchL1Plugin_logic_banks_1_write_payload_data = FetchL1Plugin_logic_bus_rsp_payload_data;
   assign FetchL1Plugin_logic_bus_rsp_ready = 1'b1;
   assign when_FetchL1Plugin_l330 = (FetchL1Plugin_logic_refill_onRsp_wordIndex == 4'b1111);
   assign FetchL1Plugin_logic_cmd_doIt = (fetch_logic_ctrls_1_up_ready || ((! fetch_logic_ctrls_1_up_valid) && 1'b1));
   assign FetchL1Plugin_logic_banks_0_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
   assign FetchL1Plugin_logic_banks_0_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[11 : 2];
+  assign FetchL1Plugin_logic_banks_1_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
+  assign FetchL1Plugin_logic_banks_1_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[11 : 2];
   assign FetchL1Plugin_logic_ways_0_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
   assign FetchL1Plugin_logic_ways_0_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[11 : 6];
+  assign FetchL1Plugin_logic_ways_1_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
+  assign FetchL1Plugin_logic_ways_1_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[11 : 6];
   assign FetchL1Plugin_logic_plru_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
   assign FetchL1Plugin_logic_plru_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[11 : 6];
   assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID = (FetchL1Plugin_logic_plru_write_valid && (FetchL1Plugin_logic_plru_write_payload_address == FetchL1Plugin_logic_plru_read_cmd_payload));
+  assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0 = FetchL1Plugin_logic_plru_write_payload_data_0;
   assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE = (|FetchL1Plugin_logic_waysWrite_mask);
   assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS = FetchL1Plugin_logic_waysWrite_address;
+  always @(*) begin
+    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_BYPASSED_0 = fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_READ_0;
+    if(fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID) begin
+      fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_BYPASSED_0 = fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
+    end
+  end
+
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_0 = fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_0[31 : 0];
-  assign fetch_logic_ctrls_2_down_Fetch_WORD = (fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_0 : 32'h0);
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_1 = fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_1[31 : 0];
+  assign fetch_logic_ctrls_2_down_Fetch_WORD = ((fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_0 : 32'h0) | (fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_1 : 32'h0));
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_HAZARD = (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE && (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS == fetch_logic_ctrls_1_down_Fetch_WORD_PC[11 : 6]));
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0 = (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded && (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address == fetch_logic_ctrls_1_down_MMU_TRANSLATED[31 : 12]));
-  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT = (|fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0);
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_1 = (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded && (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_address == fetch_logic_ctrls_1_down_MMU_TRANSLATED[31 : 12]));
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT = (|{fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_1,fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0});
   assign FetchL1Plugin_logic_ctrl_pmaPort_cmd_address = fetch_logic_ctrls_2_down_MMU_TRANSLATED;
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_evict_logic_0_state = FetchL1Plugin_logic_ctrl_plruLogic_core_io_context_state_0[0];
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_evict_sel_0 = (! FetchL1Plugin_logic_ctrl_plruLogic_core_evict_logic_0_state);
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_io_evict_id = FetchL1Plugin_logic_ctrl_plruLogic_core_evict_sel_0;
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_state_0[0] = FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_id[0];
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_io_context_state_0 = fetch_logic_ctrls_2_down_FetchL1Plugin_logic_PLRU_BYPASSED_0;
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_id = fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1;
   always @(*) begin
     FetchL1Plugin_logic_plru_write_valid = FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_valid;
     if(when_FetchL1Plugin_l558) begin
@@ -4905,8 +6283,17 @@ module VexiiRiscv (
     end
   end
 
+  always @(*) begin
+    FetchL1Plugin_logic_plru_write_payload_data_0 = FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_data_0;
+    if(when_FetchL1Plugin_l558) begin
+      FetchL1Plugin_logic_plru_write_payload_data_0 = _zz_FetchL1Plugin_logic_plru_write_payload_data_0[0 : 0];
+    end
+  end
+
   assign FetchL1Plugin_logic_ctrl_plruLogic_buffer_valid = (fetch_logic_ctrls_2_up_isValid && fetch_logic_ctrls_2_up_isReady);
   assign FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address = fetch_logic_ctrls_2_down_Fetch_WORD_PC[11 : 6];
+  assign FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_data_0 = FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_state_0;
+  assign FetchL1Plugin_logic_refill_start_wayToAllocate = FetchL1Plugin_logic_ctrl_plruLogic_core_io_evict_id;
   assign FetchL1Plugin_logic_ctrl_dataAccessFault = (_zz_FetchL1Plugin_logic_ctrl_dataAccessFault[0] && (! fetch_logic_ctrls_2_down_FetchL1Plugin_logic_HAZARD));
   always @(*) begin
     FetchL1Plugin_logic_trapPort_valid = 1'b0;
@@ -4990,8 +6377,8 @@ module VexiiRiscv (
     end
   end
 
-  assign _zz_24 = zz_FetchL1Plugin_logic_trapPort_payload_arg(1'b0);
-  always @(*) FetchL1Plugin_logic_trapPort_payload_arg = _zz_24;
+  assign _zz_44 = zz_FetchL1Plugin_logic_trapPort_payload_arg(1'b0);
+  always @(*) FetchL1Plugin_logic_trapPort_payload_arg = _zz_44;
   always @(*) begin
     FetchL1Plugin_logic_ctrl_allowRefill = ((! fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HIT) && (! fetch_logic_ctrls_2_down_FetchL1Plugin_logic_HAZARD));
     if(when_FetchL1Plugin_l480) begin
@@ -5049,7 +6436,7 @@ module VexiiRiscv (
 
   assign LsuPlugin_logic_flusher_wantKill = 1'b0;
   assign TrapPlugin_logic_lsuL1Invalidate_0_cmd_ready = LsuPlugin_logic_flusher_arbiter_io_inputs_0_ready;
-  assign LsuPlugin_logic_flusher_inflight = (|{(execute_ctrl4_down_LsuL1_SEL_lane0 && execute_ctrl4_down_LsuL1_FLUSH_lane0),(execute_ctrl3_down_LsuL1_SEL_lane0 && execute_ctrl3_down_LsuL1_FLUSH_lane0)});
+  assign LsuPlugin_logic_flusher_inflight = (|{(execute_ctrl3_down_LsuL1_SEL_lane0 && execute_ctrl3_down_LsuL1_FLUSH_lane0),(execute_ctrl2_down_LsuL1_SEL_lane0 && execute_ctrl2_down_LsuL1_FLUSH_lane0)});
   always @(*) begin
     LsuPlugin_logic_flusher_arbiter_io_output_ready = 1'b0;
     case(LsuPlugin_logic_flusher_stateReg)
@@ -5065,19 +6452,19 @@ module VexiiRiscv (
     endcase
   end
 
-  assign PrivilegedPlugin_api_lsuTriggerBus_load = execute_ctrl3_down_LsuL1_LOAD_lane0;
-  assign PrivilegedPlugin_api_lsuTriggerBus_store = execute_ctrl3_down_LsuL1_STORE_lane0;
-  assign PrivilegedPlugin_api_lsuTriggerBus_virtual = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
-  assign PrivilegedPlugin_api_lsuTriggerBus_size = execute_ctrl3_down_LsuL1_SIZE_lane0;
-  assign execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0 = 1'b0;
-  assign execute_ctrl2_down_LsuPlugin_logic_FORCE_PHYSICAL_lane0 = (execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0 || execute_ctrl2_down_LsuPlugin_logic_FROM_WB_lane0);
-  assign LsuPlugin_logic_onAddress0_ls_prefetchOp = execute_ctrl2_down_Decode_UOP_lane0[24 : 20];
-  assign LsuPlugin_logic_onAddress0_ls_port_valid = (execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_AguPlugin_SEL_lane0);
-  assign LsuPlugin_logic_onAddress0_ls_port_payload_address = execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
-  assign LsuPlugin_logic_onAddress0_ls_port_payload_size = execute_ctrl2_down_AguPlugin_SIZE_lane0;
-  assign LsuPlugin_logic_onAddress0_ls_port_payload_load = execute_ctrl2_down_AguPlugin_LOAD_lane0;
-  assign LsuPlugin_logic_onAddress0_ls_port_payload_store = execute_ctrl2_down_AguPlugin_STORE_lane0;
-  assign LsuPlugin_logic_onAddress0_ls_port_payload_atomic = execute_ctrl2_down_AguPlugin_ATOMIC_lane0;
+  assign PrivilegedPlugin_api_lsuTriggerBus_load = execute_ctrl2_down_LsuL1_LOAD_lane0;
+  assign PrivilegedPlugin_api_lsuTriggerBus_store = execute_ctrl2_down_LsuL1_STORE_lane0;
+  assign PrivilegedPlugin_api_lsuTriggerBus_virtual = execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0;
+  assign PrivilegedPlugin_api_lsuTriggerBus_size = execute_ctrl2_down_LsuL1_SIZE_lane0;
+  assign execute_ctrl2_down_LsuPlugin_logic_onTrigger_HIT_lane0 = 1'b0;
+  assign execute_ctrl1_down_LsuPlugin_logic_FORCE_PHYSICAL_lane0 = (execute_ctrl1_down_LsuPlugin_logic_FROM_ACCESS_lane0 || execute_ctrl1_down_LsuPlugin_logic_FROM_WB_lane0);
+  assign LsuPlugin_logic_onAddress0_ls_prefetchOp = execute_ctrl1_down_Decode_UOP_lane0[24 : 20];
+  assign LsuPlugin_logic_onAddress0_ls_port_valid = (execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_down_AguPlugin_SEL_lane0);
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_address = execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0;
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_size = execute_ctrl1_down_AguPlugin_SIZE_lane0;
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_load = execute_ctrl1_down_AguPlugin_LOAD_lane0;
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_store = execute_ctrl1_down_AguPlugin_STORE_lane0;
+  assign LsuPlugin_logic_onAddress0_ls_port_payload_atomic = execute_ctrl1_down_AguPlugin_ATOMIC_lane0;
   assign LsuPlugin_logic_onAddress0_ls_port_payload_op = LsuL1CmdOpcode_LSU;
   assign LsuPlugin_logic_onAddress0_ls_port_fire = (LsuPlugin_logic_onAddress0_ls_port_valid && LsuPlugin_logic_onAddress0_ls_port_ready);
   assign LsuPlugin_logic_onAddress0_ls_port_payload_storeId = LsuPlugin_logic_onAddress0_ls_storeId;
@@ -5093,63 +6480,63 @@ module VexiiRiscv (
   assign LsuPlugin_logic_onAddress0_ls_port_ready = LsuPlugin_logic_onAddress0_arbiter_io_inputs_0_ready;
   assign LsuPlugin_logic_onAddress0_flush_port_ready = LsuPlugin_logic_onAddress0_arbiter_io_inputs_1_ready;
   assign LsuPlugin_logic_onAddress0_arbiter_io_output_ready = (! execute_freeze_valid);
-  assign execute_ctrl2_down_LsuL1_SEL_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_valid;
-  assign execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_address;
+  assign execute_ctrl1_down_LsuL1_SEL_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_valid;
+  assign execute_ctrl1_down_LsuL1_MIXED_ADDRESS_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_address;
   always @(*) begin
-    _zz_execute_ctrl2_down_LsuL1_MASK_lane0 = 4'bxxxx;
+    _zz_execute_ctrl1_down_LsuL1_MASK_lane0 = 4'bxxxx;
     case(LsuPlugin_logic_onAddress0_arbiter_io_output_payload_size)
       2'b00 : begin
-        _zz_execute_ctrl2_down_LsuL1_MASK_lane0 = 4'b0001;
+        _zz_execute_ctrl1_down_LsuL1_MASK_lane0 = 4'b0001;
       end
       2'b01 : begin
-        _zz_execute_ctrl2_down_LsuL1_MASK_lane0 = 4'b0011;
+        _zz_execute_ctrl1_down_LsuL1_MASK_lane0 = 4'b0011;
       end
       2'b10 : begin
-        _zz_execute_ctrl2_down_LsuL1_MASK_lane0 = 4'b1111;
+        _zz_execute_ctrl1_down_LsuL1_MASK_lane0 = 4'b1111;
       end
       default : begin
       end
     endcase
   end
 
-  assign execute_ctrl2_down_LsuL1_MASK_lane0 = (_zz_execute_ctrl2_down_LsuL1_MASK_lane0 <<< LsuPlugin_logic_onAddress0_arbiter_io_output_payload_address[1 : 0]);
-  assign execute_ctrl2_down_LsuL1_SIZE_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_size;
-  assign execute_ctrl2_down_LsuL1_LOAD_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_load;
-  assign execute_ctrl2_down_LsuL1_ATOMIC_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_atomic;
-  assign execute_ctrl2_down_LsuL1_STORE_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_store;
-  assign execute_ctrl2_down_LsuL1_PREFETCH_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_PREFETCH);
-  assign execute_ctrl2_down_LsuL1_FLUSH_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_FLUSH);
-  assign execute_ctrl2_down_Decode_STORE_ID_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_storeId;
-  assign execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_ACCESS_1);
-  assign execute_ctrl2_down_LsuPlugin_logic_FROM_WB_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_STORE_BUFFER);
-  assign execute_ctrl2_down_LsuPlugin_logic_FROM_LSU_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_LSU);
-  assign execute_ctrl2_down_LsuPlugin_logic_FROM_PREFETCH_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_PREFETCH);
-  assign execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0 = execute_ctrl3_down_MMU_TRANSLATED_lane0;
-  assign when_LsuPlugin_l497 = (execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 && (! execute_ctrl3_up_LANE_SEL_lane0));
-  assign when_LsuPlugin_l497_1 = (execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 && (! execute_ctrl4_up_LANE_SEL_lane0));
-  assign execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 = (|{((execute_ctrl3_down_LsuL1_SIZE_lane0 == 2'b10) && (execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[1 : 0] != 2'b00)),((execute_ctrl3_down_LsuL1_SIZE_lane0 == 2'b01) && (execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0[0 : 0] != 1'b0))});
-  assign execute_ctrl3_down_LsuPlugin_logic_preCtrl_IS_AMO_lane0 = (((execute_ctrl3_down_AguPlugin_SEL_lane0 && execute_ctrl3_down_LsuL1_ATOMIC_lane0) && execute_ctrl3_down_LsuL1_STORE_lane0) && execute_ctrl3_down_LsuL1_LOAD_lane0);
-  assign LsuPlugin_logic_onPma_cached_cmd_address = execute_ctrl3_down_MMU_TRANSLATED_lane0;
-  assign LsuPlugin_logic_onPma_cached_cmd_op[0] = execute_ctrl3_down_LsuL1_STORE_lane0;
-  assign LsuPlugin_logic_onPma_io_cmd_address = execute_ctrl3_down_MMU_TRANSLATED_lane0;
-  assign LsuPlugin_logic_onPma_io_cmd_size = execute_ctrl3_down_LsuL1_SIZE_lane0;
-  assign LsuPlugin_logic_onPma_io_cmd_op[0] = execute_ctrl3_down_LsuL1_STORE_lane0;
-  assign execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault = LsuPlugin_logic_onPma_cached_rsp_fault;
-  assign execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io = LsuPlugin_logic_onPma_cached_rsp_io;
+  assign execute_ctrl1_down_LsuL1_MASK_lane0 = (_zz_execute_ctrl1_down_LsuL1_MASK_lane0 <<< LsuPlugin_logic_onAddress0_arbiter_io_output_payload_address[1 : 0]);
+  assign execute_ctrl1_down_LsuL1_SIZE_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_size;
+  assign execute_ctrl1_down_LsuL1_LOAD_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_load;
+  assign execute_ctrl1_down_LsuL1_ATOMIC_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_atomic;
+  assign execute_ctrl1_down_LsuL1_STORE_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_store;
+  assign execute_ctrl1_down_LsuL1_PREFETCH_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_PREFETCH);
+  assign execute_ctrl1_down_LsuL1_FLUSH_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_FLUSH);
+  assign execute_ctrl1_down_Decode_STORE_ID_lane0 = LsuPlugin_logic_onAddress0_arbiter_io_output_payload_storeId;
+  assign execute_ctrl1_down_LsuPlugin_logic_FROM_ACCESS_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_ACCESS_1);
+  assign execute_ctrl1_down_LsuPlugin_logic_FROM_WB_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_STORE_BUFFER);
+  assign execute_ctrl1_down_LsuPlugin_logic_FROM_LSU_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_LSU);
+  assign execute_ctrl1_down_LsuPlugin_logic_FROM_PREFETCH_lane0 = (LsuPlugin_logic_onAddress0_arbiter_io_output_payload_op == LsuL1CmdOpcode_PREFETCH);
+  assign execute_ctrl2_down_LsuL1_PHYSICAL_ADDRESS_lane0 = execute_ctrl2_down_MMU_TRANSLATED_lane0;
+  assign when_LsuPlugin_l497 = (execute_ctrl2_down_LsuPlugin_logic_FROM_LSU_lane0 && (! execute_ctrl2_up_LANE_SEL_lane0));
+  assign when_LsuPlugin_l497_1 = (execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 && (! execute_ctrl3_up_LANE_SEL_lane0));
+  assign execute_ctrl2_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 = (|{((execute_ctrl2_down_LsuL1_SIZE_lane0 == 2'b10) && (execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[1 : 0] != 2'b00)),((execute_ctrl2_down_LsuL1_SIZE_lane0 == 2'b01) && (execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0[0 : 0] != 1'b0))});
+  assign execute_ctrl2_down_LsuPlugin_logic_preCtrl_IS_AMO_lane0 = (((execute_ctrl2_down_AguPlugin_SEL_lane0 && execute_ctrl2_down_LsuL1_ATOMIC_lane0) && execute_ctrl2_down_LsuL1_STORE_lane0) && execute_ctrl2_down_LsuL1_LOAD_lane0);
+  assign LsuPlugin_logic_onPma_cached_cmd_address = execute_ctrl2_down_MMU_TRANSLATED_lane0;
+  assign LsuPlugin_logic_onPma_cached_cmd_op[0] = execute_ctrl2_down_LsuL1_STORE_lane0;
+  assign LsuPlugin_logic_onPma_io_cmd_address = execute_ctrl2_down_MMU_TRANSLATED_lane0;
+  assign LsuPlugin_logic_onPma_io_cmd_size = execute_ctrl2_down_LsuL1_SIZE_lane0;
+  assign LsuPlugin_logic_onPma_io_cmd_op[0] = execute_ctrl2_down_LsuL1_STORE_lane0;
+  assign execute_ctrl2_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault = LsuPlugin_logic_onPma_cached_rsp_fault;
+  assign execute_ctrl2_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io = LsuPlugin_logic_onPma_cached_rsp_io;
   always @(*) begin
-    execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault = LsuPlugin_logic_onPma_io_rsp_fault;
+    execute_ctrl2_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault = LsuPlugin_logic_onPma_io_rsp_fault;
     if(when_LsuPlugin_l519) begin
-      execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault = 1'b1;
+      execute_ctrl2_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault = 1'b1;
     end
   end
 
-  assign execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io = LsuPlugin_logic_onPma_io_rsp_io;
-  assign when_LsuPlugin_l519 = (execute_ctrl3_down_LsuL1_ATOMIC_lane0 || execute_ctrl3_down_LsuPlugin_logic_FROM_ACCESS_lane0);
-  assign execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0 = (((execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault && (! execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault)) && (! execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0)) && (! execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0));
+  assign execute_ctrl2_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io = LsuPlugin_logic_onPma_io_rsp_io;
+  assign when_LsuPlugin_l519 = (execute_ctrl2_down_LsuL1_ATOMIC_lane0 || execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0);
+  assign execute_ctrl2_down_LsuPlugin_logic_onPma_IO_lane0 = (((execute_ctrl2_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault && (! execute_ctrl2_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault)) && (! execute_ctrl2_down_LsuPlugin_logic_FENCE_lane0)) && (! execute_ctrl2_down_LsuPlugin_logic_FROM_PREFETCH_lane0));
   assign LsuPlugin_logic_onPma_addressExtension = 1'b0;
-  assign execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0 = (execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 && 1'b0);
-  assign execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 = (execute_ctrl3_down_MMU_PAGE_FAULT_lane0 || (execute_ctrl3_down_AguPlugin_STORE_lane0 ? (! execute_ctrl3_down_MMU_ALLOW_WRITE_lane0) : (! execute_ctrl3_down_MMU_ALLOW_READ_lane0)));
-  assign execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0 = ((((execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 || execute_ctrl3_down_MMU_ACCESS_FAULT_lane0) || execute_ctrl3_down_MMU_REFILL_lane0) || execute_ctrl3_down_MMU_HAZARD_lane0) || execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0);
+  assign execute_ctrl2_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0 = (execute_ctrl2_down_LsuPlugin_logic_FROM_LSU_lane0 && 1'b0);
+  assign execute_ctrl2_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 = (execute_ctrl2_down_MMU_PAGE_FAULT_lane0 || (execute_ctrl2_down_AguPlugin_STORE_lane0 ? (! execute_ctrl2_down_MMU_ALLOW_WRITE_lane0) : (! execute_ctrl2_down_MMU_ALLOW_READ_lane0)));
+  assign execute_ctrl2_down_LsuPlugin_logic_MMU_FAILURE_lane0 = ((((execute_ctrl2_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 || execute_ctrl2_down_MMU_ACCESS_FAULT_lane0) || execute_ctrl2_down_MMU_REFILL_lane0) || execute_ctrl2_down_MMU_HAZARD_lane0) || execute_ctrl2_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0);
   always @(*) begin
     LsuPlugin_logic_onCtrl_lsuTrap = 1'b0;
     if(LsuPlugin_logic_onCtrl_traps_accessFault) begin
@@ -5161,25 +6548,25 @@ module VexiiRiscv (
     if(LsuPlugin_logic_onCtrl_traps_pmaFault) begin
       LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0) begin
       LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
     end
-    if(execute_ctrl4_down_MMU_ACCESS_FAULT_lane0) begin
+    if(execute_ctrl3_down_MMU_ACCESS_FAULT_lane0) begin
       LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
     end
-    if(execute_ctrl4_down_MMU_REFILL_lane0) begin
+    if(execute_ctrl3_down_MMU_REFILL_lane0) begin
       LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
     end
-    if(execute_ctrl4_down_MMU_HAZARD_lane0) begin
+    if(execute_ctrl3_down_MMU_HAZARD_lane0) begin
       LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0) begin
       LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0) begin
       LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0) begin
       LsuPlugin_logic_onCtrl_lsuTrap = 1'b1;
     end
     if(when_LsuPlugin_l774) begin
@@ -5189,22 +6576,22 @@ module VexiiRiscv (
 
   always @(*) begin
     LsuPlugin_logic_onCtrl_writeData = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
-    LsuPlugin_logic_onCtrl_writeData[31 : 0] = execute_ctrl4_up_integer_RS2_lane0;
+    LsuPlugin_logic_onCtrl_writeData[31 : 0] = execute_ctrl3_up_integer_RS2_lane0;
   end
 
-  assign when_LsuPlugin_l545 = ((! LsuPlugin_logic_onCtrl_lsuTrap) && (! execute_lane0_ctrls_4_upIsCancel));
-  assign LsuPlugin_logic_onCtrl_io_doIt = ((execute_ctrl4_up_LANE_SEL_lane0 && execute_ctrl4_down_LsuL1_SEL_lane0) && execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0);
+  assign when_LsuPlugin_l545 = ((! LsuPlugin_logic_onCtrl_lsuTrap) && (! execute_lane0_ctrls_3_upIsCancel));
+  assign LsuPlugin_logic_onCtrl_io_doIt = ((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_down_LsuL1_SEL_lane0) && execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0);
   assign LsuPlugin_logic_bus_cmd_fire = (LsuPlugin_logic_bus_cmd_valid && LsuPlugin_logic_bus_cmd_ready);
   assign when_LsuPlugin_l549 = (! execute_freeze_valid);
   assign LsuPlugin_logic_bus_cmd_valid = (((LsuPlugin_logic_onCtrl_io_doItReg && (! LsuPlugin_logic_onCtrl_io_cmdSent)) && LsuPlugin_logic_onCtrl_io_allowIt) && (! LsuPlugin_logic_onCtrl_io_tooEarly));
-  assign LsuPlugin_logic_bus_cmd_payload_write = execute_ctrl4_down_LsuL1_STORE_lane0;
-  assign LsuPlugin_logic_bus_cmd_payload_address = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
-  assign LsuPlugin_logic_bus_cmd_payload_data = execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
-  assign LsuPlugin_logic_bus_cmd_payload_size = execute_ctrl4_down_LsuL1_SIZE_lane0;
-  assign LsuPlugin_logic_bus_cmd_payload_mask = execute_ctrl4_down_LsuL1_MASK_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_write = execute_ctrl3_down_LsuL1_STORE_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_address = execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_data = execute_ctrl3_down_LsuL1_WRITE_DATA_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_size = execute_ctrl3_down_LsuL1_SIZE_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_mask = execute_ctrl3_down_LsuL1_MASK_lane0;
   assign LsuPlugin_logic_bus_cmd_payload_io = 1'b1;
   assign LsuPlugin_logic_bus_cmd_payload_fromHart = 1'b1;
-  assign LsuPlugin_logic_bus_cmd_payload_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
+  assign LsuPlugin_logic_bus_cmd_payload_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
   assign LsuPlugin_logic_bus_rsp_toStream_valid = LsuPlugin_logic_bus_rsp_valid;
   assign LsuPlugin_logic_bus_rsp_toStream_payload_error = LsuPlugin_logic_bus_rsp_payload_error;
   assign LsuPlugin_logic_bus_rsp_toStream_payload_data = LsuPlugin_logic_bus_rsp_payload_data;
@@ -5215,7 +6602,7 @@ module VexiiRiscv (
   assign LsuPlugin_logic_onCtrl_io_rsp_payload_data = LsuPlugin_logic_bus_rsp_toStream_rData_data;
   assign LsuPlugin_logic_onCtrl_io_rsp_ready = (! execute_freeze_valid);
   assign LsuPlugin_logic_onCtrl_io_freezeIt = (LsuPlugin_logic_onCtrl_io_doIt && (LsuPlugin_logic_onCtrl_io_tooEarly || ((! LsuPlugin_logic_onCtrl_io_rsp_valid) && LsuPlugin_logic_onCtrl_io_allowIt)));
-  assign LsuPlugin_logic_onCtrl_loadData_input = (LsuPlugin_logic_onCtrl_io_cmdSent ? LsuPlugin_logic_onCtrl_io_rsp_payload_data : execute_ctrl4_down_LsuL1_READ_DATA_lane0);
+  assign LsuPlugin_logic_onCtrl_loadData_input = (LsuPlugin_logic_onCtrl_io_cmdSent ? LsuPlugin_logic_onCtrl_io_rsp_payload_data : execute_ctrl3_down_LsuL1_READ_DATA_lane0);
   assign LsuPlugin_logic_onCtrl_loadData_splited_0 = LsuPlugin_logic_onCtrl_loadData_input[7 : 0];
   assign LsuPlugin_logic_onCtrl_loadData_splited_1 = LsuPlugin_logic_onCtrl_loadData_input[15 : 8];
   assign LsuPlugin_logic_onCtrl_loadData_splited_2 = LsuPlugin_logic_onCtrl_loadData_input[23 : 16];
@@ -5227,29 +6614,29 @@ module VexiiRiscv (
     LsuPlugin_logic_onCtrl_loadData_shited[31 : 24] = LsuPlugin_logic_onCtrl_loadData_splited_3;
   end
 
-  assign execute_ctrl4_down_LsuPlugin_logic_onCtrl_loadData_RESULT_lane0 = LsuPlugin_logic_onCtrl_loadData_shited;
+  assign execute_ctrl3_down_LsuPlugin_logic_onCtrl_loadData_RESULT_lane0 = LsuPlugin_logic_onCtrl_loadData_shited;
   assign LsuPlugin_logic_onCtrl_storeData_mapping_0_1 = {4{LsuPlugin_logic_onCtrl_writeData[7 : 0]}};
   assign LsuPlugin_logic_onCtrl_storeData_mapping_1_1 = {2{LsuPlugin_logic_onCtrl_writeData[15 : 0]}};
   assign LsuPlugin_logic_onCtrl_storeData_mapping_2_1 = {1{LsuPlugin_logic_onCtrl_writeData[31 : 0]}};
   always @(*) begin
-    _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
-    case(execute_ctrl4_down_LsuL1_SIZE_lane0)
+    _zz_execute_ctrl3_down_LsuL1_WRITE_DATA_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    case(execute_ctrl3_down_LsuL1_SIZE_lane0)
       2'b00 : begin
-        _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = LsuPlugin_logic_onCtrl_storeData_mapping_0_1;
+        _zz_execute_ctrl3_down_LsuL1_WRITE_DATA_lane0 = LsuPlugin_logic_onCtrl_storeData_mapping_0_1;
       end
       2'b01 : begin
-        _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = LsuPlugin_logic_onCtrl_storeData_mapping_1_1;
+        _zz_execute_ctrl3_down_LsuL1_WRITE_DATA_lane0 = LsuPlugin_logic_onCtrl_storeData_mapping_1_1;
       end
       2'b10 : begin
-        _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = LsuPlugin_logic_onCtrl_storeData_mapping_2_1;
+        _zz_execute_ctrl3_down_LsuL1_WRITE_DATA_lane0 = LsuPlugin_logic_onCtrl_storeData_mapping_2_1;
       end
       default : begin
       end
     endcase
   end
 
-  assign execute_ctrl4_down_LsuL1_WRITE_DATA_lane0 = _zz_execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_onCtrl_SC_MISS_lane0 = LsuPlugin_logic_onCtrl_scMiss;
+  assign execute_ctrl3_down_LsuL1_WRITE_DATA_lane0 = _zz_execute_ctrl3_down_LsuL1_WRITE_DATA_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_onCtrl_SC_MISS_lane0 = LsuPlugin_logic_onCtrl_scMiss;
   assign LsuPlugin_logic_onCtrl_scMiss = 1'b0;
   assign LsuL1_lockPort_valid = 1'b0;
   assign LsuL1_lockPort_address = 32'h0;
@@ -5262,7 +6649,7 @@ module VexiiRiscv (
     end
   end
 
-  assign LsuPlugin_logic_flushPort_payload_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
+  assign LsuPlugin_logic_flushPort_payload_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
   assign LsuPlugin_logic_flushPort_payload_self = 1'b0;
   always @(*) begin
     LsuPlugin_logic_trapPort_valid = 1'b0;
@@ -5273,7 +6660,7 @@ module VexiiRiscv (
     end
   end
 
-  assign LsuPlugin_logic_trapPort_payload_tval = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0;
+  assign LsuPlugin_logic_trapPort_payload_tval = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
   always @(*) begin
     LsuPlugin_logic_trapPort_payload_exception = 1'bx;
     if(LsuPlugin_logic_onCtrl_traps_accessFault) begin
@@ -5285,25 +6672,25 @@ module VexiiRiscv (
     if(LsuPlugin_logic_onCtrl_traps_pmaFault) begin
       LsuPlugin_logic_trapPort_payload_exception = 1'b1;
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0) begin
       LsuPlugin_logic_trapPort_payload_exception = 1'b1;
     end
-    if(execute_ctrl4_down_MMU_ACCESS_FAULT_lane0) begin
+    if(execute_ctrl3_down_MMU_ACCESS_FAULT_lane0) begin
       LsuPlugin_logic_trapPort_payload_exception = 1'b1;
     end
-    if(execute_ctrl4_down_MMU_REFILL_lane0) begin
+    if(execute_ctrl3_down_MMU_REFILL_lane0) begin
       LsuPlugin_logic_trapPort_payload_exception = 1'b0;
     end
-    if(execute_ctrl4_down_MMU_HAZARD_lane0) begin
+    if(execute_ctrl3_down_MMU_HAZARD_lane0) begin
       LsuPlugin_logic_trapPort_payload_exception = 1'b0;
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0) begin
       LsuPlugin_logic_trapPort_payload_exception = 1'b1;
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0) begin
       LsuPlugin_logic_trapPort_payload_exception = 1'b1;
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0) begin
       LsuPlugin_logic_trapPort_payload_exception = 1'b0;
     end
   end
@@ -5312,7 +6699,7 @@ module VexiiRiscv (
     LsuPlugin_logic_trapPort_payload_code = 4'bxxxx;
     if(LsuPlugin_logic_onCtrl_traps_accessFault) begin
       LsuPlugin_logic_trapPort_payload_code = 4'b0101;
-      if(execute_ctrl4_down_LsuL1_STORE_lane0) begin
+      if(execute_ctrl3_down_LsuL1_STORE_lane0) begin
         LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
       end
     end
@@ -5321,76 +6708,131 @@ module VexiiRiscv (
     end
     if(LsuPlugin_logic_onCtrl_traps_pmaFault) begin
       LsuPlugin_logic_trapPort_payload_code = 4'b0101;
-      if(execute_ctrl4_down_LsuL1_STORE_lane0) begin
+      if(execute_ctrl3_down_LsuL1_STORE_lane0) begin
         LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
       end
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0) begin
       LsuPlugin_logic_trapPort_payload_code = 4'b1101;
-      if(execute_ctrl4_down_LsuL1_STORE_lane0) begin
+      if(execute_ctrl3_down_LsuL1_STORE_lane0) begin
         LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
       end
     end
-    if(execute_ctrl4_down_MMU_ACCESS_FAULT_lane0) begin
+    if(execute_ctrl3_down_MMU_ACCESS_FAULT_lane0) begin
       LsuPlugin_logic_trapPort_payload_code = 4'b0101;
-      if(execute_ctrl4_down_LsuL1_STORE_lane0) begin
+      if(execute_ctrl3_down_LsuL1_STORE_lane0) begin
         LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
       end
     end
-    if(execute_ctrl4_down_MMU_REFILL_lane0) begin
+    if(execute_ctrl3_down_MMU_REFILL_lane0) begin
       LsuPlugin_logic_trapPort_payload_code = 4'b0111;
     end
-    if(execute_ctrl4_down_MMU_HAZARD_lane0) begin
+    if(execute_ctrl3_down_MMU_HAZARD_lane0) begin
       LsuPlugin_logic_trapPort_payload_code = 4'b0100;
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0) begin
       LsuPlugin_logic_trapPort_payload_code = 4'b0101;
-      if(execute_ctrl4_down_AguPlugin_STORE_lane0) begin
+      if(execute_ctrl3_down_AguPlugin_STORE_lane0) begin
         LsuPlugin_logic_trapPort_payload_code[1] = 1'b1;
       end
       if(when_LsuPlugin_l747) begin
         LsuPlugin_logic_trapPort_payload_code[3] = 1'b1;
       end
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0) begin
       LsuPlugin_logic_trapPort_payload_code = {1'd0, _zz_LsuPlugin_logic_trapPort_payload_code};
     end
-    if(execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0) begin
+    if(execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0) begin
       LsuPlugin_logic_trapPort_payload_code = 4'b0011;
     end
   end
 
   always @(*) begin
     LsuPlugin_logic_trapPort_payload_arg = 2'b00;
-    LsuPlugin_logic_trapPort_payload_arg[1 : 0] = (execute_ctrl4_down_LsuL1_STORE_lane0 ? 2'b01 : 2'b00);
+    LsuPlugin_logic_trapPort_payload_arg[1 : 0] = (execute_ctrl3_down_LsuL1_STORE_lane0 ? 2'b01 : 2'b00);
   end
 
-  assign LsuPlugin_logic_onCtrl_traps_accessFault = ((execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault ? (LsuPlugin_logic_onCtrl_io_rsp_valid && LsuPlugin_logic_onCtrl_io_rsp_payload_error) : execute_ctrl4_down_LsuL1_FAULT_lane0) || execute_ctrl4_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0);
-  assign LsuPlugin_logic_onCtrl_traps_l1Failed = ((! execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault) && ((execute_ctrl4_down_LsuL1_HAZARD_lane0 || execute_ctrl4_down_LsuL1_MISS_lane0) || execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0));
-  assign LsuPlugin_logic_onCtrl_traps_pmaFault = (execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault && execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault);
-  assign when_LsuPlugin_l747 = (! execute_ctrl4_down_MMU_BYPASS_TRANSLATION_lane0);
-  assign when_LsuPlugin_l774 = (execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0 || execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0);
-  assign when_LsuPlugin_l788 = (execute_ctrl4_up_LANE_SEL_lane0 && execute_ctrl4_down_AguPlugin_SEL_lane0);
-  assign LsuPlugin_logic_onCtrl_mmuNeeded = (execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 || execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0);
-  assign execute_ctrl4_down_LsuL1_ABORD_lane0 = (|{(LsuPlugin_logic_onCtrl_mmuNeeded && execute_ctrl4_down_LsuPlugin_logic_MMU_FAILURE_lane0),{(execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 && (((! execute_ctrl4_up_LANE_SEL_lane0) || execute_lane0_ctrls_4_upIsCancel) || execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0)),{((! execute_ctrl4_down_LsuL1_FLUSH_lane0) && execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault),{execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0,execute_ctrl4_down_LsuL1_HAZARD_lane0}}}});
-  assign execute_ctrl4_down_LsuL1_SKIP_WRITE_lane0 = (|{execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0,{(execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 && (execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0 || execute_ctrl4_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0)),{execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0,{execute_ctrl4_down_LsuL1_FAULT_lane0,(execute_ctrl4_down_LsuL1_MISS_lane0 || execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0)}}}});
-  assign when_LsuPlugin_l827 = ((execute_ctrl4_down_LsuL1_SEL_lane0 && execute_ctrl4_down_LsuL1_FLUSH_lane0) && ((execute_ctrl4_down_LsuL1_FLUSH_HIT_lane0 || execute_ctrl4_down_LsuL1_HAZARD_lane0) || execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0));
+  assign LsuPlugin_logic_onCtrl_traps_accessFault = ((execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault ? (LsuPlugin_logic_onCtrl_io_rsp_valid && LsuPlugin_logic_onCtrl_io_rsp_payload_error) : execute_ctrl3_down_LsuL1_FAULT_lane0) || execute_ctrl3_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0);
+  assign LsuPlugin_logic_onCtrl_traps_l1Failed = ((! execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault) && ((execute_ctrl3_down_LsuL1_HAZARD_lane0 || execute_ctrl3_down_LsuL1_MISS_lane0) || execute_ctrl3_down_LsuL1_MISS_UNIQUE_lane0));
+  assign LsuPlugin_logic_onCtrl_traps_pmaFault = (execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault && execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault);
+  assign when_LsuPlugin_l747 = (! execute_ctrl3_down_MMU_BYPASS_TRANSLATION_lane0);
+  assign when_LsuPlugin_l774 = (execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0 || execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0);
+  assign when_LsuPlugin_l788 = (execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_down_AguPlugin_SEL_lane0);
+  assign LsuPlugin_logic_onCtrl_mmuNeeded = (execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 || execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0);
+  assign execute_ctrl3_down_LsuL1_ABORD_lane0 = (|{(LsuPlugin_logic_onCtrl_mmuNeeded && execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0),{(execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 && (((! execute_ctrl3_up_LANE_SEL_lane0) || execute_lane0_ctrls_3_upIsCancel) || execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0)),{((! execute_ctrl3_down_LsuL1_FLUSH_lane0) && execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault),{execute_ctrl3_down_LsuL1_FLUSH_HAZARD_lane0,execute_ctrl3_down_LsuL1_HAZARD_lane0}}}});
+  assign execute_ctrl3_down_LsuL1_SKIP_WRITE_lane0 = (|{execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0,{(execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 && (execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0 || execute_ctrl3_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0)),{execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0,{execute_ctrl3_down_LsuL1_FAULT_lane0,(execute_ctrl3_down_LsuL1_MISS_lane0 || execute_ctrl3_down_LsuL1_MISS_UNIQUE_lane0)}}}});
+  assign when_LsuPlugin_l827 = ((execute_ctrl3_down_LsuL1_SEL_lane0 && execute_ctrl3_down_LsuL1_FLUSH_lane0) && ((execute_ctrl3_down_LsuL1_FLUSH_HIT_lane0 || execute_ctrl3_down_LsuL1_HAZARD_lane0) || execute_ctrl3_down_LsuL1_FLUSH_HAZARD_lane0));
   assign when_LsuPlugin_l222 = (|(LsuPlugin_logic_onCtrl_hartRegulation_refill & (~ LsuL1_REFILL_BUSY)));
-  assign when_LsuPlugin_l871 = ((((((execute_ctrl4_up_LANE_SEL_lane0 && execute_ctrl4_down_AguPlugin_SEL_lane0) && (! execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0)) && 1'b1) && ((execute_ctrl4_down_LsuL1_HAZARD_lane0 || execute_ctrl4_down_LsuL1_MISS_lane0) || execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0));
-  assign when_LsuPlugin_l226 = (|execute_ctrl4_down_LsuL1_WAIT_REFILL_lane0);
-  assign LsuPlugin_logic_commitProbe_valid = (((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && (execute_ctrl4_down_AguPlugin_SEL_lane0 ? execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 : (execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0 && execute_ctrl4_down_LsuL1_HAZARD_lane0)));
-  assign LsuPlugin_logic_commitProbe_payload_address = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0;
-  assign LsuPlugin_logic_commitProbe_payload_load = execute_ctrl4_down_LsuL1_LOAD_lane0;
-  assign LsuPlugin_logic_commitProbe_payload_store = execute_ctrl4_down_LsuL1_STORE_lane0;
+  assign when_LsuPlugin_l871 = ((((((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_down_AguPlugin_SEL_lane0) && (! execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0)) && (! execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0)) && (! execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0)) && 1'b1) && ((execute_ctrl3_down_LsuL1_HAZARD_lane0 || execute_ctrl3_down_LsuL1_MISS_lane0) || execute_ctrl3_down_LsuL1_MISS_UNIQUE_lane0));
+  assign when_LsuPlugin_l226 = (|execute_ctrl3_down_LsuL1_WAIT_REFILL_lane0);
+  assign LsuPlugin_logic_commitProbe_valid = (((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && (execute_ctrl3_down_AguPlugin_SEL_lane0 ? execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 : (execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0 && execute_ctrl3_down_LsuL1_HAZARD_lane0)));
+  assign LsuPlugin_logic_commitProbe_payload_address = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
+  assign LsuPlugin_logic_commitProbe_payload_load = execute_ctrl3_down_LsuL1_LOAD_lane0;
+  assign LsuPlugin_logic_commitProbe_payload_store = execute_ctrl3_down_LsuL1_STORE_lane0;
   assign LsuPlugin_logic_commitProbe_payload_trap = LsuPlugin_logic_onCtrl_lsuTrap;
-  assign LsuPlugin_logic_commitProbe_payload_miss = ((execute_ctrl4_down_LsuL1_MISS_lane0 && (! execute_ctrl4_down_LsuL1_HAZARD_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_MMU_FAILURE_lane0));
-  assign LsuPlugin_logic_commitProbe_payload_io = execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0;
-  assign LsuPlugin_logic_commitProbe_payload_prefetchFailed = execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
-  assign LsuPlugin_logic_commitProbe_payload_pc = execute_ctrl4_down_PC_lane0;
-  assign LsuPlugin_logic_iwb_valid = (execute_ctrl4_down_AguPlugin_SEL_lane0 && (! execute_ctrl4_down_AguPlugin_FLOAT_lane0));
-  assign LsuPlugin_logic_iwb_payload = execute_ctrl4_down_LsuPlugin_logic_onCtrl_loadData_RESULT_lane0;
-  assign LsuPlugin_logic_onWb_storeFire = ((((((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_AguPlugin_SEL_lane0) && execute_ctrl4_down_LsuL1_STORE_lane0) && (! execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0));
-  assign LsuPlugin_logic_onWb_storeBroadcast = (((((((execute_ctrl4_down_isReady && execute_ctrl4_down_LsuL1_SEL_lane0) && execute_ctrl4_down_LsuL1_STORE_lane0) && (! execute_ctrl4_down_LsuL1_ABORD_lane0)) && (! execute_ctrl4_down_LsuL1_SKIP_WRITE_lane0)) && (! execute_ctrl4_down_LsuL1_MISS_lane0)) && (! execute_ctrl4_down_LsuL1_MISS_UNIQUE_lane0)) && (! execute_ctrl4_down_LsuL1_HAZARD_lane0));
+  assign LsuPlugin_logic_commitProbe_payload_miss = ((execute_ctrl3_down_LsuL1_MISS_lane0 && (! execute_ctrl3_down_LsuL1_HAZARD_lane0)) && (! execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0));
+  assign LsuPlugin_logic_commitProbe_payload_io = execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0;
+  assign LsuPlugin_logic_commitProbe_payload_prefetchFailed = execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  assign LsuPlugin_logic_commitProbe_payload_pc = execute_ctrl3_down_PC_lane0;
+  assign LsuPlugin_logic_iwb_valid = (execute_ctrl3_down_AguPlugin_SEL_lane0 && (! execute_ctrl3_down_AguPlugin_FLOAT_lane0));
+  assign LsuPlugin_logic_iwb_payload = execute_ctrl3_down_LsuPlugin_logic_onCtrl_loadData_RESULT_lane0;
+  assign LsuPlugin_logic_onWb_storeFire = ((((((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && execute_ctrl3_down_AguPlugin_SEL_lane0) && execute_ctrl3_down_LsuL1_STORE_lane0) && (! execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0)) && (! execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0));
+  assign LsuPlugin_logic_onWb_storeBroadcast = (((((((execute_ctrl3_down_isReady && execute_ctrl3_down_LsuL1_SEL_lane0) && execute_ctrl3_down_LsuL1_STORE_lane0) && (! execute_ctrl3_down_LsuL1_ABORD_lane0)) && (! execute_ctrl3_down_LsuL1_SKIP_WRITE_lane0)) && (! execute_ctrl3_down_LsuL1_MISS_lane0)) && (! execute_ctrl3_down_LsuL1_MISS_UNIQUE_lane0)) && (! execute_ctrl3_down_LsuL1_HAZARD_lane0));
+  assign _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH = fetch_logic_ctrls_0_down_Fetch_WORD_PC[15 : 2];
+  assign fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH = ({_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[0],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[1],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[2],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[3],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[4],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH[5],{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_1,{_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_2,_zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_3}}}}}}}} ^ _zz_fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH_4);
+  assign fetch_logic_ctrls_0_down_GSharePlugin_logic_BYPASS_valid = GSharePlugin_logic_mem_write_valid;
+  assign fetch_logic_ctrls_0_down_GSharePlugin_logic_BYPASS_payload_address = GSharePlugin_logic_mem_write_payload_address;
+  assign fetch_logic_ctrls_0_down_GSharePlugin_logic_BYPASS_payload_data_0 = GSharePlugin_logic_mem_write_payload_data_0;
+  always @(*) begin
+    fetch_logic_ctrls_1_down_GSharePlugin_GSHARE_COUNTER_0 = GSharePlugin_logic_mem_counter_spinal_port1[1 : 0];
+    if(when_GSharePlugin_l88) begin
+      fetch_logic_ctrls_1_down_GSharePlugin_GSHARE_COUNTER_0 = fetch_logic_ctrls_1_down_GSharePlugin_logic_BYPASS_payload_data_0;
+    end
+  end
+
+  assign when_GSharePlugin_l88 = (fetch_logic_ctrls_1_down_GSharePlugin_logic_BYPASS_valid && (fetch_logic_ctrls_1_down_GSharePlugin_logic_BYPASS_payload_address == fetch_logic_ctrls_1_down_GSharePlugin_logic_HASH));
+  always @(*) begin
+    BtbPlugin_logic_ras_ptr_pushIt = 1'b0;
+    if(BtbPlugin_logic_applyIt_rasLogic_pushValid) begin
+      BtbPlugin_logic_ras_ptr_pushIt = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    BtbPlugin_logic_ras_ptr_popIt = 1'b0;
+    if(when_BtbPlugin_l246) begin
+      BtbPlugin_logic_ras_ptr_popIt = 1'b1;
+    end
+  end
+
+  assign BtbPlugin_logic_ras_write_valid = BtbPlugin_logic_ras_ptr_pushIt;
+  assign BtbPlugin_logic_ras_write_payload_address = BtbPlugin_logic_ras_ptr_push;
+  always @(*) begin
+    BtbPlugin_logic_ras_write_payload_data = 30'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    BtbPlugin_logic_ras_write_payload_data = (_zz_BtbPlugin_logic_ras_write_payload_data >>> 2'd2);
+  end
+
+  assign BtbPlugin_logic_memDp_wp_valid = BtbPlugin_logic_memWrite_valid;
+  assign BtbPlugin_logic_memDp_wp_payload_address = BtbPlugin_logic_memWrite_payload_address;
+  assign BtbPlugin_logic_memDp_wp_payload_data_0_hash = BtbPlugin_logic_memWrite_payload_data_0_hash;
+  assign BtbPlugin_logic_memDp_wp_payload_data_0_pcTarget = BtbPlugin_logic_memWrite_payload_data_0_pcTarget;
+  assign BtbPlugin_logic_memDp_wp_payload_data_0_isBranch = BtbPlugin_logic_memWrite_payload_data_0_isBranch;
+  assign BtbPlugin_logic_memDp_wp_payload_data_0_isPush = BtbPlugin_logic_memWrite_payload_data_0_isPush;
+  assign BtbPlugin_logic_memDp_wp_payload_data_0_isPop = BtbPlugin_logic_memWrite_payload_data_0_isPop;
+  assign BtbPlugin_logic_memDp_wp_payload_mask = BtbPlugin_logic_memWrite_payload_mask;
+  assign _zz_BtbPlugin_logic_memDp_rp_rsp_0_hash = BtbPlugin_logic_mem_spinal_port1[48 : 0];
+  assign BtbPlugin_logic_memDp_rp_rsp_0_hash = _zz_BtbPlugin_logic_memDp_rp_rsp_0_hash[15 : 0];
+  assign BtbPlugin_logic_memDp_rp_rsp_0_pcTarget = _zz_BtbPlugin_logic_memDp_rp_rsp_0_hash[45 : 16];
+  assign BtbPlugin_logic_memDp_rp_rsp_0_isBranch = _zz_BtbPlugin_logic_memDp_rp_rsp_0_hash[46];
+  assign BtbPlugin_logic_memDp_rp_rsp_0_isPush = _zz_BtbPlugin_logic_memDp_rp_rsp_0_hash[47];
+  assign BtbPlugin_logic_memDp_rp_rsp_0_isPop = _zz_BtbPlugin_logic_memDp_rp_rsp_0_hash[48];
+  assign BtbPlugin_logic_memDp_rp_cmd_valid = BtbPlugin_logic_memRead_cmd_valid;
+  assign BtbPlugin_logic_memDp_rp_cmd_payload = BtbPlugin_logic_memRead_cmd_payload;
+  assign BtbPlugin_logic_memRead_rsp_0_hash = BtbPlugin_logic_memDp_rp_rsp_0_hash;
+  assign BtbPlugin_logic_memRead_rsp_0_pcTarget = BtbPlugin_logic_memDp_rp_rsp_0_pcTarget;
+  assign BtbPlugin_logic_memRead_rsp_0_isBranch = BtbPlugin_logic_memDp_rp_rsp_0_isBranch;
+  assign BtbPlugin_logic_memRead_rsp_0_isPush = BtbPlugin_logic_memDp_rp_rsp_0_isPush;
+  assign BtbPlugin_logic_memRead_rsp_0_isPop = BtbPlugin_logic_memDp_rp_rsp_0_isPop;
   assign WhiteboxerPlugin_logic_fetch_fetchId = fetch_logic_ctrls_0_down_Fetch_ID;
   assign WhiteboxerPlugin_logic_decodes_0_fire = ((decode_ctrls_0_up_LANE_SEL_0 && decode_ctrls_0_up_isReady) && (! decode_ctrls_0_lane0_upIsCancel));
   assign when_CtrlLaneApi_l50 = (decode_ctrls_0_up_isReady || decode_ctrls_0_lane0_upIsCancel);
@@ -5398,51 +6840,60 @@ module VexiiRiscv (
   assign WhiteboxerPlugin_logic_decodes_0_pc = _zz_WhiteboxerPlugin_logic_decodes_0_pc;
   assign WhiteboxerPlugin_logic_decodes_0_fetchId = decode_ctrls_0_down_Fetch_ID_0;
   assign WhiteboxerPlugin_logic_decodes_0_decodeId = decode_ctrls_0_down_Decode_DOP_ID_0;
-  assign execute_ctrl2_down_early0_BranchPlugin_logic_alu_EQ_lane0 = ($signed(execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0) == $signed(execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0));
+  assign execute_ctrl1_down_early0_BranchPlugin_logic_alu_EQ_lane0 = ($signed(execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0) == $signed(execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0));
+  assign execute_ctrl1_down_early0_BranchPlugin_logic_alu_btb_BAD_TARGET_lane0 = (execute_ctrl1_down_Prediction_ALIGNED_JUMPED_PC_lane0 != execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0);
   assign early0_BranchPlugin_logic_alu_expectedMsb = 1'b0;
-  assign execute_ctrl2_down_early0_BranchPlugin_logic_alu_MSB_FAILED_lane0 = ((execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_JALR) && 1'b0);
-  assign switch_Misc_l242 = execute_ctrl2_down_Decode_UOP_lane0[14 : 12];
+  assign execute_ctrl1_down_early0_BranchPlugin_logic_alu_MSB_FAILED_lane0 = ((execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_JALR) && 1'b0);
+  assign switch_Misc_l242 = execute_ctrl1_down_Decode_UOP_lane0[14 : 12];
   always @(*) begin
     casez(switch_Misc_l242)
       3'b000 : begin
-        _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = execute_ctrl2_down_early0_BranchPlugin_logic_alu_EQ_lane0;
+        _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = execute_ctrl1_down_early0_BranchPlugin_logic_alu_EQ_lane0;
       end
       3'b001 : begin
-        _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = (! execute_ctrl2_down_early0_BranchPlugin_logic_alu_EQ_lane0);
+        _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = (! execute_ctrl1_down_early0_BranchPlugin_logic_alu_EQ_lane0);
       end
       3'b1?1 : begin
-        _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = (! execute_ctrl2_down_early0_SrcPlugin_LESS_lane0);
+        _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = (! execute_ctrl1_down_early0_SrcPlugin_LESS_lane0);
       end
       default : begin
-        _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = execute_ctrl2_down_early0_SrcPlugin_LESS_lane0;
+        _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = execute_ctrl1_down_early0_SrcPlugin_LESS_lane0;
       end
     endcase
   end
 
   always @(*) begin
-    case(execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0)
+    case(execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0)
       BranchPlugin_BranchCtrlEnum_JALR : begin
-        _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1 = 1'b1;
+        _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1 = 1'b1;
       end
       BranchPlugin_BranchCtrlEnum_JAL : begin
-        _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1 = 1'b1;
+        _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1 = 1'b1;
       end
       default : begin
-        _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1 = _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0;
+        _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1 = _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0;
       end
     endcase
   end
 
-  assign execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = _zz_execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1;
-  assign early0_BranchPlugin_logic_jumpLogic_needFix = (execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 || execute_ctrl2_down_early0_BranchPlugin_logic_alu_MSB_FAILED_lane0);
-  assign early0_BranchPlugin_logic_jumpLogic_doIt = ((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_early0_BranchPlugin_SEL_lane0) && early0_BranchPlugin_logic_jumpLogic_needFix);
+  assign execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 = _zz_execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0_1;
+  assign execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_btb_REAL_TARGET_lane0 = (execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 ? execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 : execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0);
+  assign early0_BranchPlugin_logic_jumpLogic_wrongCond = (execute_ctrl1_down_Prediction_ALIGNED_JUMPED_lane0 != execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0);
+  assign early0_BranchPlugin_logic_jumpLogic_needFix = ((early0_BranchPlugin_logic_jumpLogic_wrongCond || (execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0 && execute_ctrl1_down_early0_BranchPlugin_logic_alu_btb_BAD_TARGET_lane0)) || execute_ctrl1_down_early0_BranchPlugin_logic_alu_MSB_FAILED_lane0);
+  assign early0_BranchPlugin_logic_jumpLogic_doIt = ((execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_down_early0_BranchPlugin_SEL_lane0) && early0_BranchPlugin_logic_jumpLogic_needFix);
+  assign early0_BranchPlugin_logic_jumpLogic_history_shifter = execute_ctrl1_down_Prediction_BRANCH_HISTORY_lane0;
+  assign when_BranchPlugin_l218 = (execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_B);
+  assign early0_BranchPlugin_logic_jumpLogic_history_next = early0_BranchPlugin_logic_jumpLogic_history_shifter_1;
+  assign early0_BranchPlugin_logic_jumpLogic_history_fetched = execute_ctrl1_down_Prediction_BRANCH_HISTORY_lane0;
   assign early0_BranchPlugin_logic_pcPort_valid = early0_BranchPlugin_logic_jumpLogic_doIt;
-  assign early0_BranchPlugin_logic_pcPort_payload_fault = execute_ctrl2_down_early0_BranchPlugin_logic_alu_MSB_FAILED_lane0;
-  assign early0_BranchPlugin_logic_pcPort_payload_pc = execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  assign early0_BranchPlugin_logic_pcPort_payload_fault = execute_ctrl1_down_early0_BranchPlugin_logic_alu_MSB_FAILED_lane0;
+  assign early0_BranchPlugin_logic_pcPort_payload_pc = execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_btb_REAL_TARGET_lane0;
+  assign early0_BranchPlugin_logic_historyPort_valid = early0_BranchPlugin_logic_jumpLogic_doIt;
+  assign early0_BranchPlugin_logic_historyPort_payload_history = early0_BranchPlugin_logic_jumpLogic_history_next;
   assign early0_BranchPlugin_logic_flushPort_valid = early0_BranchPlugin_logic_jumpLogic_doIt;
-  assign early0_BranchPlugin_logic_flushPort_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
+  assign early0_BranchPlugin_logic_flushPort_payload_uopId = execute_ctrl1_down_Decode_UOP_ID_lane0;
   assign early0_BranchPlugin_logic_flushPort_payload_self = 1'b0;
-  assign execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0 = ((execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0[1 : 0] != 2'b00) && execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0);
+  assign execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0 = ((execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0[1 : 0] != 2'b00) && execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0);
   always @(*) begin
     early0_BranchPlugin_logic_trapPort_valid = 1'b0;
     if(when_BranchPlugin_l251) begin
@@ -5452,26 +6903,16 @@ module VexiiRiscv (
 
   assign early0_BranchPlugin_logic_trapPort_payload_exception = 1'b1;
   assign early0_BranchPlugin_logic_trapPort_payload_code = 4'b0000;
-  assign early0_BranchPlugin_logic_trapPort_payload_tval = execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  assign early0_BranchPlugin_logic_trapPort_payload_tval = execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
   assign early0_BranchPlugin_logic_trapPort_payload_arg = 2'b00;
-  assign when_BranchPlugin_l251 = (early0_BranchPlugin_logic_jumpLogic_doIt && execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0);
-  assign execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_IS_JAL_lane0 = (execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_JAL);
-  assign execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0 = (execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_JALR);
-  assign early0_BranchPlugin_logic_jumpLogic_rdLink = (|{(execute_ctrl2_down_Decode_UOP_lane0[11 : 7] == 5'h05),(execute_ctrl2_down_Decode_UOP_lane0[11 : 7] == 5'h01)});
-  assign early0_BranchPlugin_logic_jumpLogic_rs1Link = (|{(execute_ctrl2_down_Decode_UOP_lane0[19 : 15] == 5'h05),(execute_ctrl2_down_Decode_UOP_lane0[19 : 15] == 5'h01)});
-  assign early0_BranchPlugin_logic_jumpLogic_rdEquRs1 = (execute_ctrl2_down_Decode_UOP_lane0[11 : 7] == execute_ctrl2_down_Decode_UOP_lane0[19 : 15]);
-  assign early0_BranchPlugin_logic_jumpLogic_learn_valid = (((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_isReady) && (! execute_lane0_ctrls_2_upIsCancel)) && (|execute_ctrl2_down_early0_BranchPlugin_SEL_lane0));
-  assign early0_BranchPlugin_logic_jumpLogic_learn_payload_taken = execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_payload_pcTarget = execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_payload_pcOnLastSlice = execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_payload_isBranch = (execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_B);
-  assign early0_BranchPlugin_logic_jumpLogic_learn_payload_isPush = ((execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_IS_JAL_lane0 || execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0) && early0_BranchPlugin_logic_jumpLogic_rdLink);
-  assign early0_BranchPlugin_logic_jumpLogic_learn_payload_isPop = (execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0 && (((! early0_BranchPlugin_logic_jumpLogic_rdLink) && early0_BranchPlugin_logic_jumpLogic_rs1Link) || ((early0_BranchPlugin_logic_jumpLogic_rdLink && early0_BranchPlugin_logic_jumpLogic_rs1Link) && (! early0_BranchPlugin_logic_jumpLogic_rdEquRs1))));
-  assign early0_BranchPlugin_logic_jumpLogic_learn_payload_wasWrong = early0_BranchPlugin_logic_jumpLogic_needFix;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_payload_badPredictedTarget = 1'b0;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
-  assign early0_BranchPlugin_logic_wb_valid = execute_ctrl2_down_early0_BranchPlugin_SEL_lane0;
-  assign early0_BranchPlugin_logic_wb_payload = execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+  assign when_BranchPlugin_l251 = (early0_BranchPlugin_logic_jumpLogic_doIt && execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0);
+  assign execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_IS_JAL_lane0 = (execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_JAL);
+  assign execute_ctrl1_down_early0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0 = (execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_JALR);
+  assign early0_BranchPlugin_logic_jumpLogic_rdLink = (|{(execute_ctrl1_down_Decode_UOP_lane0[11 : 7] == 5'h05),(execute_ctrl1_down_Decode_UOP_lane0[11 : 7] == 5'h01)});
+  assign early0_BranchPlugin_logic_jumpLogic_rs1Link = (|{(execute_ctrl1_down_Decode_UOP_lane0[19 : 15] == 5'h05),(execute_ctrl1_down_Decode_UOP_lane0[19 : 15] == 5'h01)});
+  assign early0_BranchPlugin_logic_jumpLogic_rdEquRs1 = (execute_ctrl1_down_Decode_UOP_lane0[11 : 7] == execute_ctrl1_down_Decode_UOP_lane0[19 : 15]);
+  assign early0_BranchPlugin_logic_wb_valid = execute_ctrl1_down_early0_BranchPlugin_SEL_lane0;
+  assign early0_BranchPlugin_logic_wb_payload = execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
   always @(*) begin
     early0_EnvPlugin_logic_flushPort_valid = 1'b0;
     if(when_EnvPlugin_l119) begin
@@ -5479,7 +6920,7 @@ module VexiiRiscv (
     end
   end
 
-  assign early0_EnvPlugin_logic_flushPort_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
+  assign early0_EnvPlugin_logic_flushPort_payload_uopId = execute_ctrl1_down_Decode_UOP_ID_lane0;
   assign early0_EnvPlugin_logic_flushPort_payload_self = 1'b0;
   always @(*) begin
     early0_EnvPlugin_logic_trapPort_valid = 1'b0;
@@ -5490,7 +6931,7 @@ module VexiiRiscv (
 
   always @(*) begin
     early0_EnvPlugin_logic_trapPort_payload_exception = 1'b1;
-    case(execute_ctrl2_down_early0_EnvPlugin_OP_lane0)
+    case(execute_ctrl1_down_early0_EnvPlugin_OP_lane0)
       EnvPluginOp_PRIV_RET : begin
         if(when_EnvPlugin_l86) begin
           early0_EnvPlugin_logic_trapPort_payload_exception = 1'b0;
@@ -5509,10 +6950,10 @@ module VexiiRiscv (
     endcase
   end
 
-  assign early0_EnvPlugin_logic_trapPort_payload_tval = ((execute_ctrl2_down_early0_EnvPlugin_OP_lane0 == EnvPluginOp_EBREAK) ? execute_ctrl2_down_PC_lane0 : 32'h0);
+  assign early0_EnvPlugin_logic_trapPort_payload_tval = ((execute_ctrl1_down_early0_EnvPlugin_OP_lane0 == EnvPluginOp_EBREAK) ? execute_ctrl1_down_PC_lane0 : 32'h0);
   always @(*) begin
     early0_EnvPlugin_logic_trapPort_payload_code = 4'b0010;
-    case(execute_ctrl2_down_early0_EnvPlugin_OP_lane0)
+    case(execute_ctrl1_down_early0_EnvPlugin_OP_lane0)
       EnvPluginOp_EBREAK : begin
         early0_EnvPlugin_logic_trapPort_payload_code = 4'b0011;
       end
@@ -5539,7 +6980,7 @@ module VexiiRiscv (
 
   always @(*) begin
     early0_EnvPlugin_logic_trapPort_payload_arg = 2'bxx;
-    case(execute_ctrl2_down_early0_EnvPlugin_OP_lane0)
+    case(execute_ctrl1_down_early0_EnvPlugin_OP_lane0)
       EnvPluginOp_PRIV_RET : begin
         if(when_EnvPlugin_l86) begin
           early0_EnvPlugin_logic_trapPort_payload_arg[1 : 0] = early0_EnvPlugin_logic_exe_xretPriv;
@@ -5560,10 +7001,10 @@ module VexiiRiscv (
   assign FetchL1Plugin_logic_pmpPort_logic_torCmpAddress = (fetch_logic_ctrls_1_down_MMU_TRANSLATED >>> 4'd12);
   assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_pmpPort_logic_NEED_HIT = ((PmpPlugin_logic_checkInstruction && 1'b1) || (FetchL1Plugin_logic_pmpPort_logic_portCheckData && (1'b0 || 1'b0)));
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_pmpPort_ACCESS_FAULT = 1'b0;
-  assign LsuPlugin_logic_pmpPort_logic_portCheckData = (PmpPlugin_logic_checkData || execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0);
-  assign LsuPlugin_logic_pmpPort_logic_torCmpAddress = (execute_ctrl3_down_MMU_TRANSLATED_lane0 >>> 4'd12);
-  assign execute_ctrl2_down_LsuPlugin_logic_pmpPort_logic_NEED_HIT_lane0 = ((PmpPlugin_logic_checkInstruction && 1'b0) || (LsuPlugin_logic_pmpPort_logic_portCheckData && (execute_ctrl2_down_LsuL1_LOAD_lane0 || execute_ctrl2_down_LsuL1_STORE_lane0)));
-  assign execute_ctrl4_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0 = 1'b0;
+  assign LsuPlugin_logic_pmpPort_logic_portCheckData = (PmpPlugin_logic_checkData || execute_ctrl1_down_LsuPlugin_logic_FROM_ACCESS_lane0);
+  assign LsuPlugin_logic_pmpPort_logic_torCmpAddress = (execute_ctrl2_down_MMU_TRANSLATED_lane0 >>> 4'd12);
+  assign execute_ctrl1_down_LsuPlugin_logic_pmpPort_logic_NEED_HIT_lane0 = ((PmpPlugin_logic_checkInstruction && 1'b0) || (LsuPlugin_logic_pmpPort_logic_portCheckData && (execute_ctrl1_down_LsuL1_LOAD_lane0 || execute_ctrl1_down_LsuL1_STORE_lane0)));
+  assign execute_ctrl3_down_LsuPlugin_logic_pmpPort_ACCESS_FAULT_lane0 = 1'b0;
   assign FetchL1Plugin_pmaBuilder_addressBits = FetchL1Plugin_logic_ctrl_pmaPort_cmd_address;
   assign _zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io = ((FetchL1Plugin_pmaBuilder_addressBits & 32'h0) == 32'h0);
   assign FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit = _zz_FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit[0];
@@ -5645,56 +7086,56 @@ module VexiiRiscv (
   assign LsuPlugin_logic_onPma_io_rsp_fault = (! ((|{_zz_LsuPlugin_logic_onPma_io_rsp_fault,((LsuPlugin_pmaBuilder_io_addressBits & 32'hffff0000) == 32'hf0000000)}) && (|LsuPlugin_pmaBuilder_io_onTransfers_0_hit)));
   assign LsuPlugin_logic_onPma_io_rsp_io = (! _zz_LsuPlugin_logic_onPma_io_rsp_io[0]);
   always @(*) begin
-    _zz_execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
-    case(execute_ctrl1_down_early0_SrcPlugin_logic_SRC1_CTRL_lane0)
+    _zz_execute_ctrl0_down_early0_SrcPlugin_SRC1_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    case(execute_ctrl0_down_early0_SrcPlugin_logic_SRC1_CTRL_lane0)
       1'b0 : begin
-        _zz_execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0 = execute_ctrl1_down_integer_RS1_lane0;
+        _zz_execute_ctrl0_down_early0_SrcPlugin_SRC1_lane0 = execute_ctrl0_down_integer_RS1_lane0;
       end
       default : begin
-        _zz_execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0 = {execute_ctrl1_down_Decode_UOP_lane0[31 : 12],12'h0};
+        _zz_execute_ctrl0_down_early0_SrcPlugin_SRC1_lane0 = {execute_ctrl0_down_Decode_UOP_lane0[31 : 12],12'h0};
       end
     endcase
   end
 
-  assign execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0 = _zz_execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
+  assign execute_ctrl0_down_early0_SrcPlugin_SRC1_lane0 = _zz_execute_ctrl0_down_early0_SrcPlugin_SRC1_lane0;
   always @(*) begin
-    _zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
-    case(execute_ctrl1_down_early0_SrcPlugin_logic_SRC2_CTRL_lane0)
+    _zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    case(execute_ctrl0_down_early0_SrcPlugin_logic_SRC2_CTRL_lane0)
       2'b00 : begin
-        _zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl1_down_integer_RS2_lane0;
+        _zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl0_down_integer_RS2_lane0;
       end
       2'b01 : begin
-        _zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0 = {{20{_zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0[11]}}, _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0};
+        _zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0 = {{20{_zz__zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0[11]}}, _zz__zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0};
       end
       2'b10 : begin
-        _zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl1_down_PC_lane0;
+        _zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl0_down_PC_lane0;
       end
       default : begin
-        _zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0 = {{20{_zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0_1[11]}}, _zz__zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0_1};
+        _zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0 = {{20{_zz__zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0_1[11]}}, _zz__zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0_1};
       end
     endcase
   end
 
-  assign execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0 = _zz_execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
+  assign execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0 = _zz_execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0;
   always @(*) begin
-    early0_SrcPlugin_logic_addsub_combined_rs2Patched = execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0;
-    if(execute_ctrl2_down_SrcStageables_REVERT_lane0) begin
-      early0_SrcPlugin_logic_addsub_combined_rs2Patched = (~ execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0);
+    early0_SrcPlugin_logic_addsub_combined_rs2Patched = execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
+    if(execute_ctrl1_down_SrcStageables_REVERT_lane0) begin
+      early0_SrcPlugin_logic_addsub_combined_rs2Patched = (~ execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0);
     end
-    if(execute_ctrl2_down_SrcStageables_ZERO_lane0) begin
+    if(execute_ctrl1_down_SrcStageables_ZERO_lane0) begin
       early0_SrcPlugin_logic_addsub_combined_rs2Patched = 32'h0;
     end
   end
 
-  assign execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0 = ($signed(_zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0) + $signed(_zz_execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0_1));
-  assign execute_ctrl2_down_early0_SrcPlugin_LESS_lane0 = ((execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[31] == execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0[31]) ? execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0[31] : (execute_ctrl2_down_SrcStageables_UNSIGNED_lane0 ? execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0[31] : execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0[31]));
+  assign execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0 = ($signed(_zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0) + $signed(_zz_execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0_1));
+  assign execute_ctrl1_down_early0_SrcPlugin_LESS_lane0 = ((execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[31] == execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0[31]) ? execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0[31] : (execute_ctrl1_down_SrcStageables_UNSIGNED_lane0 ? execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0[31] : execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0[31]));
   assign lane0_IntFormatPlugin_logic_stages_0_hits = {early0_BarrelShifterPlugin_logic_wb_valid,early0_IntAluPlugin_logic_wb_valid};
-  assign lane0_IntFormatPlugin_logic_stages_0_wb_valid = (execute_ctrl2_up_LANE_SEL_lane0 && (|lane0_IntFormatPlugin_logic_stages_0_hits));
+  assign lane0_IntFormatPlugin_logic_stages_0_wb_valid = (execute_ctrl1_up_LANE_SEL_lane0 && (|lane0_IntFormatPlugin_logic_stages_0_hits));
   assign lane0_IntFormatPlugin_logic_stages_0_raw = ((lane0_IntFormatPlugin_logic_stages_0_hits[0] ? early0_IntAluPlugin_logic_wb_payload : 32'h0) | (lane0_IntFormatPlugin_logic_stages_0_hits[1] ? early0_BarrelShifterPlugin_logic_wb_payload : 32'h0));
   assign lane0_IntFormatPlugin_logic_stages_0_wb_payload = lane0_IntFormatPlugin_logic_stages_0_raw;
-  assign lane0_IntFormatPlugin_logic_stages_1_hits = {LsuPlugin_logic_iwb_valid,early0_MulPlugin_logic_formatBus_valid};
-  assign lane0_IntFormatPlugin_logic_stages_1_wb_valid = (execute_ctrl4_up_LANE_SEL_lane0 && (|lane0_IntFormatPlugin_logic_stages_1_hits));
-  assign lane0_IntFormatPlugin_logic_stages_1_raw = ((lane0_IntFormatPlugin_logic_stages_1_hits[0] ? early0_MulPlugin_logic_formatBus_payload : 32'h0) | (lane0_IntFormatPlugin_logic_stages_1_hits[1] ? LsuPlugin_logic_iwb_payload : 32'h0));
+  assign lane0_IntFormatPlugin_logic_stages_1_hits = {LsuPlugin_logic_iwb_valid,{late0_BarrelShifterPlugin_logic_wb_valid,{late0_IntAluPlugin_logic_wb_valid,early0_MulPlugin_logic_formatBus_valid}}};
+  assign lane0_IntFormatPlugin_logic_stages_1_wb_valid = (execute_ctrl3_up_LANE_SEL_lane0 && (|lane0_IntFormatPlugin_logic_stages_1_hits));
+  assign lane0_IntFormatPlugin_logic_stages_1_raw = (((lane0_IntFormatPlugin_logic_stages_1_hits[0] ? early0_MulPlugin_logic_formatBus_payload : 32'h0) | (lane0_IntFormatPlugin_logic_stages_1_hits[1] ? late0_IntAluPlugin_logic_wb_payload : 32'h0)) | ((lane0_IntFormatPlugin_logic_stages_1_hits[2] ? late0_BarrelShifterPlugin_logic_wb_payload : 32'h0) | (lane0_IntFormatPlugin_logic_stages_1_hits[3] ? LsuPlugin_logic_iwb_payload : 32'h0)));
   always @(*) begin
     lane0_IntFormatPlugin_logic_stages_1_wb_payload = lane0_IntFormatPlugin_logic_stages_1_raw;
     if(lane0_IntFormatPlugin_logic_stages_1_segments_0_doIt) begin
@@ -5708,7 +7149,7 @@ module VexiiRiscv (
   assign lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_sels_0 = lane0_IntFormatPlugin_logic_stages_1_raw[7];
   always @(*) begin
     _zz_lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_value = 1'bx;
-    case(execute_ctrl4_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0)
+    case(execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0)
       2'b00 : begin
         _zz_lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_value = lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_sels_0;
       end
@@ -5717,13 +7158,13 @@ module VexiiRiscv (
     endcase
   end
 
-  assign lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_value = (execute_ctrl4_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 && _zz_lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_value);
-  assign lane0_IntFormatPlugin_logic_stages_1_segments_0_doIt = (execute_ctrl4_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 < 2'b01);
+  assign lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_value = (execute_ctrl3_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 && _zz_lane0_IntFormatPlugin_logic_stages_1_segments_0_sign_value);
+  assign lane0_IntFormatPlugin_logic_stages_1_segments_0_doIt = (execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 < 2'b01);
   assign lane0_IntFormatPlugin_logic_stages_1_segments_1_sign_sels_0 = lane0_IntFormatPlugin_logic_stages_1_raw[7];
   assign lane0_IntFormatPlugin_logic_stages_1_segments_1_sign_sels_1 = lane0_IntFormatPlugin_logic_stages_1_raw[15];
   always @(*) begin
     _zz_lane0_IntFormatPlugin_logic_stages_1_segments_1_sign_value = 1'bx;
-    case(execute_ctrl4_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0)
+    case(execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0)
       2'b00 : begin
         _zz_lane0_IntFormatPlugin_logic_stages_1_segments_1_sign_value = lane0_IntFormatPlugin_logic_stages_1_segments_1_sign_sels_0;
       end
@@ -5735,60 +7176,145 @@ module VexiiRiscv (
     endcase
   end
 
-  assign lane0_IntFormatPlugin_logic_stages_1_segments_1_sign_value = (execute_ctrl4_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 && _zz_lane0_IntFormatPlugin_logic_stages_1_segments_1_sign_value);
-  assign lane0_IntFormatPlugin_logic_stages_1_segments_1_doIt = (execute_ctrl4_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 < 2'b10);
+  assign lane0_IntFormatPlugin_logic_stages_1_segments_1_sign_value = (execute_ctrl3_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 && _zz_lane0_IntFormatPlugin_logic_stages_1_segments_1_sign_value);
+  assign lane0_IntFormatPlugin_logic_stages_1_segments_1_doIt = (execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 < 2'b10);
   assign lane0_IntFormatPlugin_logic_stages_2_hits = {CsrAccessPlugin_logic_wbWi_valid,early0_DivPlugin_logic_formatBus_valid};
-  assign lane0_IntFormatPlugin_logic_stages_2_wb_valid = (execute_ctrl3_up_LANE_SEL_lane0 && (|lane0_IntFormatPlugin_logic_stages_2_hits));
+  assign lane0_IntFormatPlugin_logic_stages_2_wb_valid = (execute_ctrl2_up_LANE_SEL_lane0 && (|lane0_IntFormatPlugin_logic_stages_2_hits));
   assign lane0_IntFormatPlugin_logic_stages_2_raw = ((lane0_IntFormatPlugin_logic_stages_2_hits[0] ? early0_DivPlugin_logic_formatBus_payload : 32'h0) | (lane0_IntFormatPlugin_logic_stages_2_hits[1] ? CsrAccessPlugin_logic_wbWi_payload : 32'h0));
   assign lane0_IntFormatPlugin_logic_stages_2_wb_payload = lane0_IntFormatPlugin_logic_stages_2_raw;
-  assign LearnPlugin_logic_buffered_0_valid = early0_BranchPlugin_logic_jumpLogic_learn_valid;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_ready = LearnPlugin_logic_buffered_0_ready;
-  assign LearnPlugin_logic_buffered_0_payload_pcOnLastSlice = early0_BranchPlugin_logic_jumpLogic_learn_payload_pcOnLastSlice;
-  assign LearnPlugin_logic_buffered_0_payload_pcTarget = early0_BranchPlugin_logic_jumpLogic_learn_payload_pcTarget;
-  assign LearnPlugin_logic_buffered_0_payload_taken = early0_BranchPlugin_logic_jumpLogic_learn_payload_taken;
-  assign LearnPlugin_logic_buffered_0_payload_isBranch = early0_BranchPlugin_logic_jumpLogic_learn_payload_isBranch;
-  assign LearnPlugin_logic_buffered_0_payload_isPush = early0_BranchPlugin_logic_jumpLogic_learn_payload_isPush;
-  assign LearnPlugin_logic_buffered_0_payload_isPop = early0_BranchPlugin_logic_jumpLogic_learn_payload_isPop;
-  assign LearnPlugin_logic_buffered_0_payload_wasWrong = early0_BranchPlugin_logic_jumpLogic_learn_payload_wasWrong;
-  assign LearnPlugin_logic_buffered_0_payload_badPredictedTarget = early0_BranchPlugin_logic_jumpLogic_learn_payload_badPredictedTarget;
-  assign LearnPlugin_logic_buffered_0_payload_uopId = early0_BranchPlugin_logic_jumpLogic_learn_payload_uopId;
-  assign LearnPlugin_logic_buffered_0_ready = streamArbiter_4_io_inputs_0_ready;
-  assign LearnPlugin_logic_arbitrated_valid = streamArbiter_4_io_output_valid;
-  assign LearnPlugin_logic_arbitrated_payload_pcOnLastSlice = streamArbiter_4_io_output_payload_pcOnLastSlice;
-  assign LearnPlugin_logic_arbitrated_payload_pcTarget = streamArbiter_4_io_output_payload_pcTarget;
-  assign LearnPlugin_logic_arbitrated_payload_taken = streamArbiter_4_io_output_payload_taken;
-  assign LearnPlugin_logic_arbitrated_payload_isBranch = streamArbiter_4_io_output_payload_isBranch;
-  assign LearnPlugin_logic_arbitrated_payload_isPush = streamArbiter_4_io_output_payload_isPush;
-  assign LearnPlugin_logic_arbitrated_payload_isPop = streamArbiter_4_io_output_payload_isPop;
-  assign LearnPlugin_logic_arbitrated_payload_wasWrong = streamArbiter_4_io_output_payload_wasWrong;
-  assign LearnPlugin_logic_arbitrated_payload_badPredictedTarget = streamArbiter_4_io_output_payload_badPredictedTarget;
-  assign LearnPlugin_logic_arbitrated_payload_uopId = streamArbiter_4_io_output_payload_uopId;
-  assign LearnPlugin_logic_arbitrated_ready = 1'b1;
-  assign LearnPlugin_logic_arbitrated_toFlow_valid = LearnPlugin_logic_arbitrated_valid;
-  assign LearnPlugin_logic_arbitrated_toFlow_payload_pcOnLastSlice = LearnPlugin_logic_arbitrated_payload_pcOnLastSlice;
-  assign LearnPlugin_logic_arbitrated_toFlow_payload_pcTarget = LearnPlugin_logic_arbitrated_payload_pcTarget;
-  assign LearnPlugin_logic_arbitrated_toFlow_payload_taken = LearnPlugin_logic_arbitrated_payload_taken;
-  assign LearnPlugin_logic_arbitrated_toFlow_payload_isBranch = LearnPlugin_logic_arbitrated_payload_isBranch;
-  assign LearnPlugin_logic_arbitrated_toFlow_payload_isPush = LearnPlugin_logic_arbitrated_payload_isPush;
-  assign LearnPlugin_logic_arbitrated_toFlow_payload_isPop = LearnPlugin_logic_arbitrated_payload_isPop;
-  assign LearnPlugin_logic_arbitrated_toFlow_payload_wasWrong = LearnPlugin_logic_arbitrated_payload_wasWrong;
-  assign LearnPlugin_logic_arbitrated_toFlow_payload_badPredictedTarget = LearnPlugin_logic_arbitrated_payload_badPredictedTarget;
-  assign LearnPlugin_logic_arbitrated_toFlow_payload_uopId = LearnPlugin_logic_arbitrated_payload_uopId;
-  assign LearnPlugin_logic_learn_valid = LearnPlugin_logic_arbitrated_toFlow_valid;
-  assign LearnPlugin_logic_learn_payload_pcOnLastSlice = LearnPlugin_logic_arbitrated_toFlow_payload_pcOnLastSlice;
-  assign LearnPlugin_logic_learn_payload_pcTarget = LearnPlugin_logic_arbitrated_toFlow_payload_pcTarget;
-  assign LearnPlugin_logic_learn_payload_taken = LearnPlugin_logic_arbitrated_toFlow_payload_taken;
-  assign LearnPlugin_logic_learn_payload_isBranch = LearnPlugin_logic_arbitrated_toFlow_payload_isBranch;
-  assign LearnPlugin_logic_learn_payload_isPush = LearnPlugin_logic_arbitrated_toFlow_payload_isPush;
-  assign LearnPlugin_logic_learn_payload_isPop = LearnPlugin_logic_arbitrated_toFlow_payload_isPop;
-  assign LearnPlugin_logic_learn_payload_wasWrong = LearnPlugin_logic_arbitrated_toFlow_payload_wasWrong;
-  assign LearnPlugin_logic_learn_payload_badPredictedTarget = LearnPlugin_logic_arbitrated_toFlow_payload_badPredictedTarget;
-  assign LearnPlugin_logic_learn_payload_uopId = LearnPlugin_logic_arbitrated_toFlow_payload_uopId;
+  always @(*) begin
+    _zz_execute_ctrl2_down_late0_SrcPlugin_SRC1_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    case(execute_ctrl2_down_late0_SrcPlugin_logic_SRC1_CTRL_lane0)
+      1'b0 : begin
+        _zz_execute_ctrl2_down_late0_SrcPlugin_SRC1_lane0 = execute_ctrl2_down_integer_RS1_lane0;
+      end
+      default : begin
+        _zz_execute_ctrl2_down_late0_SrcPlugin_SRC1_lane0 = {execute_ctrl2_down_Decode_UOP_lane0[31 : 12],12'h0};
+      end
+    endcase
+  end
+
+  assign execute_ctrl2_down_late0_SrcPlugin_SRC1_lane0 = _zz_execute_ctrl2_down_late0_SrcPlugin_SRC1_lane0;
+  always @(*) begin
+    _zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0 = 32'bxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx;
+    case(execute_ctrl2_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0)
+      2'b00 : begin
+        _zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0 = execute_ctrl2_down_integer_RS2_lane0;
+      end
+      2'b01 : begin
+        _zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0 = {{20{_zz__zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0[11]}}, _zz__zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0};
+      end
+      2'b10 : begin
+        _zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0 = execute_ctrl2_down_PC_lane0;
+      end
+      default : begin
+      end
+    endcase
+  end
+
+  assign execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0 = _zz_execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0;
+  always @(*) begin
+    late0_SrcPlugin_logic_addsub_combined_rs2Patched = execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0;
+    if(execute_ctrl3_down_SrcStageables_REVERT_lane0) begin
+      late0_SrcPlugin_logic_addsub_combined_rs2Patched = (~ execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0);
+    end
+    if(execute_ctrl3_down_SrcStageables_ZERO_lane0) begin
+      late0_SrcPlugin_logic_addsub_combined_rs2Patched = 32'h0;
+    end
+  end
+
+  assign execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0 = ($signed(_zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0) + $signed(_zz_execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0_1));
+  assign execute_ctrl3_down_late0_SrcPlugin_LESS_lane0 = ((execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[31] == execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0[31]) ? execute_ctrl3_down_late0_SrcPlugin_ADD_SUB_lane0[31] : (execute_ctrl3_down_SrcStageables_UNSIGNED_lane0 ? execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0[31] : execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0[31]));
+  assign execute_ctrl3_down_late0_BranchPlugin_logic_alu_EQ_lane0 = ($signed(execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0) == $signed(execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0));
+  assign execute_ctrl3_down_late0_BranchPlugin_logic_alu_btb_BAD_TARGET_lane0 = (execute_ctrl3_down_Prediction_ALIGNED_JUMPED_PC_lane0 != execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0);
+  assign late0_BranchPlugin_logic_alu_expectedMsb = 1'b0;
+  assign execute_ctrl3_down_late0_BranchPlugin_logic_alu_MSB_FAILED_lane0 = ((execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_JALR) && 1'b0);
+  assign switch_Misc_l242_1 = execute_ctrl3_down_Decode_UOP_lane0[14 : 12];
+  always @(*) begin
+    casez(switch_Misc_l242_1)
+      3'b000 : begin
+        _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0 = execute_ctrl3_down_late0_BranchPlugin_logic_alu_EQ_lane0;
+      end
+      3'b001 : begin
+        _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0 = (! execute_ctrl3_down_late0_BranchPlugin_logic_alu_EQ_lane0);
+      end
+      3'b1?1 : begin
+        _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0 = (! execute_ctrl3_down_late0_SrcPlugin_LESS_lane0);
+      end
+      default : begin
+        _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0 = execute_ctrl3_down_late0_SrcPlugin_LESS_lane0;
+      end
+    endcase
+  end
+
+  always @(*) begin
+    case(execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0)
+      BranchPlugin_BranchCtrlEnum_JALR : begin
+        _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0_1 = 1'b1;
+      end
+      BranchPlugin_BranchCtrlEnum_JAL : begin
+        _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0_1 = 1'b1;
+      end
+      default : begin
+        _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0_1 = _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0;
+      end
+    endcase
+  end
+
+  assign execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0 = _zz_execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0_1;
+  assign execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_btb_REAL_TARGET_lane0 = (execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0 ? execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 : execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0);
+  assign late0_BranchPlugin_logic_jumpLogic_wrongCond = (execute_ctrl3_down_Prediction_ALIGNED_JUMPED_lane0 != execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0);
+  assign late0_BranchPlugin_logic_jumpLogic_needFix = ((late0_BranchPlugin_logic_jumpLogic_wrongCond || (execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0 && execute_ctrl3_down_late0_BranchPlugin_logic_alu_btb_BAD_TARGET_lane0)) || execute_ctrl3_down_late0_BranchPlugin_logic_alu_MSB_FAILED_lane0);
+  assign late0_BranchPlugin_logic_jumpLogic_doIt = ((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_down_late0_BranchPlugin_SEL_lane0) && late0_BranchPlugin_logic_jumpLogic_needFix);
+  assign late0_BranchPlugin_logic_jumpLogic_history_shifter = execute_ctrl3_down_Prediction_BRANCH_HISTORY_lane0;
+  assign when_BranchPlugin_l218_1 = (execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_B);
+  assign late0_BranchPlugin_logic_jumpLogic_history_next = late0_BranchPlugin_logic_jumpLogic_history_shifter_1;
+  assign late0_BranchPlugin_logic_jumpLogic_history_fetched = execute_ctrl3_down_Prediction_BRANCH_HISTORY_lane0;
+  assign late0_BranchPlugin_logic_pcPort_valid = late0_BranchPlugin_logic_jumpLogic_doIt;
+  assign late0_BranchPlugin_logic_pcPort_payload_fault = execute_ctrl3_down_late0_BranchPlugin_logic_alu_MSB_FAILED_lane0;
+  assign late0_BranchPlugin_logic_pcPort_payload_pc = execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_btb_REAL_TARGET_lane0;
+  assign late0_BranchPlugin_logic_historyPort_valid = late0_BranchPlugin_logic_jumpLogic_doIt;
+  assign late0_BranchPlugin_logic_historyPort_payload_history = late0_BranchPlugin_logic_jumpLogic_history_next;
+  assign late0_BranchPlugin_logic_flushPort_valid = late0_BranchPlugin_logic_jumpLogic_doIt;
+  assign late0_BranchPlugin_logic_flushPort_payload_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
+  assign late0_BranchPlugin_logic_flushPort_payload_self = 1'b0;
+  assign execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0 = ((execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0[1 : 0] != 2'b00) && execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0);
+  always @(*) begin
+    late0_BranchPlugin_logic_trapPort_valid = 1'b0;
+    if(when_BranchPlugin_l251_1) begin
+      late0_BranchPlugin_logic_trapPort_valid = 1'b1;
+    end
+  end
+
+  assign late0_BranchPlugin_logic_trapPort_payload_exception = 1'b1;
+  assign late0_BranchPlugin_logic_trapPort_payload_code = 4'b0000;
+  assign late0_BranchPlugin_logic_trapPort_payload_tval = execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  assign late0_BranchPlugin_logic_trapPort_payload_arg = 2'b00;
+  assign when_BranchPlugin_l251_1 = (late0_BranchPlugin_logic_jumpLogic_doIt && execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_MISSALIGNED_lane0);
+  assign execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_IS_JAL_lane0 = (execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_JAL);
+  assign execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0 = (execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_JALR);
+  assign late0_BranchPlugin_logic_jumpLogic_rdLink = (|{(execute_ctrl3_down_Decode_UOP_lane0[11 : 7] == 5'h05),(execute_ctrl3_down_Decode_UOP_lane0[11 : 7] == 5'h01)});
+  assign late0_BranchPlugin_logic_jumpLogic_rs1Link = (|{(execute_ctrl3_down_Decode_UOP_lane0[19 : 15] == 5'h05),(execute_ctrl3_down_Decode_UOP_lane0[19 : 15] == 5'h01)});
+  assign late0_BranchPlugin_logic_jumpLogic_rdEquRs1 = (execute_ctrl3_down_Decode_UOP_lane0[11 : 7] == execute_ctrl3_down_Decode_UOP_lane0[19 : 15]);
+  assign late0_BranchPlugin_logic_jumpLogic_learn_valid = (((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_upIsCancel)) && (|{execute_ctrl3_down_late0_BranchPlugin_SEL_lane0,execute_ctrl3_down_early0_BranchPlugin_SEL_lane0}));
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_taken = execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_COND_lane0;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_pcTarget = execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_pcOnLastSlice = execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_isBranch = (execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0 == BranchPlugin_BranchCtrlEnum_B);
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_isPush = ((execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_IS_JAL_lane0 || execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0) && late0_BranchPlugin_logic_jumpLogic_rdLink);
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_isPop = (execute_ctrl3_down_late0_BranchPlugin_logic_jumpLogic_IS_JALR_lane0 && (((! late0_BranchPlugin_logic_jumpLogic_rdLink) && late0_BranchPlugin_logic_jumpLogic_rs1Link) || ((late0_BranchPlugin_logic_jumpLogic_rdLink && late0_BranchPlugin_logic_jumpLogic_rs1Link) && (! late0_BranchPlugin_logic_jumpLogic_rdEquRs1))));
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_wasWrong = late0_BranchPlugin_logic_jumpLogic_needFix;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_badPredictedTarget = execute_ctrl3_down_late0_BranchPlugin_logic_alu_btb_BAD_TARGET_lane0;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_history = late0_BranchPlugin_logic_jumpLogic_history_fetched;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 = execute_ctrl3_down_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  assign late0_BranchPlugin_logic_wb_valid = execute_ctrl3_down_late0_BranchPlugin_SEL_lane0;
+  assign late0_BranchPlugin_logic_wb_payload = execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
   assign early0_EnvPlugin_logic_exe_privilege = PrivilegedPlugin_logic_harts_0_privilege;
-  assign early0_EnvPlugin_logic_exe_xretPriv = execute_ctrl2_down_Decode_UOP_lane0[29 : 28];
+  assign early0_EnvPlugin_logic_exe_xretPriv = execute_ctrl1_down_Decode_UOP_lane0[29 : 28];
   always @(*) begin
     early0_EnvPlugin_logic_exe_commit = 1'b0;
-    case(execute_ctrl2_down_early0_EnvPlugin_OP_lane0)
+    case(execute_ctrl1_down_early0_EnvPlugin_OP_lane0)
       EnvPluginOp_PRIV_RET : begin
         if(when_EnvPlugin_l86) begin
           early0_EnvPlugin_logic_exe_commit = 1'b1;
@@ -5811,8 +7337,59 @@ module VexiiRiscv (
   assign early0_EnvPlugin_logic_exe_vmaKo = 1'b0;
   assign when_EnvPlugin_l86 = ((early0_EnvPlugin_logic_exe_xretPriv <= PrivilegedPlugin_logic_harts_0_privilege) && (! early0_EnvPlugin_logic_exe_retKo));
   assign when_EnvPlugin_l95 = ((early0_EnvPlugin_logic_exe_privilege == 2'b11) || ((! PrivilegedPlugin_logic_harts_0_m_status_tw) && (1'b1 || (early0_EnvPlugin_logic_exe_privilege == 2'b01))));
-  assign when_EnvPlugin_l119 = (execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_early0_EnvPlugin_SEL_lane0);
+  assign when_EnvPlugin_l119 = (execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_down_early0_EnvPlugin_SEL_lane0);
   assign when_EnvPlugin_l123 = (! early0_EnvPlugin_logic_exe_commit);
+  assign LearnPlugin_logic_buffered_0_valid = late0_BranchPlugin_logic_jumpLogic_learn_valid;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_ready = LearnPlugin_logic_buffered_0_ready;
+  assign LearnPlugin_logic_buffered_0_payload_pcOnLastSlice = late0_BranchPlugin_logic_jumpLogic_learn_payload_pcOnLastSlice;
+  assign LearnPlugin_logic_buffered_0_payload_pcTarget = late0_BranchPlugin_logic_jumpLogic_learn_payload_pcTarget;
+  assign LearnPlugin_logic_buffered_0_payload_taken = late0_BranchPlugin_logic_jumpLogic_learn_payload_taken;
+  assign LearnPlugin_logic_buffered_0_payload_isBranch = late0_BranchPlugin_logic_jumpLogic_learn_payload_isBranch;
+  assign LearnPlugin_logic_buffered_0_payload_isPush = late0_BranchPlugin_logic_jumpLogic_learn_payload_isPush;
+  assign LearnPlugin_logic_buffered_0_payload_isPop = late0_BranchPlugin_logic_jumpLogic_learn_payload_isPop;
+  assign LearnPlugin_logic_buffered_0_payload_wasWrong = late0_BranchPlugin_logic_jumpLogic_learn_payload_wasWrong;
+  assign LearnPlugin_logic_buffered_0_payload_badPredictedTarget = late0_BranchPlugin_logic_jumpLogic_learn_payload_badPredictedTarget;
+  assign LearnPlugin_logic_buffered_0_payload_history = late0_BranchPlugin_logic_jumpLogic_learn_payload_history;
+  assign LearnPlugin_logic_buffered_0_payload_uopId = late0_BranchPlugin_logic_jumpLogic_learn_payload_uopId;
+  assign LearnPlugin_logic_buffered_0_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 = late0_BranchPlugin_logic_jumpLogic_learn_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
+  assign LearnPlugin_logic_buffered_0_ready = streamArbiter_4_io_inputs_0_ready;
+  assign LearnPlugin_logic_arbitrated_valid = streamArbiter_4_io_output_valid;
+  assign LearnPlugin_logic_arbitrated_payload_pcOnLastSlice = streamArbiter_4_io_output_payload_pcOnLastSlice;
+  assign LearnPlugin_logic_arbitrated_payload_pcTarget = streamArbiter_4_io_output_payload_pcTarget;
+  assign LearnPlugin_logic_arbitrated_payload_taken = streamArbiter_4_io_output_payload_taken;
+  assign LearnPlugin_logic_arbitrated_payload_isBranch = streamArbiter_4_io_output_payload_isBranch;
+  assign LearnPlugin_logic_arbitrated_payload_isPush = streamArbiter_4_io_output_payload_isPush;
+  assign LearnPlugin_logic_arbitrated_payload_isPop = streamArbiter_4_io_output_payload_isPop;
+  assign LearnPlugin_logic_arbitrated_payload_wasWrong = streamArbiter_4_io_output_payload_wasWrong;
+  assign LearnPlugin_logic_arbitrated_payload_badPredictedTarget = streamArbiter_4_io_output_payload_badPredictedTarget;
+  assign LearnPlugin_logic_arbitrated_payload_history = streamArbiter_4_io_output_payload_history;
+  assign LearnPlugin_logic_arbitrated_payload_uopId = streamArbiter_4_io_output_payload_uopId;
+  assign LearnPlugin_logic_arbitrated_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 = streamArbiter_4_io_output_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
+  assign LearnPlugin_logic_arbitrated_ready = 1'b1;
+  assign LearnPlugin_logic_arbitrated_toFlow_valid = LearnPlugin_logic_arbitrated_valid;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_pcOnLastSlice = LearnPlugin_logic_arbitrated_payload_pcOnLastSlice;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_pcTarget = LearnPlugin_logic_arbitrated_payload_pcTarget;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_taken = LearnPlugin_logic_arbitrated_payload_taken;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_isBranch = LearnPlugin_logic_arbitrated_payload_isBranch;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_isPush = LearnPlugin_logic_arbitrated_payload_isPush;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_isPop = LearnPlugin_logic_arbitrated_payload_isPop;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_wasWrong = LearnPlugin_logic_arbitrated_payload_wasWrong;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_badPredictedTarget = LearnPlugin_logic_arbitrated_payload_badPredictedTarget;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_history = LearnPlugin_logic_arbitrated_payload_history;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_uopId = LearnPlugin_logic_arbitrated_payload_uopId;
+  assign LearnPlugin_logic_arbitrated_toFlow_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 = LearnPlugin_logic_arbitrated_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
+  assign LearnPlugin_logic_learn_valid = LearnPlugin_logic_arbitrated_toFlow_valid;
+  assign LearnPlugin_logic_learn_payload_pcOnLastSlice = LearnPlugin_logic_arbitrated_toFlow_payload_pcOnLastSlice;
+  assign LearnPlugin_logic_learn_payload_pcTarget = LearnPlugin_logic_arbitrated_toFlow_payload_pcTarget;
+  assign LearnPlugin_logic_learn_payload_taken = LearnPlugin_logic_arbitrated_toFlow_payload_taken;
+  assign LearnPlugin_logic_learn_payload_isBranch = LearnPlugin_logic_arbitrated_toFlow_payload_isBranch;
+  assign LearnPlugin_logic_learn_payload_isPush = LearnPlugin_logic_arbitrated_toFlow_payload_isPush;
+  assign LearnPlugin_logic_learn_payload_isPop = LearnPlugin_logic_arbitrated_toFlow_payload_isPop;
+  assign LearnPlugin_logic_learn_payload_wasWrong = LearnPlugin_logic_arbitrated_toFlow_payload_wasWrong;
+  assign LearnPlugin_logic_learn_payload_badPredictedTarget = LearnPlugin_logic_arbitrated_toFlow_payload_badPredictedTarget;
+  assign LearnPlugin_logic_learn_payload_history = LearnPlugin_logic_arbitrated_toFlow_payload_history;
+  assign LearnPlugin_logic_learn_payload_uopId = LearnPlugin_logic_arbitrated_toFlow_payload_uopId;
+  assign LearnPlugin_logic_learn_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 = LearnPlugin_logic_arbitrated_toFlow_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
   assign when_DecoderPlugin_l138 = (decode_ctrls_1_up_isMoving && 1'b1);
   assign DecoderPlugin_logic_interrupt_async = PrivilegedPlugin_logic_harts_0_int_pending;
   assign when_DecoderPlugin_l146 = (((! decode_ctrls_1_up_valid) || decode_ctrls_1_up_ready) || decode_ctrls_1_up_isCanceling);
@@ -5821,6 +7398,7 @@ module VexiiRiscv (
   assign decode_ctrls_1_down_RS1_PHYS_0 = decode_ctrls_1_down_Decode_INSTRUCTION_0[19 : 15];
   assign decode_ctrls_1_down_RS2_ENABLE_0 = _zz_decode_ctrls_1_down_RS2_ENABLE_0[0];
   assign decode_ctrls_1_down_RS2_PHYS_0 = decode_ctrls_1_down_Decode_INSTRUCTION_0[24 : 20];
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000048) == 32'h00000048);
   always @(*) begin
     decode_ctrls_1_down_RD_ENABLE_0 = _zz_decode_ctrls_1_down_RD_ENABLE_0[0];
     if(when_DecoderPlugin_l240) begin
@@ -5835,11 +7413,17 @@ module VexiiRiscv (
     DecoderPlugin_logic_laneLogic_0_trapPort_valid = 1'b0;
     if(when_DecoderPlugin_l222) begin
       DecoderPlugin_logic_laneLogic_0_trapPort_valid = ((! decode_ctrls_1_up_TRAP_0) || DecoderPlugin_logic_laneLogic_0_interruptPending);
+      if(DecoderPlugin_logic_laneLogic_0_fixer_doIt) begin
+        DecoderPlugin_logic_laneLogic_0_trapPort_valid = 1'b1;
+      end
     end
   end
 
   always @(*) begin
     DecoderPlugin_logic_laneLogic_0_trapPort_payload_exception = 1'b1;
+    if(DecoderPlugin_logic_laneLogic_0_fixer_doIt) begin
+      DecoderPlugin_logic_laneLogic_0_trapPort_payload_exception = 1'b0;
+    end
     if(DecoderPlugin_logic_laneLogic_0_interruptPending) begin
       DecoderPlugin_logic_laneLogic_0_trapPort_payload_exception = 1'b0;
     end
@@ -5848,6 +7432,9 @@ module VexiiRiscv (
   assign DecoderPlugin_logic_laneLogic_0_trapPort_payload_tval = decode_ctrls_1_down_Decode_INSTRUCTION_RAW_0;
   always @(*) begin
     DecoderPlugin_logic_laneLogic_0_trapPort_payload_code = 4'b0010;
+    if(DecoderPlugin_logic_laneLogic_0_fixer_doIt) begin
+      DecoderPlugin_logic_laneLogic_0_trapPort_payload_code = 4'b0100;
+    end
     if(DecoderPlugin_logic_laneLogic_0_interruptPending) begin
       DecoderPlugin_logic_laneLogic_0_trapPort_payload_code = 4'b0000;
     end
@@ -5855,12 +7442,14 @@ module VexiiRiscv (
 
   assign DecoderPlugin_logic_laneLogic_0_trapPort_payload_laneAge = 1'b0;
   assign DecoderPlugin_logic_laneLogic_0_trapPort_payload_arg = 2'b00;
+  assign DecoderPlugin_logic_laneLogic_0_fixer_isJb = _zz_DecoderPlugin_logic_laneLogic_0_fixer_isJb[0];
+  assign DecoderPlugin_logic_laneLogic_0_fixer_doIt = (decode_ctrls_1_up_LANE_SEL_0 && ((decode_ctrls_1_down_Prediction_ALIGNED_JUMPED_0 && (! DecoderPlugin_logic_laneLogic_0_fixer_isJb)) || decode_ctrls_1_down_Prediction_ALIGN_REDO_0));
   assign when_CtrlLaneApi_l50_1 = (decode_ctrls_1_up_isReady || decode_ctrls_1_lane0_upIsCancel);
   assign DecoderPlugin_logic_laneLogic_0_completionPort_valid = ((decode_ctrls_1_up_LANE_SEL_0 && decode_ctrls_1_down_TRAP_0) && (decode_ctrls_1_up_LANE_SEL_0 && (! decode_ctrls_1_up_LANE_SEL_0_regNext)));
   assign DecoderPlugin_logic_laneLogic_0_completionPort_payload_uopId = decode_ctrls_1_down_Decode_UOP_ID_0;
   assign DecoderPlugin_logic_laneLogic_0_completionPort_payload_trap = 1'b1;
   assign DecoderPlugin_logic_laneLogic_0_completionPort_payload_commit = 1'b0;
-  assign when_DecoderPlugin_l222 = (decode_ctrls_1_up_LANE_SEL_0 && (((! decode_ctrls_1_down_Decode_LEGAL_0) || DecoderPlugin_logic_laneLogic_0_interruptPending) || 1'b0));
+  assign when_DecoderPlugin_l222 = (decode_ctrls_1_up_LANE_SEL_0 && (((! decode_ctrls_1_down_Decode_LEGAL_0) || DecoderPlugin_logic_laneLogic_0_interruptPending) || DecoderPlugin_logic_laneLogic_0_fixer_doIt));
   assign DecoderPlugin_logic_laneLogic_0_flushPort_valid = (decode_ctrls_1_up_LANE_SEL_0 && decode_ctrls_1_down_TRAP_0);
   assign DecoderPlugin_logic_laneLogic_0_flushPort_payload_uopId = decode_ctrls_1_down_Decode_UOP_ID_0;
   assign DecoderPlugin_logic_laneLogic_0_flushPort_payload_self = 1'b0;
@@ -5868,19 +7457,96 @@ module VexiiRiscv (
   assign decode_ctrls_1_down_Decode_UOP_0 = decode_ctrls_1_down_Decode_INSTRUCTION_0;
   assign DecoderPlugin_logic_laneLogic_0_uopIdBase = DecoderPlugin_logic_harts_0_uopId;
   assign decode_ctrls_1_down_Decode_UOP_ID_0 = (DecoderPlugin_logic_laneLogic_0_uopIdBase + 16'h0);
-  assign execute_ctrl2_COMPLETED_lane0_bypass = (execute_ctrl2_up_COMPLETED_lane0 || execute_ctrl2_down_COMPLETION_AT_2_lane0);
-  assign execute_ctrl4_COMPLETED_lane0_bypass = (execute_ctrl4_up_COMPLETED_lane0 || execute_ctrl4_down_COMPLETION_AT_4_lane0);
+  assign _zz_GSharePlugin_logic_onLearn_hash = LearnPlugin_logic_learn_payload_pcOnLastSlice[15 : 2];
+  assign GSharePlugin_logic_onLearn_hash = ({_zz_GSharePlugin_logic_onLearn_hash[0],{_zz_GSharePlugin_logic_onLearn_hash[1],{_zz_GSharePlugin_logic_onLearn_hash[2],{_zz_GSharePlugin_logic_onLearn_hash[3],{_zz_GSharePlugin_logic_onLearn_hash[4],{_zz_GSharePlugin_logic_onLearn_hash[5],{_zz_GSharePlugin_logic_onLearn_hash_1,{_zz_GSharePlugin_logic_onLearn_hash_2,_zz_GSharePlugin_logic_onLearn_hash_3}}}}}}}} ^ _zz_GSharePlugin_logic_onLearn_hash_4);
+  assign GSharePlugin_logic_onLearn_incrValue = (LearnPlugin_logic_learn_payload_taken ? 2'b01 : 2'b11);
+  always @(*) begin
+    GSharePlugin_logic_onLearn_overflow = 1'b0;
+    if(when_GSharePlugin_l107) begin
+      GSharePlugin_logic_onLearn_overflow = 1'b1;
+    end
+  end
+
+  assign GSharePlugin_logic_onLearn_updated_0 = (LearnPlugin_logic_learn_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 + (1'b1 ? GSharePlugin_logic_onLearn_incrValue : 2'b00));
+  assign when_GSharePlugin_l107 = (((LearnPlugin_logic_learn_payload_taken && LearnPlugin_logic_learn_payload_ctx_GSharePlugin_GSHARE_COUNTER_0[1]) && (! GSharePlugin_logic_onLearn_updated_0[1])) || (((! LearnPlugin_logic_learn_payload_taken) && (! LearnPlugin_logic_learn_payload_ctx_GSharePlugin_GSHARE_COUNTER_0[1])) && GSharePlugin_logic_onLearn_updated_0[1]));
+  assign GSharePlugin_logic_mem_write_valid = ((LearnPlugin_logic_learn_valid && LearnPlugin_logic_learn_payload_isBranch) && (! GSharePlugin_logic_onLearn_overflow));
+  assign GSharePlugin_logic_mem_write_payload_address = GSharePlugin_logic_onLearn_hash;
+  assign GSharePlugin_logic_mem_write_payload_data_0 = GSharePlugin_logic_onLearn_updated_0;
+  assign BtbPlugin_logic_onLearn_hash = LearnPlugin_logic_learn_payload_pcOnLastSlice[26 : 11];
+  always @(*) begin
+    BtbPlugin_logic_memWrite_valid = (LearnPlugin_logic_learn_valid && (LearnPlugin_logic_learn_payload_badPredictedTarget && LearnPlugin_logic_learn_payload_taken));
+    if(DecoderPlugin_logic_forgetPort_valid) begin
+      BtbPlugin_logic_memWrite_valid = DecoderPlugin_logic_forgetPort_valid;
+    end
+  end
+
+  always @(*) begin
+    BtbPlugin_logic_memWrite_payload_address = _zz_BtbPlugin_logic_memWrite_payload_address[8:0];
+    if(DecoderPlugin_logic_forgetPort_valid) begin
+      BtbPlugin_logic_memWrite_payload_address = _zz_BtbPlugin_logic_memWrite_payload_address_1[8:0];
+    end
+  end
+
+  always @(*) begin
+    BtbPlugin_logic_memWrite_payload_mask = 1'b1;
+    if(DecoderPlugin_logic_forgetPort_valid) begin
+      BtbPlugin_logic_memWrite_payload_mask = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    BtbPlugin_logic_memWrite_payload_data_0_hash = BtbPlugin_logic_onLearn_hash;
+    if(DecoderPlugin_logic_forgetPort_valid) begin
+      BtbPlugin_logic_memWrite_payload_data_0_hash = (~ BtbPlugin_logic_onForget_hash);
+    end
+  end
+
+  assign BtbPlugin_logic_memWrite_payload_data_0_pcTarget = (LearnPlugin_logic_learn_payload_pcTarget >>> 2'd2);
+  always @(*) begin
+    BtbPlugin_logic_memWrite_payload_data_0_isBranch = LearnPlugin_logic_learn_payload_isBranch;
+    if(DecoderPlugin_logic_forgetPort_valid) begin
+      BtbPlugin_logic_memWrite_payload_data_0_isBranch = 1'b0;
+    end
+  end
+
+  always @(*) begin
+    BtbPlugin_logic_memWrite_payload_data_0_isPush = LearnPlugin_logic_learn_payload_isPush;
+    if(DecoderPlugin_logic_forgetPort_valid) begin
+      BtbPlugin_logic_memWrite_payload_data_0_isPush = 1'b0;
+    end
+  end
+
+  always @(*) begin
+    BtbPlugin_logic_memWrite_payload_data_0_isPop = LearnPlugin_logic_learn_payload_isPop;
+    if(DecoderPlugin_logic_forgetPort_valid) begin
+      BtbPlugin_logic_memWrite_payload_data_0_isPop = 1'b0;
+    end
+  end
+
+  assign execute_ctrl1_COMPLETED_lane0_bypass = (execute_ctrl1_up_COMPLETED_lane0 || execute_ctrl1_down_COMPLETION_AT_1_lane0);
   assign execute_ctrl3_COMPLETED_lane0_bypass = (execute_ctrl3_up_COMPLETED_lane0 || execute_ctrl3_down_COMPLETION_AT_3_lane0);
-  assign execute_lane0_api_hartsInflight[0] = (|{(execute_ctrl4_up_LANE_SEL_lane0 && 1'b1),{(execute_ctrl3_up_LANE_SEL_lane0 && 1'b1),{(execute_ctrl2_up_LANE_SEL_lane0 && 1'b1),(execute_ctrl1_up_LANE_SEL_lane0 && 1'b1)}}});
+  assign execute_ctrl2_COMPLETED_lane0_bypass = (execute_ctrl2_up_COMPLETED_lane0 || execute_ctrl2_down_COMPLETION_AT_2_lane0);
+  assign execute_lane0_api_hartsInflight[0] = (|{(execute_ctrl3_up_LANE_SEL_lane0 && 1'b1),{(execute_ctrl2_up_LANE_SEL_lane0 && 1'b1),(execute_ctrl1_up_LANE_SEL_lane0 && 1'b1)}});
   assign DispatchPlugin_logic_trapPendings[0] = 1'b0;
   assign DispatchPlugin_logic_candidates_0_moving = (((! DispatchPlugin_logic_candidates_0_ctx_valid) || DispatchPlugin_logic_candidates_0_fire) || DispatchPlugin_logic_candidates_0_cancel);
-  assign DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard = (DispatchPlugin_logic_candidates_0_ctx_hm_RS1_ENABLE && (|{((((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0 && execute_ctrl4_up_RD_ENABLE_lane0) && (execute_ctrl4_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS1_PHYS)) && 1'b1) && (! execute_ctrl4_down_BYPASSED_AT_4_lane0)),{(((_zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard && _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_1) && 1'b1) && (! execute_ctrl3_down_BYPASSED_AT_3_lane0)),{((_zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_2 && _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_3) && (! execute_ctrl2_down_BYPASSED_AT_2_lane0)),((_zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_4 && _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard_5) && (! execute_ctrl1_down_BYPASSED_AT_1_lane0))}}}));
-  assign DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard = (DispatchPlugin_logic_candidates_0_ctx_hm_RS2_ENABLE && (|{((((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0 && execute_ctrl4_up_RD_ENABLE_lane0) && (execute_ctrl4_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS2_PHYS)) && 1'b1) && (! execute_ctrl4_down_BYPASSED_AT_4_lane0)),{(((_zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard && _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_1) && 1'b1) && (! execute_ctrl3_down_BYPASSED_AT_3_lane0)),{((_zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_2 && _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_3) && (! execute_ctrl2_down_BYPASSED_AT_2_lane0)),((_zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_4 && _zz_DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard_5) && (! execute_ctrl1_down_BYPASSED_AT_1_lane0))}}}));
-  assign DispatchPlugin_logic_candidates_0_rsHazards[0] = (|{DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard,DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard});
+  assign DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard = (DispatchPlugin_logic_candidates_0_ctx_hm_RS1_ENABLE && (|{((((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS1_PHYS)) && 1'b1) && (! execute_ctrl2_down_BYPASSED_AT_2_lane0)),((((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0 && execute_ctrl1_up_RD_ENABLE_lane0) && (execute_ctrl1_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS1_PHYS)) && 1'b1) && (! execute_ctrl1_down_BYPASSED_AT_1_lane0))}));
+  assign DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard = (DispatchPlugin_logic_candidates_0_ctx_hm_RS2_ENABLE && (|{((((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS2_PHYS)) && 1'b1) && (! execute_ctrl2_down_BYPASSED_AT_2_lane0)),((((DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0 && execute_ctrl1_up_RD_ENABLE_lane0) && (execute_ctrl1_up_RD_PHYS_lane0 == DispatchPlugin_logic_candidates_0_ctx_hm_RS2_PHYS)) && 1'b1) && (! execute_ctrl1_down_BYPASSED_AT_1_lane0))}));
+  always @(*) begin
+    DispatchPlugin_logic_candidates_0_rsHazards[0] = (|{DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_1_hazard,DispatchPlugin_logic_rsHazardChecker_0_onLl_0_onRs_0_hazard});
+    DispatchPlugin_logic_candidates_0_rsHazards[1] = (|{DispatchPlugin_logic_rsHazardChecker_0_onLl_1_onRs_1_hazard,DispatchPlugin_logic_rsHazardChecker_0_onLl_1_onRs_0_hazard});
+  end
+
+  assign DispatchPlugin_logic_rsHazardChecker_0_onLl_1_onRs_0_hazard = (DispatchPlugin_logic_candidates_0_ctx_hm_RS1_ENABLE && 1'b0);
+  assign DispatchPlugin_logic_rsHazardChecker_0_onLl_1_onRs_1_hazard = (DispatchPlugin_logic_candidates_0_ctx_hm_RS2_ENABLE && 1'b0);
   assign DispatchPlugin_logic_reservationChecker_0_onLl_0_hit = 1'b0;
-  assign DispatchPlugin_logic_candidates_0_reservationHazards[0] = DispatchPlugin_logic_reservationChecker_0_onLl_0_hit;
-  assign DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_0 = (|{(((DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_4 && execute_ctrl1_up_LANE_SEL_lane0) && 1'b1) && execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0),(((DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3 && execute_ctrl1_up_LANE_SEL_lane0) && 1'b1) && execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0)});
-  assign DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_1 = (|(((DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3 && execute_ctrl2_up_LANE_SEL_lane0) && 1'b1) && execute_ctrl2_down_MAY_FLUSH_PRECISE_3_lane0));
+  always @(*) begin
+    DispatchPlugin_logic_candidates_0_reservationHazards[0] = DispatchPlugin_logic_reservationChecker_0_onLl_0_hit;
+    DispatchPlugin_logic_candidates_0_reservationHazards[1] = DispatchPlugin_logic_reservationChecker_0_onLl_1_hit;
+  end
+
+  assign DispatchPlugin_logic_reservationChecker_0_onLl_1_hit = 1'b0;
+  assign DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_0 = (|{(((DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3 && execute_ctrl1_up_LANE_SEL_lane0) && 1'b1) && execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0),(((DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_2 && execute_ctrl1_up_LANE_SEL_lane0) && 1'b1) && execute_ctrl1_down_MAY_FLUSH_PRECISE_2_lane0)});
+  assign DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_1 = (|(((DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_2 && execute_ctrl2_up_LANE_SEL_lane0) && 1'b1) && execute_ctrl2_down_MAY_FLUSH_PRECISE_2_lane0));
   assign DispatchPlugin_logic_flushChecker_0_oldersHazard = 1'b0;
   assign DispatchPlugin_logic_candidates_0_flushHazards = ((|{DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_1,DispatchPlugin_logic_flushChecker_0_executeCheck_0_hits_0}) || (DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH_FROM_LANES && DispatchPlugin_logic_flushChecker_0_oldersHazard));
   assign DispatchPlugin_logic_fenceChecker_olderInflights = (|execute_lane0_api_hartsInflight[0]);
@@ -5896,19 +7562,25 @@ module VexiiRiscv (
   assign DispatchPlugin_logic_candidates_0_cancel = decode_ctrls_1_lane0_upIsCancel;
   assign DispatchPlugin_logic_candidates_0_ctx_valid = ((decode_ctrls_1_up_isValid && decode_ctrls_1_up_LANE_SEL_0) && (! DispatchPlugin_logic_feeds_0_sent));
   always @(*) begin
-    DispatchPlugin_logic_candidates_0_ctx_laneLayerHits = decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0;
+    DispatchPlugin_logic_candidates_0_ctx_laneLayerHits = {decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0,decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0};
     if(decode_ctrls_1_down_TRAP_0) begin
-      DispatchPlugin_logic_candidates_0_ctx_laneLayerHits = 1'b1;
+      DispatchPlugin_logic_candidates_0_ctx_laneLayerHits = 2'b01;
     end
   end
 
   assign DispatchPlugin_logic_candidates_0_ctx_uop = decode_ctrls_1_down_Decode_UOP_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_JUMPED = decode_ctrls_1_down_Prediction_ALIGNED_JUMPED_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_JUMPED_PC = decode_ctrls_1_down_Prediction_ALIGNED_JUMPED_PC_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_SLICES_TAKEN = decode_ctrls_1_down_Prediction_ALIGNED_SLICES_TAKEN_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_SLICES_BRANCH = decode_ctrls_1_down_Prediction_ALIGNED_SLICES_BRANCH_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_GSharePlugin_GSHARE_COUNTER_0 = decode_ctrls_1_down_GSharePlugin_GSHARE_COUNTER_0_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_BRANCH_HISTORY = decode_ctrls_1_down_Prediction_BRANCH_HISTORY_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_FENCE_OLDER = decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_MAY_FLUSH = decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH = decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH_FROM_LANES = decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_2 = decode_ctrls_1_down_DONT_FLUSH_PRECISE_2_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3 = decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0;
-  assign DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_4 = decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_PC = decode_ctrls_1_down_PC_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_TRAP = decode_ctrls_1_down_TRAP_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_Decode_UOP_ID = decode_ctrls_1_down_Decode_UOP_ID_0;
@@ -5920,15 +7592,24 @@ module VexiiRiscv (
   assign DispatchPlugin_logic_candidates_0_ctx_hm_RD_PHYS = decode_ctrls_1_down_RD_PHYS_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0 = decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0;
   assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0 = decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1 = decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0 = decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_0;
+  assign DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0 = decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0;
   assign when_DispatchPlugin_l368 = ((decode_ctrls_1_up_LANE_SEL_0 && (! DispatchPlugin_logic_feeds_0_sent)) && (! DispatchPlugin_logic_candidates_0_fire));
   assign DispatchPlugin_logic_scheduler_eusFree_0 = 1'b1;
   assign DispatchPlugin_logic_scheduler_hartFree_0 = 1'b1;
   assign DispatchPlugin_logic_scheduler_arbiters_0_candHazard = 1'b0;
-  assign DispatchPlugin_logic_scheduler_arbiters_0_layersHits = (((DispatchPlugin_logic_candidates_0_ctx_laneLayerHits & (~ DispatchPlugin_logic_candidates_0_rsHazards)) & (~ DispatchPlugin_logic_candidates_0_reservationHazards)) & DispatchPlugin_logic_scheduler_eusFree_0[0]);
-  assign DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0 = DispatchPlugin_logic_scheduler_arbiters_0_layersHits[0];
-  assign _zz_DispatchPlugin_logic_scheduler_arbiters_0_layerOh[0] = (DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0 && (! 1'b0));
+  assign DispatchPlugin_logic_scheduler_arbiters_0_layersHits = (((DispatchPlugin_logic_candidates_0_ctx_laneLayerHits & (~ DispatchPlugin_logic_candidates_0_rsHazards)) & (~ DispatchPlugin_logic_candidates_0_reservationHazards)) & {DispatchPlugin_logic_scheduler_eusFree_0[0],DispatchPlugin_logic_scheduler_eusFree_0[0]});
+  assign _zz_DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0 = DispatchPlugin_logic_scheduler_arbiters_0_layersHits;
+  assign DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0 = _zz_DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0[0];
+  assign DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_1 = _zz_DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0[1];
+  always @(*) begin
+    _zz_DispatchPlugin_logic_scheduler_arbiters_0_layerOh[0] = (DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0 && (! 1'b0));
+    _zz_DispatchPlugin_logic_scheduler_arbiters_0_layerOh[1] = (DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_1 && (! DispatchPlugin_logic_scheduler_arbiters_0_layersHits_bools_0));
+  end
+
   assign DispatchPlugin_logic_scheduler_arbiters_0_layerOh = _zz_DispatchPlugin_logic_scheduler_arbiters_0_layerOh;
-  assign DispatchPlugin_logic_scheduler_arbiters_0_eusOh = (|DispatchPlugin_logic_scheduler_arbiters_0_layerOh[0]);
+  assign DispatchPlugin_logic_scheduler_arbiters_0_eusOh = (|{DispatchPlugin_logic_scheduler_arbiters_0_layerOh[1],DispatchPlugin_logic_scheduler_arbiters_0_layerOh[0]});
   assign DispatchPlugin_logic_scheduler_arbiters_0_doIt = (((((DispatchPlugin_logic_candidates_0_ctx_valid && (! DispatchPlugin_logic_candidates_0_flushHazards)) && (! DispatchPlugin_logic_candidates_0_fenceOlderHazards)) && (|DispatchPlugin_logic_scheduler_arbiters_0_layerOh)) && DispatchPlugin_logic_scheduler_hartFree_0[0]) && (! DispatchPlugin_logic_scheduler_arbiters_0_candHazard));
   assign DispatchPlugin_logic_scheduler_eusFree_1 = (DispatchPlugin_logic_scheduler_eusFree_0 & ((! DispatchPlugin_logic_scheduler_arbiters_0_doIt) ? 1'b1 : (~ DispatchPlugin_logic_scheduler_arbiters_0_eusOh)));
   assign DispatchPlugin_logic_scheduler_hartFree_1 = (DispatchPlugin_logic_scheduler_hartFree_0 & (((! DispatchPlugin_logic_candidates_0_ctx_valid) || DispatchPlugin_logic_scheduler_arbiters_0_doIt) ? 1'b1 : (~ 1'b1)));
@@ -5937,6 +7618,12 @@ module VexiiRiscv (
   assign DispatchPlugin_logic_inserter_0_trap = DispatchPlugin_logic_candidates_0_ctx_hm_TRAP;
   assign execute_ctrl0_up_LANE_SEL_lane0 = (((|DispatchPlugin_logic_inserter_0_oh) && (! DispatchPlugin_logic_candidates_0_cancel)) && (! DispatchPlugin_api_haltDispatch));
   assign execute_ctrl0_up_Decode_UOP_lane0 = DispatchPlugin_logic_candidates_0_ctx_uop;
+  assign execute_ctrl0_up_Prediction_ALIGNED_JUMPED_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_JUMPED;
+  assign execute_ctrl0_up_Prediction_ALIGNED_JUMPED_PC_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_JUMPED_PC;
+  assign execute_ctrl0_up_Prediction_ALIGNED_SLICES_TAKEN_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_SLICES_TAKEN;
+  assign execute_ctrl0_up_Prediction_ALIGNED_SLICES_BRANCH_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_ALIGNED_SLICES_BRANCH;
+  assign execute_ctrl0_up_GSharePlugin_GSHARE_COUNTER_lane0_0 = DispatchPlugin_logic_candidates_0_ctx_hm_GSharePlugin_GSHARE_COUNTER_0;
+  assign execute_ctrl0_up_Prediction_BRANCH_HISTORY_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_Prediction_BRANCH_HISTORY;
   assign execute_ctrl0_up_DispatchPlugin_FENCE_OLDER_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_FENCE_OLDER;
   always @(*) begin
     execute_ctrl0_up_DispatchPlugin_MAY_FLUSH_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_MAY_FLUSH;
@@ -5947,8 +7634,8 @@ module VexiiRiscv (
 
   assign execute_ctrl0_up_DispatchPlugin_DONT_FLUSH_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH;
   assign execute_ctrl0_up_DispatchPlugin_DONT_FLUSH_FROM_LANES_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_DONT_FLUSH_FROM_LANES;
+  assign execute_ctrl0_up_DONT_FLUSH_PRECISE_2_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_2;
   assign execute_ctrl0_up_DONT_FLUSH_PRECISE_3_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_3;
-  assign execute_ctrl0_up_DONT_FLUSH_PRECISE_4_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DONT_FLUSH_PRECISE_4;
   assign execute_ctrl0_up_PC_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_PC;
   assign execute_ctrl0_up_TRAP_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_TRAP;
   assign execute_ctrl0_up_Decode_UOP_ID_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_Decode_UOP_ID;
@@ -5966,34 +7653,42 @@ module VexiiRiscv (
   assign execute_ctrl0_up_RD_PHYS_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_RD_PHYS;
   assign execute_ctrl0_up_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0;
   assign execute_ctrl0_up_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0;
+  assign execute_ctrl0_up_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1;
+  assign execute_ctrl0_up_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0;
+  assign execute_ctrl0_up_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_lane0 = DispatchPlugin_logic_candidates_0_ctx_hm_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0;
   assign when_DispatchPlugin_l439 = ((! execute_ctrl0_up_LANE_SEL_lane0) || DispatchPlugin_logic_inserter_0_trap);
   assign execute_ctrl0_up_COMPLETED_lane0 = DispatchPlugin_logic_inserter_0_trap;
-  assign DispatchPlugin_logic_inserter_0_layerOhUnfiltred = (DispatchPlugin_logic_inserter_0_oh[0] ? DispatchPlugin_logic_scheduler_arbiters_0_layerOh : 1'b0);
+  assign DispatchPlugin_logic_inserter_0_layerOhUnfiltred = (DispatchPlugin_logic_inserter_0_oh[0] ? DispatchPlugin_logic_scheduler_arbiters_0_layerOh : 2'b00);
+  assign DispatchPlugin_logic_inserter_0_layer_0_0 = 1'b1;
   assign DispatchPlugin_logic_inserter_0_layer_0_1 = DispatchPlugin_logic_inserter_0_layerOhUnfiltred[0];
+  assign DispatchPlugin_logic_inserter_0_layer_1_0 = 1'b0;
+  assign DispatchPlugin_logic_inserter_0_layer_1_1 = DispatchPlugin_logic_inserter_0_layerOhUnfiltred[1];
+  assign _zz_execute_ctrl0_up_lane0_LAYER_SEL_lane0 = {DispatchPlugin_logic_inserter_0_layer_1_1,DispatchPlugin_logic_inserter_0_layer_0_1};
+  assign execute_ctrl0_up_lane0_LAYER_SEL_lane0 = ((_zz_execute_ctrl0_up_lane0_LAYER_SEL_lane0[0] ? DispatchPlugin_logic_inserter_0_layer_0_0 : 1'b0) | (_zz_execute_ctrl0_up_lane0_LAYER_SEL_lane0[1] ? DispatchPlugin_logic_inserter_0_layer_1_0 : 1'b0));
   assign lane0_integer_WriteBackPlugin_logic_stages_0_hits = {lane0_IntFormatPlugin_logic_stages_0_wb_valid,early0_BranchPlugin_logic_wb_valid};
   assign lane0_integer_WriteBackPlugin_logic_stages_0_muxed = ((lane0_integer_WriteBackPlugin_logic_stages_0_hits[0] ? early0_BranchPlugin_logic_wb_payload : 32'h0) | (lane0_integer_WriteBackPlugin_logic_stages_0_hits[1] ? lane0_IntFormatPlugin_logic_stages_0_wb_payload : 32'h0));
-  assign execute_ctrl2_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass = lane0_integer_WriteBackPlugin_logic_stages_0_muxed;
-  assign lane0_integer_WriteBackPlugin_logic_stages_0_write_valid = (((((execute_ctrl2_down_LANE_SEL_lane0 && execute_ctrl2_down_isReady) && (! execute_lane0_ctrls_2_downIsCancel)) && (|lane0_integer_WriteBackPlugin_logic_stages_0_hits)) && execute_ctrl2_up_RD_ENABLE_lane0) && execute_ctrl2_down_COMMIT_lane0);
-  assign lane0_integer_WriteBackPlugin_logic_stages_0_write_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
+  assign execute_ctrl1_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass = lane0_integer_WriteBackPlugin_logic_stages_0_muxed;
+  assign lane0_integer_WriteBackPlugin_logic_stages_0_write_valid = (((((execute_ctrl1_down_LANE_SEL_lane0 && execute_ctrl1_down_isReady) && (! execute_lane0_ctrls_1_downIsCancel)) && (|lane0_integer_WriteBackPlugin_logic_stages_0_hits)) && execute_ctrl1_up_RD_ENABLE_lane0) && execute_ctrl1_down_COMMIT_lane0);
+  assign lane0_integer_WriteBackPlugin_logic_stages_0_write_payload_uopId = execute_ctrl1_down_Decode_UOP_ID_lane0;
   assign lane0_integer_WriteBackPlugin_logic_stages_0_write_payload_data = lane0_integer_WriteBackPlugin_logic_stages_0_muxed;
   assign lane0_integer_WriteBackPlugin_logic_stages_1_hits = lane0_IntFormatPlugin_logic_stages_2_wb_valid;
   assign lane0_integer_WriteBackPlugin_logic_stages_1_muxed = (lane0_integer_WriteBackPlugin_logic_stages_1_hits[0] ? lane0_IntFormatPlugin_logic_stages_2_wb_payload : 32'h0);
-  assign lane0_integer_WriteBackPlugin_logic_stages_1_merged = (execute_ctrl3_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 | lane0_integer_WriteBackPlugin_logic_stages_1_muxed);
-  assign execute_ctrl3_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass = lane0_integer_WriteBackPlugin_logic_stages_1_merged;
-  assign lane0_integer_WriteBackPlugin_logic_stages_1_write_valid = (((((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && (|lane0_integer_WriteBackPlugin_logic_stages_1_hits)) && execute_ctrl3_up_RD_ENABLE_lane0) && execute_ctrl3_down_COMMIT_lane0);
-  assign lane0_integer_WriteBackPlugin_logic_stages_1_write_payload_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
+  assign lane0_integer_WriteBackPlugin_logic_stages_1_merged = (execute_ctrl2_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 | lane0_integer_WriteBackPlugin_logic_stages_1_muxed);
+  assign execute_ctrl2_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass = lane0_integer_WriteBackPlugin_logic_stages_1_merged;
+  assign lane0_integer_WriteBackPlugin_logic_stages_1_write_valid = (((((execute_ctrl2_down_LANE_SEL_lane0 && execute_ctrl2_down_isReady) && (! execute_lane0_ctrls_2_downIsCancel)) && (|lane0_integer_WriteBackPlugin_logic_stages_1_hits)) && execute_ctrl2_up_RD_ENABLE_lane0) && execute_ctrl2_down_COMMIT_lane0);
+  assign lane0_integer_WriteBackPlugin_logic_stages_1_write_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
   assign lane0_integer_WriteBackPlugin_logic_stages_1_write_payload_data = lane0_integer_WriteBackPlugin_logic_stages_1_muxed;
-  assign lane0_integer_WriteBackPlugin_logic_stages_2_hits = lane0_IntFormatPlugin_logic_stages_1_wb_valid;
-  assign lane0_integer_WriteBackPlugin_logic_stages_2_muxed = (lane0_integer_WriteBackPlugin_logic_stages_2_hits[0] ? lane0_IntFormatPlugin_logic_stages_1_wb_payload : 32'h0);
-  assign lane0_integer_WriteBackPlugin_logic_stages_2_merged = (execute_ctrl4_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 | lane0_integer_WriteBackPlugin_logic_stages_2_muxed);
-  assign execute_ctrl4_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass = lane0_integer_WriteBackPlugin_logic_stages_2_merged;
-  assign lane0_integer_WriteBackPlugin_logic_stages_2_write_valid = (((((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && (|lane0_integer_WriteBackPlugin_logic_stages_2_hits)) && execute_ctrl4_up_RD_ENABLE_lane0) && execute_ctrl4_down_COMMIT_lane0);
-  assign lane0_integer_WriteBackPlugin_logic_stages_2_write_payload_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
+  assign lane0_integer_WriteBackPlugin_logic_stages_2_hits = {lane0_IntFormatPlugin_logic_stages_1_wb_valid,late0_BranchPlugin_logic_wb_valid};
+  assign lane0_integer_WriteBackPlugin_logic_stages_2_muxed = ((lane0_integer_WriteBackPlugin_logic_stages_2_hits[0] ? late0_BranchPlugin_logic_wb_payload : 32'h0) | (lane0_integer_WriteBackPlugin_logic_stages_2_hits[1] ? lane0_IntFormatPlugin_logic_stages_1_wb_payload : 32'h0));
+  assign lane0_integer_WriteBackPlugin_logic_stages_2_merged = (execute_ctrl3_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 | lane0_integer_WriteBackPlugin_logic_stages_2_muxed);
+  assign execute_ctrl3_lane0_integer_WriteBackPlugin_logic_DATA_lane0_bypass = lane0_integer_WriteBackPlugin_logic_stages_2_merged;
+  assign lane0_integer_WriteBackPlugin_logic_stages_2_write_valid = (((((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && (|lane0_integer_WriteBackPlugin_logic_stages_2_hits)) && execute_ctrl3_up_RD_ENABLE_lane0) && execute_ctrl3_down_COMMIT_lane0);
+  assign lane0_integer_WriteBackPlugin_logic_stages_2_write_payload_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
   assign lane0_integer_WriteBackPlugin_logic_stages_2_write_payload_data = lane0_integer_WriteBackPlugin_logic_stages_2_muxed;
-  assign lane0_integer_WriteBackPlugin_logic_write_port_valid = (((((execute_ctrl4_up_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_upIsCancel)) && execute_ctrl4_up_RD_ENABLE_lane0) && execute_ctrl4_down_lane0_integer_WriteBackPlugin_SEL_lane0) && execute_ctrl4_down_COMMIT_lane0);
-  assign lane0_integer_WriteBackPlugin_logic_write_port_address = execute_ctrl4_down_RD_PHYS_lane0;
-  assign lane0_integer_WriteBackPlugin_logic_write_port_data = execute_ctrl4_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
-  assign lane0_integer_WriteBackPlugin_logic_write_port_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
+  assign lane0_integer_WriteBackPlugin_logic_write_port_valid = (((((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_upIsCancel)) && execute_ctrl3_up_RD_ENABLE_lane0) && execute_ctrl3_down_lane0_integer_WriteBackPlugin_SEL_lane0) && execute_ctrl3_down_COMMIT_lane0);
+  assign lane0_integer_WriteBackPlugin_logic_write_port_address = execute_ctrl3_down_RD_PHYS_lane0;
+  assign lane0_integer_WriteBackPlugin_logic_write_port_data = execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+  assign lane0_integer_WriteBackPlugin_logic_write_port_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
   assign _zz_CsrRamPlugin_csrMapper_ramAddress = CsrAccessPlugin_bus_decode_address;
   assign CsrRamPlugin_csrMapper_ramAddress = {(|{((_zz_CsrRamPlugin_csrMapper_ramAddress & 12'h002) == 12'h002),((_zz_CsrRamPlugin_csrMapper_ramAddress & 12'h040) == 12'h0)}),(|((_zz_CsrRamPlugin_csrMapper_ramAddress & 12'h003) == 12'h001))};
   always @(*) begin
@@ -6020,18 +7715,23 @@ module VexiiRiscv (
   assign when_CsrRamPlugin_l96 = ((CsrRamPlugin_csrMapper_doWrite && (! CsrRamPlugin_csrMapper_fired)) && (! CsrRamPlugin_csrMapper_write_ready));
   assign decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0 = _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_FPU_0[0];
   assign decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0 = _zz_decode_ctrls_1_down_DecoderPlugin_logic_NEED_RM_0[0];
-  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h0) == 32'h0);
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h0) == 32'h0);
   assign decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_0_0[0];
+  assign decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_LANES_LAYER_HIT_1_0_1[0];
+  assign _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00000040) == 32'h00000040);
   assign decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0 = _zz_decode_ctrls_1_down_DispatchPlugin_MAY_FLUSH_0_1[0];
-  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00002050) == 32'h00002050);
-  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_1 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001050) == 32'h00001050);
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00002050) == 32'h00002050);
+  assign _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_1 = ((decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h00001050) == 32'h00001050);
   assign decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_0[0];
   assign decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0 = _zz_decode_ctrls_1_down_DispatchPlugin_DONT_FLUSH_FROM_LANES_0[0];
   assign decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0 = _zz_decode_ctrls_1_down_DispatchPlugin_FENCE_OLDER_0[0];
-  assign decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0[0];
-  assign decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_4_0_2[0];
+  assign decode_ctrls_1_down_DONT_FLUSH_PRECISE_2_0 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_2_0[0];
+  assign decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0 = _zz_decode_ctrls_1_down_DONT_FLUSH_PRECISE_3_0_2[0];
   assign decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_0_ENABLES_0_0[0];
   assign decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_0_0_1[0];
+  assign decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_0_onRs_1_ENABLES_1_0[0];
+  assign decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_0_ENABLES_0_0[0];
+  assign decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0 = _zz_decode_ctrls_1_down_DispatchPlugin_logic_hcs_1_onRs_1_ENABLES_0_0_1[0];
   assign when_CtrlLaneApi_l50_2 = (decode_ctrls_1_up_isReady || decode_ctrls_1_lane0_upIsCancel);
   assign WhiteboxerPlugin_logic_serializeds_0_fire = (decode_ctrls_1_up_LANE_SEL_0 && (! decode_ctrls_1_up_LANE_SEL_0_regNext_1));
   assign WhiteboxerPlugin_logic_serializeds_0_decodeId = decode_ctrls_1_down_Decode_DOP_ID_0;
@@ -6040,19 +7740,72 @@ module VexiiRiscv (
   assign when_CtrlLaneApi_l50_3 = (execute_ctrl0_down_isReady || execute_lane0_ctrls_0_downIsCancel);
   assign WhiteboxerPlugin_logic_dispatches_0_fire = (execute_ctrl0_down_LANE_SEL_lane0 && (! execute_ctrl0_down_LANE_SEL_lane0_regNext));
   assign WhiteboxerPlugin_logic_dispatches_0_microOpId = execute_ctrl0_down_Decode_UOP_ID_lane0;
-  assign when_CtrlLaneApi_l50_4 = (execute_ctrl2_down_isReady || execute_lane0_ctrls_2_downIsCancel);
-  assign WhiteboxerPlugin_logic_executes_0_fire = ((execute_ctrl2_down_LANE_SEL_lane0 && (! execute_ctrl2_down_LANE_SEL_lane0_regNext)) && execute_ctrl2_down_COMMIT_lane0);
-  assign WhiteboxerPlugin_logic_executes_0_microOpId = execute_ctrl2_down_Decode_UOP_ID_lane0;
-  assign AlignerPlugin_logic_nobuffer_flushIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
-  assign when_AlignerPlugin_l298 = ((AlignerPlugin_logic_nobuffer_flushIt || (! fetch_logic_ctrls_2_down_isValid)) || fetch_logic_ctrls_2_down_isReady);
-  assign AlignerPlugin_logic_slices_data_0 = fetch_logic_ctrls_2_down_Fetch_WORD[31 : 0];
-  assign AlignerPlugin_logic_slices_mask = ((fetch_logic_ctrls_2_down_valid ? fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_MASK : 1'b0) & 1'b1);
-  assign AlignerPlugin_logic_slices_last = 1'b0;
-  assign fetch_logic_ctrls_2_down_ready = ((! fetch_logic_ctrls_2_down_valid) || ((decode_ctrls_0_up_isReady && (! AlignerPlugin_api_haltIt)) && (AlignerPlugin_logic_nobuffer_remaningMask == 1'b0)));
-  assign AlignerPlugin_logic_extractors_0_ctx_instruction = AlignerPlugin_logic_slicesInstructions_0;
-  assign AlignerPlugin_logic_extractors_0_ctx_pc = fetch_logic_ctrls_2_down_Fetch_WORD_PC;
-  assign AlignerPlugin_logic_extractors_0_ctx_trap = fetch_logic_ctrls_2_down_TRAP;
-  assign AlignerPlugin_logic_extractors_0_ctx_hm_Fetch_ID = fetch_logic_ctrls_2_down_Fetch_ID;
+  assign when_CtrlLaneApi_l50_4 = (execute_ctrl1_down_isReady || execute_lane0_ctrls_1_downIsCancel);
+  assign WhiteboxerPlugin_logic_executes_0_fire = ((execute_ctrl1_down_LANE_SEL_lane0 && (! execute_ctrl1_down_LANE_SEL_lane0_regNext)) && execute_ctrl1_down_COMMIT_lane0);
+  assign WhiteboxerPlugin_logic_executes_0_microOpId = execute_ctrl1_down_Decode_UOP_ID_lane0;
+  assign BtbPlugin_logic_onForget_hash = DecoderPlugin_logic_forgetPort_payload_pcOnLastSlice[26 : 11];
+  assign BtbPlugin_logic_memRead_cmd_valid = fetch_logic_ctrls_0_down_isReady;
+  assign BtbPlugin_logic_memRead_cmd_payload = _zz_BtbPlugin_logic_memRead_cmd_payload[8:0];
+  assign fetch_logic_ctrls_0_down_BtbPlugin_logic_readCmd_HAZARDS = ((BtbPlugin_logic_memWrite_valid && (BtbPlugin_logic_memWrite_payload_address == BtbPlugin_logic_memRead_cmd_payload)) ? BtbPlugin_logic_memWrite_payload_mask : 1'b0);
+  assign fetch_logic_ctrls_0_haltRequest_BtbPlugin_l200 = BtbPlugin_logic_memWrite_valid;
+  assign BtbPlugin_logic_predictions = fetch_logic_ctrls_1_down_GSharePlugin_GSHARE_COUNTER_0[1];
+  assign fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_hash = BtbPlugin_logic_memRead_rsp_0_hash;
+  assign fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_pcTarget = BtbPlugin_logic_memRead_rsp_0_pcTarget;
+  assign fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isBranch = BtbPlugin_logic_memRead_rsp_0_isBranch;
+  assign fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isPush = BtbPlugin_logic_memRead_rsp_0_isPush;
+  assign fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isPop = BtbPlugin_logic_memRead_rsp_0_isPop;
+  assign fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_hitCalc_HIT = ((fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_hash == fetch_logic_ctrls_1_down_Fetch_WORD_PC[26 : 11]) && 1'b1);
+  assign fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_predict_TAKEN = ((! fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isBranch) || BtbPlugin_logic_predictions[0]);
+  assign BtbPlugin_logic_ras_readIt = fetch_logic_ctrls_0_down_isReady;
+  assign BtbPlugin_logic_applyIt_chunksMask = (fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_hitCalc_HIT && 1'b1);
+  assign BtbPlugin_logic_applyIt_chunksTakenOh = (fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_predict_TAKEN & BtbPlugin_logic_applyIt_chunksMask);
+  assign BtbPlugin_logic_applyIt_needIt = (fetch_logic_ctrls_1_up_isValid && (|BtbPlugin_logic_applyIt_chunksTakenOh));
+  assign when_BtbPlugin_l233 = (fetch_logic_ctrls_1_up_isReady || fetch_logic_ctrls_1_up_isCancel);
+  assign BtbPlugin_logic_applyIt_doIt = (BtbPlugin_logic_applyIt_needIt && (! BtbPlugin_logic_applyIt_correctionSent));
+  assign BtbPlugin_logic_applyIt_entry_hash = fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_hash;
+  assign BtbPlugin_logic_applyIt_entry_pcTarget = fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_pcTarget;
+  assign BtbPlugin_logic_applyIt_entry_isBranch = fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isBranch;
+  assign BtbPlugin_logic_applyIt_entry_isPush = fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isPush;
+  assign BtbPlugin_logic_applyIt_entry_isPop = fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isPop;
+  always @(*) begin
+    BtbPlugin_logic_applyIt_pcTarget = BtbPlugin_logic_applyIt_entry_pcTarget;
+    if(BtbPlugin_logic_applyIt_entry_isPop) begin
+      BtbPlugin_logic_applyIt_pcTarget = BtbPlugin_logic_ras_read;
+    end
+  end
+
+  assign BtbPlugin_logic_applyIt_rasLogic_pushValid = (BtbPlugin_logic_applyIt_doIt && BtbPlugin_logic_applyIt_entry_isPush);
+  assign BtbPlugin_logic_applyIt_rasLogic_pushPc = fetch_logic_ctrls_1_down_Fetch_WORD_PC;
+  assign when_BtbPlugin_l246 = (BtbPlugin_logic_applyIt_doIt && BtbPlugin_logic_applyIt_entry_isPop);
+  assign BtbPlugin_logic_flushPort_valid = BtbPlugin_logic_applyIt_doIt;
+  assign BtbPlugin_logic_flushPort_payload_self = 1'b0;
+  assign BtbPlugin_logic_pcPort_valid = BtbPlugin_logic_applyIt_doIt;
+  assign BtbPlugin_logic_pcPort_payload_fault = 1'b0;
+  assign BtbPlugin_logic_pcPort_payload_pc = ({2'd0,BtbPlugin_logic_applyIt_pcTarget} <<< 2'd2);
+  assign fetch_logic_ctrls_1_down_Prediction_WORD_JUMPED = BtbPlugin_logic_applyIt_needIt;
+  assign fetch_logic_ctrls_1_down_Prediction_WORD_JUMP_PC = ({2'd0,BtbPlugin_logic_applyIt_pcTarget} <<< 2'd2);
+  assign BtbPlugin_logic_applyIt_history_layers_0_history = fetch_logic_ctrls_1_down_Prediction_BRANCH_HISTORY;
+  assign BtbPlugin_logic_applyIt_history_layersLogic_0_doIt = (BtbPlugin_logic_applyIt_chunksMask[0] && fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isBranch);
+  assign BtbPlugin_logic_applyIt_history_layersLogic_0_shifted = {BtbPlugin_logic_applyIt_history_layers_0_history[10 : 0],fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_predict_TAKEN};
+  assign BtbPlugin_logic_applyIt_history_layers_1_history = (BtbPlugin_logic_applyIt_history_layersLogic_0_doIt ? BtbPlugin_logic_applyIt_history_layersLogic_0_shifted : BtbPlugin_logic_applyIt_history_layers_0_history);
+  assign BtbPlugin_logic_historyPort_valid = ((fetch_logic_ctrls_1_up_isValid && (! BtbPlugin_logic_applyIt_correctionSent)) && (|fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_hitCalc_HIT));
+  assign BtbPlugin_logic_historyPort_payload_history = BtbPlugin_logic_applyIt_history_layers_1_history;
+  assign fetch_logic_ctrls_1_down_Prediction_WORD_SLICES_BRANCH[0] = ((fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_hitCalc_HIT && fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_isBranch) && 1'b1);
+  assign fetch_logic_ctrls_1_down_Prediction_WORD_SLICES_TAKEN[0] = fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_predict_TAKEN;
+  assign AlignerPlugin_logic_buffer_flushIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(late0_BranchPlugin_logic_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}}});
+  assign AlignerPlugin_logic_buffer_readers_0_firstFromBuffer = (|_zz_AlignerPlugin_logic_extractors_0_redo);
+  assign AlignerPlugin_logic_buffer_readers_0_lastFromBuffer = (AlignerPlugin_logic_extractors_0_usageMask[1] == 1'b0);
+  assign _zz_AlignerPlugin_logic_extractors_0_ctx_instruction = {_zz_AlignerPlugin_logic_extractors_0_redo_1,_zz_AlignerPlugin_logic_extractors_0_redo};
+  assign AlignerPlugin_logic_extractors_0_ctx_instruction = ((_zz_AlignerPlugin_logic_extractors_0_ctx_instruction[0] ? AlignerPlugin_logic_slicesInstructions_0 : 32'h0) | (_zz_AlignerPlugin_logic_extractors_0_ctx_instruction[1] ? AlignerPlugin_logic_slicesInstructions_1 : 32'h0));
+  assign AlignerPlugin_logic_extractors_0_ctx_pc = (AlignerPlugin_logic_buffer_readers_0_firstFromBuffer ? AlignerPlugin_logic_buffer_pc : fetch_logic_ctrls_2_down_Fetch_WORD_PC);
+  assign AlignerPlugin_logic_extractors_0_ctx_trap = ((AlignerPlugin_logic_buffer_readers_0_firstFromBuffer && AlignerPlugin_logic_buffer_trap) || ((! AlignerPlugin_logic_buffer_readers_0_lastFromBuffer) && fetch_logic_ctrls_2_down_TRAP));
+  assign AlignerPlugin_logic_extractors_0_ctx_hm_Fetch_ID = (AlignerPlugin_logic_buffer_readers_0_firstFromBuffer ? AlignerPlugin_logic_buffer_hm_Fetch_ID : fetch_logic_ctrls_2_down_Fetch_ID);
+  assign AlignerPlugin_logic_extractors_0_ctx_hm_GSharePlugin_GSHARE_COUNTER_0 = (AlignerPlugin_logic_buffer_readers_0_lastFromBuffer ? AlignerPlugin_logic_buffer_hm_GSharePlugin_GSHARE_COUNTER_0 : fetch_logic_ctrls_2_down_GSharePlugin_GSHARE_COUNTER_0);
+  assign AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_BRANCH_HISTORY = (AlignerPlugin_logic_buffer_readers_0_lastFromBuffer ? AlignerPlugin_logic_buffer_hm_Prediction_BRANCH_HISTORY : fetch_logic_ctrls_2_down_Prediction_BRANCH_HISTORY);
+  assign AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_SLICES_BRANCH = (AlignerPlugin_logic_buffer_readers_0_lastFromBuffer ? AlignerPlugin_logic_buffer_hm_Prediction_WORD_SLICES_BRANCH : fetch_logic_ctrls_2_down_Prediction_WORD_SLICES_BRANCH);
+  assign AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_SLICES_TAKEN = (AlignerPlugin_logic_buffer_readers_0_lastFromBuffer ? AlignerPlugin_logic_buffer_hm_Prediction_WORD_SLICES_TAKEN : fetch_logic_ctrls_2_down_Prediction_WORD_SLICES_TAKEN);
+  assign AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_JUMP_PC = (AlignerPlugin_logic_buffer_readers_0_lastFromBuffer ? AlignerPlugin_logic_buffer_hm_Prediction_WORD_JUMP_PC : fetch_logic_ctrls_2_down_Prediction_WORD_JUMP_PC);
+  assign AlignerPlugin_logic_extractors_0_ctx_hm_Prediction_WORD_JUMPED = (AlignerPlugin_logic_buffer_readers_0_lastFromBuffer ? AlignerPlugin_logic_buffer_hm_Prediction_WORD_JUMPED : fetch_logic_ctrls_2_down_Prediction_WORD_JUMPED);
   assign AlignerPlugin_api_downMoving = decode_ctrls_0_up_isMoving;
   always @(*) begin
     TrapPlugin_logic_harts_0_crsPorts_read_valid = 1'b0;
@@ -6118,10 +7871,10 @@ module VexiiRiscv (
     endcase
   end
 
-  assign decode_logic_flushes_0_onLanes_0_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
+  assign decode_logic_flushes_0_onLanes_0_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(late0_BranchPlugin_logic_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}}});
   assign decode_ctrls_0_lane0_downIsCancel = 1'b0;
   assign decode_ctrls_0_lane0_upIsCancel = decode_logic_flushes_0_onLanes_0_doIt;
-  assign decode_logic_flushes_1_onLanes_0_doIt = (|{((DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && DecoderPlugin_logic_laneLogic_0_flushPort_payload_self))),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
+  assign decode_logic_flushes_1_onLanes_0_doIt = (|{((DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && DecoderPlugin_logic_laneLogic_0_flushPort_payload_self))),{(late0_BranchPlugin_logic_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && _zz_decode_logic_flushes_1_onLanes_0_doIt),{_zz_decode_logic_flushes_1_onLanes_0_doIt_1,_zz_decode_logic_flushes_1_onLanes_0_doIt_2}}}}});
   assign decode_ctrls_1_lane0_downIsCancel = 1'b0;
   assign decode_ctrls_1_lane0_upIsCancel = decode_logic_flushes_1_onLanes_0_doIt;
   assign decode_logic_trapPending[0] = (|{((decode_ctrls_1_up_LANE_SEL_0 && 1'b1) && decode_ctrls_1_down_TRAP_0),((decode_ctrls_0_up_LANE_SEL_0 && 1'b1) && decode_ctrls_0_down_TRAP_0)});
@@ -6280,12 +8033,15 @@ module VexiiRiscv (
   assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid = (LsuPlugin_logic_trapPort_valid && 1'b1);
   assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1 = (early0_BranchPlugin_logic_trapPort_valid && 1'b1);
   assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2 = (CsrAccessPlugin_logic_trapPort_valid && 1'b1);
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1 = (late0_BranchPlugin_logic_trapPort_valid && 1'b1);
   assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid = (DecoderPlugin_logic_laneLogic_0_trapPort_valid && 1'b1);
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid = (|_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid);
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception = LsuPlugin_logic_trapPort_payload_exception;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_tval = LsuPlugin_logic_trapPort_payload_tval;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_code = LsuPlugin_logic_trapPort_payload_code;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_arg = LsuPlugin_logic_trapPort_payload_arg;
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception = {(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1 && (&(! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid && 1'b0)))),(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid && (&(! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1 && 1'b0))))};
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid = (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid});
+  assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1 = ((_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception[0] ? {LsuPlugin_logic_trapPort_payload_arg,{LsuPlugin_logic_trapPort_payload_code,{LsuPlugin_logic_trapPort_payload_tval,LsuPlugin_logic_trapPort_payload_exception}}} : 39'h0) | (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception[1] ? {late0_BranchPlugin_logic_trapPort_payload_arg,{late0_BranchPlugin_logic_trapPort_payload_code,{late0_BranchPlugin_logic_trapPort_payload_tval,late0_BranchPlugin_logic_trapPort_payload_exception}}} : 39'h0));
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1[0];
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_tval = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1[32 : 1];
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_code = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1[36 : 33];
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_arg = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_exception_1[38 : 37];
   assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception = {(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2 && (&{(! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1 && _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception)),(! (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid && _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1))})),{(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1 && (&{(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_2),(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_3)})),(_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid && (&{(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_4),(! _zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_5)}))}};
   assign TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid = (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid}});
   assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1 = (((_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception[0] ? {early0_EnvPlugin_logic_trapPort_payload_arg,{early0_EnvPlugin_logic_trapPort_payload_code,{early0_EnvPlugin_logic_trapPort_payload_tval,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1_1}}} : 39'h0) | (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception[1] ? {early0_BranchPlugin_logic_trapPort_payload_arg,{early0_BranchPlugin_logic_trapPort_payload_code,{early0_BranchPlugin_logic_trapPort_payload_tval,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception_1_2}}} : 39'h0)) | (_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_exception[2] ? {CsrAccessPlugin_logic_trapPort_payload_arg,{CsrAccessPlugin_logic_trapPort_payload_code,{CsrAccessPlugin_logic_trapPort_payload_tval,CsrAccessPlugin_logic_trapPort_payload_exception}}} : 39'h0));
@@ -6315,7 +8071,7 @@ module VexiiRiscv (
   end
 
   assign TrapPlugin_logic_harts_0_trap_pending_arbiter_oh = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_oh_4;
-  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_down_valid = (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_valid,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid}}}}});
+  assign TrapPlugin_logic_harts_0_trap_pending_arbiter_down_valid = (|{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_valid,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid_1,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_2,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid_1,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_valid,{_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_valid,_zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_valid}}}}}});
   assign _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception = (((TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[0] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_0_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception}} : 39'h0) | (TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[1] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_1_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_1}} : 39'h0)) | ((TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[2] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_2_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_2}} : 39'h0) | (TrapPlugin_logic_harts_0_trap_pending_arbiter_oh[3] ? {TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_arg,{TrapPlugin_logic_harts_0_trap_pending_arbiter_ports_3_payload_code,_zz__zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception_3}} : 39'h0)));
   assign TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception[0];
   assign TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_tval = _zz_TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_exception[32 : 1];
@@ -6326,8 +8082,8 @@ module VexiiRiscv (
   assign TrapPlugin_logic_harts_0_trap_exception_exceptionTargetPrivilegeUncapped = 2'b11;
   assign TrapPlugin_logic_harts_0_trap_exception_code = TrapPlugin_logic_harts_0_trap_pending_state_code;
   assign TrapPlugin_logic_harts_0_trap_exception_targetPrivilege = ((PrivilegedPlugin_logic_harts_0_privilege < TrapPlugin_logic_harts_0_trap_exception_exceptionTargetPrivilegeUncapped) ? TrapPlugin_logic_harts_0_trap_exception_exceptionTargetPrivilegeUncapped : PrivilegedPlugin_logic_harts_0_privilege);
-  assign PrivilegedPlugin_logic_harts_0_commitMask = (((execute_ctrl5_down_LANE_SEL_lane0 && execute_ctrl5_down_isReady) && (! execute_lane0_ctrls_5_downIsCancel)) && execute_ctrl5_down_COMMIT_lane0);
-  assign TrapPlugin_logic_harts_0_trap_trigger_oh = (((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_TRAP_lane0);
+  assign PrivilegedPlugin_logic_harts_0_commitMask = (((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_COMMIT_lane0);
+  assign TrapPlugin_logic_harts_0_trap_trigger_oh = (((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && execute_ctrl3_down_TRAP_lane0);
   assign TrapPlugin_logic_harts_0_trap_trigger_valid = (|TrapPlugin_logic_harts_0_trap_trigger_oh);
   always @(*) begin
     TrapPlugin_logic_harts_0_trap_whitebox_trap = 1'b0;
@@ -6422,6 +8178,38 @@ module VexiiRiscv (
     endcase
   end
 
+  always @(*) begin
+    TrapPlugin_logic_harts_0_trap_historyPort_valid = 1'b0;
+    case(TrapPlugin_logic_harts_0_trap_fsm_stateReg)
+      TrapPlugin_logic_harts_0_trap_fsm_RUNNING : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_PROCESS_1 : begin
+        TrapPlugin_logic_harts_0_trap_historyPort_valid = 1'b1;
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_EPC : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_TVAL : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_TVEC : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_TRAP_APPLY : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_XRET_EPC : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_XRET_APPLY : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_JUMP : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_LSU_FLUSH : begin
+      end
+      TrapPlugin_logic_harts_0_trap_fsm_FETCH_FLUSH : begin
+      end
+      default : begin
+      end
+    endcase
+  end
+
+  assign TrapPlugin_logic_harts_0_trap_historyPort_payload_history = TrapPlugin_logic_harts_0_trap_pending_history;
   always @(*) begin
     TrapPlugin_logic_harts_0_trap_pcPort_valid = 1'b0;
     case(TrapPlugin_logic_harts_0_trap_fsm_stateReg)
@@ -6722,37 +8510,48 @@ module VexiiRiscv (
   assign TrapPlugin_logic_harts_0_trap_fsm_triggerEbreak = 1'b0;
   assign when_TrapPlugin_l556 = (TrapPlugin_logic_harts_0_crsPorts_read_valid && TrapPlugin_logic_harts_0_crsPorts_read_ready);
   assign TrapPlugin_logic_harts_0_trap_fsm_xretPrivilege = TrapPlugin_logic_harts_0_trap_pending_state_arg[1 : 0];
-  assign PcPlugin_logic_forcedSpawn = (|{TrapPlugin_logic_harts_0_trap_pcPort_valid,early0_BranchPlugin_logic_pcPort_valid});
+  assign PcPlugin_logic_forcedSpawn = (|{TrapPlugin_logic_harts_0_trap_pcPort_valid,{late0_BranchPlugin_logic_pcPort_valid,{early0_BranchPlugin_logic_pcPort_valid,BtbPlugin_logic_pcPort_valid}}});
   assign PcPlugin_logic_harts_0_self_pc = (PcPlugin_logic_harts_0_self_state + _zz_PcPlugin_logic_harts_0_self_pc);
   assign PcPlugin_logic_harts_0_self_flow_valid = 1'b1;
   assign PcPlugin_logic_harts_0_self_flow_payload_fault = PcPlugin_logic_harts_0_self_fault;
   assign PcPlugin_logic_harts_0_self_flow_payload_pc = PcPlugin_logic_harts_0_self_pc;
+  assign PcPlugin_logic_harts_0_aggregator_sortedByPriority_3_laneValid = 1'b1;
+  assign PcPlugin_logic_harts_0_aggregator_sortedByPriority_2_laneValid = 1'b1;
   assign PcPlugin_logic_harts_0_aggregator_sortedByPriority_1_laneValid = 1'b1;
   assign PcPlugin_logic_harts_0_aggregator_sortedByPriority_0_laneValid = 1'b1;
-  assign PcPlugin_logic_harts_0_aggregator_sortedByPriority_2_laneValid = 1'b1;
+  assign PcPlugin_logic_harts_0_aggregator_sortedByPriority_4_laneValid = 1'b1;
   assign PcPlugin_logic_harts_0_aggregator_valids_0 = ((TrapPlugin_logic_harts_0_trap_pcPort_valid && 1'b1) && PcPlugin_logic_harts_0_aggregator_sortedByPriority_0_laneValid);
-  assign PcPlugin_logic_harts_0_aggregator_valids_1 = ((early0_BranchPlugin_logic_pcPort_valid && 1'b1) && PcPlugin_logic_harts_0_aggregator_sortedByPriority_1_laneValid);
-  assign PcPlugin_logic_harts_0_aggregator_valids_2 = ((PcPlugin_logic_harts_0_self_flow_valid && 1'b1) && PcPlugin_logic_harts_0_aggregator_sortedByPriority_2_laneValid);
-  assign _zz_PcPlugin_logic_harts_0_aggregator_oh = {PcPlugin_logic_harts_0_aggregator_valids_2,{PcPlugin_logic_harts_0_aggregator_valids_1,PcPlugin_logic_harts_0_aggregator_valids_0}};
+  assign PcPlugin_logic_harts_0_aggregator_valids_1 = ((late0_BranchPlugin_logic_pcPort_valid && 1'b1) && PcPlugin_logic_harts_0_aggregator_sortedByPriority_1_laneValid);
+  assign PcPlugin_logic_harts_0_aggregator_valids_2 = ((early0_BranchPlugin_logic_pcPort_valid && 1'b1) && PcPlugin_logic_harts_0_aggregator_sortedByPriority_2_laneValid);
+  assign PcPlugin_logic_harts_0_aggregator_valids_3 = ((BtbPlugin_logic_pcPort_valid && 1'b1) && PcPlugin_logic_harts_0_aggregator_sortedByPriority_3_laneValid);
+  assign PcPlugin_logic_harts_0_aggregator_valids_4 = ((PcPlugin_logic_harts_0_self_flow_valid && 1'b1) && PcPlugin_logic_harts_0_aggregator_sortedByPriority_4_laneValid);
+  assign _zz_PcPlugin_logic_harts_0_aggregator_oh = {PcPlugin_logic_harts_0_aggregator_valids_4,{PcPlugin_logic_harts_0_aggregator_valids_3,{PcPlugin_logic_harts_0_aggregator_valids_2,{PcPlugin_logic_harts_0_aggregator_valids_1,PcPlugin_logic_harts_0_aggregator_valids_0}}}};
   assign _zz_PcPlugin_logic_harts_0_aggregator_oh_1 = _zz_PcPlugin_logic_harts_0_aggregator_oh[0];
   assign _zz_PcPlugin_logic_harts_0_aggregator_oh_2 = _zz_PcPlugin_logic_harts_0_aggregator_oh[1];
+  assign _zz_PcPlugin_logic_harts_0_aggregator_oh_3 = _zz_PcPlugin_logic_harts_0_aggregator_oh[2];
+  assign _zz_PcPlugin_logic_harts_0_aggregator_oh_4 = _zz_PcPlugin_logic_harts_0_aggregator_oh[3];
   always @(*) begin
-    _zz_PcPlugin_logic_harts_0_aggregator_oh_3[0] = (_zz_PcPlugin_logic_harts_0_aggregator_oh_1 && (! 1'b0));
-    _zz_PcPlugin_logic_harts_0_aggregator_oh_3[1] = (_zz_PcPlugin_logic_harts_0_aggregator_oh_2 && (! _zz_PcPlugin_logic_harts_0_aggregator_oh_1));
-    _zz_PcPlugin_logic_harts_0_aggregator_oh_3[2] = (_zz_PcPlugin_logic_harts_0_aggregator_oh[2] && (! (|{_zz_PcPlugin_logic_harts_0_aggregator_oh_2,_zz_PcPlugin_logic_harts_0_aggregator_oh_1})));
+    _zz_PcPlugin_logic_harts_0_aggregator_oh_5[0] = (_zz_PcPlugin_logic_harts_0_aggregator_oh_1 && (! 1'b0));
+    _zz_PcPlugin_logic_harts_0_aggregator_oh_5[1] = (_zz_PcPlugin_logic_harts_0_aggregator_oh_2 && (! _zz_PcPlugin_logic_harts_0_aggregator_oh_1));
+    _zz_PcPlugin_logic_harts_0_aggregator_oh_5[2] = (_zz_PcPlugin_logic_harts_0_aggregator_oh_3 && (! (|{_zz_PcPlugin_logic_harts_0_aggregator_oh_2,_zz_PcPlugin_logic_harts_0_aggregator_oh_1})));
+    _zz_PcPlugin_logic_harts_0_aggregator_oh_5[3] = (_zz_PcPlugin_logic_harts_0_aggregator_oh_4 && (! (|{_zz_PcPlugin_logic_harts_0_aggregator_oh_3,{_zz_PcPlugin_logic_harts_0_aggregator_oh_2,_zz_PcPlugin_logic_harts_0_aggregator_oh_1}})));
+    _zz_PcPlugin_logic_harts_0_aggregator_oh_5[4] = (_zz_PcPlugin_logic_harts_0_aggregator_oh[4] && (! (|{_zz_PcPlugin_logic_harts_0_aggregator_oh_4,{_zz_PcPlugin_logic_harts_0_aggregator_oh_3,{_zz_PcPlugin_logic_harts_0_aggregator_oh_2,_zz_PcPlugin_logic_harts_0_aggregator_oh_1}}})));
   end
 
-  assign PcPlugin_logic_harts_0_aggregator_oh = _zz_PcPlugin_logic_harts_0_aggregator_oh_3;
+  assign PcPlugin_logic_harts_0_aggregator_oh = _zz_PcPlugin_logic_harts_0_aggregator_oh_5;
   assign _zz_PcPlugin_logic_harts_0_aggregator_target = PcPlugin_logic_harts_0_aggregator_oh[0];
   assign _zz_PcPlugin_logic_harts_0_aggregator_target_1 = PcPlugin_logic_harts_0_aggregator_oh[1];
   assign _zz_PcPlugin_logic_harts_0_aggregator_target_2 = PcPlugin_logic_harts_0_aggregator_oh[2];
-  assign PcPlugin_logic_harts_0_aggregator_target = (((_zz_PcPlugin_logic_harts_0_aggregator_target ? TrapPlugin_logic_harts_0_trap_pcPort_payload_pc : 32'h0) | (_zz_PcPlugin_logic_harts_0_aggregator_target_1 ? early0_BranchPlugin_logic_pcPort_payload_pc : 32'h0)) | (_zz_PcPlugin_logic_harts_0_aggregator_target_2 ? PcPlugin_logic_harts_0_self_flow_payload_pc : 32'h0));
+  assign _zz_PcPlugin_logic_harts_0_aggregator_target_3 = PcPlugin_logic_harts_0_aggregator_oh[4];
+  assign PcPlugin_logic_harts_0_aggregator_target = (((_zz_PcPlugin_logic_harts_0_aggregator_target ? TrapPlugin_logic_harts_0_trap_pcPort_payload_pc : 32'h0) | (_zz_PcPlugin_logic_harts_0_aggregator_target_1 ? late0_BranchPlugin_logic_pcPort_payload_pc : 32'h0)) | ((_zz_PcPlugin_logic_harts_0_aggregator_target_2 ? early0_BranchPlugin_logic_pcPort_payload_pc : 32'h0) | (_zz_PcPlugin_logic_harts_0_aggregator_target_3 ? PcPlugin_logic_harts_0_self_flow_payload_pc : 32'h0)));
   assign PcPlugin_logic_harts_0_aggregator_fault = _zz_PcPlugin_logic_harts_0_aggregator_fault[0];
+  assign _zz_PcPlugin_logic_harts_0_aggregator_fault_1 = PcPlugin_logic_harts_0_aggregator_oh[3];
+  assign when_PcPlugin_l80 = (|_zz_PcPlugin_logic_harts_0_aggregator_fault_1);
   assign PcPlugin_logic_harts_0_holdComb = (|TrapPlugin_logic_harts_0_trap_fsm_holdPort);
   assign PcPlugin_logic_harts_0_output_valid = (! PcPlugin_logic_harts_0_holdReg);
-  assign PcPlugin_logic_harts_0_output_payload_fault = PcPlugin_logic_harts_0_aggregator_fault;
+  assign PcPlugin_logic_harts_0_output_payload_fault = PcPlugin_logic_harts_0_aggregator_fault_1;
   always @(*) begin
-    PcPlugin_logic_harts_0_output_payload_pc = PcPlugin_logic_harts_0_aggregator_target;
+    PcPlugin_logic_harts_0_output_payload_pc = PcPlugin_logic_harts_0_aggregator_target_1;
     PcPlugin_logic_harts_0_output_payload_pc[1 : 0] = 2'b00;
   end
 
@@ -6793,7 +8592,7 @@ module VexiiRiscv (
       CsrAccessPlugin_logic_fsm_WRITE : begin
       end
       CsrAccessPlugin_logic_fsm_COMPLETION : begin
-        if(execute_ctrl2_down_isReady) begin
+        if(execute_ctrl1_down_isReady) begin
           CsrAccessPlugin_logic_fsm_interface_fire = 1'b1;
         end
       end
@@ -6802,11 +8601,11 @@ module VexiiRiscv (
     endcase
   end
 
-  assign CsrAccessPlugin_logic_fsm_inject_csrAddress = execute_ctrl2_down_Decode_UOP_lane0[31 : 20];
-  assign CsrAccessPlugin_logic_fsm_inject_immZero = (execute_ctrl2_down_Decode_UOP_lane0[19 : 15] == 5'h0);
-  assign CsrAccessPlugin_logic_fsm_inject_srcZero = (execute_ctrl2_down_CsrAccessPlugin_CSR_IMM_lane0 ? CsrAccessPlugin_logic_fsm_inject_immZero : (execute_ctrl2_down_Decode_UOP_lane0[19 : 15] == 5'h0));
-  assign CsrAccessPlugin_logic_fsm_inject_csrWrite = (! (execute_ctrl2_down_CsrAccessPlugin_CSR_MASK_lane0 && CsrAccessPlugin_logic_fsm_inject_srcZero));
-  assign CsrAccessPlugin_logic_fsm_inject_csrRead = (! ((! execute_ctrl2_down_CsrAccessPlugin_CSR_MASK_lane0) && (! execute_ctrl2_up_RD_ENABLE_lane0)));
+  assign CsrAccessPlugin_logic_fsm_inject_csrAddress = execute_ctrl1_down_Decode_UOP_lane0[31 : 20];
+  assign CsrAccessPlugin_logic_fsm_inject_immZero = (execute_ctrl1_down_Decode_UOP_lane0[19 : 15] == 5'h0);
+  assign CsrAccessPlugin_logic_fsm_inject_srcZero = (execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0 ? CsrAccessPlugin_logic_fsm_inject_immZero : (execute_ctrl1_down_Decode_UOP_lane0[19 : 15] == 5'h0));
+  assign CsrAccessPlugin_logic_fsm_inject_csrWrite = (! (execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0 && CsrAccessPlugin_logic_fsm_inject_srcZero));
+  assign CsrAccessPlugin_logic_fsm_inject_csrRead = (! ((! execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0) && (! execute_ctrl1_up_RD_ENABLE_lane0)));
   assign COMB_CSR_1952 = (CsrAccessPlugin_logic_fsm_inject_csrAddress == 12'h7a0);
   assign COMB_CSR_1953 = (CsrAccessPlugin_logic_fsm_inject_csrAddress == 12'h7a1);
   assign COMB_CSR_1954 = (CsrAccessPlugin_logic_fsm_inject_csrAddress == 12'h7a2);
@@ -6824,21 +8623,21 @@ module VexiiRiscv (
   assign COMB_CSR_CsrRamPlugin_csrMapper_selFilter = (|{(CsrAccessPlugin_logic_fsm_inject_csrAddress == 12'h340),{(CsrAccessPlugin_logic_fsm_inject_csrAddress == 12'h341),{(CsrAccessPlugin_logic_fsm_inject_csrAddress == 12'h343),(CsrAccessPlugin_logic_fsm_inject_csrAddress == 12'h305)}}});
   assign COMB_CSR_CsrAccessPlugin_logic_trapNextOnWriteFilter = (|(CsrAccessPlugin_logic_fsm_inject_csrAddress == 12'h300));
   assign CsrAccessPlugin_logic_fsm_inject_implemented = (|{COMB_CSR_CsrAccessPlugin_logic_trapNextOnWriteFilter,{COMB_CSR_CsrRamPlugin_csrMapper_selFilter,{COMB_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_epcFilter,{COMB_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_tvecFilter,{COMB_CSR_772,{COMB_CSR_836,{COMB_CSR_834,{COMB_CSR_768,{COMB_CSR_769,{COMB_CSR_3860,{_zz_CsrAccessPlugin_logic_fsm_inject_implemented,_zz_CsrAccessPlugin_logic_fsm_inject_implemented_1}}}}}}}}}}});
-  assign CsrAccessPlugin_logic_fsm_inject_onDecodeDo = ((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_CsrAccessPlugin_SEL_lane0) && (CsrAccessPlugin_logic_fsm_stateReg == CsrAccessPlugin_logic_fsm_IDLE));
+  assign CsrAccessPlugin_logic_fsm_inject_onDecodeDo = ((execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_down_CsrAccessPlugin_SEL_lane0) && (CsrAccessPlugin_logic_fsm_stateReg == CsrAccessPlugin_logic_fsm_IDLE));
   assign when_CsrAccessPlugin_l155 = (CsrAccessPlugin_logic_fsm_inject_onDecodeDo && COMB_CSR_CsrAccessPlugin_logic_trapNextOnWriteFilter);
   assign CsrAccessPlugin_logic_fsm_inject_trap = ((! CsrAccessPlugin_logic_fsm_inject_implemented) || CsrAccessPlugin_bus_decode_exception);
   assign CsrAccessPlugin_bus_decode_read = CsrAccessPlugin_logic_fsm_inject_csrRead;
   assign CsrAccessPlugin_bus_decode_write = CsrAccessPlugin_logic_fsm_inject_csrWrite;
   assign CsrAccessPlugin_bus_decode_address = CsrAccessPlugin_logic_fsm_inject_csrAddress;
-  assign CsrAccessPlugin_logic_fsm_interface_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
-  assign CsrAccessPlugin_logic_fsm_interface_rs1 = execute_ctrl2_up_integer_RS1_lane0;
-  assign CsrAccessPlugin_logic_fsm_interface_uop = execute_ctrl2_down_Decode_UOP_lane0;
-  assign CsrAccessPlugin_logic_fsm_interface_doImm = execute_ctrl2_down_CsrAccessPlugin_CSR_IMM_lane0;
-  assign CsrAccessPlugin_logic_fsm_interface_doMask = execute_ctrl2_down_CsrAccessPlugin_CSR_MASK_lane0;
-  assign CsrAccessPlugin_logic_fsm_interface_doClear = execute_ctrl2_down_CsrAccessPlugin_CSR_CLEAR_lane0;
-  assign CsrAccessPlugin_logic_fsm_interface_rdEnable = execute_ctrl2_up_RD_ENABLE_lane0;
-  assign CsrAccessPlugin_logic_fsm_interface_rdPhys = execute_ctrl2_down_RD_PHYS_lane0;
-  assign CsrAccessPlugin_logic_fsm_inject_freeze = ((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_CsrAccessPlugin_SEL_lane0) && (! CsrAccessPlugin_logic_fsm_inject_unfreeze));
+  assign CsrAccessPlugin_logic_fsm_interface_uopId = execute_ctrl1_down_Decode_UOP_ID_lane0;
+  assign CsrAccessPlugin_logic_fsm_interface_rs1 = execute_ctrl1_up_integer_RS1_lane0;
+  assign CsrAccessPlugin_logic_fsm_interface_uop = execute_ctrl1_down_Decode_UOP_lane0;
+  assign CsrAccessPlugin_logic_fsm_interface_doImm = execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0;
+  assign CsrAccessPlugin_logic_fsm_interface_doMask = execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0;
+  assign CsrAccessPlugin_logic_fsm_interface_doClear = execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0;
+  assign CsrAccessPlugin_logic_fsm_interface_rdEnable = execute_ctrl1_up_RD_ENABLE_lane0;
+  assign CsrAccessPlugin_logic_fsm_interface_rdPhys = execute_ctrl1_down_RD_PHYS_lane0;
+  assign CsrAccessPlugin_logic_fsm_inject_freeze = ((execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_down_CsrAccessPlugin_SEL_lane0) && (! CsrAccessPlugin_logic_fsm_inject_unfreeze));
   always @(*) begin
     CsrAccessPlugin_logic_flushPort_valid = 1'b0;
     if(CsrAccessPlugin_logic_fsm_inject_flushReg) begin
@@ -6867,7 +8666,7 @@ module VexiiRiscv (
     endcase
   end
 
-  assign CsrAccessPlugin_logic_flushPort_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
+  assign CsrAccessPlugin_logic_flushPort_payload_uopId = execute_ctrl1_down_Decode_UOP_ID_lane0;
   assign CsrAccessPlugin_logic_flushPort_payload_self = 1'b0;
   always @(*) begin
     CsrAccessPlugin_logic_trapPort_valid = 1'b0;
@@ -6940,7 +8739,7 @@ module VexiiRiscv (
     endcase
   end
 
-  assign CsrAccessPlugin_logic_trapPort_payload_tval = execute_ctrl2_down_Decode_UOP_lane0;
+  assign CsrAccessPlugin_logic_trapPort_payload_tval = execute_ctrl1_down_Decode_UOP_lane0;
   assign CsrAccessPlugin_logic_trapPort_payload_arg = 2'b00;
   assign when_CsrAccessPlugin_l197 = (! execute_freeze_valid);
   always @(*) begin
@@ -7037,7 +8836,7 @@ module VexiiRiscv (
   assign when_CsrAccessPlugin_l343 = (CsrAccessPlugin_logic_fsm_writeLogic_onWritesDo && REG_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_tvecFilter);
   assign when_CsrAccessPlugin_l343_1 = (CsrAccessPlugin_logic_fsm_writeLogic_onWritesDo && REG_CSR_PrivilegedPlugin_logic_readAnyWriteLegal_epcFilter);
   assign when_CsrAccessPlugin_l343_2 = (CsrAccessPlugin_logic_fsm_writeLogic_onWritesDo && REG_CSR_CsrRamPlugin_csrMapper_selFilter);
-  assign CsrAccessPlugin_logic_wbWi_valid = execute_ctrl3_down_CsrAccessPlugin_SEL_lane0;
+  assign CsrAccessPlugin_logic_wbWi_valid = execute_ctrl2_down_CsrAccessPlugin_SEL_lane0;
   assign CsrAccessPlugin_logic_wbWi_payload = CsrAccessPlugin_logic_fsm_interface_csrValue;
   assign fetch_logic_ctrls_1_down_MMU_REFILL = 1'b0;
   assign fetch_logic_ctrls_1_down_MMU_HAZARD = 1'b0;
@@ -7048,19 +8847,40 @@ module VexiiRiscv (
   assign fetch_logic_ctrls_1_down_MMU_PAGE_FAULT = 1'b0;
   assign fetch_logic_ctrls_1_down_MMU_ACCESS_FAULT = 1'b0;
   assign fetch_logic_ctrls_1_down_MMU_BYPASS_TRANSLATION = 1'b1;
-  assign execute_ctrl3_down_MMU_REFILL_lane0 = 1'b0;
-  assign execute_ctrl3_down_MMU_HAZARD_lane0 = 1'b0;
-  assign execute_ctrl3_down_MMU_TRANSLATED_lane0 = execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
-  assign execute_ctrl3_down_MMU_ALLOW_EXECUTE_lane0 = 1'b1;
-  assign execute_ctrl3_down_MMU_ALLOW_READ_lane0 = 1'b1;
-  assign execute_ctrl3_down_MMU_ALLOW_WRITE_lane0 = 1'b1;
-  assign execute_ctrl3_down_MMU_PAGE_FAULT_lane0 = 1'b0;
-  assign execute_ctrl3_down_MMU_ACCESS_FAULT_lane0 = 1'b0;
-  assign execute_ctrl3_down_MMU_BYPASS_TRANSLATION_lane0 = 1'b1;
-  assign fetch_logic_flushes_0_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
-  assign fetch_logic_ctrls_1_throwWhen_FetchPipelinePlugin_l48 = fetch_logic_flushes_0_doIt;
-  assign fetch_logic_flushes_1_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
-  assign fetch_logic_ctrls_2_forgetsSingleRequest_FetchPipelinePlugin_l50 = fetch_logic_flushes_1_doIt;
+  assign execute_ctrl2_down_MMU_REFILL_lane0 = 1'b0;
+  assign execute_ctrl2_down_MMU_HAZARD_lane0 = 1'b0;
+  assign execute_ctrl2_down_MMU_TRANSLATED_lane0 = execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0;
+  assign execute_ctrl2_down_MMU_ALLOW_EXECUTE_lane0 = 1'b1;
+  assign execute_ctrl2_down_MMU_ALLOW_READ_lane0 = 1'b1;
+  assign execute_ctrl2_down_MMU_ALLOW_WRITE_lane0 = 1'b1;
+  assign execute_ctrl2_down_MMU_PAGE_FAULT_lane0 = 1'b0;
+  assign execute_ctrl2_down_MMU_ACCESS_FAULT_lane0 = 1'b0;
+  assign execute_ctrl2_down_MMU_BYPASS_TRANSLATION_lane0 = 1'b1;
+  always @(*) begin
+    HistoryPlugin_logic_onFetch_valueNext = HistoryPlugin_logic_onFetch_value;
+    if(HistoryPlugin_logic_onFetch_ports_0_valid) begin
+      HistoryPlugin_logic_onFetch_valueNext = HistoryPlugin_logic_onFetch_ports_0_payload_history;
+    end
+    if(HistoryPlugin_logic_onFetch_ports_1_valid) begin
+      HistoryPlugin_logic_onFetch_valueNext = HistoryPlugin_logic_onFetch_ports_1_payload_history;
+    end
+    if(HistoryPlugin_logic_onFetch_ports_2_valid) begin
+      HistoryPlugin_logic_onFetch_valueNext = HistoryPlugin_logic_onFetch_ports_2_payload_history;
+    end
+    if(HistoryPlugin_logic_onFetch_ports_3_valid) begin
+      HistoryPlugin_logic_onFetch_valueNext = HistoryPlugin_logic_onFetch_ports_3_payload_history;
+    end
+  end
+
+  assign HistoryPlugin_logic_onFetch_ports_0_valid = (|BtbPlugin_logic_historyPort_valid);
+  assign HistoryPlugin_logic_onFetch_ports_0_payload_history = BtbPlugin_logic_historyPort_payload_history;
+  assign HistoryPlugin_logic_onFetch_ports_1_valid = (|early0_BranchPlugin_logic_historyPort_valid);
+  assign HistoryPlugin_logic_onFetch_ports_1_payload_history = early0_BranchPlugin_logic_historyPort_payload_history;
+  assign HistoryPlugin_logic_onFetch_ports_2_valid = (|late0_BranchPlugin_logic_historyPort_valid);
+  assign HistoryPlugin_logic_onFetch_ports_2_payload_history = late0_BranchPlugin_logic_historyPort_payload_history;
+  assign HistoryPlugin_logic_onFetch_ports_3_valid = (|TrapPlugin_logic_harts_0_trap_historyPort_valid);
+  assign HistoryPlugin_logic_onFetch_ports_3_payload_history = TrapPlugin_logic_harts_0_trap_historyPort_payload_history;
+  assign fetch_logic_ctrls_0_down_Prediction_BRANCH_HISTORY = HistoryPlugin_logic_onFetch_valueNext;
   assign CsrRamPlugin_logic_writeLogic_hits = {CsrRamPlugin_setup_initPort_valid,{CsrRamPlugin_csrMapper_write_valid,TrapPlugin_logic_harts_0_crsPorts_write_valid}};
   assign CsrRamPlugin_logic_writeLogic_hit = (|CsrRamPlugin_logic_writeLogic_hits);
   assign CsrRamPlugin_logic_writeLogic_hits_ohFirst_input = CsrRamPlugin_logic_writeLogic_hits;
@@ -7096,241 +8916,332 @@ module VexiiRiscv (
   assign execute_lane0_bypasser_integer_RS1_port_valid = (! execute_freeze_valid);
   assign execute_lane0_bypasser_integer_RS1_port_address = execute_ctrl0_down_RS1_PHYS_lane0;
   always @(*) begin
-    execute_lane0_bypasser_integer_RS1_bypassEnables[0] = (((execute_ctrl5_up_LANE_SEL_lane0 && execute_ctrl5_up_RD_ENABLE_lane0) && (execute_ctrl5_down_RD_PHYS_lane0 == execute_ctrl1_down_RS1_PHYS_lane0)) && 1'b1);
-    execute_lane0_bypasser_integer_RS1_bypassEnables[1] = 1'b1;
+    execute_lane0_bypasser_integer_RS1_bypassEnables[0] = (((execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_up_RD_ENABLE_lane0) && (execute_ctrl1_down_RD_PHYS_lane0 == execute_ctrl0_down_RS1_PHYS_lane0)) && 1'b1);
+    execute_lane0_bypasser_integer_RS1_bypassEnables[1] = (((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_down_RD_PHYS_lane0 == execute_ctrl0_down_RS1_PHYS_lane0)) && 1'b1);
+    execute_lane0_bypasser_integer_RS1_bypassEnables[2] = (((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_up_RD_ENABLE_lane0) && (execute_ctrl3_down_RD_PHYS_lane0 == execute_ctrl0_down_RS1_PHYS_lane0)) && 1'b1);
+    execute_lane0_bypasser_integer_RS1_bypassEnables[3] = 1'b1;
   end
 
   assign _zz_execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0 = execute_lane0_bypasser_integer_RS1_bypassEnables;
   assign execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0 = _zz_execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0[0];
   assign execute_lane0_bypasser_integer_RS1_bypassEnables_bools_1 = _zz_execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0[1];
+  assign execute_lane0_bypasser_integer_RS1_bypassEnables_bools_2 = _zz_execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0[2];
+  assign execute_lane0_bypasser_integer_RS1_bypassEnables_bools_3 = _zz_execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0[3];
   always @(*) begin
     _zz_execute_lane0_bypasser_integer_RS1_sel[0] = (execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0 && (! 1'b0));
     _zz_execute_lane0_bypasser_integer_RS1_sel[1] = (execute_lane0_bypasser_integer_RS1_bypassEnables_bools_1 && (! execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0));
+    _zz_execute_lane0_bypasser_integer_RS1_sel[2] = (execute_lane0_bypasser_integer_RS1_bypassEnables_bools_2 && (! execute_lane0_bypasser_integer_RS1_bypassEnables_range_0_to_1));
+    _zz_execute_lane0_bypasser_integer_RS1_sel[3] = (execute_lane0_bypasser_integer_RS1_bypassEnables_bools_3 && (! execute_lane0_bypasser_integer_RS1_bypassEnables_range_0_to_2));
   end
 
+  assign execute_lane0_bypasser_integer_RS1_bypassEnables_range_0_to_1 = (|{execute_lane0_bypasser_integer_RS1_bypassEnables_bools_1,execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0});
+  assign execute_lane0_bypasser_integer_RS1_bypassEnables_range_0_to_2 = (|{execute_lane0_bypasser_integer_RS1_bypassEnables_bools_2,{execute_lane0_bypasser_integer_RS1_bypassEnables_bools_1,execute_lane0_bypasser_integer_RS1_bypassEnables_bools_0}});
   assign execute_lane0_bypasser_integer_RS1_sel = _zz_execute_lane0_bypasser_integer_RS1_sel;
-  assign execute_ctrl1_down_integer_RS1_lane0 = ((execute_lane0_bypasser_integer_RS1_sel[0] ? execute_ctrl5_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0) | (execute_lane0_bypasser_integer_RS1_sel[1] ? execute_lane0_bypasser_integer_RS1_port_data : 32'h0));
+  assign _zz_execute_ctrl0_down_integer_RS1_lane0 = execute_lane0_bypasser_integer_RS1_sel[3 : 1];
+  always @(*) begin
+    _zz_execute_ctrl0_down_integer_RS1_lane0_1 = (((_zz_execute_ctrl0_down_integer_RS1_lane0[0] ? execute_ctrl2_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0) | (_zz_execute_ctrl0_down_integer_RS1_lane0[1] ? execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0)) | (_zz_execute_ctrl0_down_integer_RS1_lane0[2] ? execute_lane0_bypasser_integer_RS1_port_data : 32'h0));
+    if(when_ExecuteLanePlugin_l197) begin
+      _zz_execute_ctrl0_down_integer_RS1_lane0_1 = execute_ctrl1_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+    end
+  end
+
+  assign execute_ctrl0_down_integer_RS1_lane0 = _zz_execute_ctrl0_down_integer_RS1_lane0_1;
+  assign when_ExecuteLanePlugin_l197 = execute_lane0_bypasser_integer_RS1_sel[0];
+  assign execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_0_selfHit = (((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_up_RD_ENABLE_lane0) && (execute_ctrl3_down_RD_PHYS_lane0 == execute_ctrl1_down_RS1_PHYS_lane0)) && 1'b1);
+  assign execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_0_youngerHits_0 = (((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_down_RD_PHYS_lane0 == execute_ctrl1_down_RS1_PHYS_lane0)) && 1'b1);
+  assign execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_0_hit = (execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_0_selfHit && (! (|execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_0_youngerHits_0)));
+  assign execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_1_selfHit = (((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_down_RD_PHYS_lane0 == execute_ctrl1_down_RS1_PHYS_lane0)) && 1'b1);
+  assign execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_1_hit = (execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_1_selfHit && (! 1'b0));
+  assign execute_lane0_bypasser_integer_RS1_along_bypasses_0_hits = {execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_1_hit,execute_lane0_bypasser_integer_RS1_along_bypasses_0_checks_0_hit};
+  assign _zz_execute_ctrl1_integer_RS1_lane0_bypass = {execute_lane0_bypasser_integer_RS1_along_bypasses_0_hits,(! (|execute_lane0_bypasser_integer_RS1_along_bypasses_0_hits))};
+  assign execute_ctrl1_integer_RS1_lane0_bypass = (((_zz_execute_ctrl1_integer_RS1_lane0_bypass[0] ? execute_ctrl1_up_integer_RS1_lane0 : 32'h0) | (_zz_execute_ctrl1_integer_RS1_lane0_bypass[1] ? execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0)) | (_zz_execute_ctrl1_integer_RS1_lane0_bypass[2] ? execute_ctrl2_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0));
+  assign execute_lane0_bypasser_integer_RS1_along_bypasses_1_checks_0_selfHit = (((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_up_RD_ENABLE_lane0) && (execute_ctrl3_down_RD_PHYS_lane0 == execute_ctrl2_down_RS1_PHYS_lane0)) && 1'b1);
+  assign execute_lane0_bypasser_integer_RS1_along_bypasses_1_checks_0_hit = (execute_lane0_bypasser_integer_RS1_along_bypasses_1_checks_0_selfHit && (! 1'b0));
+  assign execute_lane0_bypasser_integer_RS1_along_bypasses_1_hits = execute_lane0_bypasser_integer_RS1_along_bypasses_1_checks_0_hit;
+  assign _zz_execute_ctrl2_integer_RS1_lane0_bypass = {execute_lane0_bypasser_integer_RS1_along_bypasses_1_hits,(! (|execute_lane0_bypasser_integer_RS1_along_bypasses_1_hits))};
+  assign execute_ctrl2_integer_RS1_lane0_bypass = ((_zz_execute_ctrl2_integer_RS1_lane0_bypass[0] ? execute_ctrl2_up_integer_RS1_lane0 : 32'h0) | (_zz_execute_ctrl2_integer_RS1_lane0_bypass[1] ? execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0));
   assign execute_lane0_bypasser_integer_RS2_port_valid = (! execute_freeze_valid);
   assign execute_lane0_bypasser_integer_RS2_port_address = execute_ctrl0_down_RS2_PHYS_lane0;
   always @(*) begin
-    execute_lane0_bypasser_integer_RS2_bypassEnables[0] = (((execute_ctrl5_up_LANE_SEL_lane0 && execute_ctrl5_up_RD_ENABLE_lane0) && (execute_ctrl5_down_RD_PHYS_lane0 == execute_ctrl1_down_RS2_PHYS_lane0)) && 1'b1);
-    execute_lane0_bypasser_integer_RS2_bypassEnables[1] = 1'b1;
+    execute_lane0_bypasser_integer_RS2_bypassEnables[0] = (((execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_up_RD_ENABLE_lane0) && (execute_ctrl1_down_RD_PHYS_lane0 == execute_ctrl0_down_RS2_PHYS_lane0)) && 1'b1);
+    execute_lane0_bypasser_integer_RS2_bypassEnables[1] = (((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_down_RD_PHYS_lane0 == execute_ctrl0_down_RS2_PHYS_lane0)) && 1'b1);
+    execute_lane0_bypasser_integer_RS2_bypassEnables[2] = (((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_up_RD_ENABLE_lane0) && (execute_ctrl3_down_RD_PHYS_lane0 == execute_ctrl0_down_RS2_PHYS_lane0)) && 1'b1);
+    execute_lane0_bypasser_integer_RS2_bypassEnables[3] = 1'b1;
   end
 
   assign _zz_execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0 = execute_lane0_bypasser_integer_RS2_bypassEnables;
   assign execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0 = _zz_execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0[0];
   assign execute_lane0_bypasser_integer_RS2_bypassEnables_bools_1 = _zz_execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0[1];
+  assign execute_lane0_bypasser_integer_RS2_bypassEnables_bools_2 = _zz_execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0[2];
+  assign execute_lane0_bypasser_integer_RS2_bypassEnables_bools_3 = _zz_execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0[3];
   always @(*) begin
     _zz_execute_lane0_bypasser_integer_RS2_sel[0] = (execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0 && (! 1'b0));
     _zz_execute_lane0_bypasser_integer_RS2_sel[1] = (execute_lane0_bypasser_integer_RS2_bypassEnables_bools_1 && (! execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0));
+    _zz_execute_lane0_bypasser_integer_RS2_sel[2] = (execute_lane0_bypasser_integer_RS2_bypassEnables_bools_2 && (! execute_lane0_bypasser_integer_RS2_bypassEnables_range_0_to_1));
+    _zz_execute_lane0_bypasser_integer_RS2_sel[3] = (execute_lane0_bypasser_integer_RS2_bypassEnables_bools_3 && (! execute_lane0_bypasser_integer_RS2_bypassEnables_range_0_to_2));
   end
 
+  assign execute_lane0_bypasser_integer_RS2_bypassEnables_range_0_to_1 = (|{execute_lane0_bypasser_integer_RS2_bypassEnables_bools_1,execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0});
+  assign execute_lane0_bypasser_integer_RS2_bypassEnables_range_0_to_2 = (|{execute_lane0_bypasser_integer_RS2_bypassEnables_bools_2,{execute_lane0_bypasser_integer_RS2_bypassEnables_bools_1,execute_lane0_bypasser_integer_RS2_bypassEnables_bools_0}});
   assign execute_lane0_bypasser_integer_RS2_sel = _zz_execute_lane0_bypasser_integer_RS2_sel;
-  assign execute_ctrl1_down_integer_RS2_lane0 = ((execute_lane0_bypasser_integer_RS2_sel[0] ? execute_ctrl5_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0) | (execute_lane0_bypasser_integer_RS2_sel[1] ? execute_lane0_bypasser_integer_RS2_port_data : 32'h0));
-  assign execute_lane0_logic_completions_onCtrl_0_port_valid = (((execute_ctrl2_down_LANE_SEL_lane0 && execute_ctrl2_down_isReady) && (! execute_lane0_ctrls_2_downIsCancel)) && execute_ctrl2_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0);
-  assign execute_lane0_logic_completions_onCtrl_0_port_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
-  assign execute_lane0_logic_completions_onCtrl_0_port_payload_trap = execute_ctrl2_down_TRAP_lane0;
-  assign execute_lane0_logic_completions_onCtrl_0_port_payload_commit = execute_ctrl2_down_COMMIT_lane0;
-  assign execute_lane0_logic_completions_onCtrl_1_port_valid = (((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0);
-  assign execute_lane0_logic_completions_onCtrl_1_port_payload_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
-  assign execute_lane0_logic_completions_onCtrl_1_port_payload_trap = execute_ctrl4_down_TRAP_lane0;
-  assign execute_lane0_logic_completions_onCtrl_1_port_payload_commit = execute_ctrl4_down_COMMIT_lane0;
-  assign execute_lane0_logic_completions_onCtrl_2_port_valid = (((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && execute_ctrl3_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0);
-  assign execute_lane0_logic_completions_onCtrl_2_port_payload_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
-  assign execute_lane0_logic_completions_onCtrl_2_port_payload_trap = execute_ctrl3_down_TRAP_lane0;
-  assign execute_lane0_logic_completions_onCtrl_2_port_payload_commit = execute_ctrl3_down_COMMIT_lane0;
-  assign execute_lane0_logic_decoding_decodingBits = execute_ctrl1_down_Decode_UOP_lane0;
+  assign _zz_execute_ctrl0_down_integer_RS2_lane0 = execute_lane0_bypasser_integer_RS2_sel[3 : 1];
   always @(*) begin
-    execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0 = 1'b0;
+    _zz_execute_ctrl0_down_integer_RS2_lane0_1 = (((_zz_execute_ctrl0_down_integer_RS2_lane0[0] ? execute_ctrl2_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0) | (_zz_execute_ctrl0_down_integer_RS2_lane0[1] ? execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0)) | (_zz_execute_ctrl0_down_integer_RS2_lane0[2] ? execute_lane0_bypasser_integer_RS2_port_data : 32'h0));
+    if(when_ExecuteLanePlugin_l197_1) begin
+      _zz_execute_ctrl0_down_integer_RS2_lane0_1 = execute_ctrl1_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+    end
+  end
+
+  assign execute_ctrl0_down_integer_RS2_lane0 = _zz_execute_ctrl0_down_integer_RS2_lane0_1;
+  assign when_ExecuteLanePlugin_l197_1 = execute_lane0_bypasser_integer_RS2_sel[0];
+  assign execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_0_selfHit = (((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_up_RD_ENABLE_lane0) && (execute_ctrl3_down_RD_PHYS_lane0 == execute_ctrl1_down_RS2_PHYS_lane0)) && 1'b1);
+  assign execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_0_youngerHits_0 = (((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_down_RD_PHYS_lane0 == execute_ctrl1_down_RS2_PHYS_lane0)) && 1'b1);
+  assign execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_0_hit = (execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_0_selfHit && (! (|execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_0_youngerHits_0)));
+  assign execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_1_selfHit = (((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_up_RD_ENABLE_lane0) && (execute_ctrl2_down_RD_PHYS_lane0 == execute_ctrl1_down_RS2_PHYS_lane0)) && 1'b1);
+  assign execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_1_hit = (execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_1_selfHit && (! 1'b0));
+  assign execute_lane0_bypasser_integer_RS2_along_bypasses_0_hits = {execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_1_hit,execute_lane0_bypasser_integer_RS2_along_bypasses_0_checks_0_hit};
+  assign _zz_execute_ctrl1_integer_RS2_lane0_bypass = {execute_lane0_bypasser_integer_RS2_along_bypasses_0_hits,(! (|execute_lane0_bypasser_integer_RS2_along_bypasses_0_hits))};
+  assign execute_ctrl1_integer_RS2_lane0_bypass = (((_zz_execute_ctrl1_integer_RS2_lane0_bypass[0] ? execute_ctrl1_up_integer_RS2_lane0 : 32'h0) | (_zz_execute_ctrl1_integer_RS2_lane0_bypass[1] ? execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0)) | (_zz_execute_ctrl1_integer_RS2_lane0_bypass[2] ? execute_ctrl2_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0));
+  assign execute_lane0_bypasser_integer_RS2_along_bypasses_1_checks_0_selfHit = (((execute_ctrl3_up_LANE_SEL_lane0 && execute_ctrl3_up_RD_ENABLE_lane0) && (execute_ctrl3_down_RD_PHYS_lane0 == execute_ctrl2_down_RS2_PHYS_lane0)) && 1'b1);
+  assign execute_lane0_bypasser_integer_RS2_along_bypasses_1_checks_0_hit = (execute_lane0_bypasser_integer_RS2_along_bypasses_1_checks_0_selfHit && (! 1'b0));
+  assign execute_lane0_bypasser_integer_RS2_along_bypasses_1_hits = execute_lane0_bypasser_integer_RS2_along_bypasses_1_checks_0_hit;
+  assign _zz_execute_ctrl2_integer_RS2_lane0_bypass = {execute_lane0_bypasser_integer_RS2_along_bypasses_1_hits,(! (|execute_lane0_bypasser_integer_RS2_along_bypasses_1_hits))};
+  assign execute_ctrl2_integer_RS2_lane0_bypass = ((_zz_execute_ctrl2_integer_RS2_lane0_bypass[0] ? execute_ctrl2_up_integer_RS2_lane0 : 32'h0) | (_zz_execute_ctrl2_integer_RS2_lane0_bypass[1] ? execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 : 32'h0));
+  assign execute_lane0_logic_completions_onCtrl_0_port_valid = (((execute_ctrl1_down_LANE_SEL_lane0 && execute_ctrl1_down_isReady) && (! execute_lane0_ctrls_1_downIsCancel)) && execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0);
+  assign execute_lane0_logic_completions_onCtrl_0_port_payload_uopId = execute_ctrl1_down_Decode_UOP_ID_lane0;
+  assign execute_lane0_logic_completions_onCtrl_0_port_payload_trap = execute_ctrl1_down_TRAP_lane0;
+  assign execute_lane0_logic_completions_onCtrl_0_port_payload_commit = execute_ctrl1_down_COMMIT_lane0;
+  assign execute_lane0_logic_completions_onCtrl_1_port_valid = (((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && execute_ctrl3_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0);
+  assign execute_lane0_logic_completions_onCtrl_1_port_payload_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
+  assign execute_lane0_logic_completions_onCtrl_1_port_payload_trap = execute_ctrl3_down_TRAP_lane0;
+  assign execute_lane0_logic_completions_onCtrl_1_port_payload_commit = execute_ctrl3_down_COMMIT_lane0;
+  assign execute_lane0_logic_completions_onCtrl_2_port_valid = (((execute_ctrl2_down_LANE_SEL_lane0 && execute_ctrl2_down_isReady) && (! execute_lane0_ctrls_2_downIsCancel)) && execute_ctrl2_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0);
+  assign execute_lane0_logic_completions_onCtrl_2_port_payload_uopId = execute_ctrl2_down_Decode_UOP_ID_lane0;
+  assign execute_lane0_logic_completions_onCtrl_2_port_payload_trap = execute_ctrl2_down_TRAP_lane0;
+  assign execute_lane0_logic_completions_onCtrl_2_port_payload_commit = execute_ctrl2_down_COMMIT_lane0;
+  assign execute_lane0_logic_decoding_decodingBits = {execute_ctrl0_down_lane0_LAYER_SEL_lane0,execute_ctrl0_down_Decode_UOP_lane0};
+  always @(*) begin
+    execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0 = 1'b0;
     end
   end
 
   always @(*) begin
-    execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0 = 1'b0;
+    execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0 = 1'b0;
     end
   end
 
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000050) == 32'h00000040);
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h100000050) == 33'h100000040);
   always @(*) begin
-    execute_ctrl1_down_early0_BranchPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_BranchPlugin_SEL_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_early0_BranchPlugin_SEL_lane0 = 1'b0;
-    end
-  end
-
-  always @(*) begin
-    execute_ctrl1_down_early0_MulPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_MulPlugin_SEL_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_early0_MulPlugin_SEL_lane0 = 1'b0;
-    end
-  end
-
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h02004064) == 32'h02004020);
-  always @(*) begin
-    execute_ctrl1_down_early0_DivPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_DivPlugin_SEL_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_early0_DivPlugin_SEL_lane0 = 1'b0;
+    execute_ctrl0_down_early0_BranchPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_BranchPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_early0_BranchPlugin_SEL_lane0 = 1'b0;
     end
   end
 
   always @(*) begin
-    execute_ctrl1_down_early0_EnvPlugin_SEL_lane0 = _zz_execute_ctrl1_down_early0_EnvPlugin_SEL_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_early0_EnvPlugin_SEL_lane0 = 1'b0;
+    execute_ctrl0_down_early0_MulPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_MulPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_early0_MulPlugin_SEL_lane0 = 1'b0;
     end
   end
 
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 32'h00002050) == 32'h00002050);
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2 = ((execute_lane0_logic_decoding_decodingBits & 32'h00001050) == 32'h00001050);
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h002004064) == 33'h002004020);
   always @(*) begin
-    execute_ctrl1_down_CsrAccessPlugin_SEL_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_SEL_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_CsrAccessPlugin_SEL_lane0 = 1'b0;
+    execute_ctrl0_down_early0_DivPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_DivPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_early0_DivPlugin_SEL_lane0 = 1'b0;
     end
   end
 
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000058) == 32'h0);
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 32'h00001050) == 32'h0);
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 33'h000001048) == 33'h000001008);
   always @(*) begin
-    execute_ctrl1_down_AguPlugin_SEL_lane0 = _zz_execute_ctrl1_down_AguPlugin_SEL_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_AguPlugin_SEL_lane0 = 1'b0;
+    execute_ctrl0_down_early0_EnvPlugin_SEL_lane0 = _zz_execute_ctrl0_down_early0_EnvPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_early0_EnvPlugin_SEL_lane0 = 1'b0;
     end
   end
 
   always @(*) begin
-    execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0 = _zz_execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0 = 1'b0;
-    end
-  end
-
-  assign _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000028) == 32'h0);
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 32'h0000000c) == 32'h00000004);
-  always @(*) begin
-    execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0 = _zz_execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0 = 1'b0;
-    end
-  end
-
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2 = ((execute_lane0_logic_decoding_decodingBits & 32'h02000050) == 32'h00000010);
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3 = ((execute_lane0_logic_decoding_decodingBits & 32'h00003040) == 32'h00000040);
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000030) == 32'h00000010);
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5 = ((execute_lane0_logic_decoding_decodingBits & 32'h00001008) == 32'h00001008);
-  always @(*) begin
-    execute_ctrl1_down_COMPLETION_AT_2_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_2_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_COMPLETION_AT_2_lane0 = 1'b0;
-    end
-  end
-
-  assign _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2 = ((execute_lane0_logic_decoding_decodingBits & 32'h02004064) == 32'h02000020);
-  always @(*) begin
-    execute_ctrl1_down_COMPLETION_AT_4_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_4_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_COMPLETION_AT_4_lane0 = 1'b0;
+    execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0 = _zz_execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0 = 1'b0;
     end
   end
 
   always @(*) begin
-    execute_ctrl1_down_COMPLETION_AT_3_lane0 = _zz_execute_ctrl1_down_COMPLETION_AT_3_lane0[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_COMPLETION_AT_3_lane0 = 1'b0;
+    execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0 = _zz_execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0 = 1'b0;
+    end
+  end
+
+  assign _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h100000010) == 33'h0);
+  always @(*) begin
+    execute_ctrl0_down_late0_BranchPlugin_SEL_lane0 = _zz_execute_ctrl0_down_late0_BranchPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_late0_BranchPlugin_SEL_lane0 = 1'b0;
+    end
+  end
+
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 33'h000002050) == 33'h000002050);
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_2 = ((execute_lane0_logic_decoding_decodingBits & 33'h000001050) == 33'h000001050);
+  always @(*) begin
+    execute_ctrl0_down_CsrAccessPlugin_SEL_lane0 = _zz_execute_ctrl0_down_CsrAccessPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_CsrAccessPlugin_SEL_lane0 = 1'b0;
+    end
+  end
+
+  assign _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 33'h000000058) == 33'h0);
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000001050) == 33'h0);
+  always @(*) begin
+    execute_ctrl0_down_AguPlugin_SEL_lane0 = _zz_execute_ctrl0_down_AguPlugin_SEL_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_AguPlugin_SEL_lane0 = 1'b0;
     end
   end
 
   always @(*) begin
-    execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_6[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = 1'b0;
+    execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0 = _zz_execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0 = 1'b0;
+    end
+  end
+
+  assign _zz_execute_ctrl0_down_AguPlugin_LOAD_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000000028) == 33'h0);
+  assign _zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h00000000c) == 33'h000000004);
+  always @(*) begin
+    execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0 = _zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0_1[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0 = 1'b0;
+    end
+  end
+
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_2 = ((execute_lane0_logic_decoding_decodingBits & 33'h100003040) == 33'h100000040);
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_3 = ((execute_lane0_logic_decoding_decodingBits & 33'h102000050) == 33'h100000010);
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_4 = ((execute_lane0_logic_decoding_decodingBits & 33'h10000000c) == 33'h100000004);
+  assign _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h100000030) == 33'h100000010);
+  always @(*) begin
+    execute_ctrl0_down_COMPLETION_AT_1_lane0 = _zz_execute_ctrl0_down_COMPLETION_AT_1_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_COMPLETION_AT_1_lane0 = 1'b0;
+    end
+  end
+
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 33'h002004064) == 33'h002000020);
+  assign _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_2 = ((execute_lane0_logic_decoding_decodingBits & 33'h100000000) == 33'h0);
+  always @(*) begin
+    execute_ctrl0_down_COMPLETION_AT_3_lane0 = _zz_execute_ctrl0_down_COMPLETION_AT_3_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_COMPLETION_AT_3_lane0 = 1'b0;
     end
   end
 
   always @(*) begin
-    execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = 1'b0;
+    execute_ctrl0_down_COMPLETION_AT_2_lane0 = _zz_execute_ctrl0_down_COMPLETION_AT_2_lane0[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_COMPLETION_AT_2_lane0 = 1'b0;
     end
   end
 
   always @(*) begin
-    execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = _zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3[0];
-    if(execute_ctrl1_down_TRAP_lane0) begin
-      execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = 1'b0;
+    execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_5[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = 1'b0;
     end
   end
 
-  assign _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00006000) == 32'h0);
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000004) == 32'h00000004);
-  assign execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0_1[0];
-  assign execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0[0];
-  assign _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00004000) == 32'h0);
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00001000) == 32'h00001000);
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1 = {(|{_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0,{_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0,_zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0}}),(|{_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0,{_zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0,((execute_lane0_logic_decoding_decodingBits & 32'h00003000) == 32'h00002000)}})};
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1;
-  assign _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
-  assign execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = _zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2;
-  assign execute_ctrl1_down_SrcStageables_REVERT_lane0 = _zz_execute_ctrl1_down_SrcStageables_REVERT_lane0[0];
-  assign execute_ctrl1_down_SrcStageables_ZERO_lane0 = _zz_execute_ctrl1_down_SrcStageables_ZERO_lane0[0];
-  assign execute_ctrl1_down_early0_SrcPlugin_logic_SRC1_CTRL_lane0 = (|((execute_lane0_logic_decoding_decodingBits & 32'h00000044) == 32'h00000004));
-  assign execute_ctrl1_down_early0_SrcPlugin_logic_SRC2_CTRL_lane0 = {(|{_zz_execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0,((execute_lane0_logic_decoding_decodingBits & 32'h00000070) == 32'h00000020)}),(|{((execute_lane0_logic_decoding_decodingBits & 32'h00000050) == 32'h0),((execute_lane0_logic_decoding_decodingBits & 32'h00000024) == 32'h0)})};
-  assign execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 = _zz_execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0[0];
-  assign _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00002000) == 32'h00002000);
-  assign execute_ctrl1_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 = {(|{((execute_lane0_logic_decoding_decodingBits & 32'h00000010) == 32'h00000010),_zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0}),(|((execute_lane0_logic_decoding_decodingBits & 32'h00001010) == 32'h00001000))};
-  assign execute_ctrl1_down_BYPASSED_AT_1_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_1_lane0[0];
-  assign execute_ctrl1_down_BYPASSED_AT_2_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_2_lane0[0];
-  assign execute_ctrl1_down_BYPASSED_AT_3_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_3_lane0[0];
-  assign execute_ctrl1_down_BYPASSED_AT_4_lane0 = _zz_execute_ctrl1_down_BYPASSED_AT_4_lane0[0];
-  assign execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0 = _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0[0];
-  assign execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0 = _zz_execute_ctrl1_down_MAY_FLUSH_PRECISE_4_lane0[0];
-  assign execute_ctrl1_down_SrcStageables_UNSIGNED_lane0 = _zz_execute_ctrl1_down_SrcStageables_UNSIGNED_lane0[0];
-  assign execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0 = _zz_execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0_1[0];
-  assign execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0 = _zz_execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0[0];
-  assign _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1 = {(|_zz_execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0_1),(|((execute_lane0_logic_decoding_decodingBits & 32'h00000008) == 32'h00000008))};
-  assign _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0 = _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_1;
-  assign _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2 = _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0;
-  assign execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0 = _zz_execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0_2;
-  assign execute_ctrl1_down_MulPlugin_HIGH_lane0 = _zz_execute_ctrl1_down_MulPlugin_HIGH_lane0[0];
-  assign execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0 = _zz_execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0[0];
-  assign execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0 = _zz_execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0_1[0];
-  assign execute_ctrl1_down_DivPlugin_REM_lane0 = _zz_execute_ctrl1_down_DivPlugin_REM_lane0[0];
-  assign execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0[0];
-  assign execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0_1[0];
-  assign execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0 = _zz_execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0_1[0];
-  assign execute_ctrl1_down_AguPlugin_LOAD_lane0 = _zz_execute_ctrl1_down_AguPlugin_LOAD_lane0_1[0];
-  assign execute_ctrl1_down_AguPlugin_STORE_lane0 = _zz_execute_ctrl1_down_AguPlugin_STORE_lane0[0];
-  assign execute_ctrl1_down_AguPlugin_ATOMIC_lane0 = _zz_execute_ctrl1_down_AguPlugin_ATOMIC_lane0[0];
-  assign execute_ctrl1_down_AguPlugin_FLOAT_lane0 = _zz_execute_ctrl1_down_AguPlugin_FLOAT_lane0[0];
-  assign execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = _zz_execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0[0];
-  assign _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0 = ((execute_lane0_logic_decoding_decodingBits & 32'h00000040) == 32'h0);
-  assign _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2 = {(|((execute_lane0_logic_decoding_decodingBits & 32'h30001000) == 32'h10000000)),{(|{((execute_lane0_logic_decoding_decodingBits & 32'h20000000) == 32'h20000000),_zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0}),(|{((execute_lane0_logic_decoding_decodingBits & 32'h00100000) == 32'h00100000),_zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0})}};
-  assign _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1 = _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_2;
-  assign _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3 = _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_1;
-  assign execute_ctrl1_down_early0_EnvPlugin_OP_lane0 = _zz_execute_ctrl1_down_early0_EnvPlugin_OP_lane0_3;
-  assign when_ExecuteLanePlugin_l307 = (|{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}});
+  always @(*) begin
+    execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0_3[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = 1'b0;
+    end
+  end
+
+  always @(*) begin
+    execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = _zz_execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0_3[0];
+    if(execute_ctrl0_down_TRAP_lane0) begin
+      execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = 1'b0;
+    end
+  end
+
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000006000) == 33'h0);
+  assign _zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000000004) == 33'h000000004);
+  assign execute_ctrl0_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 = _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0[0];
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000006004) == 33'h000002000);
+  assign execute_ctrl0_down_early0_IntAluPlugin_ALU_SLTX_lane0 = _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_SLTX_lane0[0];
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000003000) == 33'h000002000);
+  assign _zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000004000) == 33'h0);
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000001000) == 33'h000001000);
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1 = {(|{_zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0,{_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0,_zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0}}),(|{_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0,{_zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0,_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0}})};
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1;
+  assign _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2 = _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  assign execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = _zz_execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2;
+  assign execute_ctrl0_down_SrcStageables_REVERT_lane0 = _zz_execute_ctrl0_down_SrcStageables_REVERT_lane0[0];
+  assign execute_ctrl0_down_SrcStageables_ZERO_lane0 = _zz_execute_ctrl0_down_SrcStageables_ZERO_lane0[0];
+  assign execute_ctrl0_down_early0_SrcPlugin_logic_SRC1_CTRL_lane0 = (|((execute_lane0_logic_decoding_decodingBits & 33'h000000044) == 33'h000000004));
+  assign _zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 33'h000000024) == 33'h0);
+  assign execute_ctrl0_down_early0_SrcPlugin_logic_SRC2_CTRL_lane0 = {(|{_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0,((execute_lane0_logic_decoding_decodingBits & 33'h000000070) == 33'h000000020)}),(|{((execute_lane0_logic_decoding_decodingBits & 33'h000000050) == 33'h0),_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0_1})};
+  assign execute_ctrl0_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 = _zz_execute_ctrl0_down_lane0_IntFormatPlugin_logic_SIGNED_lane0[0];
+  assign _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000002000) == 33'h000002000);
+  assign execute_ctrl0_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 = {(|{((execute_lane0_logic_decoding_decodingBits & 33'h000000010) == 33'h000000010),_zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0}),(|((execute_lane0_logic_decoding_decodingBits & 33'h000001010) == 33'h000001000))};
+  assign _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_1 = ((execute_lane0_logic_decoding_decodingBits & 33'h100000004) == 33'h100000004);
+  assign execute_ctrl0_down_BYPASSED_AT_1_lane0 = _zz_execute_ctrl0_down_BYPASSED_AT_1_lane0[0];
+  assign execute_ctrl0_down_BYPASSED_AT_2_lane0 = _zz_execute_ctrl0_down_BYPASSED_AT_2_lane0_2[0];
+  assign execute_ctrl0_down_MAY_FLUSH_PRECISE_2_lane0 = _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_2_lane0[0];
+  assign execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0 = _zz_execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0_2[0];
+  assign execute_ctrl0_down_SrcStageables_UNSIGNED_lane0 = _zz_execute_ctrl0_down_SrcStageables_UNSIGNED_lane0[0];
+  assign execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0 = _zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0_1[0];
+  assign execute_ctrl0_down_BarrelShifterPlugin_SIGNED_lane0 = _zz_execute_ctrl0_down_BarrelShifterPlugin_SIGNED_lane0[0];
+  assign _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_1 = {(|_zz_execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0),(|((execute_lane0_logic_decoding_decodingBits & 33'h000000008) == 33'h000000008))};
+  assign _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0 = _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_1;
+  assign _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_2 = _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0;
+  assign execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0 = _zz_execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0_2;
+  assign execute_ctrl0_down_MulPlugin_HIGH_lane0 = _zz_execute_ctrl0_down_MulPlugin_HIGH_lane0[0];
+  assign execute_ctrl0_down_RsUnsignedPlugin_RS1_SIGNED_lane0 = _zz_execute_ctrl0_down_RsUnsignedPlugin_RS1_SIGNED_lane0[0];
+  assign execute_ctrl0_down_RsUnsignedPlugin_RS2_SIGNED_lane0 = _zz_execute_ctrl0_down_RsUnsignedPlugin_RS2_SIGNED_lane0[0];
+  assign execute_ctrl0_down_DivPlugin_REM_lane0 = _zz_execute_ctrl0_down_DivPlugin_REM_lane0[0];
+  assign execute_ctrl0_down_CsrAccessPlugin_CSR_IMM_lane0 = _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_IMM_lane0[0];
+  assign execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0 = _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0_1[0];
+  assign execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0 = _zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0_1[0];
+  assign execute_ctrl0_down_AguPlugin_LOAD_lane0 = _zz_execute_ctrl0_down_AguPlugin_LOAD_lane0_1[0];
+  assign execute_ctrl0_down_AguPlugin_STORE_lane0 = _zz_execute_ctrl0_down_AguPlugin_STORE_lane0[0];
+  assign execute_ctrl0_down_AguPlugin_ATOMIC_lane0 = _zz_execute_ctrl0_down_AguPlugin_ATOMIC_lane0[0];
+  assign execute_ctrl0_down_AguPlugin_FLOAT_lane0 = _zz_execute_ctrl0_down_AguPlugin_FLOAT_lane0[0];
+  assign execute_ctrl0_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = _zz_execute_ctrl0_down_LsuPlugin_logic_LSU_PREFETCH_lane0[0];
+  assign _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0 = ((execute_lane0_logic_decoding_decodingBits & 33'h000000040) == 33'h0);
+  assign _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2 = {(|((execute_lane0_logic_decoding_decodingBits & 33'h030001000) == 33'h010000000)),{(|{((execute_lane0_logic_decoding_decodingBits & 33'h020000000) == 33'h020000000),_zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0}),(|{((execute_lane0_logic_decoding_decodingBits & 33'h000100000) == 33'h000100000),_zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0})}};
+  assign _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1 = _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_2;
+  assign _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3 = _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_1;
+  assign execute_ctrl0_down_early0_EnvPlugin_OP_lane0 = _zz_execute_ctrl0_down_early0_EnvPlugin_OP_lane0_3;
+  assign execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0 = _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0_1[0];
+  assign execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0 = _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0_1[0];
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2 = {(|{_zz_execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0,{_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0,_zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0}}),(|{_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0,{_zz_execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0,_zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0}})};
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1 = _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_2;
+  assign _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3 = _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_1;
+  assign execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = _zz_execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0_3;
+  assign execute_ctrl0_down_late0_SrcPlugin_logic_SRC1_CTRL_lane0 = (|_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0);
+  assign execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0 = {(|_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0),(|_zz_execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0_1)};
+  assign when_ExecuteLanePlugin_l307 = (|{(late0_BranchPlugin_logic_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}});
   assign execute_lane0_ctrls_0_downIsCancel = 1'b0;
   assign execute_lane0_ctrls_0_upIsCancel = when_ExecuteLanePlugin_l307;
-  assign when_ExecuteLanePlugin_l307_1 = (|{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}});
+  assign when_ExecuteLanePlugin_l307_1 = (|{(late0_BranchPlugin_logic_flushPort_valid && 1'b1),{((early0_EnvPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (_zz_when_ExecuteLanePlugin_l307_1 && early0_EnvPlugin_logic_flushPort_payload_self))),{((CsrAccessPlugin_logic_flushPort_valid && _zz_when_ExecuteLanePlugin_l307_1_1) && (_zz_when_ExecuteLanePlugin_l307_1_2 || _zz_when_ExecuteLanePlugin_l307_1_3)),{(_zz_when_ExecuteLanePlugin_l307_1_4 && _zz_when_ExecuteLanePlugin_l307_1_5),(LsuPlugin_logic_flushPort_valid && _zz_when_ExecuteLanePlugin_l307_1_6)}}}});
   assign execute_lane0_ctrls_1_downIsCancel = 1'b0;
   assign execute_lane0_ctrls_1_upIsCancel = when_ExecuteLanePlugin_l307_1;
-  assign when_ExecuteLanePlugin_l307_2 = (|{((early0_EnvPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && early0_EnvPlugin_logic_flushPort_payload_self))),{((CsrAccessPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (_zz_when_ExecuteLanePlugin_l307_2 && CsrAccessPlugin_logic_flushPort_payload_self))),{((early0_BranchPlugin_logic_flushPort_valid && _zz_when_ExecuteLanePlugin_l307_2_1) && (_zz_when_ExecuteLanePlugin_l307_2_2 || _zz_when_ExecuteLanePlugin_l307_2_3)),(LsuPlugin_logic_flushPort_valid && 1'b1)}}});
+  assign when_ExecuteLanePlugin_l307_2 = (|{(late0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)});
   assign execute_lane0_ctrls_2_downIsCancel = 1'b0;
   assign execute_lane0_ctrls_2_upIsCancel = when_ExecuteLanePlugin_l307_2;
-  assign when_ExecuteLanePlugin_l307_3 = (|(LsuPlugin_logic_flushPort_valid && 1'b1));
+  assign when_ExecuteLanePlugin_l307_3 = (|{((late0_BranchPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && late0_BranchPlugin_logic_flushPort_payload_self))),((LsuPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && LsuPlugin_logic_flushPort_payload_self)))});
   assign execute_lane0_ctrls_3_downIsCancel = 1'b0;
   assign execute_lane0_ctrls_3_upIsCancel = when_ExecuteLanePlugin_l307_3;
-  assign when_ExecuteLanePlugin_l307_4 = (|((LsuPlugin_logic_flushPort_valid && 1'b1) && (1'b0 || (1'b1 && LsuPlugin_logic_flushPort_payload_self))));
   assign execute_lane0_ctrls_4_downIsCancel = 1'b0;
-  assign execute_lane0_ctrls_4_upIsCancel = when_ExecuteLanePlugin_l307_4;
-  assign execute_lane0_ctrls_5_downIsCancel = 1'b0;
-  assign execute_lane0_ctrls_5_upIsCancel = 1'b0;
-  assign execute_lane0_logic_trapPending[0] = (|{((execute_ctrl4_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl4_down_TRAP_lane0),{((execute_ctrl3_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl3_down_TRAP_lane0),{((execute_ctrl2_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl2_down_TRAP_lane0),((execute_ctrl1_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl1_down_TRAP_lane0)}}});
-  assign execute_ctrl2_up_COMMIT_lane0 = (! execute_ctrl2_up_TRAP_lane0);
+  assign execute_lane0_ctrls_4_upIsCancel = 1'b0;
+  assign execute_lane0_logic_trapPending[0] = (|{((execute_ctrl3_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl3_down_TRAP_lane0),{((execute_ctrl2_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl2_down_TRAP_lane0),((execute_ctrl1_up_LANE_SEL_lane0 && 1'b1) && execute_ctrl1_down_TRAP_lane0)}});
+  assign execute_ctrl1_up_COMMIT_lane0 = (! execute_ctrl1_up_TRAP_lane0);
   assign WhiteboxerPlugin_logic_csr_access_valid = CsrAccessPlugin_logic_fsm_interface_fire;
   assign WhiteboxerPlugin_logic_csr_access_payload_uopId = CsrAccessPlugin_logic_fsm_interface_uopId;
   assign WhiteboxerPlugin_logic_csr_access_payload_address = _zz_WhiteboxerPlugin_logic_csr_access_payload_address[31 : 20];
@@ -7370,62 +9281,75 @@ module VexiiRiscv (
   assign WhiteboxerPlugin_logic_completions_ports_3_payload_uopId = execute_lane0_logic_completions_onCtrl_2_port_payload_uopId;
   assign WhiteboxerPlugin_logic_completions_ports_3_payload_trap = execute_lane0_logic_completions_onCtrl_2_port_payload_trap;
   assign WhiteboxerPlugin_logic_completions_ports_3_payload_commit = execute_lane0_logic_completions_onCtrl_2_port_payload_commit;
-  assign WhiteboxerPlugin_logic_commits_ports_0_oh_0 = ((((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_COMMIT_lane0) && 1'b1);
+  assign WhiteboxerPlugin_logic_commits_ports_0_oh_0 = ((((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && execute_ctrl3_down_COMMIT_lane0) && 1'b1);
   assign WhiteboxerPlugin_logic_commits_ports_0_valid = (|WhiteboxerPlugin_logic_commits_ports_0_oh_0);
-  assign WhiteboxerPlugin_logic_commits_ports_0_pc = (WhiteboxerPlugin_logic_commits_ports_0_oh_0 ? execute_ctrl4_down_PC_lane0 : 32'h0);
-  assign WhiteboxerPlugin_logic_commits_ports_0_uop = (WhiteboxerPlugin_logic_commits_ports_0_oh_0 ? execute_ctrl4_down_Decode_UOP_lane0 : 32'h0);
-  assign WhiteboxerPlugin_logic_reschedules_flushes_0_valid = LsuPlugin_logic_flushPort_valid;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_0_payload_uopId = LsuPlugin_logic_flushPort_payload_uopId;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_0_payload_self = LsuPlugin_logic_flushPort_payload_self;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_1_valid = early0_BranchPlugin_logic_flushPort_valid;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_1_payload_uopId = early0_BranchPlugin_logic_flushPort_payload_uopId;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_1_payload_self = early0_BranchPlugin_logic_flushPort_payload_self;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_2_valid = CsrAccessPlugin_logic_flushPort_valid;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_2_payload_uopId = CsrAccessPlugin_logic_flushPort_payload_uopId;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_2_payload_self = CsrAccessPlugin_logic_flushPort_payload_self;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_3_valid = early0_EnvPlugin_logic_flushPort_valid;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_3_payload_uopId = early0_EnvPlugin_logic_flushPort_payload_uopId;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_3_payload_self = early0_EnvPlugin_logic_flushPort_payload_self;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_4_valid = DecoderPlugin_logic_laneLogic_0_flushPort_valid;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_4_payload_uopId = DecoderPlugin_logic_laneLogic_0_flushPort_payload_uopId;
-  assign WhiteboxerPlugin_logic_reschedules_flushes_4_payload_self = DecoderPlugin_logic_laneLogic_0_flushPort_payload_self;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_valid = early0_BranchPlugin_logic_jumpLogic_learn_valid;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcOnLastSlice = early0_BranchPlugin_logic_jumpLogic_learn_payload_pcOnLastSlice;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcTarget = early0_BranchPlugin_logic_jumpLogic_learn_payload_pcTarget;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_taken = early0_BranchPlugin_logic_jumpLogic_learn_payload_taken;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isBranch = early0_BranchPlugin_logic_jumpLogic_learn_payload_isBranch;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPush = early0_BranchPlugin_logic_jumpLogic_learn_payload_isPush;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPop = early0_BranchPlugin_logic_jumpLogic_learn_payload_isPop;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_wasWrong = early0_BranchPlugin_logic_jumpLogic_learn_payload_wasWrong;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_badPredictedTarget = early0_BranchPlugin_logic_jumpLogic_learn_payload_badPredictedTarget;
-  assign early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_uopId = early0_BranchPlugin_logic_jumpLogic_learn_payload_uopId;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_valid = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_valid;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_pcOnLastSlice = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcOnLastSlice;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_pcTarget = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcTarget;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_taken = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_taken;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_isBranch = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isBranch;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_isPush = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPush;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_isPop = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPop;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_wasWrong = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_wasWrong;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_badPredictedTarget = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_badPredictedTarget;
-  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_uopId = early0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_uopId;
-  assign WhiteboxerPlugin_logic_loadExecute_fire = (((((((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_AguPlugin_SEL_lane0) && execute_ctrl4_down_AguPlugin_LOAD_lane0) && (! execute_ctrl4_down_LsuPlugin_logic_LSU_PREFETCH_lane0)) && (! execute_ctrl4_down_TRAP_lane0)) && (! execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0));
-  assign WhiteboxerPlugin_logic_loadExecute_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
-  assign WhiteboxerPlugin_logic_loadExecute_size = execute_ctrl4_down_AguPlugin_SIZE_lane0;
-  assign WhiteboxerPlugin_logic_loadExecute_address = execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+  assign WhiteboxerPlugin_logic_commits_ports_0_pc = (WhiteboxerPlugin_logic_commits_ports_0_oh_0 ? execute_ctrl3_down_PC_lane0 : 32'h0);
+  assign WhiteboxerPlugin_logic_commits_ports_0_uop = (WhiteboxerPlugin_logic_commits_ports_0_oh_0 ? execute_ctrl3_down_Decode_UOP_lane0 : 32'h0);
+  assign WhiteboxerPlugin_logic_reschedules_flushes_0_valid = BtbPlugin_logic_flushPort_valid;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_0_payload_self = BtbPlugin_logic_flushPort_payload_self;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_1_valid = LsuPlugin_logic_flushPort_valid;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_1_payload_uopId = LsuPlugin_logic_flushPort_payload_uopId;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_1_payload_self = LsuPlugin_logic_flushPort_payload_self;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_2_valid = early0_BranchPlugin_logic_flushPort_valid;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_2_payload_uopId = early0_BranchPlugin_logic_flushPort_payload_uopId;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_2_payload_self = early0_BranchPlugin_logic_flushPort_payload_self;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_3_valid = CsrAccessPlugin_logic_flushPort_valid;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_3_payload_uopId = CsrAccessPlugin_logic_flushPort_payload_uopId;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_3_payload_self = CsrAccessPlugin_logic_flushPort_payload_self;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_4_valid = early0_EnvPlugin_logic_flushPort_valid;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_4_payload_uopId = early0_EnvPlugin_logic_flushPort_payload_uopId;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_4_payload_self = early0_EnvPlugin_logic_flushPort_payload_self;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_5_valid = late0_BranchPlugin_logic_flushPort_valid;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_5_payload_uopId = late0_BranchPlugin_logic_flushPort_payload_uopId;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_5_payload_self = late0_BranchPlugin_logic_flushPort_payload_self;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_6_valid = DecoderPlugin_logic_laneLogic_0_flushPort_valid;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_6_payload_uopId = DecoderPlugin_logic_laneLogic_0_flushPort_payload_uopId;
+  assign WhiteboxerPlugin_logic_reschedules_flushes_6_payload_self = DecoderPlugin_logic_laneLogic_0_flushPort_payload_self;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_valid = late0_BranchPlugin_logic_jumpLogic_learn_valid;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcOnLastSlice = late0_BranchPlugin_logic_jumpLogic_learn_payload_pcOnLastSlice;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcTarget = late0_BranchPlugin_logic_jumpLogic_learn_payload_pcTarget;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_taken = late0_BranchPlugin_logic_jumpLogic_learn_payload_taken;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isBranch = late0_BranchPlugin_logic_jumpLogic_learn_payload_isBranch;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPush = late0_BranchPlugin_logic_jumpLogic_learn_payload_isPush;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPop = late0_BranchPlugin_logic_jumpLogic_learn_payload_isPop;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_wasWrong = late0_BranchPlugin_logic_jumpLogic_learn_payload_wasWrong;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_badPredictedTarget = late0_BranchPlugin_logic_jumpLogic_learn_payload_badPredictedTarget;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_history = late0_BranchPlugin_logic_jumpLogic_learn_payload_history;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_uopId = late0_BranchPlugin_logic_jumpLogic_learn_payload_uopId;
+  assign late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 = late0_BranchPlugin_logic_jumpLogic_learn_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_valid = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_valid;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_pcOnLastSlice = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcOnLastSlice;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_pcTarget = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_pcTarget;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_taken = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_taken;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_isBranch = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isBranch;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_isPush = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPush;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_isPop = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_isPop;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_wasWrong = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_wasWrong;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_badPredictedTarget = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_badPredictedTarget;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_history = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_history;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_uopId = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_uopId;
+  assign WhiteboxerPlugin_logic_prediction_learns_0_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 = late0_BranchPlugin_logic_jumpLogic_learn_asFlow_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
+  assign WhiteboxerPlugin_logic_loadExecute_fire = (((((((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && execute_ctrl3_down_AguPlugin_SEL_lane0) && execute_ctrl3_down_AguPlugin_LOAD_lane0) && (! execute_ctrl3_down_LsuPlugin_logic_LSU_PREFETCH_lane0)) && (! execute_ctrl3_down_TRAP_lane0)) && (! execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0));
+  assign WhiteboxerPlugin_logic_loadExecute_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
+  assign WhiteboxerPlugin_logic_loadExecute_size = execute_ctrl3_down_AguPlugin_SIZE_lane0;
+  assign WhiteboxerPlugin_logic_loadExecute_address = execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0;
   assign WhiteboxerPlugin_logic_loadExecute_data = lane0_IntFormatPlugin_logic_stages_1_wb_payload;
   assign WhiteboxerPlugin_logic_storeCommit_fire = LsuPlugin_logic_onWb_storeFire;
-  assign WhiteboxerPlugin_logic_storeCommit_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
-  assign WhiteboxerPlugin_logic_storeCommit_size = execute_ctrl4_down_AguPlugin_SIZE_lane0;
-  assign WhiteboxerPlugin_logic_storeCommit_address = execute_ctrl4_down_MMU_TRANSLATED_lane0;
-  assign WhiteboxerPlugin_logic_storeCommit_data = execute_ctrl4_down_LsuL1_WRITE_DATA_lane0;
-  assign WhiteboxerPlugin_logic_storeCommit_storeId = execute_ctrl4_down_Decode_STORE_ID_lane0;
+  assign WhiteboxerPlugin_logic_storeCommit_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
+  assign WhiteboxerPlugin_logic_storeCommit_size = execute_ctrl3_down_AguPlugin_SIZE_lane0;
+  assign WhiteboxerPlugin_logic_storeCommit_address = execute_ctrl3_down_MMU_TRANSLATED_lane0;
+  assign WhiteboxerPlugin_logic_storeCommit_data = execute_ctrl3_down_LsuL1_WRITE_DATA_lane0;
+  assign WhiteboxerPlugin_logic_storeCommit_storeId = execute_ctrl3_down_Decode_STORE_ID_lane0;
   assign WhiteboxerPlugin_logic_storeCommit_amo = 1'b0;
-  assign WhiteboxerPlugin_logic_storeConditional_fire = (((((execute_ctrl4_down_LANE_SEL_lane0 && execute_ctrl4_down_isReady) && (! execute_lane0_ctrls_4_downIsCancel)) && execute_ctrl4_down_AguPlugin_SEL_lane0) && (execute_ctrl4_down_AguPlugin_ATOMIC_lane0 && (! execute_ctrl4_down_AguPlugin_LOAD_lane0))) && (! execute_ctrl4_down_TRAP_lane0));
-  assign WhiteboxerPlugin_logic_storeConditional_uopId = execute_ctrl4_down_Decode_UOP_ID_lane0;
-  assign WhiteboxerPlugin_logic_storeConditional_miss = execute_ctrl4_down_LsuPlugin_logic_onCtrl_SC_MISS_lane0;
+  assign WhiteboxerPlugin_logic_storeConditional_fire = (((((execute_ctrl3_down_LANE_SEL_lane0 && execute_ctrl3_down_isReady) && (! execute_lane0_ctrls_3_downIsCancel)) && execute_ctrl3_down_AguPlugin_SEL_lane0) && (execute_ctrl3_down_AguPlugin_ATOMIC_lane0 && (! execute_ctrl3_down_AguPlugin_LOAD_lane0))) && (! execute_ctrl3_down_TRAP_lane0));
+  assign WhiteboxerPlugin_logic_storeConditional_uopId = execute_ctrl3_down_Decode_UOP_ID_lane0;
+  assign WhiteboxerPlugin_logic_storeConditional_miss = execute_ctrl3_down_LsuPlugin_logic_onCtrl_SC_MISS_lane0;
   assign WhiteboxerPlugin_logic_storeBroadcast_fire = LsuPlugin_logic_onWb_storeBroadcast;
-  assign WhiteboxerPlugin_logic_storeBroadcast_storeId = execute_ctrl4_down_Decode_STORE_ID_lane0;
+  assign WhiteboxerPlugin_logic_storeBroadcast_storeId = execute_ctrl3_down_Decode_STORE_ID_lane0;
+  assign fetch_logic_flushes_0_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(late0_BranchPlugin_logic_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),{(LsuPlugin_logic_flushPort_valid && _zz_fetch_logic_flushes_0_doIt),(_zz_fetch_logic_flushes_0_doIt_1 && _zz_fetch_logic_flushes_0_doIt_2)}}}}}});
+  assign fetch_logic_ctrls_1_throwWhen_FetchPipelinePlugin_l48 = fetch_logic_flushes_0_doIt;
+  assign fetch_logic_flushes_1_doIt = (|{(DecoderPlugin_logic_laneLogic_0_flushPort_valid && 1'b1),{(late0_BranchPlugin_logic_flushPort_valid && 1'b1),{(early0_EnvPlugin_logic_flushPort_valid && 1'b1),{(CsrAccessPlugin_logic_flushPort_valid && 1'b1),{(early0_BranchPlugin_logic_flushPort_valid && 1'b1),(LsuPlugin_logic_flushPort_valid && 1'b1)}}}}});
+  assign fetch_logic_ctrls_2_forgetsSingleRequest_FetchPipelinePlugin_l50 = fetch_logic_flushes_1_doIt;
   assign integer_RegFilePlugin_logic_writeMerges_0_bus_valid = (|lane0_integer_WriteBackPlugin_logic_write_port_valid);
   assign integer_RegFilePlugin_logic_writeMerges_0_bus_address = lane0_integer_WriteBackPlugin_logic_write_port_address;
   assign integer_RegFilePlugin_logic_writeMerges_0_bus_data = lane0_integer_WriteBackPlugin_logic_write_port_data;
@@ -7460,8 +9384,8 @@ module VexiiRiscv (
   assign integer_write_0_data = integer_RegFilePlugin_logic_writeMerges_0_bus_data;
   assign integer_write_0_uopId = integer_RegFilePlugin_logic_writeMerges_0_bus_uopId;
   assign execute_freeze_valid = (|{CsrAccessPlugin_logic_fsm_inject_freeze,{LsuPlugin_logic_onCtrl_io_freezeIt,early0_DivPlugin_logic_processing_freeze}});
-  assign execute_ctrl5_down_ready = (! execute_freeze_valid);
-  assign TrapPlugin_logic_initHold = (|{(! CsrRamPlugin_logic_flush_done),{((! LsuL1Plugin_logic_initializer_done) || 1'b0),{(! integer_RegFilePlugin_logic_initalizer_done),(FetchL1Plugin_logic_invalidate_firstEver || 1'b0)}}});
+  assign execute_ctrl4_down_ready = (! execute_freeze_valid);
+  assign TrapPlugin_logic_initHold = (|{(! CsrRamPlugin_logic_flush_done),{((! LsuL1Plugin_logic_initializer_done) || 1'b0),{(! integer_RegFilePlugin_logic_initalizer_done),{(FetchL1Plugin_logic_invalidate_firstEver || 1'b0),{1'b0,1'b0}}}}});
   assign WhiteboxerPlugin_logic_wfi = TrapPlugin_logic_harts_0_trap_fsm_wfi;
   assign WhiteboxerPlugin_logic_perf_executeFreezed = execute_freeze_valid;
   assign WhiteboxerPlugin_logic_perf_dispatchHazards = (|(DispatchPlugin_logic_candidates_0_ctx_valid && (! DispatchPlugin_logic_candidates_0_fire)));
@@ -7584,7 +9508,7 @@ module VexiiRiscv (
     end
   end
 
-  assign when_CtrlLink_l150 = (|{fetch_logic_ctrls_0_haltRequest_PcPlugin_l133,{fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l297,fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l217}});
+  assign when_CtrlLink_l150 = (|{fetch_logic_ctrls_0_haltRequest_PcPlugin_l133,{fetch_logic_ctrls_0_haltRequest_BtbPlugin_l200,{fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l297,fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l217}}});
   assign fetch_logic_ctrls_0_down_Fetch_WORD_PC = fetch_logic_ctrls_0_up_Fetch_WORD_PC;
   assign fetch_logic_ctrls_0_down_Fetch_PC_FAULT = fetch_logic_ctrls_0_up_Fetch_PC_FAULT;
   assign fetch_logic_ctrls_0_down_Fetch_ID = fetch_logic_ctrls_0_up_Fetch_ID;
@@ -7601,21 +9525,40 @@ module VexiiRiscv (
   assign fetch_logic_ctrls_1_down_Fetch_PC_FAULT = fetch_logic_ctrls_1_up_Fetch_PC_FAULT;
   assign fetch_logic_ctrls_1_down_Fetch_ID = fetch_logic_ctrls_1_up_Fetch_ID;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID = fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0 = fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE = fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS = fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
+  assign fetch_logic_ctrls_1_down_GSharePlugin_logic_HASH = fetch_logic_ctrls_1_up_GSharePlugin_logic_HASH;
+  assign fetch_logic_ctrls_1_down_Prediction_BRANCH_HISTORY = fetch_logic_ctrls_1_up_Prediction_BRANCH_HISTORY;
+  assign fetch_logic_ctrls_1_down_GSharePlugin_logic_BYPASS_valid = fetch_logic_ctrls_1_up_GSharePlugin_logic_BYPASS_valid;
+  assign fetch_logic_ctrls_1_down_GSharePlugin_logic_BYPASS_payload_address = fetch_logic_ctrls_1_up_GSharePlugin_logic_BYPASS_payload_address;
+  assign fetch_logic_ctrls_1_down_GSharePlugin_logic_BYPASS_payload_data_0 = fetch_logic_ctrls_1_up_GSharePlugin_logic_BYPASS_payload_data_0;
+  assign fetch_logic_ctrls_1_down_BtbPlugin_logic_readCmd_HAZARDS = fetch_logic_ctrls_1_up_BtbPlugin_logic_readCmd_HAZARDS;
   assign fetch_logic_ctrls_2_down_valid = fetch_logic_ctrls_2_up_valid;
   assign fetch_logic_ctrls_2_up_ready = fetch_logic_ctrls_2_down_isReady;
   assign fetch_logic_ctrls_2_down_Fetch_WORD_PC = fetch_logic_ctrls_2_up_Fetch_WORD_PC;
   assign fetch_logic_ctrls_2_down_Fetch_PC_FAULT = fetch_logic_ctrls_2_up_Fetch_PC_FAULT;
   assign fetch_logic_ctrls_2_down_Fetch_ID = fetch_logic_ctrls_2_up_Fetch_ID;
+  assign fetch_logic_ctrls_2_down_Prediction_BRANCH_HISTORY = fetch_logic_ctrls_2_up_Prediction_BRANCH_HISTORY;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_error = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_error;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_address = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_error = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_address = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_address;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_PLRU_BYPASSED_0 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_PLRU_BYPASSED_0;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_0 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_0;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_1 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_1;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_HAZARD = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_HAZARD;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_0;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_1;
   assign fetch_logic_ctrls_2_down_MMU_TRANSLATED = fetch_logic_ctrls_2_up_MMU_TRANSLATED;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HIT = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HIT;
+  assign fetch_logic_ctrls_2_down_GSharePlugin_GSHARE_COUNTER_0 = fetch_logic_ctrls_2_up_GSharePlugin_GSHARE_COUNTER_0;
+  assign fetch_logic_ctrls_2_down_Prediction_WORD_JUMPED = fetch_logic_ctrls_2_up_Prediction_WORD_JUMPED;
+  assign fetch_logic_ctrls_2_down_Prediction_WORD_JUMP_PC = fetch_logic_ctrls_2_up_Prediction_WORD_JUMP_PC;
+  assign fetch_logic_ctrls_2_down_Prediction_WORD_SLICES_BRANCH = fetch_logic_ctrls_2_up_Prediction_WORD_SLICES_BRANCH;
+  assign fetch_logic_ctrls_2_down_Prediction_WORD_SLICES_TAKEN = fetch_logic_ctrls_2_up_Prediction_WORD_SLICES_TAKEN;
   assign fetch_logic_ctrls_2_down_MMU_REFILL = fetch_logic_ctrls_2_up_MMU_REFILL;
   assign fetch_logic_ctrls_2_down_MMU_HAZARD = fetch_logic_ctrls_2_up_MMU_HAZARD;
   assign fetch_logic_ctrls_2_down_MMU_ALLOW_EXECUTE = fetch_logic_ctrls_2_up_MMU_ALLOW_EXECUTE;
@@ -7639,7 +9582,14 @@ module VexiiRiscv (
   assign decode_ctrls_0_down_PC_0 = decode_ctrls_0_up_PC_0;
   assign decode_ctrls_0_down_Decode_DOP_ID_0 = decode_ctrls_0_up_Decode_DOP_ID_0;
   assign decode_ctrls_0_down_Fetch_ID_0 = decode_ctrls_0_up_Fetch_ID_0;
+  assign decode_ctrls_0_down_GSharePlugin_GSHARE_COUNTER_0_0 = decode_ctrls_0_up_GSharePlugin_GSHARE_COUNTER_0_0;
+  assign decode_ctrls_0_down_Prediction_BRANCH_HISTORY_0 = decode_ctrls_0_up_Prediction_BRANCH_HISTORY_0;
   assign decode_ctrls_0_down_TRAP_0 = decode_ctrls_0_up_TRAP_0;
+  assign decode_ctrls_0_down_Prediction_ALIGNED_JUMPED_0 = decode_ctrls_0_up_Prediction_ALIGNED_JUMPED_0;
+  assign decode_ctrls_0_down_Prediction_ALIGNED_JUMPED_PC_0 = decode_ctrls_0_up_Prediction_ALIGNED_JUMPED_PC_0;
+  assign decode_ctrls_0_down_Prediction_ALIGNED_SLICES_BRANCH_0 = decode_ctrls_0_up_Prediction_ALIGNED_SLICES_BRANCH_0;
+  assign decode_ctrls_0_down_Prediction_ALIGNED_SLICES_TAKEN_0 = decode_ctrls_0_up_Prediction_ALIGNED_SLICES_TAKEN_0;
+  assign decode_ctrls_0_down_Prediction_ALIGN_REDO_0 = decode_ctrls_0_up_Prediction_ALIGN_REDO_0;
   assign decode_ctrls_1_down_valid = decode_ctrls_1_up_valid;
   assign decode_ctrls_1_up_ready = decode_ctrls_1_down_isReady;
   assign decode_ctrls_1_down_Decode_INSTRUCTION_0 = decode_ctrls_1_up_Decode_INSTRUCTION_0;
@@ -7647,13 +9597,23 @@ module VexiiRiscv (
   assign decode_ctrls_1_down_Decode_INSTRUCTION_RAW_0 = decode_ctrls_1_up_Decode_INSTRUCTION_RAW_0;
   assign decode_ctrls_1_down_PC_0 = decode_ctrls_1_up_PC_0;
   assign decode_ctrls_1_down_Decode_DOP_ID_0 = decode_ctrls_1_up_Decode_DOP_ID_0;
+  assign decode_ctrls_1_down_GSharePlugin_GSHARE_COUNTER_0_0 = decode_ctrls_1_up_GSharePlugin_GSHARE_COUNTER_0_0;
+  assign decode_ctrls_1_down_Prediction_BRANCH_HISTORY_0 = decode_ctrls_1_up_Prediction_BRANCH_HISTORY_0;
+  assign decode_ctrls_1_down_Prediction_ALIGNED_JUMPED_0 = decode_ctrls_1_up_Prediction_ALIGNED_JUMPED_0;
+  assign decode_ctrls_1_down_Prediction_ALIGNED_JUMPED_PC_0 = decode_ctrls_1_up_Prediction_ALIGNED_JUMPED_PC_0;
+  assign decode_ctrls_1_down_Prediction_ALIGNED_SLICES_BRANCH_0 = decode_ctrls_1_up_Prediction_ALIGNED_SLICES_BRANCH_0;
+  assign decode_ctrls_1_down_Prediction_ALIGNED_SLICES_TAKEN_0 = decode_ctrls_1_up_Prediction_ALIGNED_SLICES_TAKEN_0;
+  assign decode_ctrls_1_down_Prediction_ALIGN_REDO_0 = decode_ctrls_1_up_Prediction_ALIGN_REDO_0;
   assign execute_ctrl0_down_ready = execute_ctrl1_up_ready;
   assign execute_ctrl1_down_ready = execute_ctrl2_up_ready;
   assign execute_ctrl2_down_ready = execute_ctrl3_up_ready;
   assign execute_ctrl3_down_ready = execute_ctrl4_up_ready;
-  assign execute_ctrl4_down_ready = execute_ctrl5_up_ready;
   assign execute_ctrl0_up_ready = execute_ctrl0_down_isReady;
   assign execute_ctrl0_down_Decode_UOP_lane0 = execute_ctrl0_up_Decode_UOP_lane0;
+  assign execute_ctrl0_down_Prediction_ALIGNED_JUMPED_lane0 = execute_ctrl0_up_Prediction_ALIGNED_JUMPED_lane0;
+  assign execute_ctrl0_down_Prediction_ALIGNED_JUMPED_PC_lane0 = execute_ctrl0_up_Prediction_ALIGNED_JUMPED_PC_lane0;
+  assign execute_ctrl0_down_GSharePlugin_GSHARE_COUNTER_lane0_0 = execute_ctrl0_up_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  assign execute_ctrl0_down_Prediction_BRANCH_HISTORY_lane0 = execute_ctrl0_up_Prediction_BRANCH_HISTORY_lane0;
   assign execute_ctrl0_down_PC_lane0 = execute_ctrl0_up_PC_lane0;
   assign execute_ctrl0_down_TRAP_lane0 = execute_ctrl0_up_TRAP_lane0;
   assign execute_ctrl0_down_Decode_UOP_ID_lane0 = execute_ctrl0_up_Decode_UOP_ID_lane0;
@@ -7661,112 +9621,191 @@ module VexiiRiscv (
   assign execute_ctrl0_down_RS2_PHYS_lane0 = execute_ctrl0_up_RS2_PHYS_lane0;
   assign execute_ctrl0_down_RD_PHYS_lane0 = execute_ctrl0_up_RD_PHYS_lane0;
   assign execute_ctrl0_down_COMPLETED_lane0 = execute_ctrl0_up_COMPLETED_lane0;
+  assign execute_ctrl0_down_lane0_LAYER_SEL_lane0 = execute_ctrl0_up_lane0_LAYER_SEL_lane0;
   assign execute_ctrl1_up_ready = execute_ctrl1_down_isReady;
   assign execute_ctrl1_down_Decode_UOP_lane0 = execute_ctrl1_up_Decode_UOP_lane0;
+  assign execute_ctrl1_down_Prediction_ALIGNED_JUMPED_lane0 = execute_ctrl1_up_Prediction_ALIGNED_JUMPED_lane0;
+  assign execute_ctrl1_down_Prediction_ALIGNED_JUMPED_PC_lane0 = execute_ctrl1_up_Prediction_ALIGNED_JUMPED_PC_lane0;
+  assign execute_ctrl1_down_GSharePlugin_GSHARE_COUNTER_lane0_0 = execute_ctrl1_up_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  assign execute_ctrl1_down_Prediction_BRANCH_HISTORY_lane0 = execute_ctrl1_up_Prediction_BRANCH_HISTORY_lane0;
   assign execute_ctrl1_down_PC_lane0 = execute_ctrl1_up_PC_lane0;
-  assign execute_ctrl1_down_TRAP_lane0 = execute_ctrl1_up_TRAP_lane0;
   assign execute_ctrl1_down_Decode_UOP_ID_lane0 = execute_ctrl1_up_Decode_UOP_ID_lane0;
   assign execute_ctrl1_down_RS1_PHYS_lane0 = execute_ctrl1_up_RS1_PHYS_lane0;
   assign execute_ctrl1_down_RS2_PHYS_lane0 = execute_ctrl1_up_RS2_PHYS_lane0;
   assign execute_ctrl1_down_RD_PHYS_lane0 = execute_ctrl1_up_RD_PHYS_lane0;
-  assign execute_ctrl1_down_COMPLETED_lane0 = execute_ctrl1_up_COMPLETED_lane0;
   assign execute_ctrl1_down_AguPlugin_SIZE_lane0 = execute_ctrl1_up_AguPlugin_SIZE_lane0;
+  assign execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0 = execute_ctrl1_up_early0_SrcPlugin_SRC1_lane0;
+  assign execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl1_up_early0_SrcPlugin_SRC2_lane0;
+  assign execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0 = execute_ctrl1_up_early0_IntAluPlugin_SEL_lane0;
+  assign execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0 = execute_ctrl1_up_early0_BarrelShifterPlugin_SEL_lane0;
+  assign execute_ctrl1_down_early0_BranchPlugin_SEL_lane0 = execute_ctrl1_up_early0_BranchPlugin_SEL_lane0;
+  assign execute_ctrl1_down_early0_MulPlugin_SEL_lane0 = execute_ctrl1_up_early0_MulPlugin_SEL_lane0;
+  assign execute_ctrl1_down_early0_DivPlugin_SEL_lane0 = execute_ctrl1_up_early0_DivPlugin_SEL_lane0;
+  assign execute_ctrl1_down_early0_EnvPlugin_SEL_lane0 = execute_ctrl1_up_early0_EnvPlugin_SEL_lane0;
+  assign execute_ctrl1_down_late0_IntAluPlugin_SEL_lane0 = execute_ctrl1_up_late0_IntAluPlugin_SEL_lane0;
+  assign execute_ctrl1_down_late0_BarrelShifterPlugin_SEL_lane0 = execute_ctrl1_up_late0_BarrelShifterPlugin_SEL_lane0;
+  assign execute_ctrl1_down_late0_BranchPlugin_SEL_lane0 = execute_ctrl1_up_late0_BranchPlugin_SEL_lane0;
+  assign execute_ctrl1_down_CsrAccessPlugin_SEL_lane0 = execute_ctrl1_up_CsrAccessPlugin_SEL_lane0;
+  assign execute_ctrl1_down_AguPlugin_SEL_lane0 = execute_ctrl1_up_AguPlugin_SEL_lane0;
+  assign execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0 = execute_ctrl1_up_LsuPlugin_logic_FENCE_lane0;
+  assign execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0 = execute_ctrl1_up_lane0_integer_WriteBackPlugin_SEL_lane0;
+  assign execute_ctrl1_down_COMPLETION_AT_1_lane0 = execute_ctrl1_up_COMPLETION_AT_1_lane0;
+  assign execute_ctrl1_down_COMPLETION_AT_3_lane0 = execute_ctrl1_up_COMPLETION_AT_3_lane0;
+  assign execute_ctrl1_down_COMPLETION_AT_2_lane0 = execute_ctrl1_up_COMPLETION_AT_2_lane0;
+  assign execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = execute_ctrl1_up_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+  assign execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = execute_ctrl1_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+  assign execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = execute_ctrl1_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+  assign execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 = execute_ctrl1_up_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  assign execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0 = execute_ctrl1_up_early0_IntAluPlugin_ALU_SLTX_lane0;
+  assign execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  assign execute_ctrl1_down_SrcStageables_REVERT_lane0 = execute_ctrl1_up_SrcStageables_REVERT_lane0;
+  assign execute_ctrl1_down_SrcStageables_ZERO_lane0 = execute_ctrl1_up_SrcStageables_ZERO_lane0;
+  assign execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 = execute_ctrl1_up_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+  assign execute_ctrl1_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 = execute_ctrl1_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
+  assign execute_ctrl1_down_BYPASSED_AT_1_lane0 = execute_ctrl1_up_BYPASSED_AT_1_lane0;
+  assign execute_ctrl1_down_BYPASSED_AT_2_lane0 = execute_ctrl1_up_BYPASSED_AT_2_lane0;
+  assign execute_ctrl1_down_MAY_FLUSH_PRECISE_2_lane0 = execute_ctrl1_up_MAY_FLUSH_PRECISE_2_lane0;
+  assign execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0 = execute_ctrl1_up_MAY_FLUSH_PRECISE_3_lane0;
+  assign execute_ctrl1_down_SrcStageables_UNSIGNED_lane0 = execute_ctrl1_up_SrcStageables_UNSIGNED_lane0;
+  assign execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0 = execute_ctrl1_up_BarrelShifterPlugin_LEFT_lane0;
+  assign execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0 = execute_ctrl1_up_BarrelShifterPlugin_SIGNED_lane0;
+  assign execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0 = execute_ctrl1_up_BranchPlugin_BRANCH_CTRL_lane0;
+  assign execute_ctrl1_down_MulPlugin_HIGH_lane0 = execute_ctrl1_up_MulPlugin_HIGH_lane0;
+  assign execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0 = execute_ctrl1_up_RsUnsignedPlugin_RS1_SIGNED_lane0;
+  assign execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0 = execute_ctrl1_up_RsUnsignedPlugin_RS2_SIGNED_lane0;
+  assign execute_ctrl1_down_DivPlugin_REM_lane0 = execute_ctrl1_up_DivPlugin_REM_lane0;
+  assign execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0 = execute_ctrl1_up_CsrAccessPlugin_CSR_IMM_lane0;
+  assign execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0 = execute_ctrl1_up_CsrAccessPlugin_CSR_MASK_lane0;
+  assign execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0 = execute_ctrl1_up_CsrAccessPlugin_CSR_CLEAR_lane0;
+  assign execute_ctrl1_down_AguPlugin_LOAD_lane0 = execute_ctrl1_up_AguPlugin_LOAD_lane0;
+  assign execute_ctrl1_down_AguPlugin_STORE_lane0 = execute_ctrl1_up_AguPlugin_STORE_lane0;
+  assign execute_ctrl1_down_AguPlugin_ATOMIC_lane0 = execute_ctrl1_up_AguPlugin_ATOMIC_lane0;
+  assign execute_ctrl1_down_AguPlugin_FLOAT_lane0 = execute_ctrl1_up_AguPlugin_FLOAT_lane0;
+  assign execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = execute_ctrl1_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
+  assign execute_ctrl1_down_early0_EnvPlugin_OP_lane0 = execute_ctrl1_up_early0_EnvPlugin_OP_lane0;
+  assign execute_ctrl1_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0 = execute_ctrl1_up_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  assign execute_ctrl1_down_late0_IntAluPlugin_ALU_SLTX_lane0 = execute_ctrl1_up_late0_IntAluPlugin_ALU_SLTX_lane0;
+  assign execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  assign execute_ctrl1_down_late0_SrcPlugin_logic_SRC1_CTRL_lane0 = execute_ctrl1_up_late0_SrcPlugin_logic_SRC1_CTRL_lane0;
+  assign execute_ctrl1_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0 = execute_ctrl1_up_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
   assign execute_ctrl2_up_ready = execute_ctrl2_down_isReady;
   assign execute_ctrl2_down_Decode_UOP_lane0 = execute_ctrl2_up_Decode_UOP_lane0;
+  assign execute_ctrl2_down_Prediction_ALIGNED_JUMPED_lane0 = execute_ctrl2_up_Prediction_ALIGNED_JUMPED_lane0;
+  assign execute_ctrl2_down_Prediction_ALIGNED_JUMPED_PC_lane0 = execute_ctrl2_up_Prediction_ALIGNED_JUMPED_PC_lane0;
+  assign execute_ctrl2_down_GSharePlugin_GSHARE_COUNTER_lane0_0 = execute_ctrl2_up_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  assign execute_ctrl2_down_Prediction_BRANCH_HISTORY_lane0 = execute_ctrl2_up_Prediction_BRANCH_HISTORY_lane0;
   assign execute_ctrl2_down_PC_lane0 = execute_ctrl2_up_PC_lane0;
+  assign execute_ctrl2_down_TRAP_lane0 = execute_ctrl2_up_TRAP_lane0;
   assign execute_ctrl2_down_Decode_UOP_ID_lane0 = execute_ctrl2_up_Decode_UOP_ID_lane0;
+  assign execute_ctrl2_down_RS1_PHYS_lane0 = execute_ctrl2_up_RS1_PHYS_lane0;
+  assign execute_ctrl2_down_RS2_PHYS_lane0 = execute_ctrl2_up_RS2_PHYS_lane0;
   assign execute_ctrl2_down_RD_PHYS_lane0 = execute_ctrl2_up_RD_PHYS_lane0;
   assign execute_ctrl2_down_AguPlugin_SIZE_lane0 = execute_ctrl2_up_AguPlugin_SIZE_lane0;
-  assign execute_ctrl2_down_early0_SrcPlugin_SRC1_lane0 = execute_ctrl2_up_early0_SrcPlugin_SRC1_lane0;
-  assign execute_ctrl2_down_early0_SrcPlugin_SRC2_lane0 = execute_ctrl2_up_early0_SrcPlugin_SRC2_lane0;
-  assign execute_ctrl2_down_integer_RS2_lane0 = execute_ctrl2_up_integer_RS2_lane0;
-  assign execute_ctrl2_down_MAY_FLUSH_PRECISE_3_lane0 = execute_ctrl2_up_MAY_FLUSH_PRECISE_3_lane0;
-  assign execute_ctrl2_down_early0_IntAluPlugin_SEL_lane0 = execute_ctrl2_up_early0_IntAluPlugin_SEL_lane0;
-  assign execute_ctrl2_down_early0_BarrelShifterPlugin_SEL_lane0 = execute_ctrl2_up_early0_BarrelShifterPlugin_SEL_lane0;
   assign execute_ctrl2_down_early0_BranchPlugin_SEL_lane0 = execute_ctrl2_up_early0_BranchPlugin_SEL_lane0;
   assign execute_ctrl2_down_early0_MulPlugin_SEL_lane0 = execute_ctrl2_up_early0_MulPlugin_SEL_lane0;
   assign execute_ctrl2_down_early0_DivPlugin_SEL_lane0 = execute_ctrl2_up_early0_DivPlugin_SEL_lane0;
-  assign execute_ctrl2_down_early0_EnvPlugin_SEL_lane0 = execute_ctrl2_up_early0_EnvPlugin_SEL_lane0;
+  assign execute_ctrl2_down_late0_IntAluPlugin_SEL_lane0 = execute_ctrl2_up_late0_IntAluPlugin_SEL_lane0;
+  assign execute_ctrl2_down_late0_BarrelShifterPlugin_SEL_lane0 = execute_ctrl2_up_late0_BarrelShifterPlugin_SEL_lane0;
+  assign execute_ctrl2_down_late0_BranchPlugin_SEL_lane0 = execute_ctrl2_up_late0_BranchPlugin_SEL_lane0;
   assign execute_ctrl2_down_CsrAccessPlugin_SEL_lane0 = execute_ctrl2_up_CsrAccessPlugin_SEL_lane0;
   assign execute_ctrl2_down_AguPlugin_SEL_lane0 = execute_ctrl2_up_AguPlugin_SEL_lane0;
   assign execute_ctrl2_down_LsuPlugin_logic_FENCE_lane0 = execute_ctrl2_up_LsuPlugin_logic_FENCE_lane0;
   assign execute_ctrl2_down_lane0_integer_WriteBackPlugin_SEL_lane0 = execute_ctrl2_up_lane0_integer_WriteBackPlugin_SEL_lane0;
-  assign execute_ctrl2_down_COMPLETION_AT_2_lane0 = execute_ctrl2_up_COMPLETION_AT_2_lane0;
-  assign execute_ctrl2_down_COMPLETION_AT_4_lane0 = execute_ctrl2_up_COMPLETION_AT_4_lane0;
   assign execute_ctrl2_down_COMPLETION_AT_3_lane0 = execute_ctrl2_up_COMPLETION_AT_3_lane0;
-  assign execute_ctrl2_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0 = execute_ctrl2_up_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+  assign execute_ctrl2_down_COMPLETION_AT_2_lane0 = execute_ctrl2_up_COMPLETION_AT_2_lane0;
   assign execute_ctrl2_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = execute_ctrl2_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
   assign execute_ctrl2_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = execute_ctrl2_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
-  assign execute_ctrl2_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0 = execute_ctrl2_up_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
-  assign execute_ctrl2_down_early0_IntAluPlugin_ALU_SLTX_lane0 = execute_ctrl2_up_early0_IntAluPlugin_ALU_SLTX_lane0;
-  assign execute_ctrl2_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
   assign execute_ctrl2_down_SrcStageables_REVERT_lane0 = execute_ctrl2_up_SrcStageables_REVERT_lane0;
   assign execute_ctrl2_down_SrcStageables_ZERO_lane0 = execute_ctrl2_up_SrcStageables_ZERO_lane0;
   assign execute_ctrl2_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 = execute_ctrl2_up_lane0_IntFormatPlugin_logic_SIGNED_lane0;
   assign execute_ctrl2_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 = execute_ctrl2_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
   assign execute_ctrl2_down_BYPASSED_AT_2_lane0 = execute_ctrl2_up_BYPASSED_AT_2_lane0;
-  assign execute_ctrl2_down_BYPASSED_AT_3_lane0 = execute_ctrl2_up_BYPASSED_AT_3_lane0;
-  assign execute_ctrl2_down_BYPASSED_AT_4_lane0 = execute_ctrl2_up_BYPASSED_AT_4_lane0;
+  assign execute_ctrl2_down_MAY_FLUSH_PRECISE_2_lane0 = execute_ctrl2_up_MAY_FLUSH_PRECISE_2_lane0;
   assign execute_ctrl2_down_SrcStageables_UNSIGNED_lane0 = execute_ctrl2_up_SrcStageables_UNSIGNED_lane0;
   assign execute_ctrl2_down_BarrelShifterPlugin_LEFT_lane0 = execute_ctrl2_up_BarrelShifterPlugin_LEFT_lane0;
   assign execute_ctrl2_down_BarrelShifterPlugin_SIGNED_lane0 = execute_ctrl2_up_BarrelShifterPlugin_SIGNED_lane0;
   assign execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0 = execute_ctrl2_up_BranchPlugin_BRANCH_CTRL_lane0;
   assign execute_ctrl2_down_MulPlugin_HIGH_lane0 = execute_ctrl2_up_MulPlugin_HIGH_lane0;
-  assign execute_ctrl2_down_RsUnsignedPlugin_RS1_SIGNED_lane0 = execute_ctrl2_up_RsUnsignedPlugin_RS1_SIGNED_lane0;
-  assign execute_ctrl2_down_RsUnsignedPlugin_RS2_SIGNED_lane0 = execute_ctrl2_up_RsUnsignedPlugin_RS2_SIGNED_lane0;
-  assign execute_ctrl2_down_DivPlugin_REM_lane0 = execute_ctrl2_up_DivPlugin_REM_lane0;
-  assign execute_ctrl2_down_CsrAccessPlugin_CSR_IMM_lane0 = execute_ctrl2_up_CsrAccessPlugin_CSR_IMM_lane0;
-  assign execute_ctrl2_down_CsrAccessPlugin_CSR_MASK_lane0 = execute_ctrl2_up_CsrAccessPlugin_CSR_MASK_lane0;
-  assign execute_ctrl2_down_CsrAccessPlugin_CSR_CLEAR_lane0 = execute_ctrl2_up_CsrAccessPlugin_CSR_CLEAR_lane0;
   assign execute_ctrl2_down_AguPlugin_LOAD_lane0 = execute_ctrl2_up_AguPlugin_LOAD_lane0;
   assign execute_ctrl2_down_AguPlugin_STORE_lane0 = execute_ctrl2_up_AguPlugin_STORE_lane0;
   assign execute_ctrl2_down_AguPlugin_ATOMIC_lane0 = execute_ctrl2_up_AguPlugin_ATOMIC_lane0;
   assign execute_ctrl2_down_AguPlugin_FLOAT_lane0 = execute_ctrl2_up_AguPlugin_FLOAT_lane0;
   assign execute_ctrl2_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = execute_ctrl2_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
-  assign execute_ctrl2_down_early0_EnvPlugin_OP_lane0 = execute_ctrl2_up_early0_EnvPlugin_OP_lane0;
+  assign execute_ctrl2_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0 = execute_ctrl2_up_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  assign execute_ctrl2_down_late0_IntAluPlugin_ALU_SLTX_lane0 = execute_ctrl2_up_late0_IntAluPlugin_ALU_SLTX_lane0;
+  assign execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+  assign execute_ctrl2_down_late0_SrcPlugin_logic_SRC1_CTRL_lane0 = execute_ctrl2_up_late0_SrcPlugin_logic_SRC1_CTRL_lane0;
+  assign execute_ctrl2_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0 = execute_ctrl2_up_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
+  assign execute_ctrl2_down_COMMIT_lane0 = execute_ctrl2_up_COMMIT_lane0;
+  assign execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0 = execute_ctrl2_up_early0_SrcPlugin_ADD_SUB_lane0;
+  assign execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0 = execute_ctrl2_up_LsuL1_MIXED_ADDRESS_lane0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0 = execute_ctrl2_up_LsuL1Plugin_logic_BANK_BUSY_lane0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 = execute_ctrl2_up_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0 = execute_ctrl2_up_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 = execute_ctrl2_up_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0 = execute_ctrl2_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_plru_0 = execute_ctrl2_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_plru_0;
+  assign execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty = execute_ctrl2_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+  assign execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_0_lane0 = execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_0_lane0;
+  assign execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0 = execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_1_lane0;
+  assign execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0 = execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_2_lane0;
+  assign execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0 = execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_3_lane0;
+  assign execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0 = execute_ctrl2_up_DivPlugin_DIV_RESULT_lane0;
+  assign execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 = execute_ctrl2_up_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  assign execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 = execute_ctrl2_up_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+  assign execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 = execute_ctrl2_up_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
+  assign execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0 = execute_ctrl2_up_LsuPlugin_logic_FROM_ACCESS_lane0;
+  assign execute_ctrl2_down_LsuL1_MASK_lane0 = execute_ctrl2_up_LsuL1_MASK_lane0;
+  assign execute_ctrl2_down_LsuL1_SIZE_lane0 = execute_ctrl2_up_LsuL1_SIZE_lane0;
+  assign execute_ctrl2_down_LsuL1_LOAD_lane0 = execute_ctrl2_up_LsuL1_LOAD_lane0;
+  assign execute_ctrl2_down_LsuL1_ATOMIC_lane0 = execute_ctrl2_up_LsuL1_ATOMIC_lane0;
+  assign execute_ctrl2_down_LsuL1_STORE_lane0 = execute_ctrl2_up_LsuL1_STORE_lane0;
+  assign execute_ctrl2_down_LsuL1_PREFETCH_lane0 = execute_ctrl2_up_LsuL1_PREFETCH_lane0;
+  assign execute_ctrl2_down_LsuL1_FLUSH_lane0 = execute_ctrl2_up_LsuL1_FLUSH_lane0;
+  assign execute_ctrl2_down_Decode_STORE_ID_lane0 = execute_ctrl2_up_Decode_STORE_ID_lane0;
+  assign execute_ctrl2_down_LsuPlugin_logic_FROM_LSU_lane0 = execute_ctrl2_up_LsuPlugin_logic_FROM_LSU_lane0;
+  assign execute_ctrl2_down_LsuPlugin_logic_FROM_PREFETCH_lane0 = execute_ctrl2_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
   assign execute_ctrl3_up_ready = execute_ctrl3_down_isReady;
   assign execute_ctrl3_down_Decode_UOP_lane0 = execute_ctrl3_up_Decode_UOP_lane0;
+  assign execute_ctrl3_down_Prediction_ALIGNED_JUMPED_lane0 = execute_ctrl3_up_Prediction_ALIGNED_JUMPED_lane0;
+  assign execute_ctrl3_down_Prediction_ALIGNED_JUMPED_PC_lane0 = execute_ctrl3_up_Prediction_ALIGNED_JUMPED_PC_lane0;
+  assign execute_ctrl3_down_GSharePlugin_GSHARE_COUNTER_lane0_0 = execute_ctrl3_up_GSharePlugin_GSHARE_COUNTER_lane0_0;
+  assign execute_ctrl3_down_Prediction_BRANCH_HISTORY_lane0 = execute_ctrl3_up_Prediction_BRANCH_HISTORY_lane0;
   assign execute_ctrl3_down_PC_lane0 = execute_ctrl3_up_PC_lane0;
-  assign execute_ctrl3_down_TRAP_lane0 = execute_ctrl3_up_TRAP_lane0;
   assign execute_ctrl3_down_Decode_UOP_ID_lane0 = execute_ctrl3_up_Decode_UOP_ID_lane0;
   assign execute_ctrl3_down_RD_PHYS_lane0 = execute_ctrl3_up_RD_PHYS_lane0;
   assign execute_ctrl3_down_AguPlugin_SIZE_lane0 = execute_ctrl3_up_AguPlugin_SIZE_lane0;
-  assign execute_ctrl3_down_integer_RS2_lane0 = execute_ctrl3_up_integer_RS2_lane0;
+  assign execute_ctrl3_down_early0_BranchPlugin_SEL_lane0 = execute_ctrl3_up_early0_BranchPlugin_SEL_lane0;
   assign execute_ctrl3_down_early0_MulPlugin_SEL_lane0 = execute_ctrl3_up_early0_MulPlugin_SEL_lane0;
-  assign execute_ctrl3_down_early0_DivPlugin_SEL_lane0 = execute_ctrl3_up_early0_DivPlugin_SEL_lane0;
-  assign execute_ctrl3_down_CsrAccessPlugin_SEL_lane0 = execute_ctrl3_up_CsrAccessPlugin_SEL_lane0;
+  assign execute_ctrl3_down_late0_IntAluPlugin_SEL_lane0 = execute_ctrl3_up_late0_IntAluPlugin_SEL_lane0;
+  assign execute_ctrl3_down_late0_BarrelShifterPlugin_SEL_lane0 = execute_ctrl3_up_late0_BarrelShifterPlugin_SEL_lane0;
+  assign execute_ctrl3_down_late0_BranchPlugin_SEL_lane0 = execute_ctrl3_up_late0_BranchPlugin_SEL_lane0;
   assign execute_ctrl3_down_AguPlugin_SEL_lane0 = execute_ctrl3_up_AguPlugin_SEL_lane0;
   assign execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0 = execute_ctrl3_up_LsuPlugin_logic_FENCE_lane0;
   assign execute_ctrl3_down_lane0_integer_WriteBackPlugin_SEL_lane0 = execute_ctrl3_up_lane0_integer_WriteBackPlugin_SEL_lane0;
-  assign execute_ctrl3_down_COMPLETION_AT_4_lane0 = execute_ctrl3_up_COMPLETION_AT_4_lane0;
   assign execute_ctrl3_down_COMPLETION_AT_3_lane0 = execute_ctrl3_up_COMPLETION_AT_3_lane0;
   assign execute_ctrl3_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = execute_ctrl3_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-  assign execute_ctrl3_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0 = execute_ctrl3_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+  assign execute_ctrl3_down_SrcStageables_REVERT_lane0 = execute_ctrl3_up_SrcStageables_REVERT_lane0;
+  assign execute_ctrl3_down_SrcStageables_ZERO_lane0 = execute_ctrl3_up_SrcStageables_ZERO_lane0;
   assign execute_ctrl3_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 = execute_ctrl3_up_lane0_IntFormatPlugin_logic_SIGNED_lane0;
   assign execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 = execute_ctrl3_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-  assign execute_ctrl3_down_BYPASSED_AT_3_lane0 = execute_ctrl3_up_BYPASSED_AT_3_lane0;
-  assign execute_ctrl3_down_BYPASSED_AT_4_lane0 = execute_ctrl3_up_BYPASSED_AT_4_lane0;
+  assign execute_ctrl3_down_SrcStageables_UNSIGNED_lane0 = execute_ctrl3_up_SrcStageables_UNSIGNED_lane0;
+  assign execute_ctrl3_down_BarrelShifterPlugin_LEFT_lane0 = execute_ctrl3_up_BarrelShifterPlugin_LEFT_lane0;
+  assign execute_ctrl3_down_BarrelShifterPlugin_SIGNED_lane0 = execute_ctrl3_up_BarrelShifterPlugin_SIGNED_lane0;
+  assign execute_ctrl3_down_BranchPlugin_BRANCH_CTRL_lane0 = execute_ctrl3_up_BranchPlugin_BRANCH_CTRL_lane0;
   assign execute_ctrl3_down_MulPlugin_HIGH_lane0 = execute_ctrl3_up_MulPlugin_HIGH_lane0;
   assign execute_ctrl3_down_AguPlugin_LOAD_lane0 = execute_ctrl3_up_AguPlugin_LOAD_lane0;
   assign execute_ctrl3_down_AguPlugin_STORE_lane0 = execute_ctrl3_up_AguPlugin_STORE_lane0;
   assign execute_ctrl3_down_AguPlugin_ATOMIC_lane0 = execute_ctrl3_up_AguPlugin_ATOMIC_lane0;
   assign execute_ctrl3_down_AguPlugin_FLOAT_lane0 = execute_ctrl3_up_AguPlugin_FLOAT_lane0;
   assign execute_ctrl3_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = execute_ctrl3_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
-  assign execute_ctrl3_down_COMMIT_lane0 = execute_ctrl3_up_COMMIT_lane0;
-  assign execute_ctrl3_down_early0_SrcPlugin_ADD_SUB_lane0 = execute_ctrl3_up_early0_SrcPlugin_ADD_SUB_lane0;
+  assign execute_ctrl3_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0 = execute_ctrl3_up_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+  assign execute_ctrl3_down_late0_IntAluPlugin_ALU_SLTX_lane0 = execute_ctrl3_up_late0_IntAluPlugin_ALU_SLTX_lane0;
+  assign execute_ctrl3_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 = execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
   assign execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0 = execute_ctrl3_up_LsuL1_MIXED_ADDRESS_lane0;
-  assign execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_BANK_BUSY_lane0;
-  assign execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
-  assign execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
-  assign execute_ctrl3_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
-  assign execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
-  assign execute_ctrl3_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty = execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
-  assign execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_0_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_0_lane0;
-  assign execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_1_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_1_lane0;
-  assign execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_2_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_2_lane0;
-  assign execute_ctrl3_down_early0_MulPlugin_logic_mul_VALUES_3_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_3_lane0;
-  assign execute_ctrl3_down_DivPlugin_DIV_RESULT_lane0 = execute_ctrl3_up_DivPlugin_DIV_RESULT_lane0;
-  assign execute_ctrl3_down_LsuPlugin_logic_FROM_ACCESS_lane0 = execute_ctrl3_up_LsuPlugin_logic_FROM_ACCESS_lane0;
+  assign execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 = execute_ctrl3_up_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+  assign execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 = execute_ctrl3_up_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+  assign execute_ctrl3_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 = execute_ctrl3_up_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
   assign execute_ctrl3_down_LsuL1_MASK_lane0 = execute_ctrl3_up_LsuL1_MASK_lane0;
   assign execute_ctrl3_down_LsuL1_SIZE_lane0 = execute_ctrl3_up_LsuL1_SIZE_lane0;
   assign execute_ctrl3_down_LsuL1_LOAD_lane0 = execute_ctrl3_up_LsuL1_LOAD_lane0;
@@ -7777,72 +9816,48 @@ module VexiiRiscv (
   assign execute_ctrl3_down_Decode_STORE_ID_lane0 = execute_ctrl3_up_Decode_STORE_ID_lane0;
   assign execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0 = execute_ctrl3_up_LsuPlugin_logic_FROM_LSU_lane0;
   assign execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0 = execute_ctrl3_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_plru_0 = execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_plru_0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 = execute_ctrl3_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_1 = execute_ctrl3_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_1;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
+  assign execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0 = execute_ctrl3_up_LsuL1_PHYSICAL_ADDRESS_lane0;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded = execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address = execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault = execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded = execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address = execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault = execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault;
+  assign execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0 = execute_ctrl3_up_LsuL1Plugin_logic_WAYS_HITS_lane0;
+  assign execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_steps_0_adders_0_lane0;
+  assign execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0 = execute_ctrl3_up_early0_MulPlugin_logic_steps_0_adders_1_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0 = execute_ctrl3_up_LsuPlugin_logic_onTrigger_HIT_lane0;
+  assign execute_ctrl3_down_MMU_TRANSLATED_lane0 = execute_ctrl3_up_MMU_TRANSLATED_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 = execute_ctrl3_up_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault = execute_ctrl3_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io = execute_ctrl3_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault = execute_ctrl3_up_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io = execute_ctrl3_up_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0 = execute_ctrl3_up_LsuPlugin_logic_onPma_IO_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0 = execute_ctrl3_up_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 = execute_ctrl3_up_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
+  assign execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0 = execute_ctrl3_up_LsuPlugin_logic_MMU_FAILURE_lane0;
+  assign execute_ctrl3_down_MMU_ACCESS_FAULT_lane0 = execute_ctrl3_up_MMU_ACCESS_FAULT_lane0;
+  assign execute_ctrl3_down_MMU_REFILL_lane0 = execute_ctrl3_up_MMU_REFILL_lane0;
+  assign execute_ctrl3_down_MMU_HAZARD_lane0 = execute_ctrl3_up_MMU_HAZARD_lane0;
+  assign execute_ctrl3_down_late0_SrcPlugin_SRC1_lane0 = execute_ctrl3_up_late0_SrcPlugin_SRC1_lane0;
+  assign execute_ctrl3_down_late0_SrcPlugin_SRC2_lane0 = execute_ctrl3_up_late0_SrcPlugin_SRC2_lane0;
+  assign execute_ctrl3_down_MMU_BYPASS_TRANSLATION_lane0 = execute_ctrl3_up_MMU_BYPASS_TRANSLATION_lane0;
   assign execute_ctrl4_up_ready = execute_ctrl4_down_isReady;
-  assign execute_ctrl4_down_Decode_UOP_lane0 = execute_ctrl4_up_Decode_UOP_lane0;
-  assign execute_ctrl4_down_PC_lane0 = execute_ctrl4_up_PC_lane0;
-  assign execute_ctrl4_down_Decode_UOP_ID_lane0 = execute_ctrl4_up_Decode_UOP_ID_lane0;
-  assign execute_ctrl4_down_RD_PHYS_lane0 = execute_ctrl4_up_RD_PHYS_lane0;
-  assign execute_ctrl4_down_AguPlugin_SIZE_lane0 = execute_ctrl4_up_AguPlugin_SIZE_lane0;
-  assign execute_ctrl4_down_early0_MulPlugin_SEL_lane0 = execute_ctrl4_up_early0_MulPlugin_SEL_lane0;
-  assign execute_ctrl4_down_AguPlugin_SEL_lane0 = execute_ctrl4_up_AguPlugin_SEL_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_FENCE_lane0 = execute_ctrl4_up_LsuPlugin_logic_FENCE_lane0;
-  assign execute_ctrl4_down_lane0_integer_WriteBackPlugin_SEL_lane0 = execute_ctrl4_up_lane0_integer_WriteBackPlugin_SEL_lane0;
-  assign execute_ctrl4_down_COMPLETION_AT_4_lane0 = execute_ctrl4_up_COMPLETION_AT_4_lane0;
-  assign execute_ctrl4_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0 = execute_ctrl4_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-  assign execute_ctrl4_down_lane0_IntFormatPlugin_logic_SIGNED_lane0 = execute_ctrl4_up_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-  assign execute_ctrl4_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 = execute_ctrl4_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-  assign execute_ctrl4_down_BYPASSED_AT_4_lane0 = execute_ctrl4_up_BYPASSED_AT_4_lane0;
-  assign execute_ctrl4_down_MulPlugin_HIGH_lane0 = execute_ctrl4_up_MulPlugin_HIGH_lane0;
-  assign execute_ctrl4_down_AguPlugin_LOAD_lane0 = execute_ctrl4_up_AguPlugin_LOAD_lane0;
-  assign execute_ctrl4_down_AguPlugin_STORE_lane0 = execute_ctrl4_up_AguPlugin_STORE_lane0;
-  assign execute_ctrl4_down_AguPlugin_ATOMIC_lane0 = execute_ctrl4_up_AguPlugin_ATOMIC_lane0;
-  assign execute_ctrl4_down_AguPlugin_FLOAT_lane0 = execute_ctrl4_up_AguPlugin_FLOAT_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_LSU_PREFETCH_lane0 = execute_ctrl4_up_LsuPlugin_logic_LSU_PREFETCH_lane0;
-  assign execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0 = execute_ctrl4_up_LsuL1_MIXED_ADDRESS_lane0;
-  assign execute_ctrl4_down_LsuL1_MASK_lane0 = execute_ctrl4_up_LsuL1_MASK_lane0;
-  assign execute_ctrl4_down_LsuL1_SIZE_lane0 = execute_ctrl4_up_LsuL1_SIZE_lane0;
-  assign execute_ctrl4_down_LsuL1_LOAD_lane0 = execute_ctrl4_up_LsuL1_LOAD_lane0;
-  assign execute_ctrl4_down_LsuL1_ATOMIC_lane0 = execute_ctrl4_up_LsuL1_ATOMIC_lane0;
-  assign execute_ctrl4_down_LsuL1_STORE_lane0 = execute_ctrl4_up_LsuL1_STORE_lane0;
-  assign execute_ctrl4_down_LsuL1_PREFETCH_lane0 = execute_ctrl4_up_LsuL1_PREFETCH_lane0;
-  assign execute_ctrl4_down_LsuL1_FLUSH_lane0 = execute_ctrl4_up_LsuL1_FLUSH_lane0;
-  assign execute_ctrl4_down_Decode_STORE_ID_lane0 = execute_ctrl4_up_Decode_STORE_ID_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_FROM_LSU_lane0 = execute_ctrl4_up_LsuPlugin_logic_FROM_LSU_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_FROM_PREFETCH_lane0 = execute_ctrl4_up_LsuPlugin_logic_FROM_PREFETCH_lane0;
-  assign execute_ctrl4_down_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl4_up_LsuL1Plugin_logic_SHARED_lane0_dirty;
-  assign execute_ctrl4_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0 = execute_ctrl4_up_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
-  assign execute_ctrl4_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 = execute_ctrl4_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
-  assign execute_ctrl4_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0 = execute_ctrl4_up_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
-  assign execute_ctrl4_down_LsuL1_PHYSICAL_ADDRESS_lane0 = execute_ctrl4_up_LsuL1_PHYSICAL_ADDRESS_lane0;
-  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded = execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
-  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address = execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
-  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault = execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
-  assign execute_ctrl4_down_LsuL1Plugin_logic_WAYS_HITS_lane0 = execute_ctrl4_up_LsuL1Plugin_logic_WAYS_HITS_lane0;
-  assign execute_ctrl4_down_early0_MulPlugin_logic_steps_0_adders_0_lane0 = execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_0_lane0;
-  assign execute_ctrl4_down_early0_MulPlugin_logic_steps_0_adders_1_lane0 = execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_1_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_onTrigger_HIT_lane0 = execute_ctrl4_up_LsuPlugin_logic_onTrigger_HIT_lane0;
-  assign execute_ctrl4_down_MMU_TRANSLATED_lane0 = execute_ctrl4_up_MMU_TRANSLATED_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 = execute_ctrl4_up_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault = execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
-  assign execute_ctrl4_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io = execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
-  assign execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault = execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
-  assign execute_ctrl4_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io = execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
-  assign execute_ctrl4_down_LsuPlugin_logic_onPma_IO_lane0 = execute_ctrl4_up_LsuPlugin_logic_onPma_IO_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0 = execute_ctrl4_up_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 = execute_ctrl4_up_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
-  assign execute_ctrl4_down_LsuPlugin_logic_MMU_FAILURE_lane0 = execute_ctrl4_up_LsuPlugin_logic_MMU_FAILURE_lane0;
-  assign execute_ctrl4_down_MMU_ACCESS_FAULT_lane0 = execute_ctrl4_up_MMU_ACCESS_FAULT_lane0;
-  assign execute_ctrl4_down_MMU_REFILL_lane0 = execute_ctrl4_up_MMU_REFILL_lane0;
-  assign execute_ctrl4_down_MMU_HAZARD_lane0 = execute_ctrl4_up_MMU_HAZARD_lane0;
-  assign execute_ctrl4_down_MMU_BYPASS_TRANSLATION_lane0 = execute_ctrl4_up_MMU_BYPASS_TRANSLATION_lane0;
-  assign execute_ctrl5_up_ready = execute_ctrl5_down_isReady;
-  assign execute_ctrl5_down_LANE_SEL_lane0 = execute_ctrl5_up_LANE_SEL_lane0;
-  assign execute_ctrl5_down_RD_PHYS_lane0 = execute_ctrl5_up_RD_PHYS_lane0;
-  assign execute_ctrl5_down_COMMIT_lane0 = execute_ctrl5_up_COMMIT_lane0;
-  assign execute_ctrl5_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0 = execute_ctrl5_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+  assign execute_ctrl4_down_LANE_SEL_lane0 = execute_ctrl4_up_LANE_SEL_lane0;
+  assign execute_ctrl4_down_COMMIT_lane0 = execute_ctrl4_up_COMMIT_lane0;
   assign fetch_logic_ctrls_0_down_isFiring = (fetch_logic_ctrls_0_down_isValid && fetch_logic_ctrls_0_down_isReady);
   assign fetch_logic_ctrls_0_down_isValid = fetch_logic_ctrls_0_down_valid;
   assign fetch_logic_ctrls_0_down_isReady = fetch_logic_ctrls_0_down_ready;
+  assign fetch_logic_ctrls_1_up_isValid = fetch_logic_ctrls_1_up_valid;
+  assign fetch_logic_ctrls_1_up_isReady = fetch_logic_ctrls_1_up_ready;
+  assign fetch_logic_ctrls_1_up_isCancel = fetch_logic_ctrls_1_up_cancel;
   assign fetch_logic_ctrls_1_down_isValid = fetch_logic_ctrls_1_down_valid;
   assign fetch_logic_ctrls_1_down_isReady = fetch_logic_ctrls_1_down_ready;
   assign fetch_logic_ctrls_2_up_isValid = fetch_logic_ctrls_2_up_valid;
@@ -7854,6 +9869,7 @@ module VexiiRiscv (
   assign fetch_logic_ctrls_0_up_isReady = fetch_logic_ctrls_0_up_ready;
   assign fetch_logic_ctrls_2_down_isValid = fetch_logic_ctrls_2_down_valid;
   assign fetch_logic_ctrls_2_down_isReady = fetch_logic_ctrls_2_down_ready;
+  assign fetch_logic_ctrls_2_down_isCancel = 1'b0;
   assign decode_ctrls_0_down_isValid = decode_ctrls_0_down_valid;
   assign decode_ctrls_0_down_isReady = decode_ctrls_0_down_ready;
   assign decode_ctrls_1_up_isMoving = (decode_ctrls_1_up_isValid && decode_ctrls_1_up_isReady);
@@ -7864,13 +9880,13 @@ module VexiiRiscv (
   assign decode_ctrls_0_up_isMoving = (decode_ctrls_0_up_isValid && decode_ctrls_0_up_isReady);
   assign decode_ctrls_0_up_isValid = decode_ctrls_0_up_valid;
   assign decode_ctrls_0_up_isReady = decode_ctrls_0_up_ready;
+  assign decode_ctrls_0_up_isCancel = 1'b0;
   assign decode_ctrls_1_down_isReady = decode_ctrls_1_down_ready;
   assign execute_ctrl0_down_isReady = execute_ctrl0_down_ready;
   assign execute_ctrl1_down_isReady = execute_ctrl1_down_ready;
   assign execute_ctrl2_down_isReady = execute_ctrl2_down_ready;
   assign execute_ctrl3_down_isReady = execute_ctrl3_down_ready;
   assign execute_ctrl4_down_isReady = execute_ctrl4_down_ready;
-  assign execute_ctrl5_down_isReady = execute_ctrl5_down_ready;
   always @(*) begin
     LsuPlugin_logic_flusher_stateNext = LsuPlugin_logic_flusher_stateReg;
     case(LsuPlugin_logic_flusher_stateReg)
@@ -8036,7 +10052,7 @@ module VexiiRiscv (
         end
       end
       CsrAccessPlugin_logic_fsm_COMPLETION : begin
-        if(execute_ctrl2_down_isReady) begin
+        if(execute_ctrl1_down_isReady) begin
           CsrAccessPlugin_logic_fsm_stateNext = CsrAccessPlugin_logic_fsm_IDLE;
         end
       end
@@ -8086,6 +10102,7 @@ module VexiiRiscv (
       LsuL1Plugin_logic_writeback_write_wordIndex <= 4'b0000;
       LsuL1Plugin_logic_writeback_write_bufferRead_rValid <= 1'b0;
       LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg <= 1'b0;
+      LsuL1Plugin_logic_lsu_rb1_onBanks_1_busyReg <= 1'b0;
       LsuL1Plugin_logic_lsu_ctrl_hazardReg <= 1'b0;
       LsuL1Plugin_logic_lsu_ctrl_flushHazardReg <= 1'b0;
       LsuL1Plugin_logic_initializer_counter <= 7'h0;
@@ -8104,7 +10121,9 @@ module VexiiRiscv (
       PrivilegedPlugin_logic_harts_0_m_ie_mtie <= 1'b0;
       PrivilegedPlugin_logic_harts_0_m_ie_msie <= 1'b0;
       AlignerPlugin_logic_feeder_harts_0_dopId <= 10'h0;
-      AlignerPlugin_logic_nobuffer_mask <= 1'b1;
+      AlignerPlugin_logic_buffer_mask <= 1'b0;
+      AlignerPlugin_logic_buffer_last <= 1'b0;
+      AlignerPlugin_logic_buffer_trap <= 1'b0;
       LsuL1Plugin_logic_bus_toWishbone_arbiter_counter <= 4'b0000;
       LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rValid <= 1'b0;
       FetchL1Plugin_logic_invalidate_counter <= 7'h0;
@@ -8119,14 +10138,16 @@ module VexiiRiscv (
       FetchL1Plugin_logic_ctrl_trapSent <= 1'b0;
       FetchL1Plugin_logic_ctrl_firstCycle <= 1'b1;
       LsuPlugin_logic_onAddress0_ls_storeId <= 12'h0;
+      execute_ctrl2_up_LsuL1_SEL_lane0 <= 1'b0;
       execute_ctrl3_up_LsuL1_SEL_lane0 <= 1'b0;
-      execute_ctrl4_up_LsuL1_SEL_lane0 <= 1'b0;
       LsuPlugin_logic_onCtrl_io_tooEarly <= 1'b0;
       LsuPlugin_logic_onCtrl_io_allowIt <= 1'b0;
       LsuPlugin_logic_onCtrl_io_doItReg <= 1'b0;
       LsuPlugin_logic_onCtrl_io_cmdSent <= 1'b0;
       LsuPlugin_logic_bus_rsp_toStream_rValid <= 1'b0;
       LsuPlugin_logic_onCtrl_hartRegulation_valid <= 1'b0;
+      BtbPlugin_logic_ras_ptr_push <= 2'b00;
+      BtbPlugin_logic_ras_ptr_pop <= 2'b11;
       decode_ctrls_0_up_LANE_SEL_0_regNext <= 1'b0;
       FetchL1Plugin_logic_bus_toWishbone_counter <= 4'b0000;
       _zz_FetchL1Plugin_logic_bus_rsp_valid <= 1'b0;
@@ -8138,7 +10159,8 @@ module VexiiRiscv (
       CsrRamPlugin_csrMapper_fired <= 1'b0;
       decode_ctrls_1_up_LANE_SEL_0_regNext_1 <= 1'b0;
       execute_ctrl0_down_LANE_SEL_lane0_regNext <= 1'b0;
-      execute_ctrl2_down_LANE_SEL_lane0_regNext <= 1'b0;
+      execute_ctrl1_down_LANE_SEL_lane0_regNext <= 1'b0;
+      BtbPlugin_logic_applyIt_correctionSent <= 1'b0;
       decode_ctrls_1_up_LANE_SEL_0 <= 1'b0;
       TrapPlugin_logic_harts_0_interrupt_validBuffer <= 1'b0;
       TrapPlugin_logic_harts_0_trap_fsm_trapEnterDebug <= 1'b0;
@@ -8150,6 +10172,7 @@ module VexiiRiscv (
       CsrAccessPlugin_logic_fsm_inject_unfreeze <= 1'b0;
       CsrAccessPlugin_logic_fsm_inject_flushReg <= 1'b0;
       CsrAccessPlugin_logic_fsm_inject_sampled <= 1'b0;
+      HistoryPlugin_logic_onFetch_value <= 12'h0;
       CsrRamPlugin_logic_readLogic_ohReg <= 2'b00;
       CsrRamPlugin_logic_readLogic_busy <= 1'b0;
       CsrRamPlugin_logic_flush_counter <= 3'b000;
@@ -8157,7 +10180,6 @@ module VexiiRiscv (
       execute_ctrl2_up_LANE_SEL_lane0 <= 1'b0;
       execute_ctrl3_up_LANE_SEL_lane0 <= 1'b0;
       execute_ctrl4_up_LANE_SEL_lane0 <= 1'b0;
-      execute_ctrl5_up_LANE_SEL_lane0 <= 1'b0;
       integer_RegFilePlugin_logic_initalizer_counter <= 6'h0;
       _zz_WhiteboxerPlugin_logic_perf_executeFreezedCounter_2 <= 60'h0;
       _zz_WhiteboxerPlugin_logic_perf_dispatchHazardsCounter_2 <= 60'h0;
@@ -8255,14 +10277,20 @@ module VexiiRiscv (
       if(when_LsuL1Plugin_l735) begin
         LsuL1Plugin_logic_lsu_rb1_onBanks_0_busyReg <= 1'b0;
       end
-      LsuL1Plugin_logic_lsu_ctrl_hazardReg <= (execute_ctrl4_down_LsuL1_HAZARD_lane0 && execute_freeze_valid);
-      LsuL1Plugin_logic_lsu_ctrl_flushHazardReg <= (execute_ctrl4_down_LsuL1_FLUSH_HAZARD_lane0 && execute_freeze_valid);
-      if(execute_ctrl4_down_LsuL1_SEL_lane0) begin
+      if(LsuL1Plugin_logic_banks_1_usedByWriteback) begin
+        LsuL1Plugin_logic_lsu_rb1_onBanks_1_busyReg <= 1'b1;
+      end
+      if(when_LsuL1Plugin_l735_1) begin
+        LsuL1Plugin_logic_lsu_rb1_onBanks_1_busyReg <= 1'b0;
+      end
+      LsuL1Plugin_logic_lsu_ctrl_hazardReg <= (execute_ctrl3_down_LsuL1_HAZARD_lane0 && execute_freeze_valid);
+      LsuL1Plugin_logic_lsu_ctrl_flushHazardReg <= (execute_ctrl3_down_LsuL1_FLUSH_HAZARD_lane0 && execute_freeze_valid);
+      if(execute_ctrl3_down_LsuL1_SEL_lane0) begin
         `ifndef SYNTHESIS
           `ifdef FORMAL
-            assert((_zz_20 <= 1'b1)); // LsuL1Plugin.scala:L889
+            assert((_zz_40 <= 2'b01)); // LsuL1Plugin.scala:L889
           `else
-            if(!(_zz_20 <= 1'b1)) begin
+            if(!(_zz_40 <= 2'b01)) begin
               $display("FAILURE Multiple way hit ???"); // LsuL1Plugin.scala:L889
               $finish;
             end
@@ -8272,9 +10300,9 @@ module VexiiRiscv (
       if(when_LsuL1Plugin_l912) begin
         `ifndef SYNTHESIS
           `ifdef FORMAL
-            assert((_zz_22 < 2'b10)); // LsuL1Plugin.scala:L913
+            assert((_zz_42 < 2'b10)); // LsuL1Plugin.scala:L913
           `else
-            if(!(_zz_22 < 2'b10)) begin
+            if(!(_zz_42 < 2'b10)) begin
               $display("FAILURE "); // LsuL1Plugin.scala:L913
               $finish;
             end
@@ -8287,11 +10315,11 @@ module VexiiRiscv (
       if(io_cmd_fire) begin
         early0_DivPlugin_logic_processing_cmdSent <= 1'b1;
       end
-      if(execute_ctrl2_down_isReady) begin
+      if(execute_ctrl1_down_isReady) begin
         early0_DivPlugin_logic_processing_cmdSent <= 1'b0;
       end
-      early0_DivPlugin_logic_processing_unscheduleRequest <= execute_lane0_ctrls_2_upIsCancel;
-      if(execute_ctrl2_down_isReady) begin
+      early0_DivPlugin_logic_processing_unscheduleRequest <= execute_lane0_ctrls_1_upIsCancel;
+      if(execute_ctrl1_down_isReady) begin
         early0_DivPlugin_logic_processing_unscheduleRequest <= 1'b0;
       end
       if(PrivilegedPlugin_logic_harts_0_xretAwayFromMachine) begin
@@ -8303,8 +10331,14 @@ module VexiiRiscv (
       if(when_AlignerPlugin_l171) begin
         AlignerPlugin_logic_feeder_harts_0_dopId <= (decode_ctrls_0_down_Decode_DOP_ID_0 + 10'h001);
       end
-      if(when_AlignerPlugin_l292) begin
-        AlignerPlugin_logic_nobuffer_mask <= AlignerPlugin_logic_nobuffer_remaningMask;
+      if(AlignerPlugin_logic_buffer_downFire) begin
+        AlignerPlugin_logic_buffer_mask <= (AlignerPlugin_logic_buffer_mask & (~ AlignerPlugin_logic_buffer_usedMask[0 : 0]));
+        AlignerPlugin_logic_buffer_last <= (AlignerPlugin_logic_buffer_last & (~ AlignerPlugin_logic_buffer_usedMask[0 : 0]));
+      end
+      if(when_AlignerPlugin_l256) begin
+        AlignerPlugin_logic_buffer_mask <= (fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_MASK & (~ (AlignerPlugin_logic_buffer_downFire ? AlignerPlugin_logic_buffer_usedMask[1 : 1] : 1'b0)));
+        AlignerPlugin_logic_buffer_trap <= fetch_logic_ctrls_2_down_TRAP;
+        AlignerPlugin_logic_buffer_last <= fetch_logic_ctrls_2_down_AlignerPlugin_logic_FETCH_LAST;
       end
       if(LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_fire) begin
         LsuL1Plugin_logic_bus_toWishbone_arbiter_counter <= (LsuL1Plugin_logic_bus_toWishbone_arbiter_counter + 4'b0001);
@@ -8402,6 +10436,7 @@ module VexiiRiscv (
           LsuPlugin_logic_onCtrl_hartRegulation_valid <= 1'b1;
         end
       end
+      BtbPlugin_logic_ras_ptr_push <= (_zz_BtbPlugin_logic_ras_ptr_push - _zz_BtbPlugin_logic_ras_ptr_push_3);
       decode_ctrls_0_up_LANE_SEL_0_regNext <= decode_ctrls_0_up_LANE_SEL_0;
       if(when_CtrlLaneApi_l50) begin
         decode_ctrls_0_up_LANE_SEL_0_regNext <= 1'b0;
@@ -8445,12 +10480,29 @@ module VexiiRiscv (
       if(when_CtrlLaneApi_l50_3) begin
         execute_ctrl0_down_LANE_SEL_lane0_regNext <= 1'b0;
       end
-      execute_ctrl2_down_LANE_SEL_lane0_regNext <= execute_ctrl2_down_LANE_SEL_lane0;
+      execute_ctrl1_down_LANE_SEL_lane0_regNext <= execute_ctrl1_down_LANE_SEL_lane0;
       if(when_CtrlLaneApi_l50_4) begin
-        execute_ctrl2_down_LANE_SEL_lane0_regNext <= 1'b0;
+        execute_ctrl1_down_LANE_SEL_lane0_regNext <= 1'b0;
       end
-      if(when_AlignerPlugin_l298) begin
-        AlignerPlugin_logic_nobuffer_mask <= 1'b1;
+      `ifndef SYNTHESIS
+        `ifdef FORMAL
+          assert((! (fetch_logic_ctrls_1_up_isValid && fetch_logic_ctrls_1_down_BtbPlugin_logic_readCmd_HAZARDS[0]))); // BtbPlugin.scala:L215
+        `else
+          if(!(! (fetch_logic_ctrls_1_up_isValid && fetch_logic_ctrls_1_down_BtbPlugin_logic_readCmd_HAZARDS[0]))) begin
+            $display("FAILURE "); // BtbPlugin.scala:L215
+            $finish;
+          end
+        `endif
+      `endif
+      if(fetch_logic_ctrls_1_up_isValid) begin
+        BtbPlugin_logic_applyIt_correctionSent <= 1'b1;
+      end
+      if(when_BtbPlugin_l233) begin
+        BtbPlugin_logic_applyIt_correctionSent <= 1'b0;
+      end
+      if(AlignerPlugin_logic_buffer_flushIt) begin
+        AlignerPlugin_logic_buffer_mask <= 1'b0;
+        AlignerPlugin_logic_buffer_last <= 1'b0;
       end
       TrapPlugin_logic_harts_0_interrupt_validBuffer <= TrapPlugin_logic_harts_0_interrupt_valid;
       PcPlugin_logic_harts_0_holdReg <= PcPlugin_logic_harts_0_holdComb;
@@ -8465,9 +10517,9 @@ module VexiiRiscv (
       end
       `ifndef SYNTHESIS
         `ifdef FORMAL
-          assert((! ((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_CsrAccessPlugin_SEL_lane0) && execute_lane0_ctrls_2_upIsCancel))); // CsrAccessPlugin.scala:L136
+          assert((! ((execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_down_CsrAccessPlugin_SEL_lane0) && execute_lane0_ctrls_1_upIsCancel))); // CsrAccessPlugin.scala:L136
         `else
-          if(!(! ((execute_ctrl2_up_LANE_SEL_lane0 && execute_ctrl2_down_CsrAccessPlugin_SEL_lane0) && execute_lane0_ctrls_2_upIsCancel))) begin
+          if(!(! ((execute_ctrl1_up_LANE_SEL_lane0 && execute_ctrl1_down_CsrAccessPlugin_SEL_lane0) && execute_lane0_ctrls_1_upIsCancel))) begin
             $display("FAILURE CsrAccessPlugin saw forbidden select && cancel request"); // CsrAccessPlugin.scala:L136
             $finish;
           end
@@ -8495,6 +10547,7 @@ module VexiiRiscv (
         PrivilegedPlugin_logic_harts_0_m_ie_mtie <= CsrAccessPlugin_bus_write_bits[7];
         PrivilegedPlugin_logic_harts_0_m_ie_msie <= CsrAccessPlugin_bus_write_bits[3];
       end
+      HistoryPlugin_logic_onFetch_value <= HistoryPlugin_logic_onFetch_valueNext;
       CsrRamPlugin_logic_readLogic_ohReg <= (CsrRamPlugin_logic_readLogic_port_cmd_valid ? CsrRamPlugin_logic_readLogic_oh : 2'b00);
       CsrRamPlugin_logic_readLogic_busy <= CsrRamPlugin_logic_readLogic_port_cmd_valid;
       CsrRamPlugin_logic_flush_counter <= (CsrRamPlugin_logic_flush_counter + _zz_CsrRamPlugin_logic_flush_counter);
@@ -8533,6 +10586,7 @@ module VexiiRiscv (
       end
       if(execute_ctrl1_down_isReady) begin
         execute_ctrl2_up_LANE_SEL_lane0 <= execute_ctrl1_down_LANE_SEL_lane0;
+        execute_ctrl2_up_LsuL1_SEL_lane0 <= execute_ctrl1_down_LsuL1_SEL_lane0;
       end
       if(execute_ctrl2_down_isReady) begin
         execute_ctrl3_up_LANE_SEL_lane0 <= execute_ctrl2_down_LANE_SEL_lane0;
@@ -8540,10 +10594,6 @@ module VexiiRiscv (
       end
       if(execute_ctrl3_down_isReady) begin
         execute_ctrl4_up_LANE_SEL_lane0 <= execute_ctrl3_down_LANE_SEL_lane0;
-        execute_ctrl4_up_LsuL1_SEL_lane0 <= execute_ctrl3_down_LsuL1_SEL_lane0;
-      end
-      if(execute_ctrl4_down_isReady) begin
-        execute_ctrl5_up_LANE_SEL_lane0 <= execute_ctrl4_down_LANE_SEL_lane0;
       end
       LsuPlugin_logic_flusher_stateReg <= LsuPlugin_logic_flusher_stateNext;
       TrapPlugin_logic_harts_0_trap_fsm_stateReg <= TrapPlugin_logic_harts_0_trap_fsm_stateNext;
@@ -8663,6 +10713,7 @@ module VexiiRiscv (
         default : begin
         end
       endcase
+      BtbPlugin_logic_ras_ptr_pop <= BtbPlugin_logic_ras_ptr_pop_aheadValue;
     end
   end
 
@@ -8670,6 +10721,7 @@ module VexiiRiscv (
     LsuL1Plugin_logic_refill_slots_0_loadedCounter <= (LsuL1Plugin_logic_refill_slots_0_loadedCounter + ((LsuL1Plugin_logic_refill_slots_0_loaded && (! LsuL1Plugin_logic_refill_slots_0_loadedDone)) && (! execute_freeze_valid)));
     if(when_LsuL1Plugin_l381) begin
       LsuL1Plugin_logic_refill_slots_0_address <= LsuL1Plugin_logic_refill_push_payload_address;
+      LsuL1Plugin_logic_refill_slots_0_way <= LsuL1Plugin_logic_refill_push_payload_way;
       LsuL1Plugin_logic_refill_slots_0_cmdSent <= 1'b0;
       LsuL1Plugin_logic_refill_slots_0_loadedCounter <= 1'b0;
       LsuL1Plugin_logic_refill_slots_0_victim <= LsuL1Plugin_logic_refill_push_payload_victim;
@@ -8683,6 +10735,7 @@ module VexiiRiscv (
     LsuL1Plugin_logic_writeback_slots_0_timer_counter <= (LsuL1Plugin_logic_writeback_slots_0_timer_counter + ((! LsuL1Plugin_logic_writeback_slots_0_timer_done) && (! execute_freeze_valid)));
     if(when_LsuL1Plugin_l561) begin
       LsuL1Plugin_logic_writeback_slots_0_address <= LsuL1Plugin_logic_writeback_push_payload_address;
+      LsuL1Plugin_logic_writeback_slots_0_way <= LsuL1Plugin_logic_writeback_push_payload_way;
       LsuL1Plugin_logic_writeback_slots_0_timer_counter <= 1'b0;
       LsuL1Plugin_logic_writeback_slots_0_writeCmdDone <= 1'b0;
       LsuL1Plugin_logic_writeback_slots_0_readCmdDone <= 1'b0;
@@ -8699,6 +10752,7 @@ module VexiiRiscv (
     end
     LsuL1Plugin_logic_writeback_read_slotReadLast_payload_last <= LsuL1Plugin_logic_writeback_read_slotRead_payload_last;
     LsuL1Plugin_logic_writeback_read_slotReadLast_payload_wordIndex <= LsuL1Plugin_logic_writeback_read_slotRead_payload_wordIndex;
+    LsuL1Plugin_logic_writeback_read_slotReadLast_payload_way <= LsuL1Plugin_logic_writeback_read_slotRead_payload_way;
     if(LsuL1Plugin_logic_writeback_read_slotReadLast_valid) begin
       LsuL1Plugin_logic_writeback_slots_0_victimBufferReady <= 1'b1;
       if(LsuL1Plugin_logic_writeback_read_slotReadLast_payload_last) begin
@@ -8714,7 +10768,18 @@ module VexiiRiscv (
       LsuL1Plugin_logic_writeback_write_bufferRead_rData_address <= LsuL1Plugin_logic_writeback_write_bufferRead_payload_address;
       LsuL1Plugin_logic_writeback_write_bufferRead_rData_last <= LsuL1Plugin_logic_writeback_write_bufferRead_payload_last;
     end
-    early0_DivPlugin_logic_processing_divRevertResult <= ((execute_ctrl2_down_RsUnsignedPlugin_RS1_REVERT_lane0 ^ (execute_ctrl2_down_RsUnsignedPlugin_RS2_REVERT_lane0 && (! execute_ctrl2_down_DivPlugin_REM_lane0))) && (! (((execute_ctrl2_down_RsUnsignedPlugin_RS2_FORMATED_lane0 == 32'h0) && execute_ctrl2_down_RsUnsignedPlugin_RS2_SIGNED_lane0) && (! execute_ctrl2_down_DivPlugin_REM_lane0))));
+    early0_DivPlugin_logic_processing_divRevertResult <= ((execute_ctrl1_down_RsUnsignedPlugin_RS1_REVERT_lane0 ^ (execute_ctrl1_down_RsUnsignedPlugin_RS2_REVERT_lane0 && (! execute_ctrl1_down_DivPlugin_REM_lane0))) && (! (((execute_ctrl1_down_RsUnsignedPlugin_RS2_FORMATED_lane0 == 32'h0) && execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0) && (! execute_ctrl1_down_DivPlugin_REM_lane0))));
+    if(when_AlignerPlugin_l256) begin
+      AlignerPlugin_logic_buffer_data <= fetch_logic_ctrls_2_down_Fetch_WORD;
+      AlignerPlugin_logic_buffer_pc <= fetch_logic_ctrls_2_down_Fetch_WORD_PC;
+      AlignerPlugin_logic_buffer_hm_Fetch_ID <= fetch_logic_ctrls_2_down_Fetch_ID;
+      AlignerPlugin_logic_buffer_hm_GSharePlugin_GSHARE_COUNTER_0 <= fetch_logic_ctrls_2_down_GSharePlugin_GSHARE_COUNTER_0;
+      AlignerPlugin_logic_buffer_hm_Prediction_BRANCH_HISTORY <= fetch_logic_ctrls_2_down_Prediction_BRANCH_HISTORY;
+      AlignerPlugin_logic_buffer_hm_Prediction_WORD_SLICES_BRANCH <= fetch_logic_ctrls_2_down_Prediction_WORD_SLICES_BRANCH;
+      AlignerPlugin_logic_buffer_hm_Prediction_WORD_SLICES_TAKEN <= fetch_logic_ctrls_2_down_Prediction_WORD_SLICES_TAKEN;
+      AlignerPlugin_logic_buffer_hm_Prediction_WORD_JUMP_PC <= fetch_logic_ctrls_2_down_Prediction_WORD_JUMP_PC;
+      AlignerPlugin_logic_buffer_hm_Prediction_WORD_JUMPED <= fetch_logic_ctrls_2_down_Prediction_WORD_JUMPED;
+    end
     if(LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_ready) begin
       LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_last <= LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_last;
       LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rData_fragment_write <= LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_payload_fragment_write;
@@ -8725,6 +10790,7 @@ module VexiiRiscv (
       if(_zz_when_1) begin
         FetchL1Plugin_logic_refill_slots_0_address <= FetchL1Plugin_logic_refill_start_address;
         FetchL1Plugin_logic_refill_slots_0_isIo <= FetchL1Plugin_logic_refill_start_isIo;
+        FetchL1Plugin_logic_refill_slots_0_wayToAllocate <= FetchL1Plugin_logic_refill_start_wayToAllocate;
         FetchL1Plugin_logic_refill_slots_0_priority <= FetchL1Plugin_logic_refill_slots_0_valid;
       end
     end
@@ -8732,6 +10798,7 @@ module VexiiRiscv (
       FetchL1Plugin_logic_refill_onCmd_lockedOh <= FetchL1Plugin_logic_refill_onCmd_propoedOh;
     end
     FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_address <= FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address;
+    FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_data_0 <= FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_data_0;
     if(LsuPlugin_logic_onAddress0_flush_port_fire) begin
       LsuPlugin_logic_flusher_cmdCounter <= (LsuPlugin_logic_flusher_cmdCounter + 7'h01);
     end
@@ -8744,8 +10811,11 @@ module VexiiRiscv (
     end
     if(when_LsuPlugin_l871) begin
       if(when_LsuPlugin_l226) begin
-        LsuPlugin_logic_onCtrl_hartRegulation_refill <= execute_ctrl4_down_LsuL1_WAIT_REFILL_lane0;
+        LsuPlugin_logic_onCtrl_hartRegulation_refill <= execute_ctrl3_down_LsuL1_WAIT_REFILL_lane0;
       end
+    end
+    if(BtbPlugin_logic_ras_readIt) begin
+      BtbPlugin_logic_ras_read <= BtbPlugin_logic_ras_mem_stack_spinal_port0;
     end
     FetchL1WishbonePlugin_logic_bus_DAT_MISO_regNext <= FetchL1WishbonePlugin_logic_bus_DAT_MISO;
     FetchL1WishbonePlugin_logic_bus_ERR_regNext <= FetchL1WishbonePlugin_logic_bus_ERR;
@@ -8766,7 +10836,8 @@ module VexiiRiscv (
       TrapPlugin_logic_harts_0_trap_pending_state_arg <= TrapPlugin_logic_harts_0_trap_pending_arbiter_down_payload_arg;
     end
     if(TrapPlugin_logic_harts_0_trap_trigger_valid) begin
-      TrapPlugin_logic_harts_0_trap_pending_pc <= execute_ctrl4_down_PC_lane0;
+      TrapPlugin_logic_harts_0_trap_pending_pc <= execute_ctrl3_down_PC_lane0;
+      TrapPlugin_logic_harts_0_trap_pending_history <= execute_ctrl3_down_Prediction_BRANCH_HISTORY_lane0;
       TrapPlugin_logic_harts_0_trap_pending_slices <= (1'b0 + 1'b1);
     end
     if(TrapPlugin_logic_harts_0_trap_fsm_buffer_sampleIt) begin
@@ -8782,8 +10853,8 @@ module VexiiRiscv (
     if(when_TrapPlugin_l556) begin
       TrapPlugin_logic_harts_0_trap_fsm_readed <= TrapPlugin_logic_harts_0_crsPorts_read_data;
     end
-    CsrAccessPlugin_logic_fsm_interface_read <= ((execute_ctrl2_down_CsrAccessPlugin_SEL_lane0 && (! CsrAccessPlugin_logic_fsm_inject_trap)) && CsrAccessPlugin_logic_fsm_inject_csrRead);
-    CsrAccessPlugin_logic_fsm_interface_write <= ((execute_ctrl2_down_CsrAccessPlugin_SEL_lane0 && (! CsrAccessPlugin_logic_fsm_inject_trap)) && CsrAccessPlugin_logic_fsm_inject_csrWrite);
+    CsrAccessPlugin_logic_fsm_interface_read <= ((execute_ctrl1_down_CsrAccessPlugin_SEL_lane0 && (! CsrAccessPlugin_logic_fsm_inject_trap)) && CsrAccessPlugin_logic_fsm_inject_csrRead);
+    CsrAccessPlugin_logic_fsm_interface_write <= ((execute_ctrl1_down_CsrAccessPlugin_SEL_lane0 && (! CsrAccessPlugin_logic_fsm_inject_trap)) && CsrAccessPlugin_logic_fsm_inject_csrWrite);
     CsrAccessPlugin_logic_fsm_inject_trapReg <= CsrAccessPlugin_logic_fsm_inject_trap;
     CsrAccessPlugin_logic_fsm_inject_busTrapReg <= CsrAccessPlugin_bus_decode_trap;
     CsrAccessPlugin_logic_fsm_inject_busTrapCodeReg <= CsrAccessPlugin_bus_decode_trapCode;
@@ -8793,21 +10864,40 @@ module VexiiRiscv (
       fetch_logic_ctrls_1_up_Fetch_PC_FAULT <= fetch_logic_ctrls_0_down_Fetch_PC_FAULT;
       fetch_logic_ctrls_1_up_Fetch_ID <= fetch_logic_ctrls_0_down_Fetch_ID;
       fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
+      fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0 <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
       fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
       fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
+      fetch_logic_ctrls_1_up_GSharePlugin_logic_HASH <= fetch_logic_ctrls_0_down_GSharePlugin_logic_HASH;
+      fetch_logic_ctrls_1_up_Prediction_BRANCH_HISTORY <= fetch_logic_ctrls_0_down_Prediction_BRANCH_HISTORY;
+      fetch_logic_ctrls_1_up_GSharePlugin_logic_BYPASS_valid <= fetch_logic_ctrls_0_down_GSharePlugin_logic_BYPASS_valid;
+      fetch_logic_ctrls_1_up_GSharePlugin_logic_BYPASS_payload_address <= fetch_logic_ctrls_0_down_GSharePlugin_logic_BYPASS_payload_address;
+      fetch_logic_ctrls_1_up_GSharePlugin_logic_BYPASS_payload_data_0 <= fetch_logic_ctrls_0_down_GSharePlugin_logic_BYPASS_payload_data_0;
+      fetch_logic_ctrls_1_up_BtbPlugin_logic_readCmd_HAZARDS <= fetch_logic_ctrls_0_down_BtbPlugin_logic_readCmd_HAZARDS;
     end
     if(fetch_logic_ctrls_1_down_isReady) begin
       fetch_logic_ctrls_2_up_Fetch_WORD_PC <= fetch_logic_ctrls_1_down_Fetch_WORD_PC;
       fetch_logic_ctrls_2_up_Fetch_PC_FAULT <= fetch_logic_ctrls_1_down_Fetch_PC_FAULT;
       fetch_logic_ctrls_2_up_Fetch_ID <= fetch_logic_ctrls_1_down_Fetch_ID;
+      fetch_logic_ctrls_2_up_Prediction_BRANCH_HISTORY <= fetch_logic_ctrls_1_down_Prediction_BRANCH_HISTORY;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_loaded <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_error <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_error;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_address <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_loaded <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_error <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_address <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_address;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_PLRU_BYPASSED_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_BYPASSED_0;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_0;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_1 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_1;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_HAZARD <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_HAZARD;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_1 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_1;
       fetch_logic_ctrls_2_up_MMU_TRANSLATED <= fetch_logic_ctrls_1_down_MMU_TRANSLATED;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HIT <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT;
+      fetch_logic_ctrls_2_up_GSharePlugin_GSHARE_COUNTER_0 <= fetch_logic_ctrls_1_down_GSharePlugin_GSHARE_COUNTER_0;
+      fetch_logic_ctrls_2_up_Prediction_WORD_JUMPED <= fetch_logic_ctrls_1_down_Prediction_WORD_JUMPED;
+      fetch_logic_ctrls_2_up_Prediction_WORD_JUMP_PC <= fetch_logic_ctrls_1_down_Prediction_WORD_JUMP_PC;
+      fetch_logic_ctrls_2_up_Prediction_WORD_SLICES_BRANCH <= fetch_logic_ctrls_1_down_Prediction_WORD_SLICES_BRANCH;
+      fetch_logic_ctrls_2_up_Prediction_WORD_SLICES_TAKEN <= fetch_logic_ctrls_1_down_Prediction_WORD_SLICES_TAKEN;
       fetch_logic_ctrls_2_up_MMU_REFILL <= fetch_logic_ctrls_1_down_MMU_REFILL;
       fetch_logic_ctrls_2_up_MMU_HAZARD <= fetch_logic_ctrls_1_down_MMU_HAZARD;
       fetch_logic_ctrls_2_up_MMU_ALLOW_EXECUTE <= fetch_logic_ctrls_1_down_MMU_ALLOW_EXECUTE;
@@ -8821,10 +10911,21 @@ module VexiiRiscv (
       decode_ctrls_1_up_Decode_INSTRUCTION_RAW_0 <= decode_ctrls_0_down_Decode_INSTRUCTION_RAW_0;
       decode_ctrls_1_up_PC_0 <= decode_ctrls_0_down_PC_0;
       decode_ctrls_1_up_Decode_DOP_ID_0 <= decode_ctrls_0_down_Decode_DOP_ID_0;
+      decode_ctrls_1_up_GSharePlugin_GSHARE_COUNTER_0_0 <= decode_ctrls_0_down_GSharePlugin_GSHARE_COUNTER_0_0;
+      decode_ctrls_1_up_Prediction_BRANCH_HISTORY_0 <= decode_ctrls_0_down_Prediction_BRANCH_HISTORY_0;
       decode_ctrls_1_up_TRAP_0 <= decode_ctrls_0_down_TRAP_0;
+      decode_ctrls_1_up_Prediction_ALIGNED_JUMPED_0 <= decode_ctrls_0_down_Prediction_ALIGNED_JUMPED_0;
+      decode_ctrls_1_up_Prediction_ALIGNED_JUMPED_PC_0 <= decode_ctrls_0_down_Prediction_ALIGNED_JUMPED_PC_0;
+      decode_ctrls_1_up_Prediction_ALIGNED_SLICES_BRANCH_0 <= decode_ctrls_0_down_Prediction_ALIGNED_SLICES_BRANCH_0;
+      decode_ctrls_1_up_Prediction_ALIGNED_SLICES_TAKEN_0 <= decode_ctrls_0_down_Prediction_ALIGNED_SLICES_TAKEN_0;
+      decode_ctrls_1_up_Prediction_ALIGN_REDO_0 <= decode_ctrls_0_down_Prediction_ALIGN_REDO_0;
     end
     if(execute_ctrl0_down_isReady) begin
       execute_ctrl1_up_Decode_UOP_lane0 <= execute_ctrl0_down_Decode_UOP_lane0;
+      execute_ctrl1_up_Prediction_ALIGNED_JUMPED_lane0 <= execute_ctrl0_down_Prediction_ALIGNED_JUMPED_lane0;
+      execute_ctrl1_up_Prediction_ALIGNED_JUMPED_PC_lane0 <= execute_ctrl0_down_Prediction_ALIGNED_JUMPED_PC_lane0;
+      execute_ctrl1_up_GSharePlugin_GSHARE_COUNTER_lane0_0 <= execute_ctrl0_down_GSharePlugin_GSHARE_COUNTER_lane0_0;
+      execute_ctrl1_up_Prediction_BRANCH_HISTORY_lane0 <= execute_ctrl0_down_Prediction_BRANCH_HISTORY_lane0;
       execute_ctrl1_up_PC_lane0 <= execute_ctrl0_down_PC_lane0;
       execute_ctrl1_up_TRAP_lane0 <= execute_ctrl0_down_TRAP_lane0;
       execute_ctrl1_up_Decode_UOP_ID_lane0 <= execute_ctrl0_down_Decode_UOP_ID_lane0;
@@ -8834,67 +10935,152 @@ module VexiiRiscv (
       execute_ctrl1_up_RD_PHYS_lane0 <= execute_ctrl0_down_RD_PHYS_lane0;
       execute_ctrl1_up_COMPLETED_lane0 <= execute_ctrl0_down_COMPLETED_lane0;
       execute_ctrl1_up_AguPlugin_SIZE_lane0 <= execute_ctrl0_down_AguPlugin_SIZE_lane0;
+      execute_ctrl1_up_early0_SrcPlugin_SRC1_lane0 <= execute_ctrl0_down_early0_SrcPlugin_SRC1_lane0;
+      execute_ctrl1_up_integer_RS1_lane0 <= execute_ctrl0_down_integer_RS1_lane0;
+      execute_ctrl1_up_early0_SrcPlugin_SRC2_lane0 <= execute_ctrl0_down_early0_SrcPlugin_SRC2_lane0;
+      execute_ctrl1_up_integer_RS2_lane0 <= execute_ctrl0_down_integer_RS2_lane0;
+      execute_ctrl1_up_early0_IntAluPlugin_SEL_lane0 <= execute_ctrl0_down_early0_IntAluPlugin_SEL_lane0;
+      execute_ctrl1_up_early0_BarrelShifterPlugin_SEL_lane0 <= execute_ctrl0_down_early0_BarrelShifterPlugin_SEL_lane0;
+      execute_ctrl1_up_early0_BranchPlugin_SEL_lane0 <= execute_ctrl0_down_early0_BranchPlugin_SEL_lane0;
+      execute_ctrl1_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl0_down_early0_MulPlugin_SEL_lane0;
+      execute_ctrl1_up_early0_DivPlugin_SEL_lane0 <= execute_ctrl0_down_early0_DivPlugin_SEL_lane0;
+      execute_ctrl1_up_early0_EnvPlugin_SEL_lane0 <= execute_ctrl0_down_early0_EnvPlugin_SEL_lane0;
+      execute_ctrl1_up_late0_IntAluPlugin_SEL_lane0 <= execute_ctrl0_down_late0_IntAluPlugin_SEL_lane0;
+      execute_ctrl1_up_late0_BarrelShifterPlugin_SEL_lane0 <= execute_ctrl0_down_late0_BarrelShifterPlugin_SEL_lane0;
+      execute_ctrl1_up_late0_BranchPlugin_SEL_lane0 <= execute_ctrl0_down_late0_BranchPlugin_SEL_lane0;
+      execute_ctrl1_up_CsrAccessPlugin_SEL_lane0 <= execute_ctrl0_down_CsrAccessPlugin_SEL_lane0;
+      execute_ctrl1_up_AguPlugin_SEL_lane0 <= execute_ctrl0_down_AguPlugin_SEL_lane0;
+      execute_ctrl1_up_LsuPlugin_logic_FENCE_lane0 <= execute_ctrl0_down_LsuPlugin_logic_FENCE_lane0;
+      execute_ctrl1_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl0_down_lane0_integer_WriteBackPlugin_SEL_lane0;
+      execute_ctrl1_up_COMPLETION_AT_1_lane0 <= execute_ctrl0_down_COMPLETION_AT_1_lane0;
+      execute_ctrl1_up_COMPLETION_AT_3_lane0 <= execute_ctrl0_down_COMPLETION_AT_3_lane0;
+      execute_ctrl1_up_COMPLETION_AT_2_lane0 <= execute_ctrl0_down_COMPLETION_AT_2_lane0;
+      execute_ctrl1_up_lane0_logic_completions_onCtrl_0_ENABLE_lane0 <= execute_ctrl0_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+      execute_ctrl1_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl0_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
+      execute_ctrl1_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0 <= execute_ctrl0_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+      execute_ctrl1_up_early0_IntAluPlugin_ALU_ADD_SUB_lane0 <= execute_ctrl0_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
+      execute_ctrl1_up_early0_IntAluPlugin_ALU_SLTX_lane0 <= execute_ctrl0_down_early0_IntAluPlugin_ALU_SLTX_lane0;
+      execute_ctrl1_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 <= execute_ctrl0_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+      execute_ctrl1_up_SrcStageables_REVERT_lane0 <= execute_ctrl0_down_SrcStageables_REVERT_lane0;
+      execute_ctrl1_up_SrcStageables_ZERO_lane0 <= execute_ctrl0_down_SrcStageables_ZERO_lane0;
+      execute_ctrl1_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl0_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
+      execute_ctrl1_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl0_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
+      execute_ctrl1_up_BYPASSED_AT_1_lane0 <= execute_ctrl0_down_BYPASSED_AT_1_lane0;
+      execute_ctrl1_up_BYPASSED_AT_2_lane0 <= execute_ctrl0_down_BYPASSED_AT_2_lane0;
+      execute_ctrl1_up_MAY_FLUSH_PRECISE_2_lane0 <= execute_ctrl0_down_MAY_FLUSH_PRECISE_2_lane0;
+      execute_ctrl1_up_MAY_FLUSH_PRECISE_3_lane0 <= execute_ctrl0_down_MAY_FLUSH_PRECISE_3_lane0;
+      execute_ctrl1_up_SrcStageables_UNSIGNED_lane0 <= execute_ctrl0_down_SrcStageables_UNSIGNED_lane0;
+      execute_ctrl1_up_BarrelShifterPlugin_LEFT_lane0 <= execute_ctrl0_down_BarrelShifterPlugin_LEFT_lane0;
+      execute_ctrl1_up_BarrelShifterPlugin_SIGNED_lane0 <= execute_ctrl0_down_BarrelShifterPlugin_SIGNED_lane0;
+      execute_ctrl1_up_BranchPlugin_BRANCH_CTRL_lane0 <= execute_ctrl0_down_BranchPlugin_BRANCH_CTRL_lane0;
+      execute_ctrl1_up_MulPlugin_HIGH_lane0 <= execute_ctrl0_down_MulPlugin_HIGH_lane0;
+      execute_ctrl1_up_RsUnsignedPlugin_RS1_SIGNED_lane0 <= execute_ctrl0_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
+      execute_ctrl1_up_RsUnsignedPlugin_RS2_SIGNED_lane0 <= execute_ctrl0_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
+      execute_ctrl1_up_DivPlugin_REM_lane0 <= execute_ctrl0_down_DivPlugin_REM_lane0;
+      execute_ctrl1_up_CsrAccessPlugin_CSR_IMM_lane0 <= execute_ctrl0_down_CsrAccessPlugin_CSR_IMM_lane0;
+      execute_ctrl1_up_CsrAccessPlugin_CSR_MASK_lane0 <= execute_ctrl0_down_CsrAccessPlugin_CSR_MASK_lane0;
+      execute_ctrl1_up_CsrAccessPlugin_CSR_CLEAR_lane0 <= execute_ctrl0_down_CsrAccessPlugin_CSR_CLEAR_lane0;
+      execute_ctrl1_up_AguPlugin_LOAD_lane0 <= execute_ctrl0_down_AguPlugin_LOAD_lane0;
+      execute_ctrl1_up_AguPlugin_STORE_lane0 <= execute_ctrl0_down_AguPlugin_STORE_lane0;
+      execute_ctrl1_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl0_down_AguPlugin_ATOMIC_lane0;
+      execute_ctrl1_up_AguPlugin_FLOAT_lane0 <= execute_ctrl0_down_AguPlugin_FLOAT_lane0;
+      execute_ctrl1_up_LsuPlugin_logic_LSU_PREFETCH_lane0 <= execute_ctrl0_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+      execute_ctrl1_up_early0_EnvPlugin_OP_lane0 <= execute_ctrl0_down_early0_EnvPlugin_OP_lane0;
+      execute_ctrl1_up_late0_IntAluPlugin_ALU_ADD_SUB_lane0 <= execute_ctrl0_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+      execute_ctrl1_up_late0_IntAluPlugin_ALU_SLTX_lane0 <= execute_ctrl0_down_late0_IntAluPlugin_ALU_SLTX_lane0;
+      execute_ctrl1_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 <= execute_ctrl0_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+      execute_ctrl1_up_late0_SrcPlugin_logic_SRC1_CTRL_lane0 <= execute_ctrl0_down_late0_SrcPlugin_logic_SRC1_CTRL_lane0;
+      execute_ctrl1_up_late0_SrcPlugin_logic_SRC2_CTRL_lane0 <= execute_ctrl0_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
     end
     if(execute_ctrl1_down_isReady) begin
       execute_ctrl2_up_Decode_UOP_lane0 <= execute_ctrl1_down_Decode_UOP_lane0;
+      execute_ctrl2_up_Prediction_ALIGNED_JUMPED_lane0 <= execute_ctrl1_down_Prediction_ALIGNED_JUMPED_lane0;
+      execute_ctrl2_up_Prediction_ALIGNED_JUMPED_PC_lane0 <= execute_ctrl1_down_Prediction_ALIGNED_JUMPED_PC_lane0;
+      execute_ctrl2_up_GSharePlugin_GSHARE_COUNTER_lane0_0 <= execute_ctrl1_down_GSharePlugin_GSHARE_COUNTER_lane0_0;
+      execute_ctrl2_up_Prediction_BRANCH_HISTORY_lane0 <= execute_ctrl1_down_Prediction_BRANCH_HISTORY_lane0;
       execute_ctrl2_up_PC_lane0 <= execute_ctrl1_down_PC_lane0;
       execute_ctrl2_up_TRAP_lane0 <= execute_ctrl1_down_TRAP_lane0;
       execute_ctrl2_up_Decode_UOP_ID_lane0 <= execute_ctrl1_down_Decode_UOP_ID_lane0;
+      execute_ctrl2_up_RS1_PHYS_lane0 <= execute_ctrl1_down_RS1_PHYS_lane0;
+      execute_ctrl2_up_RS2_PHYS_lane0 <= execute_ctrl1_down_RS2_PHYS_lane0;
       execute_ctrl2_up_RD_ENABLE_lane0 <= execute_ctrl1_down_RD_ENABLE_lane0;
       execute_ctrl2_up_RD_PHYS_lane0 <= execute_ctrl1_down_RD_PHYS_lane0;
       execute_ctrl2_up_COMPLETED_lane0 <= execute_ctrl1_down_COMPLETED_lane0;
       execute_ctrl2_up_AguPlugin_SIZE_lane0 <= execute_ctrl1_down_AguPlugin_SIZE_lane0;
-      execute_ctrl2_up_early0_SrcPlugin_SRC1_lane0 <= execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0;
       execute_ctrl2_up_integer_RS1_lane0 <= execute_ctrl1_down_integer_RS1_lane0;
-      execute_ctrl2_up_early0_SrcPlugin_SRC2_lane0 <= execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0;
       execute_ctrl2_up_integer_RS2_lane0 <= execute_ctrl1_down_integer_RS2_lane0;
-      execute_ctrl2_up_MAY_FLUSH_PRECISE_3_lane0 <= execute_ctrl1_down_MAY_FLUSH_PRECISE_3_lane0;
-      execute_ctrl2_up_early0_IntAluPlugin_SEL_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_SEL_lane0;
-      execute_ctrl2_up_early0_BarrelShifterPlugin_SEL_lane0 <= execute_ctrl1_down_early0_BarrelShifterPlugin_SEL_lane0;
       execute_ctrl2_up_early0_BranchPlugin_SEL_lane0 <= execute_ctrl1_down_early0_BranchPlugin_SEL_lane0;
       execute_ctrl2_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl1_down_early0_MulPlugin_SEL_lane0;
       execute_ctrl2_up_early0_DivPlugin_SEL_lane0 <= execute_ctrl1_down_early0_DivPlugin_SEL_lane0;
-      execute_ctrl2_up_early0_EnvPlugin_SEL_lane0 <= execute_ctrl1_down_early0_EnvPlugin_SEL_lane0;
+      execute_ctrl2_up_late0_IntAluPlugin_SEL_lane0 <= execute_ctrl1_down_late0_IntAluPlugin_SEL_lane0;
+      execute_ctrl2_up_late0_BarrelShifterPlugin_SEL_lane0 <= execute_ctrl1_down_late0_BarrelShifterPlugin_SEL_lane0;
+      execute_ctrl2_up_late0_BranchPlugin_SEL_lane0 <= execute_ctrl1_down_late0_BranchPlugin_SEL_lane0;
       execute_ctrl2_up_CsrAccessPlugin_SEL_lane0 <= execute_ctrl1_down_CsrAccessPlugin_SEL_lane0;
       execute_ctrl2_up_AguPlugin_SEL_lane0 <= execute_ctrl1_down_AguPlugin_SEL_lane0;
       execute_ctrl2_up_LsuPlugin_logic_FENCE_lane0 <= execute_ctrl1_down_LsuPlugin_logic_FENCE_lane0;
       execute_ctrl2_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl1_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-      execute_ctrl2_up_COMPLETION_AT_2_lane0 <= execute_ctrl1_down_COMPLETION_AT_2_lane0;
-      execute_ctrl2_up_COMPLETION_AT_4_lane0 <= execute_ctrl1_down_COMPLETION_AT_4_lane0;
       execute_ctrl2_up_COMPLETION_AT_3_lane0 <= execute_ctrl1_down_COMPLETION_AT_3_lane0;
-      execute_ctrl2_up_lane0_logic_completions_onCtrl_0_ENABLE_lane0 <= execute_ctrl1_down_lane0_logic_completions_onCtrl_0_ENABLE_lane0;
+      execute_ctrl2_up_COMPLETION_AT_2_lane0 <= execute_ctrl1_down_COMPLETION_AT_2_lane0;
       execute_ctrl2_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl1_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
       execute_ctrl2_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0 <= execute_ctrl1_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
-      execute_ctrl2_up_early0_IntAluPlugin_ALU_ADD_SUB_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_ALU_ADD_SUB_lane0;
-      execute_ctrl2_up_early0_IntAluPlugin_ALU_SLTX_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_ALU_SLTX_lane0;
-      execute_ctrl2_up_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 <= execute_ctrl1_down_early0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
       execute_ctrl2_up_SrcStageables_REVERT_lane0 <= execute_ctrl1_down_SrcStageables_REVERT_lane0;
       execute_ctrl2_up_SrcStageables_ZERO_lane0 <= execute_ctrl1_down_SrcStageables_ZERO_lane0;
       execute_ctrl2_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl1_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
       execute_ctrl2_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl1_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
       execute_ctrl2_up_BYPASSED_AT_2_lane0 <= execute_ctrl1_down_BYPASSED_AT_2_lane0;
-      execute_ctrl2_up_BYPASSED_AT_3_lane0 <= execute_ctrl1_down_BYPASSED_AT_3_lane0;
-      execute_ctrl2_up_BYPASSED_AT_4_lane0 <= execute_ctrl1_down_BYPASSED_AT_4_lane0;
+      execute_ctrl2_up_MAY_FLUSH_PRECISE_2_lane0 <= execute_ctrl1_down_MAY_FLUSH_PRECISE_2_lane0;
       execute_ctrl2_up_SrcStageables_UNSIGNED_lane0 <= execute_ctrl1_down_SrcStageables_UNSIGNED_lane0;
       execute_ctrl2_up_BarrelShifterPlugin_LEFT_lane0 <= execute_ctrl1_down_BarrelShifterPlugin_LEFT_lane0;
       execute_ctrl2_up_BarrelShifterPlugin_SIGNED_lane0 <= execute_ctrl1_down_BarrelShifterPlugin_SIGNED_lane0;
       execute_ctrl2_up_BranchPlugin_BRANCH_CTRL_lane0 <= execute_ctrl1_down_BranchPlugin_BRANCH_CTRL_lane0;
       execute_ctrl2_up_MulPlugin_HIGH_lane0 <= execute_ctrl1_down_MulPlugin_HIGH_lane0;
-      execute_ctrl2_up_RsUnsignedPlugin_RS1_SIGNED_lane0 <= execute_ctrl1_down_RsUnsignedPlugin_RS1_SIGNED_lane0;
-      execute_ctrl2_up_RsUnsignedPlugin_RS2_SIGNED_lane0 <= execute_ctrl1_down_RsUnsignedPlugin_RS2_SIGNED_lane0;
-      execute_ctrl2_up_DivPlugin_REM_lane0 <= execute_ctrl1_down_DivPlugin_REM_lane0;
-      execute_ctrl2_up_CsrAccessPlugin_CSR_IMM_lane0 <= execute_ctrl1_down_CsrAccessPlugin_CSR_IMM_lane0;
-      execute_ctrl2_up_CsrAccessPlugin_CSR_MASK_lane0 <= execute_ctrl1_down_CsrAccessPlugin_CSR_MASK_lane0;
-      execute_ctrl2_up_CsrAccessPlugin_CSR_CLEAR_lane0 <= execute_ctrl1_down_CsrAccessPlugin_CSR_CLEAR_lane0;
       execute_ctrl2_up_AguPlugin_LOAD_lane0 <= execute_ctrl1_down_AguPlugin_LOAD_lane0;
       execute_ctrl2_up_AguPlugin_STORE_lane0 <= execute_ctrl1_down_AguPlugin_STORE_lane0;
       execute_ctrl2_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl1_down_AguPlugin_ATOMIC_lane0;
       execute_ctrl2_up_AguPlugin_FLOAT_lane0 <= execute_ctrl1_down_AguPlugin_FLOAT_lane0;
       execute_ctrl2_up_LsuPlugin_logic_LSU_PREFETCH_lane0 <= execute_ctrl1_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
-      execute_ctrl2_up_early0_EnvPlugin_OP_lane0 <= execute_ctrl1_down_early0_EnvPlugin_OP_lane0;
+      execute_ctrl2_up_late0_IntAluPlugin_ALU_ADD_SUB_lane0 <= execute_ctrl1_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+      execute_ctrl2_up_late0_IntAluPlugin_ALU_SLTX_lane0 <= execute_ctrl1_down_late0_IntAluPlugin_ALU_SLTX_lane0;
+      execute_ctrl2_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 <= execute_ctrl1_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
+      execute_ctrl2_up_late0_SrcPlugin_logic_SRC1_CTRL_lane0 <= execute_ctrl1_down_late0_SrcPlugin_logic_SRC1_CTRL_lane0;
+      execute_ctrl2_up_late0_SrcPlugin_logic_SRC2_CTRL_lane0 <= execute_ctrl1_down_late0_SrcPlugin_logic_SRC2_CTRL_lane0;
+      execute_ctrl2_up_COMMIT_lane0 <= execute_ctrl1_down_COMMIT_lane0;
+      execute_ctrl2_up_early0_SrcPlugin_ADD_SUB_lane0 <= execute_ctrl1_down_early0_SrcPlugin_ADD_SUB_lane0;
+      execute_ctrl2_up_LsuL1_MIXED_ADDRESS_lane0 <= execute_ctrl1_down_LsuL1_MIXED_ADDRESS_lane0;
+      execute_ctrl2_up_LsuL1Plugin_logic_BANK_BUSY_lane0 <= execute_ctrl1_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
+      execute_ctrl2_up_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 <= execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
+      execute_ctrl2_up_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0 <= execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
+      execute_ctrl2_up_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 <= execute_ctrl1_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
+      execute_ctrl2_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0 <= execute_ctrl1_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
+      execute_ctrl2_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_plru_0 <= execute_ctrl1_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_plru_0;
+      execute_ctrl2_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty <= execute_ctrl1_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
+      execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_0_lane0 <= execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_0_lane0;
+      execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_1_lane0 <= execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
+      execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_2_lane0 <= execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
+      execute_ctrl2_up_early0_MulPlugin_logic_mul_VALUES_3_lane0 <= execute_ctrl1_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
+      execute_ctrl2_up_DivPlugin_DIV_RESULT_lane0 <= execute_ctrl1_down_DivPlugin_DIV_RESULT_lane0;
+      execute_ctrl2_up_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 <= execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+      execute_ctrl2_up_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 <= execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+      execute_ctrl2_up_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 <= execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
+      execute_ctrl2_up_LsuPlugin_logic_FROM_ACCESS_lane0 <= execute_ctrl1_down_LsuPlugin_logic_FROM_ACCESS_lane0;
+      execute_ctrl2_up_LsuL1_MASK_lane0 <= execute_ctrl1_down_LsuL1_MASK_lane0;
+      execute_ctrl2_up_LsuL1_SIZE_lane0 <= execute_ctrl1_down_LsuL1_SIZE_lane0;
+      execute_ctrl2_up_LsuL1_LOAD_lane0 <= execute_ctrl1_down_LsuL1_LOAD_lane0;
+      execute_ctrl2_up_LsuL1_ATOMIC_lane0 <= execute_ctrl1_down_LsuL1_ATOMIC_lane0;
+      execute_ctrl2_up_LsuL1_STORE_lane0 <= execute_ctrl1_down_LsuL1_STORE_lane0;
+      execute_ctrl2_up_LsuL1_PREFETCH_lane0 <= execute_ctrl1_down_LsuL1_PREFETCH_lane0;
+      execute_ctrl2_up_LsuL1_FLUSH_lane0 <= execute_ctrl1_down_LsuL1_FLUSH_lane0;
+      execute_ctrl2_up_Decode_STORE_ID_lane0 <= execute_ctrl1_down_Decode_STORE_ID_lane0;
+      execute_ctrl2_up_LsuPlugin_logic_FROM_LSU_lane0 <= execute_ctrl1_down_LsuPlugin_logic_FROM_LSU_lane0;
+      execute_ctrl2_up_LsuPlugin_logic_FROM_PREFETCH_lane0 <= execute_ctrl1_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
+      execute_ctrl2_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl1_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
     end
     if(execute_ctrl2_down_isReady) begin
       execute_ctrl3_up_Decode_UOP_lane0 <= execute_ctrl2_down_Decode_UOP_lane0;
+      execute_ctrl3_up_Prediction_ALIGNED_JUMPED_lane0 <= execute_ctrl2_down_Prediction_ALIGNED_JUMPED_lane0;
+      execute_ctrl3_up_Prediction_ALIGNED_JUMPED_PC_lane0 <= execute_ctrl2_down_Prediction_ALIGNED_JUMPED_PC_lane0;
+      execute_ctrl3_up_GSharePlugin_GSHARE_COUNTER_lane0_0 <= execute_ctrl2_down_GSharePlugin_GSHARE_COUNTER_lane0_0;
+      execute_ctrl3_up_Prediction_BRANCH_HISTORY_lane0 <= execute_ctrl2_down_Prediction_BRANCH_HISTORY_lane0;
       execute_ctrl3_up_PC_lane0 <= execute_ctrl2_down_PC_lane0;
       execute_ctrl3_up_TRAP_lane0 <= execute_ctrl2_down_TRAP_lane0;
       execute_ctrl3_up_Decode_UOP_ID_lane0 <= execute_ctrl2_down_Decode_UOP_ID_lane0;
@@ -8903,41 +11089,38 @@ module VexiiRiscv (
       execute_ctrl3_up_COMPLETED_lane0 <= execute_ctrl2_down_COMPLETED_lane0;
       execute_ctrl3_up_AguPlugin_SIZE_lane0 <= execute_ctrl2_down_AguPlugin_SIZE_lane0;
       execute_ctrl3_up_integer_RS2_lane0 <= execute_ctrl2_down_integer_RS2_lane0;
+      execute_ctrl3_up_early0_BranchPlugin_SEL_lane0 <= execute_ctrl2_down_early0_BranchPlugin_SEL_lane0;
       execute_ctrl3_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl2_down_early0_MulPlugin_SEL_lane0;
-      execute_ctrl3_up_early0_DivPlugin_SEL_lane0 <= execute_ctrl2_down_early0_DivPlugin_SEL_lane0;
-      execute_ctrl3_up_CsrAccessPlugin_SEL_lane0 <= execute_ctrl2_down_CsrAccessPlugin_SEL_lane0;
+      execute_ctrl3_up_late0_IntAluPlugin_SEL_lane0 <= execute_ctrl2_down_late0_IntAluPlugin_SEL_lane0;
+      execute_ctrl3_up_late0_BarrelShifterPlugin_SEL_lane0 <= execute_ctrl2_down_late0_BarrelShifterPlugin_SEL_lane0;
+      execute_ctrl3_up_late0_BranchPlugin_SEL_lane0 <= execute_ctrl2_down_late0_BranchPlugin_SEL_lane0;
       execute_ctrl3_up_AguPlugin_SEL_lane0 <= execute_ctrl2_down_AguPlugin_SEL_lane0;
       execute_ctrl3_up_LsuPlugin_logic_FENCE_lane0 <= execute_ctrl2_down_LsuPlugin_logic_FENCE_lane0;
       execute_ctrl3_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl2_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-      execute_ctrl3_up_COMPLETION_AT_4_lane0 <= execute_ctrl2_down_COMPLETION_AT_4_lane0;
       execute_ctrl3_up_COMPLETION_AT_3_lane0 <= execute_ctrl2_down_COMPLETION_AT_3_lane0;
       execute_ctrl3_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl2_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-      execute_ctrl3_up_lane0_logic_completions_onCtrl_2_ENABLE_lane0 <= execute_ctrl2_down_lane0_logic_completions_onCtrl_2_ENABLE_lane0;
+      execute_ctrl3_up_SrcStageables_REVERT_lane0 <= execute_ctrl2_down_SrcStageables_REVERT_lane0;
+      execute_ctrl3_up_SrcStageables_ZERO_lane0 <= execute_ctrl2_down_SrcStageables_ZERO_lane0;
       execute_ctrl3_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl2_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
       execute_ctrl3_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl2_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-      execute_ctrl3_up_BYPASSED_AT_3_lane0 <= execute_ctrl2_down_BYPASSED_AT_3_lane0;
-      execute_ctrl3_up_BYPASSED_AT_4_lane0 <= execute_ctrl2_down_BYPASSED_AT_4_lane0;
+      execute_ctrl3_up_SrcStageables_UNSIGNED_lane0 <= execute_ctrl2_down_SrcStageables_UNSIGNED_lane0;
+      execute_ctrl3_up_BarrelShifterPlugin_LEFT_lane0 <= execute_ctrl2_down_BarrelShifterPlugin_LEFT_lane0;
+      execute_ctrl3_up_BarrelShifterPlugin_SIGNED_lane0 <= execute_ctrl2_down_BarrelShifterPlugin_SIGNED_lane0;
+      execute_ctrl3_up_BranchPlugin_BRANCH_CTRL_lane0 <= execute_ctrl2_down_BranchPlugin_BRANCH_CTRL_lane0;
       execute_ctrl3_up_MulPlugin_HIGH_lane0 <= execute_ctrl2_down_MulPlugin_HIGH_lane0;
       execute_ctrl3_up_AguPlugin_LOAD_lane0 <= execute_ctrl2_down_AguPlugin_LOAD_lane0;
       execute_ctrl3_up_AguPlugin_STORE_lane0 <= execute_ctrl2_down_AguPlugin_STORE_lane0;
       execute_ctrl3_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl2_down_AguPlugin_ATOMIC_lane0;
       execute_ctrl3_up_AguPlugin_FLOAT_lane0 <= execute_ctrl2_down_AguPlugin_FLOAT_lane0;
       execute_ctrl3_up_LsuPlugin_logic_LSU_PREFETCH_lane0 <= execute_ctrl2_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
+      execute_ctrl3_up_late0_IntAluPlugin_ALU_ADD_SUB_lane0 <= execute_ctrl2_down_late0_IntAluPlugin_ALU_ADD_SUB_lane0;
+      execute_ctrl3_up_late0_IntAluPlugin_ALU_SLTX_lane0 <= execute_ctrl2_down_late0_IntAluPlugin_ALU_SLTX_lane0;
+      execute_ctrl3_up_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0 <= execute_ctrl2_down_late0_IntAluPlugin_ALU_BITWISE_CTRL_lane0;
       execute_ctrl3_up_COMMIT_lane0 <= execute_ctrl2_down_COMMIT_lane0;
-      execute_ctrl3_up_early0_SrcPlugin_ADD_SUB_lane0 <= execute_ctrl2_down_early0_SrcPlugin_ADD_SUB_lane0;
       execute_ctrl3_up_LsuL1_MIXED_ADDRESS_lane0 <= execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0;
-      execute_ctrl3_up_LsuL1Plugin_logic_BANK_BUSY_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
-      execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_VALID_lane0;
-      execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_ADDRESS_lane0;
-      execute_ctrl3_up_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_EVENT_WRITE_MASK_lane0;
-      execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALID_lane0;
-      execute_ctrl3_up_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty <= execute_ctrl2_down_LsuL1Plugin_logic_lsu_rt0_SHARED_BYPASS_VALUE_lane0_dirty;
-      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_0_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_0_lane0;
-      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_1_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_1_lane0;
-      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_2_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_2_lane0;
-      execute_ctrl3_up_early0_MulPlugin_logic_mul_VALUES_3_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_mul_VALUES_3_lane0;
-      execute_ctrl3_up_DivPlugin_DIV_RESULT_lane0 <= execute_ctrl2_down_DivPlugin_DIV_RESULT_lane0;
-      execute_ctrl3_up_LsuPlugin_logic_FROM_ACCESS_lane0 <= execute_ctrl2_down_LsuPlugin_logic_FROM_ACCESS_lane0;
+      execute_ctrl3_up_early0_BranchPlugin_pcCalc_PC_TRUE_lane0 <= execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0;
+      execute_ctrl3_up_early0_BranchPlugin_pcCalc_PC_FALSE_lane0 <= execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_FALSE_lane0;
+      execute_ctrl3_up_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0 <= execute_ctrl2_down_early0_BranchPlugin_pcCalc_PC_LAST_SLICE_lane0;
       execute_ctrl3_up_LsuL1_MASK_lane0 <= execute_ctrl2_down_LsuL1_MASK_lane0;
       execute_ctrl3_up_LsuL1_SIZE_lane0 <= execute_ctrl2_down_LsuL1_SIZE_lane0;
       execute_ctrl3_up_LsuL1_LOAD_lane0 <= execute_ctrl2_down_LsuL1_LOAD_lane0;
@@ -8949,77 +11132,42 @@ module VexiiRiscv (
       execute_ctrl3_up_LsuPlugin_logic_FROM_LSU_lane0 <= execute_ctrl2_down_LsuPlugin_logic_FROM_LSU_lane0;
       execute_ctrl3_up_LsuPlugin_logic_FROM_PREFETCH_lane0 <= execute_ctrl2_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
       execute_ctrl3_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl2_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
+      execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_plru_0 <= execute_ctrl2_down_LsuL1Plugin_logic_SHARED_lane0_plru_0;
+      execute_ctrl3_up_LsuL1Plugin_logic_SHARED_lane0_dirty <= execute_ctrl2_down_LsuL1Plugin_logic_SHARED_lane0_dirty;
+      execute_ctrl3_up_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
+      execute_ctrl3_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 <= execute_ctrl2_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
+      execute_ctrl3_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_1 <= execute_ctrl2_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_1;
+      execute_ctrl3_up_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
+      execute_ctrl3_up_LsuL1_PHYSICAL_ADDRESS_lane0 <= execute_ctrl2_down_LsuL1_PHYSICAL_ADDRESS_lane0;
+      execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded <= execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
+      execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address <= execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
+      execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault <= execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
+      execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded <= execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_loaded;
+      execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address <= execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_address;
+      execute_ctrl3_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault <= execute_ctrl2_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_1_fault;
+      execute_ctrl3_up_LsuL1Plugin_logic_WAYS_HITS_lane0 <= execute_ctrl2_down_LsuL1Plugin_logic_WAYS_HITS_lane0;
+      execute_ctrl3_up_early0_MulPlugin_logic_steps_0_adders_0_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
+      execute_ctrl3_up_early0_MulPlugin_logic_steps_0_adders_1_lane0 <= execute_ctrl2_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_onTrigger_HIT_lane0 <= execute_ctrl2_down_LsuPlugin_logic_onTrigger_HIT_lane0;
+      execute_ctrl3_up_MMU_TRANSLATED_lane0 <= execute_ctrl2_down_MMU_TRANSLATED_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 <= execute_ctrl2_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault <= execute_ctrl2_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
+      execute_ctrl3_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io <= execute_ctrl2_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
+      execute_ctrl3_up_LsuPlugin_logic_onPma_IO_RSP_lane0_fault <= execute_ctrl2_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
+      execute_ctrl3_up_LsuPlugin_logic_onPma_IO_RSP_lane0_io <= execute_ctrl2_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
+      execute_ctrl3_up_LsuPlugin_logic_onPma_IO_lane0 <= execute_ctrl2_down_LsuPlugin_logic_onPma_IO_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0 <= execute_ctrl2_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 <= execute_ctrl2_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
+      execute_ctrl3_up_LsuPlugin_logic_MMU_FAILURE_lane0 <= execute_ctrl2_down_LsuPlugin_logic_MMU_FAILURE_lane0;
+      execute_ctrl3_up_MMU_ACCESS_FAULT_lane0 <= execute_ctrl2_down_MMU_ACCESS_FAULT_lane0;
+      execute_ctrl3_up_MMU_REFILL_lane0 <= execute_ctrl2_down_MMU_REFILL_lane0;
+      execute_ctrl3_up_MMU_HAZARD_lane0 <= execute_ctrl2_down_MMU_HAZARD_lane0;
+      execute_ctrl3_up_late0_SrcPlugin_SRC1_lane0 <= execute_ctrl2_down_late0_SrcPlugin_SRC1_lane0;
+      execute_ctrl3_up_late0_SrcPlugin_SRC2_lane0 <= execute_ctrl2_down_late0_SrcPlugin_SRC2_lane0;
+      execute_ctrl3_up_MMU_BYPASS_TRANSLATION_lane0 <= execute_ctrl2_down_MMU_BYPASS_TRANSLATION_lane0;
     end
     if(execute_ctrl3_down_isReady) begin
-      execute_ctrl4_up_Decode_UOP_lane0 <= execute_ctrl3_down_Decode_UOP_lane0;
-      execute_ctrl4_up_PC_lane0 <= execute_ctrl3_down_PC_lane0;
-      execute_ctrl4_up_TRAP_lane0 <= execute_ctrl3_down_TRAP_lane0;
-      execute_ctrl4_up_Decode_UOP_ID_lane0 <= execute_ctrl3_down_Decode_UOP_ID_lane0;
-      execute_ctrl4_up_RD_ENABLE_lane0 <= execute_ctrl3_down_RD_ENABLE_lane0;
-      execute_ctrl4_up_RD_PHYS_lane0 <= execute_ctrl3_down_RD_PHYS_lane0;
-      execute_ctrl4_up_COMPLETED_lane0 <= execute_ctrl3_down_COMPLETED_lane0;
-      execute_ctrl4_up_AguPlugin_SIZE_lane0 <= execute_ctrl3_down_AguPlugin_SIZE_lane0;
-      execute_ctrl4_up_integer_RS2_lane0 <= execute_ctrl3_down_integer_RS2_lane0;
-      execute_ctrl4_up_early0_MulPlugin_SEL_lane0 <= execute_ctrl3_down_early0_MulPlugin_SEL_lane0;
-      execute_ctrl4_up_AguPlugin_SEL_lane0 <= execute_ctrl3_down_AguPlugin_SEL_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_FENCE_lane0 <= execute_ctrl3_down_LsuPlugin_logic_FENCE_lane0;
-      execute_ctrl4_up_lane0_integer_WriteBackPlugin_SEL_lane0 <= execute_ctrl3_down_lane0_integer_WriteBackPlugin_SEL_lane0;
-      execute_ctrl4_up_COMPLETION_AT_4_lane0 <= execute_ctrl3_down_COMPLETION_AT_4_lane0;
-      execute_ctrl4_up_lane0_logic_completions_onCtrl_1_ENABLE_lane0 <= execute_ctrl3_down_lane0_logic_completions_onCtrl_1_ENABLE_lane0;
-      execute_ctrl4_up_lane0_IntFormatPlugin_logic_SIGNED_lane0 <= execute_ctrl3_down_lane0_IntFormatPlugin_logic_SIGNED_lane0;
-      execute_ctrl4_up_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0 <= execute_ctrl3_down_lane0_IntFormatPlugin_logic_WIDTH_ID_lane0;
-      execute_ctrl4_up_BYPASSED_AT_4_lane0 <= execute_ctrl3_down_BYPASSED_AT_4_lane0;
-      execute_ctrl4_up_MulPlugin_HIGH_lane0 <= execute_ctrl3_down_MulPlugin_HIGH_lane0;
-      execute_ctrl4_up_AguPlugin_LOAD_lane0 <= execute_ctrl3_down_AguPlugin_LOAD_lane0;
-      execute_ctrl4_up_AguPlugin_STORE_lane0 <= execute_ctrl3_down_AguPlugin_STORE_lane0;
-      execute_ctrl4_up_AguPlugin_ATOMIC_lane0 <= execute_ctrl3_down_AguPlugin_ATOMIC_lane0;
-      execute_ctrl4_up_AguPlugin_FLOAT_lane0 <= execute_ctrl3_down_AguPlugin_FLOAT_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_LSU_PREFETCH_lane0 <= execute_ctrl3_down_LsuPlugin_logic_LSU_PREFETCH_lane0;
       execute_ctrl4_up_COMMIT_lane0 <= execute_ctrl3_down_COMMIT_lane0;
-      execute_ctrl4_up_LsuL1_MIXED_ADDRESS_lane0 <= execute_ctrl3_down_LsuL1_MIXED_ADDRESS_lane0;
-      execute_ctrl4_up_LsuL1_MASK_lane0 <= execute_ctrl3_down_LsuL1_MASK_lane0;
-      execute_ctrl4_up_LsuL1_SIZE_lane0 <= execute_ctrl3_down_LsuL1_SIZE_lane0;
-      execute_ctrl4_up_LsuL1_LOAD_lane0 <= execute_ctrl3_down_LsuL1_LOAD_lane0;
-      execute_ctrl4_up_LsuL1_ATOMIC_lane0 <= execute_ctrl3_down_LsuL1_ATOMIC_lane0;
-      execute_ctrl4_up_LsuL1_STORE_lane0 <= execute_ctrl3_down_LsuL1_STORE_lane0;
-      execute_ctrl4_up_LsuL1_PREFETCH_lane0 <= execute_ctrl3_down_LsuL1_PREFETCH_lane0;
-      execute_ctrl4_up_LsuL1_FLUSH_lane0 <= execute_ctrl3_down_LsuL1_FLUSH_lane0;
-      execute_ctrl4_up_Decode_STORE_ID_lane0 <= execute_ctrl3_down_Decode_STORE_ID_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_FROM_LSU_lane0 <= execute_ctrl3_down_LsuPlugin_logic_FROM_LSU_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_FROM_PREFETCH_lane0 <= execute_ctrl3_down_LsuPlugin_logic_FROM_PREFETCH_lane0;
-      execute_ctrl4_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl3_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
-      execute_ctrl4_up_LsuL1Plugin_logic_SHARED_lane0_dirty <= execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty;
-      execute_ctrl4_up_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0 <= execute_ctrl3_down_LsuL1Plugin_logic_BANK_BUSY_REMAPPED_lane0;
-      execute_ctrl4_up_LsuL1Plugin_logic_BANKS_MUXES_lane0_0 <= execute_ctrl3_down_LsuL1Plugin_logic_BANKS_MUXES_lane0_0;
-      execute_ctrl4_up_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0 <= execute_ctrl3_down_LsuL1Plugin_logic_WRITE_TO_READ_HAZARDS_lane0;
-      execute_ctrl4_up_LsuL1_PHYSICAL_ADDRESS_lane0 <= execute_ctrl3_down_LsuL1_PHYSICAL_ADDRESS_lane0;
-      execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded <= execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_loaded;
-      execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address <= execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_address;
-      execute_ctrl4_up_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault <= execute_ctrl3_down_LsuL1Plugin_logic_WAYS_TAGS_lane0_0_fault;
-      execute_ctrl4_up_LsuL1Plugin_logic_WAYS_HITS_lane0 <= execute_ctrl3_down_LsuL1Plugin_logic_WAYS_HITS_lane0;
-      execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_0_lane0 <= execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_0_lane0;
-      execute_ctrl4_up_early0_MulPlugin_logic_steps_0_adders_1_lane0 <= execute_ctrl3_down_early0_MulPlugin_logic_steps_0_adders_1_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_onTrigger_HIT_lane0 <= execute_ctrl3_down_LsuPlugin_logic_onTrigger_HIT_lane0;
-      execute_ctrl4_up_MMU_TRANSLATED_lane0 <= execute_ctrl3_down_MMU_TRANSLATED_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0 <= execute_ctrl3_down_LsuPlugin_logic_preCtrl_MISS_ALIGNED_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault <= execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_fault;
-      execute_ctrl4_up_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io <= execute_ctrl3_down_LsuPlugin_logic_onPma_CACHED_RSP_lane0_io;
-      execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_fault <= execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_fault;
-      execute_ctrl4_up_LsuPlugin_logic_onPma_IO_RSP_lane0_io <= execute_ctrl3_down_LsuPlugin_logic_onPma_IO_RSP_lane0_io;
-      execute_ctrl4_up_LsuPlugin_logic_onPma_IO_lane0 <= execute_ctrl3_down_LsuPlugin_logic_onPma_IO_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0 <= execute_ctrl3_down_LsuPlugin_logic_onPma_FROM_LSU_MSB_FAILED_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_MMU_PAGE_FAULT_lane0 <= execute_ctrl3_down_LsuPlugin_logic_MMU_PAGE_FAULT_lane0;
-      execute_ctrl4_up_LsuPlugin_logic_MMU_FAILURE_lane0 <= execute_ctrl3_down_LsuPlugin_logic_MMU_FAILURE_lane0;
-      execute_ctrl4_up_MMU_ACCESS_FAULT_lane0 <= execute_ctrl3_down_MMU_ACCESS_FAULT_lane0;
-      execute_ctrl4_up_MMU_REFILL_lane0 <= execute_ctrl3_down_MMU_REFILL_lane0;
-      execute_ctrl4_up_MMU_HAZARD_lane0 <= execute_ctrl3_down_MMU_HAZARD_lane0;
-      execute_ctrl4_up_MMU_BYPASS_TRANSLATION_lane0 <= execute_ctrl3_down_MMU_BYPASS_TRANSLATION_lane0;
-    end
-    if(execute_ctrl4_down_isReady) begin
-      execute_ctrl5_up_RD_ENABLE_lane0 <= execute_ctrl4_down_RD_ENABLE_lane0;
-      execute_ctrl5_up_RD_PHYS_lane0 <= execute_ctrl4_down_RD_PHYS_lane0;
-      execute_ctrl5_up_COMMIT_lane0 <= execute_ctrl4_down_COMMIT_lane0;
-      execute_ctrl5_up_lane0_integer_WriteBackPlugin_logic_DATA_lane0 <= execute_ctrl4_down_lane0_integer_WriteBackPlugin_logic_DATA_lane0;
     end
     case(LsuPlugin_logic_flusher_stateReg)
       LsuPlugin_logic_flusher_CMD : begin
@@ -9109,8 +11257,8 @@ module RegFileMem (
   input  wire          reset
 );
 
-  reg        [31:0]   asMem_ram_spinal_port1;
-  reg        [31:0]   asMem_ram_spinal_port2;
+  wire       [31:0]   asMem_ram_spinal_port1;
+  wire       [31:0]   asMem_ram_spinal_port2;
   reg                 _zz_1;
   wire                conv_writes_0_valid;
   wire       [4:0]    conv_writes_0_payload_address;
@@ -9124,13 +11272,11 @@ module RegFileMem (
   wire                asMem_writes_0_port_valid;
   wire       [4:0]    asMem_writes_0_port_payload_address;
   wire       [31:0]   asMem_writes_0_port_payload_data;
-  wire                asMem_reads_0_sync_port_cmd_valid;
-  wire       [4:0]    asMem_reads_0_sync_port_cmd_payload;
-  wire       [31:0]   asMem_reads_0_sync_port_rsp;
-  wire                asMem_reads_1_sync_port_cmd_valid;
-  wire       [4:0]    asMem_reads_1_sync_port_cmd_payload;
-  wire       [31:0]   asMem_reads_1_sync_port_rsp;
-  reg [31:0] asMem_ram [0:31] /* verilator public */ ;
+  wire       [4:0]    asMem_reads_0_async_port_address;
+  wire       [31:0]   asMem_reads_0_async_port_data;
+  wire       [4:0]    asMem_reads_1_async_port_address;
+  wire       [31:0]   asMem_reads_1_async_port_data;
+  (* ram_style = "distributed" *) reg [31:0] asMem_ram [0:31] /* verilator public */ ;
 
   always @(posedge clk) begin
     if(_zz_1) begin
@@ -9138,18 +11284,8 @@ module RegFileMem (
     end
   end
 
-  always @(posedge clk) begin
-    if(asMem_reads_0_sync_port_cmd_valid) begin
-      asMem_ram_spinal_port1 <= asMem_ram[asMem_reads_0_sync_port_cmd_payload];
-    end
-  end
-
-  always @(posedge clk) begin
-    if(asMem_reads_1_sync_port_cmd_valid) begin
-      asMem_ram_spinal_port2 <= asMem_ram[asMem_reads_1_sync_port_cmd_payload];
-    end
-  end
-
+  assign asMem_ram_spinal_port1 = asMem_ram[asMem_reads_0_async_port_address];
+  assign asMem_ram_spinal_port2 = asMem_ram[asMem_reads_1_async_port_address];
   always @(*) begin
     _zz_1 = 1'b0;
     if(asMem_writes_0_port_valid) begin
@@ -9169,14 +11305,12 @@ module RegFileMem (
   assign asMem_writes_0_port_valid = conv_writes_0_valid;
   assign asMem_writes_0_port_payload_address = conv_writes_0_payload_address;
   assign asMem_writes_0_port_payload_data = conv_writes_0_payload_data;
-  assign asMem_reads_0_sync_port_rsp = asMem_ram_spinal_port1;
-  assign asMem_reads_0_sync_port_cmd_valid = conv_read_0_cmd_valid;
-  assign asMem_reads_0_sync_port_cmd_payload = conv_read_0_cmd_payload;
-  assign conv_read_0_rsp = asMem_reads_0_sync_port_rsp;
-  assign asMem_reads_1_sync_port_rsp = asMem_ram_spinal_port2;
-  assign asMem_reads_1_sync_port_cmd_valid = conv_read_1_cmd_valid;
-  assign asMem_reads_1_sync_port_cmd_payload = conv_read_1_cmd_payload;
-  assign conv_read_1_rsp = asMem_reads_1_sync_port_rsp;
+  assign asMem_reads_0_async_port_data = asMem_ram_spinal_port1;
+  assign asMem_reads_0_async_port_address = conv_read_0_cmd_payload;
+  assign conv_read_0_rsp = asMem_reads_0_async_port_data;
+  assign asMem_reads_1_async_port_data = asMem_ram_spinal_port2;
+  assign asMem_reads_1_async_port_address = conv_read_1_cmd_payload;
+  assign conv_read_1_rsp = asMem_reads_1_async_port_data;
 
 endmodule
 
@@ -9191,7 +11325,9 @@ module StreamArbiter_3 (
   input  wire          io_inputs_0_payload_isPop,
   input  wire          io_inputs_0_payload_wasWrong,
   input  wire          io_inputs_0_payload_badPredictedTarget,
+  input  wire [11:0]   io_inputs_0_payload_history,
   input  wire [15:0]   io_inputs_0_payload_uopId,
+  input  wire [1:0]    io_inputs_0_payload_ctx_GSharePlugin_GSHARE_COUNTER_0,
   output wire          io_output_valid,
   input  wire          io_output_ready,
   output wire [31:0]   io_output_payload_pcOnLastSlice,
@@ -9202,7 +11338,9 @@ module StreamArbiter_3 (
   output wire          io_output_payload_isPop,
   output wire          io_output_payload_wasWrong,
   output wire          io_output_payload_badPredictedTarget,
+  output wire [11:0]   io_output_payload_history,
   output wire [15:0]   io_output_payload_uopId,
+  output wire [1:0]    io_output_payload_ctx_GSharePlugin_GSHARE_COUNTER_0,
   output wire [0:0]    io_chosenOH,
   input  wire          clk,
   input  wire          reset
@@ -9239,7 +11377,9 @@ module StreamArbiter_3 (
   assign io_output_payload_isPop = io_inputs_0_payload_isPop;
   assign io_output_payload_wasWrong = io_inputs_0_payload_wasWrong;
   assign io_output_payload_badPredictedTarget = io_inputs_0_payload_badPredictedTarget;
+  assign io_output_payload_history = io_inputs_0_payload_history;
   assign io_output_payload_uopId = io_inputs_0_payload_uopId;
+  assign io_output_payload_ctx_GSharePlugin_GSHARE_COUNTER_0 = io_inputs_0_payload_ctx_GSharePlugin_GSHARE_COUNTER_0;
   assign io_inputs_0_ready = (maskRouted_0 && io_output_ready);
   assign io_chosenOH = maskRouted_0;
   always @(posedge clk or posedge reset) begin
