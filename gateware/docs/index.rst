@@ -1,5 +1,5 @@
-Tiliqua Manual
-##############
+Tiliqua documentation
+#####################
 
 .. warning::
 
@@ -9,14 +9,17 @@ Tiliqua Manual
   :width: 800
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
+   blog/index
    hardware
    technical
    install
-   gettingstarted
+   gettingstarted/index
    calibration
    bootloader
-   dsp
-   soc
-   top
+   dsp/index
+   examples/index
+   GitHub <https://github.com/apfaudio/tiliqua>
+   Crowd Supply <https://www.crowdsupply.com/apfaudio/tiliqua>
+   `apf.audio` homepage <https://apf.audio/>

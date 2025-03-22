@@ -20,7 +20,7 @@ vibrato, or to an oscillator for some wierd FM effects.
 
 A block diagram of the core components of this polysynth:
 
-.. image:: _static/polysynth.png
+.. image:: /_static/polysynth.png
   :width: 800
 
 """
