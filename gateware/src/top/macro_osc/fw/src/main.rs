@@ -29,7 +29,7 @@ use hal::pca9635::*;
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
-const BLOCK_SIZE: usize = 64;
+const BLOCK_SIZE: usize = 128;
 // PSRAM heap for big audio buffers.
 const HEAP_START: usize = PSRAM_BASE + (PSRAM_SZ_BYTES / 2);
 const HEAP_SIZE: usize = 128*1024;

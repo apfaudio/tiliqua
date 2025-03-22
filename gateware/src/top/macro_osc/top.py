@@ -70,7 +70,7 @@ class AudioFIFOPeripheral(wiring.Component):
     class FifoLenReg(csr.Register, access="r"):
         fifo_len: csr.Field(csr.action.R, unsigned(16))
 
-    def __init__(self, fifo_sz=4*4, fifo_data_width=32, granularity=8, elastic_sz=64*3):
+    def __init__(self, fifo_sz=4*4, fifo_data_width=32, granularity=8, elastic_sz=128*3):
         regs = csr.Builder(addr_width=6, data_width=8)
 
         # Out and Aux FIFOs
@@ -133,9 +133,9 @@ class AudioFIFOPeripheral(wiring.Component):
 
         # Resample 12kHz to 48kHz
         m.submodules.resample_up0 = resample_up0 = dsp.Resample(
-                fs_in=12000, n_up=4, m_down=1)
+                fs_in=24000, n_up=2, m_down=1)
         m.submodules.resample_up1 = resample_up1 = dsp.Resample(
-                fs_in=12000, n_up=4, m_down=1)
+                fs_in=24000, n_up=2, m_down=1)
         wiring.connect(m, self._fifo0.r_stream, resample_up0.i)
         wiring.connect(m, self._fifo1.r_stream, resample_up1.i)
 
