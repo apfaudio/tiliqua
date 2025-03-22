@@ -583,7 +583,7 @@ class PSRAMDiffuser(wiring.Component):
 
     A block diagram of the signal flow inside this demo:
 
-    .. image:: _static/diffusor.png
+    .. image:: /_static/diffusor.png
       :width: 800
 
     All 4 input channels are inputs.
