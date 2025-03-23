@@ -46,19 +46,26 @@ For SoC projects that have firmware, for quicker iteration, ``--fw-only`` is use
 Flashing
 --------
 
+
+When you build projects from the command line, it will create a *Bitstream Archive*, which is a ``.tar.gz`` file that contains everything the bootloader needs to start a custom bitstream. Details on the inner workings of these archives can be found in the :doc:`../bootloader` section.
+
+You can flash custom bitstreams to one of 8 slots, using the built-in ``pdm flash`` command. To flash a bitstream archive you have just built, you can use ``pdm flash archive`` as follows:
+
 .. warning::
 
     For prototype hardware, you may need to reflash the RP2040 and bootloader bitstream  per :doc:`../bootloader`, before the following instructions will work.
-
-When you build projects from the command line, it will create a .tar.gz archive containing the bitstream, firmware (if applicable), and a manifest describing the contents. You can flash bitstreams to one of 8 slots, using the built-in flash tool.
-Such archives may be flashed as follows:
 
 .. code-block:: bash
 
    # Flash user bitstreams to the desired slot (0-7)
    pdm flash archive build/selftest-r4/selftest-*.tar.gz --slot 1
    pdm flash archive build/xbeam-r4/xbeam-*.tar.gz --slot 2
-   pdm flash status # check what is on the Tiliqua
+
+``pdm flash`` also supplies a ``status`` command to read back the Tiliqua's SPI flash to see what is currently on there:
+
+.. code-block:: bash
+
+   pdm flash status
 
 .. note::
 
@@ -70,7 +77,7 @@ If you are running an SoC, you can monitor serial output like so:
 
    sudo picocom -b 115200 /dev/ttyACM0
 
-For non-SoC projects that don't require extra firmware, you can also directly flash bitstreams to the SRAM of the FPGA like so:
+For non-SoC projects that don't require extra firmware, note that you can also directly flash bitstreams to the SRAM of the FPGA like so:
 
 .. code-block:: bash
 

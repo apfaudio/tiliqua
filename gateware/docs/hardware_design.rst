@@ -1,7 +1,7 @@
 Electrical Design
 #################
 
-Tiliqua consists of 3 PCBAs. All of these are open-hardware designs built in KiCAD and stored in separate repositories. **Schematics for all Tiliqua revisions in the wild are plotted to PDFs** `here <https://github.com/apfaudio/tiliqua/tree/main/hardware/schematics>`_.
+Tiliqua consists of 3 PCBAs. All of these are open-hardware designs built in KiCAD and stored in separate repositories.
 
 Block Diagram (Tiliqua R4)
 --------------------------
@@ -12,6 +12,11 @@ Below is high-level picture of how all the different electrical components of Ti
   :width: 800
 
 Some connections are omitted for simplicity (example: some ex0/ex1 pins are connected to both the ECP5 and RP2040, not shown).
+
+Pinouts and schematics
+----------------------
+- **Pinout information is available in 'amaranth-boards'** `format here <https://github.com/apfaudio/tiliqua/blob/main/gateware/src/tiliqua/tiliqua_platform.py>`_.
+- **Schematics for all PCBAs in the wild are plotted** `to PDFs here <https://github.com/apfaudio/tiliqua/tree/main/hardware/schematics>`_.
 
 We now follow with a summary of the core functions of each of the Tiliqua PCBAs.
 

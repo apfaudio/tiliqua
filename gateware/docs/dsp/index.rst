@@ -1,8 +1,8 @@
 DSP Library
 ###########
 
-Overview
---------
+Philosophy
+----------
 
 TODO short overview of the DSP library philosophy.
 
@@ -11,8 +11,8 @@ TODO link to Amaranth documentation on streams.
 .. image:: /_static/mydsp.png
   :width: 800
 
-Components
-----------
+DSP Components
+--------------
 
 .. toctree::
    :maxdepth: 2

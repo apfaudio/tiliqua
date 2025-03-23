@@ -1,73 +1,29 @@
 Bootloader
 ##########
 
-Interface
----------
+User Interface
+--------------
 
 The bootloader allows you to arbitrarily select from one of 8 bitstreams after the Tiliqua powers on, without needing to connect a computer. In short:
 
 - When Tiliqua boots, you can select a bitstream with the encoder (either using the display output, or by reading the currently lit LED if no display is connected).
-- When you select a bitstream (press encoder), the FPGA reconfigures itself and enters the selected bitstream.
+- When you select a bitstream (press encoder), the bootloader bitstream:
+    - Loads any required firmware to PSRAM and sets up any other settings requested in the bitstream manifest.
+    - Commands the RP2040 over UART to issue a bitstream reconfiguration.
+    - The RP2040 then commands the ECP5 (over JTAG) to reconfigure itself and enter the selected bitstream (loaded from the SPI flash local to the ECP5).
 - From any bitstream, you can always go back to the bootloader by holding the encoder for 3sec (this is built into the logic of every bitstream).
 
-Setup and implementation
-------------------------
-
-The bitstream selector consists of 2 key components that work together:
-
-- The RP2040 firmware (`apfbug - fork of dirtyJTAG <https://github.com/apfaudio/apfbug>`_)
-- The `bootloader <https://github.com/apfaudio/tiliqua/tree/main/gateware/src/top/bootloader>`_ top-level bitstream.
-
-First-time setup
-^^^^^^^^^^^^^^^^
-
-1. Flash the RP2040. Use the latest pre-built binaries `found here <https://github.com/apfaudio/apfbug/releases>`_. To flash them, hold RP2040 BOOTSEL (golden button on the Tiliqua motherboard) before applying power, then copy the :code:`build/*.uf2` to the usb storage device and power cycle Tiliqua again. If you don't want to remove Tiliqua from your rack, you can also enter the RP2040 bootloader by opening a serial port at 1200 baud.
-
-2. Build and flash the bootloader bitstream using the built-in flash tool (alternatively just download the latest bootloader archive from the CI artifacts):
-
-.. code-block:: bash
-
-    # Flash bootloader to start of flash, build assuming XIP (execute directly from SPI flash, not PSRAM)
-    # Be careful to replace `--hw r4` with your hardware revision!
-    pdm bootloader build --hw r4 --fw-location=spiflash --resolution 1280x720p60
-    pdm flash archive build/bootloader-r4/bootloader-*.tar.gz
-
-3. Build and flash any other bitstreams you want to slots 0..7 (you can also download these archives from CI artifacts):
-
-.. code-block:: bash
-
-   # assuming the archive has already been built / downloaded
-   pdm flash archive build/xbeam-r4/xbeam-*.tar.gz --slot 2
-
-2. Check what is currently flashed in each slot (by reading out the flash manifests):
-
-.. code-block:: bash
-
-   pdm flash status
-
-3. Before using the new bitstreams, disconnect the USB port and power cycle Tiliqua. (note: for the latest RP2040 firmware, this is not necessary and you can use them straight away).
-
-.. warning::
-
-    Before ``apfbug`` beta2 firmware, the bootloader would NOT reboot correctly (just show a blank screen) if you have
-    the :py:`dbg` USB port connected WITHOUT a tty open. You HAD to have the
-    ``/dev/ttyACM0`` open OR have the ``dbg`` USB port disconnected for it to work correctly.
-    `Tracking issue (linked) <https://github.com/apfaudio/apfbug/issues/2>`_ (resolved in beta2 FW).
-
-
-4. Now when Tiliqua boots you will enter the bootloader. Use the encoder to select an image. Hold the encoder for >3sec in any image to go back to the bootloader.
-
 Bitstream Archives and Flash Memory Layout
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------------------------
 
-Each bitstream archive contains:
+Tiliqua user projects are packaged into *Bitstream Archives*, which are ``.tar.gz`` files that contain everything the bootloader needs to start a custom bitstream. Each bitstream archive contains:
 
 - Bitstream file (top.bit)
 - Firmware binary (if applicable)
 - Any extra resources to be loaded into PSRAM (if applicable)
-- Manifest file describing the contents
+- Manifest file (human-readable ``.json``) describing the contents
 
-The flash tool manages the following memory layout on the SoldierCrab's 128Mbit SPI flash:
+Tiliqua's ``pdm flash`` command manages the memory layout on the SoldierCrab's SPI flash, ensuring that the components of a bitstream archive end up in the correct place. A picture of how the SPI flash is organized:
 
 .. code-block:: text
 
@@ -129,13 +85,64 @@ If an image requires firmware loaded to PSRAM, the SPI flash source address (in 
 That is, the value of ``spiflash_src`` is not preserved by the flash tool and instead depends on the slot number.
 This allows a bitstream that requires firmware to be loaded to PSRAM to be flashed to any slot, and the bootloader will load the firmware from the correct address.
 
-Implementation details: ECP5
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Flashing the RP2040 and bootloader bitstream
+--------------------------------------------
+
+During normal use, it should not be necessary to flash the RP2040 or bootloader bitstream. However the instructions here may be useful for unbricking a device if you accidentally erased the bootloader, or want to update the bootloader on older hardware revisions. The bootloader is composed of 2 components that work together:
+
+- The RP2040 firmware (`apfbug - fork of dirtyJTAG <https://github.com/apfaudio/apfbug>`_)
+- The `bootloader <https://github.com/apfaudio/tiliqua/tree/main/gateware/src/top/bootloader>`_ top-level bitstream.
+
+Flashing Steps
+^^^^^^^^^^^^^^
+
+1. Flash the RP2040. Use the latest pre-built binaries `found here <https://github.com/apfaudio/apfbug/releases>`_. To flash them, hold RP2040 BOOTSEL (golden button on the Tiliqua motherboard) before applying power, then copy the :code:`build/*.uf2` to the usb storage device and power cycle Tiliqua again. If you don't want to remove Tiliqua from your rack, you can also enter the RP2040 bootloader by opening a serial port at 1200 baud.
+
+2. Build and flash the bootloader bitstream using the built-in flash tool (alternatively just download the latest bootloader archive from the CI artifacts):
+
+.. code-block:: bash
+
+    # Flash bootloader to start of flash, build assuming XIP (execute directly from SPI flash, not PSRAM)
+    # Be careful to replace `--hw r4` with your hardware revision!
+    pdm bootloader build --hw r4 --fw-location=spiflash --resolution 1280x720p60
+    pdm flash archive build/bootloader-r4/bootloader-*.tar.gz
+
+3. Build and flash any other bitstreams you want to slots 0..7 (you can also download these archives from CI artifacts):
+
+.. code-block:: bash
+
+   # assuming the archive has already been built / downloaded
+   pdm flash archive build/xbeam-r4/xbeam-*.tar.gz --slot 2
+
+2. Check what is currently flashed in each slot (by reading out the flash manifests):
+
+.. code-block:: bash
+
+   pdm flash status
+
+3. Before using the new bitstreams, disconnect the USB port and power cycle Tiliqua. (note: for the latest RP2040 firmware, this is not necessary and you can use them straight away).
+
+.. warning::
+
+    Before ``apfbug`` beta2 firmware, the bootloader would NOT reboot correctly (just show a blank screen) if you have
+    the :py:`dbg` USB port connected WITHOUT a tty open. You HAD to have the
+    ``/dev/ttyACM0`` open OR have the ``dbg`` USB port disconnected for it to work correctly.
+    `Tracking issue (linked) <https://github.com/apfaudio/apfbug/issues/2>`_ (resolved in beta2 FW).
+
+
+4. Now when Tiliqua boots you will enter the bootloader. Use the encoder to select an image. Hold the encoder for >3sec in any image to go back to the bootloader.
+
+
+Technical Details
+-----------------
+
+Bootloader bitstream: ECP5
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ECP5 :code:`bootloader` bitstream copies firmware from SPI flash to PSRAM before jumping to user bitstreams by asking the RP2040 to execute a stub bitstream replay (load a special bitstream to SRAM that jumps to the new bitstream). The request is issued over UART from the ECP5 to the RP2040, so it is visible if you have the ``/dev/ttyACMX`` open. User bitstreams are responsible for asserting PROGRAMN when the encoder is held to reconfigure back to the bootloader.
 
-Implementation details: RP2040
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+`apfbug` debugger firmware: RP2040
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 :code:`apfbug` firmware includes the same features as :code:`pico-dirtyjtag` (USB-JTAG and USB-UART bridge), with some additions:
 
