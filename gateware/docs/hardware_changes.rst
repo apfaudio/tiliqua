@@ -13,7 +13,7 @@ First production hardware release.
     - **eurorack-pmod R3.3** audio interface.
 
 R4 changes (compared to R3)
-^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     - Add external PLL SI5351 and route 2x clocks to ECP5 (useful for EMC as it supports spread-spectrum, also for runtime clock/resolution switching).
     - Add series 27R/33R on all FFC lines to reduce radiated emissions.

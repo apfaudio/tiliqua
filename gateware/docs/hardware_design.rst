@@ -8,7 +8,7 @@ Block Diagram (Tiliqua R4)
 
 Below is high-level picture of how all the different electrical components of Tiliqua are connected.
 
-.. image:: _static/tiliqua-block-diagram.svg
+.. image:: /_static/tiliqua_block_diagram.svg
   :width: 800
 
 Some connections are omitted for simplicity (example: some ex0/ex1 pins are connected to both the ECP5 and RP2040, not shown).
@@ -41,7 +41,7 @@ Tiliqua Motherboard
 - Soft mute for pop-free bitstream switching
 
 FPGA SoM (`soldiercrab`)
----------------------------------
+------------------------
 
 **Repository:** `soldiercrab <https://github.com/apfaudio/soldiercrab>`_ (see README there for more detailed docs on this SoM)
 
