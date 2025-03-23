@@ -5,7 +5,7 @@ import time
 from importlib.metadata import version as package_version
 
 
-project = "Tiliqua Project"
+project = "Tiliqua"
 copyright = time.strftime("2024—%Y, S. Holzapfel and Tiliqua contributors")
 
 extensions = [
@@ -21,7 +21,8 @@ extensions = [
 with open(".gitignore") as f:
     exclude_patterns = [line.strip() for line in f.readlines()]
 
-root_doc = "cover"
+html_use_modindex = False
+html_use_index = False
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
@@ -53,7 +54,6 @@ napoleon_custom_sections = [
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
-html_css_files = ["custom.css"]
 html_logo = "_static/logo.jpg"
 
 rst_prolog = """

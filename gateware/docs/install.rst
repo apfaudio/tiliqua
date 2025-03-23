@@ -5,7 +5,7 @@ On an Ubuntu system, the following are the main dependencies:
 
 - The build system: install `pdm <https://github.com/pdm-project/pdm>`_
 - For synthesis/simulation: install `oss-cad-suite <https://github.com/YosysHQ/oss-cad-suite-build>`_ (and see note below)
-- For any examples that include a softcore: `rust <https://rustup.rs/>`_
+- For any SoC examples that include a CPU: `rust <https://rustup.rs/>`_
 
   - To build stripped images for RISC-V, you also need:
 

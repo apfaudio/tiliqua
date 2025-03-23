@@ -1,5 +1,5 @@
-Connecting Hardware
-###################
+Connections
+###########
 
 Connections: Front
 ------------------

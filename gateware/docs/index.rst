@@ -1,22 +1,41 @@
-Tiliqua Manual
-##############
+Tiliqua documentation
+#####################
 
 .. warning::
 
    This manual is under construction and very incomplete!
 
-.. image:: _static/tiliqua_front_labelled.png
+.. image:: _static/tiliqua_disassembled_top.jpg
   :width: 800
 
 .. toctree::
+   :caption: Hardware
    :maxdepth: 2
 
-   hardware
-   technical
+   connections
+   hardware_design
+   hardware_changes
+
+.. toctree::
+   :caption: Building & Flashing
+   :maxdepth: 3
+
    install
-   gettingstarted
+   gettingstarted/index
    calibration
    bootloader
-   dsp
-   soc
-   top
+   examples/index
+
+.. toctree::
+   :caption: Reference
+   :maxdepth: 3
+
+   dsp/index
+
+.. toctree::
+   :caption: Links
+   :maxdepth: 2
+
+   Tiliqua on Crowd Supply <https://www.crowdsupply.com/apfaudio/tiliqua>
+   Tiliqua on GitHub <https://github.com/apfaudio/tiliqua>
+   Homepage (apf.audio) <https://apf.audio/>
