@@ -173,7 +173,7 @@ class MidiDecode(wiring.Component):
         # If we're halfway through a message and don't get the rest of it
         # for this timeout, we give up and ignore the message.
         timeout = Signal(24)
-        timeout_cycles = 60000 # 1msec
+        timeout_cycles = 2*60000 # 2msec
         m.d.sync += timeout.eq(timeout-1)
 
         # Computed MIDI message payload length.
@@ -257,6 +257,7 @@ class MidiDecode(wiring.Component):
             with m.State('SYSEX'):
                 m.d.comb += self.i.ready.eq(1),
                 with m.If(self.i.valid):
+                    m.d.sync += self.o.payload.eq(0)
                     # Consuming bytes until SYSEX_END, report the SYSEX_END and restart the state machine.
                     with m.If(self.i.payload == ((Status.SUBCLASS.value << 4) | Subclass.SYSEX_END.value)):
                         m.d.sync += self.o.payload.as_value()[:8].eq(self.i.payload)
