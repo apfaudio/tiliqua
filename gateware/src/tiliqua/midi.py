@@ -18,7 +18,10 @@ from tiliqua.eurorack_pmod import ASQ # hardware native fixed-point sample type
 
 MIDI_BAUD_RATE = 31250
 
-class MessageType(enum.Enum, shape=unsigned(4)):
+CC_ALL_NOTES_OFF = 0x7B
+
+class Status(enum.Enum, shape=unsigned(4)):
+    # Messages associated with MIDI channels
     NOTE_OFF         = 0x8
     NOTE_ON          = 0x9
     POLY_PRESSURE    = 0xA
@@ -26,41 +29,83 @@ class MessageType(enum.Enum, shape=unsigned(4)):
     PROGRAM_CHANGE   = 0xC
     CHANNEL_PRESSURE = 0xD
     PITCH_BEND       = 0xE
-    SYSEX            = 0xF
+    # Messages NOT associated with MIDI channels
+    SUBCLASS         = 0xF
+
+class StatusSubclass(enum.Enum, shape=unsigned(4)):
+    # System Exclusive
+    SYSEX_START      = 0x0
+    SYSEX_END        = 0x7
+    # System Common
+    SONG_POINTER     = 0x2
+    SONG_SELECT      = 0x2
+    TUNE_REQUEST     = 0x6
+    # MIDI Time Code
+    QUARTER_FRAME    = 0x1
+    # System Realtime
+    TIMING_CLOCK     = 0x8
+    MEASURE_END      = 0x9
+    START            = 0xA
+    CONTINUE         = 0xB
+    STOP             = 0xC
+    ACTIVE_SENSING   = 0xE
+    RESET            = 0xF
 
 class MidiMessage(data.Struct):
-    midi_channel: unsigned(4) # 4 bit midi channel
-    midi_type:    MessageType # 4 bit message type
-    midi_payload: data.UnionLayout({
-        "note_off": data.StructLayout({
-            "note": unsigned(8),
-            "velocity": unsigned(8),
-        }),
-        "note_on": data.StructLayout({
-            "note": unsigned(8),
-            "velocity": unsigned(8),
-        }),
-        "poly_pressure": data.StructLayout({
-            "note": unsigned(8),
-            "pressure": unsigned(8),
-        }),
-        "control_change": data.StructLayout({
-            "controller_number": unsigned(8),
-            "data": unsigned(8),
-        }),
-        "program_change": data.StructLayout({
-            "program_number": unsigned(8),
-            "_unused": unsigned(8),
-        }),
-        "channel_pressure": data.StructLayout({
-            "pressure": unsigned(8),
-            "_unused": unsigned(8),
-        }),
-        "pitch_bend": data.StructLayout({
-            "lsb": unsigned(8),
-            "msb": unsigned(8),
-        }),
+    status1: data.UnionLayout({
+        "channel": unsigned(4),           # for channel specific messages
+        "subclass": StatusSubclass        # for SUBCLASS messages
     })
+    status0: Status                       # 4-bit MIDI status type
+    data1: data.UnionLayout({
+        "note":              unsigned(8), # for NOTE_OFF, NOTE_ON, POLY_PRESSURE
+        "controller_number": unsigned(8), # for CONTROL_CHANGE
+        "program_number":    unsigned(8), # for PROGRAM_CHANGE
+        "song_number":       unsigned(8), # for SUBCLASS.SONG_SELECT
+        "lsb":               unsigned(8), # for PITCH_BEND, SUBCLASS.SONG_POINTER
+        "mfg_id":            unsigned(8), # for SYSEX_START
+    })
+    data2: data.UnionLayout({
+        "velocity":          unsigned(8), # for NOTE_OFF, NOTE_ON
+        "pressure":          unsigned(8), # for POLY_PRESSURE
+        "cc_data":           unsigned(8), # for CONTROL_CHANGE
+        "msb":               unsigned(8), # for PITCH_BEND, SUBCLASS.SONG_POINTER
+    })
+
+class MessageLength:
+
+    """
+    Metadata about the length of each MIDI message in bytes.
+    """
+
+    status: Status
+    n_bytes: int
+    subclass: Optional[StatusSubclass] = None
+
+    @classmethod
+    def all(cls) -> List['MessageLength']:
+        return [
+            cls(Status.NOTE_OFF, 3),
+            cls(Status.NOTE_ON, 3),
+            cls(Status.POLY_PRESSURE, 3),
+            cls(Status.CONTROL_CHANGE, 3),
+            cls(Status.PROGRAM_CHANGE, 2),
+            cls(Status.CHANNEL_PRESSURE, 2),
+            cls(Status.PITCH_BEND, 3),
+            cls(Status.SUBCLASS, 3, StatusSubclass.SYSEX_START),  # TODO variable
+            cls(Status.SUBCLASS, 1, StatusSubclass.SYSEX_END),
+            cls(Status.SUBCLASS, 3, StatusSubclass.SONG_POINTER),
+            cls(Status.SUBCLASS, 2, StatusSubclass.SONG_SELECT),
+            cls(Status.SUBCLASS, 1, StatusSubclass.TUNE_REQUEST),
+            cls(Status.SUBCLASS, 2, StatusSubclass.QUARTER_FRAME),
+            cls(Status.SUBCLASS, 1, StatusSubclass.TIMING_CLOCK),
+            cls(Status.SUBCLASS, 2, StatusSubclass.MEASURE_END),
+            cls(Status.SUBCLASS, 1, StatusSubclass.START),
+            cls(Status.SUBCLASS, 1, StatusSubclass.CONTINUE),
+            cls(Status.SUBCLASS, 1, StatusSubclass.STOP),
+            cls(Status.SUBCLASS, 1, StatusSubclass.ACTIVE_SENSING),
+            cls(Status.SUBCLASS, 1, StatusSubclass.RESET),
+        ]
 
 class SerialRx(wiring.Component):
 
@@ -145,16 +190,28 @@ class MidiDecode(wiring.Component):
                 with m.Elif(self.i.valid):
                     m.d.sync += self.o.payload.as_value()[:8].eq(self.i.payload)
                     m.next = 'READ0'
+                    with m.If(self.o.payload.status0 == Status.SUBCLASS):
+                        with m.Switch(self.o.payload.status1.subclass):
+                            # 0-byte payloads TODO add this to 3-byte sequence!
+                            with m.Case(StatusSubclass.SYSEX_END,
+                                        StatusSubclass.TUNE_REQUEST,
+                                        StatusSubclass.TIMING_CLOCK,
+                                        StatusSubclass.START,
+                                        StatusSubclass.CONTINUE,
+                                        StatusSubclass.STOP,
+                                        StatusSubclass.ACTIVE_SENSING,
+                                        StatusSubclass.RESET):
+                                m.next = 'WAIT-READY'
             with m.State('READ0'):
                 m.d.comb += self.i.ready.eq(1),
                 with m.If(timeout == 0):
                     m.next = 'WAIT-VALID'
                 with m.Elif(self.i.valid):
                     m.d.sync += self.o.payload.as_value()[8:16].eq(self.i.payload)
-                    with m.Switch(self.o.payload.midi_type):
+                    with m.Switch(self.o.payload.status0):
                         # 1-byte payload
-                        with m.Case(MessageType.CHANNEL_PRESSURE,
-                                    MessageType.PROGRAM_CHANGE):
+                        with m.Case(Status.CHANNEL_PRESSURE,
+                                    Status.PROGRAM_CHANGE):
                             m.next = 'WAIT-READY'
                         # 2-byte payload
                         with m.Default():
@@ -167,9 +224,7 @@ class MidiDecode(wiring.Component):
                     m.d.sync += self.o.payload.as_value()[16:24].eq(self.i.payload)
                     m.next = 'WAIT-READY'
             with m.State('WAIT-READY'):
-                # Skip if it's a command we don't know how to parse.
-                with m.If(self.o.payload.midi_type != MessageType.SYSEX):
-                    m.d.comb += self.o.valid.eq(1)
+                m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
                     m.next = 'WAIT-VALID'
 
@@ -248,9 +303,9 @@ class MidiVoiceTracker(wiring.Component):
                 m.d.comb += self.i.ready.eq(1),
                 with m.If(self.i.valid):
                     m.d.sync += msg.eq(self.i.payload)
-                    with m.Switch(self.i.payload.midi_type):
-                        with m.Case(MessageType.NOTE_ON):
-                            with m.If(self.i.payload.midi_payload.note_on.velocity == 0):
+                    with m.Switch(self.i.payload.status0):
+                        with m.Case(Status.NOTE_ON):
+                            with m.If(self.i.payload.data2.velocity == 0):
                                 # According to the MIDI standard, a device may transmit a
                                 # NOTE_ON with velocity=0, and this should be treated exactly
                                 # the same as a note OFF.
@@ -258,13 +313,13 @@ class MidiVoiceTracker(wiring.Component):
                             with m.Else():
                                 m.d.sync += voice_ix_write.eq(0)
                                 m.next = 'NOTE-ON-SELECT'
-                        with m.Case(MessageType.NOTE_OFF):
+                        with m.Case(Status.NOTE_OFF):
                             m.next = 'NOTE-OFF'
-                        with m.Case(MessageType.CONTROL_CHANGE):
+                        with m.Case(Status.CONTROL_CHANGE):
                             m.next = 'CONTROL-CHANGE'
-                        with m.Case(MessageType.PITCH_BEND):
+                        with m.Case(Status.PITCH_BEND):
                             m.next = 'PITCH-BEND'
-                        with m.Case(MessageType.POLY_PRESSURE):
+                        with m.Case(Status.POLY_PRESSURE):
                             m.next = 'POLY-PRESSURE'
                         with m.Default():
                             m.next = 'WAIT-VALID'
@@ -288,18 +343,18 @@ class MidiVoiceTracker(wiring.Component):
                         with m.Case(n):
                             m.d.sync += [
                                 voice_mask.bit_select(n, 1).eq(1),
-                                self.o[n].note.eq(msg.midi_payload.note_on.note),
-                                self.o[n].velocity.eq(msg.midi_payload.note_on.velocity),
+                                self.o[n].note.eq(msg.data1.note),
+                                self.o[n].velocity.eq(msg.data2.velocity),
                                 self.o[n].gate.eq(1),
                             ]
                             if not self.velocity_mod:
-                                m.d.sync += self.o[n].velocity_mod.eq(msg.midi_payload.note_on.velocity)
+                                m.d.sync += self.o[n].velocity_mod.eq(msg.data2.velocity)
                 m.next = 'UPDATE'
 
             with m.State('NOTE-OFF'):
                 # cull any voice that matches the MIDI payload note #
                 for n in range(self.max_voices):
-                    with m.If(self.o[n].note == msg.midi_payload.note_off.note):
+                    with m.If(self.o[n].note == msg.data1.note):
                         m.d.sync += [
                             voice_mask.bit_select(n, 1).eq(0),
                             self.o[n].gate.eq(0),
@@ -307,22 +362,22 @@ class MidiVoiceTracker(wiring.Component):
                         if self.zero_velocity_gate:
                             m.d.sync += self.o[n].velocity.eq(0)
                         else:
-                            m.d.sync += self.o[n].velocity.eq(msg.midi_payload.note_off.velocity)
+                            m.d.sync += self.o[n].velocity.eq(msg.data2.velocity)
                 m.next = 'UPDATE'
 
             with m.State('POLY-PRESSURE'):
                 # update any voice that matches the MIDI payload note #
                 # TODO: rather than piggybacking on velocity, this should probably be its own field?
                 for n in range(self.max_voices):
-                    with m.If((self.o[n].note == msg.midi_payload.poly_pressure.note) & self.o[n].gate):
-                        m.d.sync += self.o[n].velocity.eq(msg.midi_payload.poly_pressure.pressure)
+                    with m.If((self.o[n].note == msg.data1.note) & self.o[n].gate):
+                        m.d.sync += self.o[n].velocity.eq(msg.data2.pressure)
                 m.next = 'UPDATE'
 
             with m.State('CONTROL-CHANGE'):
-                with m.If((msg.midi_payload.control_change.controller_number == 1) &
-                          (msg.midi_payload.control_change.data != 0)):
-                    m.d.sync += last_cc1.eq(msg.midi_payload.control_change.data)
-                with m.If(msg.midi_payload.control_change.controller_number == 123):
+                with m.If((msg.data1.controller_number == 1) &
+                          (msg.data2.cc_data != 0)):
+                    m.d.sync += last_cc1.eq(msg.data2.cc_data)
+                with m.If(msg.data1.controller_number == CC_ALL_NOTES_OFF):
                     # all stop
                     for n in range(self.max_voices):
                         m.d.sync += self.o[n].gate.eq(0)
@@ -333,8 +388,8 @@ class MidiVoiceTracker(wiring.Component):
             with m.State('PITCH-BEND'):
                 # convert 14-bit pitch bend to 16-bit signed ASQ -1 .. 1
                 pb = Signal(signed(16))
-                m.d.comb += pb.eq(Cat(msg.midi_payload.pitch_bend.lsb,
-                                      msg.midi_payload.pitch_bend.msb))
+                m.d.comb += pb.eq(Cat(msg.data1.lsb,
+                                      msg.data2.msb))
                 m.d.sync += last_pb.raw().eq(pb-(2*8192))
                 m.next = 'UPDATE'
 
@@ -441,8 +496,8 @@ class MonoMidiCV(wiring.Component):
 
         with m.If(self.i_midi.valid):
             msg = self.i_midi.payload
-            with m.Switch(msg.midi_type):
-                with m.Case(MessageType.NOTE_ON):
+            with m.Switch(msg.status0):
+                with m.Case(Status.NOTE_ON):
                     m.d.sync += [
                         # Gate output on
                         self.o.payload[0].eq(fixed.Const(0.5, shape=ASQ)),
@@ -450,7 +505,7 @@ class MonoMidiCV(wiring.Component):
                         self.o.payload[2].as_value().eq(
                             msg.midi_payload.note_on.velocity << 8),
                         # Set note index in LUT
-                        rport.addr.eq(msg.midi_payload.note_on.note),
+                        rport.addr.eq(msg.data1.note),
                     ]
                 with m.Case(MessageType.NOTE_OFF):
                     # Zero gate and velocity on NOTE_OFF
@@ -460,10 +515,10 @@ class MonoMidiCV(wiring.Component):
                     ]
                 with m.Case(MessageType.CONTROL_CHANGE):
                     # mod wheel is CC 1
-                    with m.If(msg.midi_payload.control_change.controller_number == 1):
+                    with m.If(msg.data1.controller_number == 1):
                         m.d.sync += [
                             self.o.payload[3].as_value().eq(
-                                msg.midi_payload.control_change.data << 8),
+                                msg.data2.cc_data << 8),
                         ]
 
         return m
