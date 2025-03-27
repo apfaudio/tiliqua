@@ -5,6 +5,8 @@
 
 """Helpers for dealing with MIDI over serial or USB."""
 
+from dataclasses import dataclass
+
 from amaranth              import *
 from amaranth.lib.fifo     import SyncFIFOBuffered
 from amaranth.lib          import wiring, data, enum, stream
@@ -32,7 +34,7 @@ class Status(enum.Enum, shape=unsigned(4)):
     # Messages NOT associated with MIDI channels
     SUBCLASS         = 0xF
 
-class StatusSubclass(enum.Enum, shape=unsigned(4)):
+class Subclass(enum.Enum, shape=unsigned(4)):
     # System Exclusive
     SYSEX_START      = 0x0
     SYSEX_END        = 0x7
@@ -54,7 +56,7 @@ class StatusSubclass(enum.Enum, shape=unsigned(4)):
 class MidiMessage(data.Struct):
     status1: data.UnionLayout({
         "channel": unsigned(4),           # for channel specific messages
-        "subclass": StatusSubclass        # for SUBCLASS messages
+        "subclass": Subclass        # for SUBCLASS messages
     })
     status0: Status                       # 4-bit MIDI status type
     data1: data.UnionLayout({
@@ -72,39 +74,46 @@ class MidiMessage(data.Struct):
         "msb":               unsigned(8), # for PITCH_BEND, SUBCLASS.SONG_POINTER
     })
 
-class MessageLength:
-
-    """
-    Metadata about the length of each MIDI message in bytes.
-    """
+@dataclass
+class StandardMsgLength:
 
     status: Status
-    n_bytes: int
-    subclass: Optional[StatusSubclass] = None
+    payload_bytes: int
 
     @classmethod
-    def all(cls) -> List['MessageLength']:
+    def all(cls):
         return [
-            cls(Status.NOTE_OFF, 3),
-            cls(Status.NOTE_ON, 3),
-            cls(Status.POLY_PRESSURE, 3),
-            cls(Status.CONTROL_CHANGE, 3),
-            cls(Status.PROGRAM_CHANGE, 2),
-            cls(Status.CHANNEL_PRESSURE, 2),
-            cls(Status.PITCH_BEND, 3),
-            cls(Status.SUBCLASS, 3, StatusSubclass.SYSEX_START),  # TODO variable
-            cls(Status.SUBCLASS, 1, StatusSubclass.SYSEX_END),
-            cls(Status.SUBCLASS, 3, StatusSubclass.SONG_POINTER),
-            cls(Status.SUBCLASS, 2, StatusSubclass.SONG_SELECT),
-            cls(Status.SUBCLASS, 1, StatusSubclass.TUNE_REQUEST),
-            cls(Status.SUBCLASS, 2, StatusSubclass.QUARTER_FRAME),
-            cls(Status.SUBCLASS, 1, StatusSubclass.TIMING_CLOCK),
-            cls(Status.SUBCLASS, 2, StatusSubclass.MEASURE_END),
-            cls(Status.SUBCLASS, 1, StatusSubclass.START),
-            cls(Status.SUBCLASS, 1, StatusSubclass.CONTINUE),
-            cls(Status.SUBCLASS, 1, StatusSubclass.STOP),
-            cls(Status.SUBCLASS, 1, StatusSubclass.ACTIVE_SENSING),
-            cls(Status.SUBCLASS, 1, StatusSubclass.RESET),
+            cls(Status.NOTE_OFF, 2),
+            cls(Status.NOTE_ON, 2),
+            cls(Status.POLY_PRESSURE, 2),
+            cls(Status.CONTROL_CHANGE, 2),
+            cls(Status.PROGRAM_CHANGE, 1),
+            cls(Status.CHANNEL_PRESSURE, 1),
+            cls(Status.PITCH_BEND, 2),
+        ]
+
+@dataclass
+class SubclassMsgLength:
+
+    subclass: Subclass
+    payload_bytes: int
+
+    @classmethod
+    def all(cls):
+        return [
+            cls(Subclass.SYSEX_START, 1), # variable, data2 until SYSEX_END
+            cls(Subclass.SYSEX_END, 0),
+            cls(Subclass.SONG_POINTER, 2),
+            cls(Subclass.SONG_SELECT, 1),
+            cls(Subclass.TUNE_REQUEST, 0),
+            cls(Subclass.QUARTER_FRAME, 1),
+            cls(Subclass.TIMING_CLOCK, 0),
+            cls(Subclass.MEASURE_END, 1),
+            cls(Subclass.START, 0),
+            cls(Subclass.CONTINUE, 0),
+            cls(Subclass.STOP, 0),
+            cls(Subclass.ACTIVE_SENSING, 0),
+            cls(Subclass.RESET, 0),
         ]
 
 class SerialRx(wiring.Component):
@@ -148,7 +157,7 @@ class MidiDecode(wiring.Component):
 
     By default, this core expects 3-byte RS232-style MIDI
     byte streams. If :py:`usb == True`, this core expects
-    4-byte USB-style MIDI byte streams.
+    4-byte USB-style MIDI byte streams (first byte padded).
     """
 
     i: In(stream.Signature(unsigned(8)))
@@ -161,15 +170,18 @@ class MidiDecode(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        # If we're half-way through a message and don't get the rest of it
+        # If we're halfway through a message and don't get the rest of it
         # for this timeout, we give up and ignore the message.
         timeout = Signal(24)
         timeout_cycles = 60000 # 1msec
         m.d.sync += timeout.eq(timeout-1)
 
+        # Computed MIDI message payload length.
+        remaining_bytes = Signal(2)
+
         with m.FSM() as fsm:
             with m.State('WAIT-VALID'):
-                m.d.comb += self.i.ready.eq(1),
+                m.d.comb += self.i.ready.eq(1)
                 # all valid command messages have highest bit set
                 if self.usb:
                     # 4-byte sequence
@@ -177,45 +189,53 @@ class MidiDecode(wiring.Component):
                         m.d.sync += timeout.eq(timeout_cycles)
                         m.next = 'READU'
                 else:
-                    # 3-byte sequence
+                    # 3-byte sequence (read status byte straight away)
                     with m.If(self.i.valid & self.i.payload[7]):
                         m.d.sync += timeout.eq(timeout_cycles)
                         m.d.sync += self.o.payload.as_value()[:8].eq(self.i.payload)
-                        m.next = 'READ0'
+                        m.next = 'COMPUTE-LEN'
 
-            with m.State('READU'):
-                m.d.comb += self.i.ready.eq(1),
-                with m.If(timeout == 0):
-                    m.next = 'WAIT-VALID'
-                with m.Elif(self.i.valid):
-                    m.d.sync += self.o.payload.as_value()[:8].eq(self.i.payload)
-                    m.next = 'READ0'
-                    with m.If(self.o.payload.status0 == Status.SUBCLASS):
+            if self.usb:
+                # Status byte arrives after 1-byte padding on USB bytestreams
+                with m.State('READU'):
+                    m.d.comb += self.i.ready.eq(1)
+                    with m.If(timeout == 0):
+                        m.next = 'WAIT-VALID'
+                    with m.Elif(self.i.valid):
+                        m.d.sync += self.o.payload.as_value()[:8].eq(self.i.payload)
+                        m.next = 'COMPUTE-LEN'
+
+            # Compute length of this MIDI message
+            with m.State('COMPUTE-LEN'):
+                payload_bytes = Signal(2)
+                with m.Switch(self.o.payload.status0):
+                    for msg in StandardMsgLength.all():
+                        with m.Case(msg.status):
+                            m.d.comb += payload_bytes.eq(msg.payload_bytes)
+                    with m.Case(Status.SUBCLASS):
                         with m.Switch(self.o.payload.status1.subclass):
-                            # 0-byte payloads TODO add this to 3-byte sequence!
-                            with m.Case(StatusSubclass.SYSEX_END,
-                                        StatusSubclass.TUNE_REQUEST,
-                                        StatusSubclass.TIMING_CLOCK,
-                                        StatusSubclass.START,
-                                        StatusSubclass.CONTINUE,
-                                        StatusSubclass.STOP,
-                                        StatusSubclass.ACTIVE_SENSING,
-                                        StatusSubclass.RESET):
-                                m.next = 'WAIT-READY'
+                            for msg in SubclassMsgLength.all():
+                                with m.Case(msg.subclass):
+                                    m.d.comb += payload_bytes.eq(msg.payload_bytes)
+                m.d.sync += remaining_bytes.eq(payload_bytes)
+                with m.If(payload_bytes == 0):
+                    m.next = 'WAIT-READY'
+                with m.Else():
+                    m.next = 'READ0'
+
+            # Read (optional) Data1 byte
             with m.State('READ0'):
-                m.d.comb += self.i.ready.eq(1),
+                m.d.comb += self.i.ready.eq(1)
                 with m.If(timeout == 0):
                     m.next = 'WAIT-VALID'
                 with m.Elif(self.i.valid):
                     m.d.sync += self.o.payload.as_value()[8:16].eq(self.i.payload)
-                    with m.Switch(self.o.payload.status0):
-                        # 1-byte payload
-                        with m.Case(Status.CHANNEL_PRESSURE,
-                                    Status.PROGRAM_CHANGE):
-                            m.next = 'WAIT-READY'
-                        # 2-byte payload
-                        with m.Default():
-                            m.next = 'READ1'
+                    with m.If(remaining_bytes == 1):
+                        m.next = 'WAIT-READY'
+                    with m.Else():
+                        m.next = 'READ1'
+
+            # Read (optional) Data2 byte
             with m.State('READ1'):
                 m.d.comb += self.i.ready.eq(1),
                 with m.If(timeout == 0):
@@ -223,10 +243,24 @@ class MidiDecode(wiring.Component):
                 with m.Elif(self.i.valid):
                     m.d.sync += self.o.payload.as_value()[16:24].eq(self.i.payload)
                     m.next = 'WAIT-READY'
+
             with m.State('WAIT-READY'):
                 m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
                     m.next = 'WAIT-VALID'
+                    # SysEx start/stop is transmitted on self.o, but NOTE the sysex
+                    # bytes themselves. TODO expose sysex bytes as a separate stream.
+                    with m.If((self.o.payload.status0 == Status.SUBCLASS) &
+                              (self.o.payload.status1.subclass == Subclass.SYSEX_START)):
+                        m.next = 'SYSEX'
+
+            with m.State('SYSEX'):
+                m.d.comb += self.i.ready.eq(1),
+                with m.If(self.i.valid):
+                    # Consuming bytes until SYSEX_END, report the SYSEX_END and restart the state machine.
+                    with m.If(self.i.payload == ((Status.SUBCLASS.value << 4) | Subclass.SYSEX_END.value)):
+                        m.d.sync += self.o.payload.as_value()[:8].eq(self.i.payload)
+                        m.next = 'WAIT-READY'
 
         return m
 

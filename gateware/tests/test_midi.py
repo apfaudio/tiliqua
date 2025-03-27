@@ -33,6 +33,7 @@ class MidiTests(unittest.TestCase):
                 await ctx.tick()
             ctx.set(dut.i.payload, 0x92)
             await ctx.tick()
+            await ctx.tick()
             ctx.set(dut.i.payload, 0x48)
             await ctx.tick()
             ctx.set(dut.i.payload, 0x96)
@@ -47,6 +48,50 @@ class MidiTests(unittest.TestCase):
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open(f"test_midi_decode_{name}.vcd", "w")):
+            sim.run()
+
+    @parameterized.expand([
+        ["trs", False], # 3-byte
+        ["usb", True],  # 4-byte
+    ])
+    def test_midi_sysex(self, name, is_usb):
+
+        dut = midi.MidiDecode(usb=is_usb)
+
+        async def testbench(ctx):
+            ctx.set(dut.i.valid,   1)
+            ctx.set(dut.o.ready,   1)
+            if is_usb:
+                ctx.set(dut.i.payload, 0x00)
+                await ctx.tick()
+            ctx.set(dut.i.payload, 0xf0)
+            await ctx.tick()
+            await ctx.tick()
+            ctx.set(dut.i.payload, 0x55)
+            await ctx.tick()
+            p = ctx.get(dut.o.payload)
+            self.assertEqual(p.status0, midi.Status.SUBCLASS)
+            self.assertEqual(p.status1.subclass, midi.Subclass.SYSEX_START)
+            self.assertEqual(p.data1.mfg_id, 0x55)
+            ctx.set(dut.i.payload, 0x1)
+            await ctx.tick()
+            ctx.set(dut.i.payload, 0x2)
+            await ctx.tick()
+            ctx.set(dut.i.payload, 0x3)
+            await ctx.tick()
+            ctx.set(dut.i.payload, 0x4)
+            await ctx.tick()
+            ctx.set(dut.i.payload, 0xf7)
+            await ctx.tick()
+            await ctx.tick()
+            p = ctx.get(dut.o.payload)
+            self.assertEqual(p.status0, midi.Status.SUBCLASS)
+            self.assertEqual(p.status1.subclass, midi.Subclass.SYSEX_END)
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open(f"test_midi_sysex_{name}.vcd", "w")):
             sim.run()
 
     def test_midi_voice_tracker(self):
