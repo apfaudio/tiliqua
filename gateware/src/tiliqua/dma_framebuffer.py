@@ -172,15 +172,18 @@ class DMAFramebuffer(wiring.Component):
             self.palette.pixel_in.eq(Cat(last_word[0:4], last_word[4:8])),
         ]
 
+        cnt = Signal(unsigned(8))
+        m.d.dvi += cnt.eq(cnt+1)
+
         if sim.is_hw(platform):
             # Instantiate the DVI PHY itself
             m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
             m.d.dvi += [
                 dvi_gen.de.eq(dvi_tgen.ctrl_phy.de),
                 # RGB -> TMDS
-                dvi_gen.data_in_ch0.eq(self.palette.pixel_out.b),
-                dvi_gen.data_in_ch1.eq(self.palette.pixel_out.g),
-                dvi_gen.data_in_ch2.eq(self.palette.pixel_out.r),
+                dvi_gen.data_in_ch0.eq(cnt),
+                dvi_gen.data_in_ch1.eq(cnt),
+                dvi_gen.data_in_ch2.eq(cnt),
                 # VSYNC/HSYNC -> TMDS
                 dvi_gen.ctrl_in_ch0.eq(Cat(dvi_tgen.ctrl_phy.hsync, dvi_tgen.ctrl_phy.vsync)),
                 dvi_gen.ctrl_in_ch1.eq(0),

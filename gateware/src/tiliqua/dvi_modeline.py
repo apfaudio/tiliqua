@@ -131,7 +131,7 @@ class DVIModeline:
             "720x720pslow": DVIModeline(
                 h_active      = 720,
                 h_sync_start  = 766,
-                h_sync_end    = 768,
+                h_sync_end    = 782,
                 h_total       = 812,
                 h_sync_invert = True,
                 v_active      = 720,
