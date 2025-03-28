@@ -139,7 +139,7 @@ class DVIModeline:
                 v_sync_end    = 786,
                 v_total       = 802,
                 v_sync_invert = True,
-                pixel_clk_mhz = 16.0,
+                pixel_clk_mhz = 39.073,
             ),
         }
 

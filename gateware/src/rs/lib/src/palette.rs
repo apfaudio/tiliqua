@@ -16,6 +16,7 @@ pub enum ColorPalette {
     Linear,
     Gray,
     InvGray,
+    RGB332,
 }
 
 fn hue2rgb(p: f32, q: f32, mut t: f32) -> f32 {
@@ -70,10 +71,6 @@ pub fn hsl2rgb(h: f32, s: f32, l: f32) -> RGB {
 
 
 impl ColorPalette {
-    pub fn default() -> Self {
-        ColorPalette::Linear
-    }
-
     fn compute_color(&self, i: i32, h: i32) -> RGB {
         let n_i: i32 = PX_INTENSITY_MAX;
         let n_h: i32 = PX_HUE_MAX;
@@ -96,6 +93,15 @@ impl ColorPalette {
             ColorPalette::InvGray => {
                 let gray: u8 = 255u8 - (i * 16) as u8;
                 RGB { r: gray, g: gray, b: gray }
+            }
+            ColorPalette::RGB332 => {
+                // Raw palette index 0-255
+                let rgb: u8 = (((i&0xF)<<4)|(h&0xF)) as u8;
+                // Convert to RGB332 equivalent (msb-to-lsb: 'rrrgggbb')
+                let r: u8 = rgb&0xe0;
+                let g: u8 = (rgb&0x1c)<<3;
+                let b: u8 = (rgb&0x3)<<6;
+                RGB { r, g, b }
             }
         }
     }
