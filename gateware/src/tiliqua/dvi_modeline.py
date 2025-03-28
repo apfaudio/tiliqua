@@ -126,6 +126,21 @@ class DVIModeline:
                 v_sync_invert = False,
                 pixel_clk_mhz = 37.40,
             ),
+
+            # A round AliExpress display
+            "720x720pslow": DVIModeline(
+                h_active      = 720,
+                h_sync_start  = 766,
+                h_sync_end    = 768,
+                h_total       = 812,
+                h_sync_invert = True,
+                v_active      = 720,
+                v_sync_start  = 770,
+                v_sync_end    = 786,
+                v_total       = 802,
+                v_sync_invert = True,
+                pixel_clk_mhz = 16.0,
+            ),
         }
 
 @dataclass
