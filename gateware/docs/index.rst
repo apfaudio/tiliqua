@@ -9,6 +9,14 @@ Tiliqua documentation
   :width: 800
 
 .. toctree::
+   :caption: Keep Updated
+   :maxdepth: 2
+
+   devlog/march25
+   community
+   foss_funding
+
+.. toctree::
    :caption: Hardware
    :maxdepth: 2
 
