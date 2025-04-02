@@ -40,12 +40,12 @@ impl<I2C: I2c> Pca9635<I2C> for Pca9635Driver<I2C> {
            self.leds[0xD], // PWM13
            self.leds[0xE], // PWM14
            self.leds[0xF], // PWM15
-           0xFFu8, // GRPPWM
+           0x40u8, // GRPPWM
            0x00u8, // GRPFREQ
-           0xAAu8, // LEDOUT0
-           0xAAu8, // LEDOUT1
-           0xAAu8, // LEDOUT2
-           0xAAu8, // LEDOUT3
+           0xFFu8, // LEDOUT0
+           0xFFu8, // LEDOUT1
+           0xFFu8, // LEDOUT2
+           0xFFu8, // LEDOUT3
         ];
         self.i2c.transaction(PCA9635_ADDR, &mut [Operation::Write(&pca9635_bytes)])
     }
