@@ -431,7 +431,7 @@ class I2CMaster(wiring.Component):
         0x10, # PWM13
         0x10, # PWM14
         0x10, # PWM15
-        0x80, # GRPPWM
+        0x40, # GRPPWM
         0x00, # GRPFREQ
         0xFF, # LEDOUT0
         0xFF, # LEDOUT1
