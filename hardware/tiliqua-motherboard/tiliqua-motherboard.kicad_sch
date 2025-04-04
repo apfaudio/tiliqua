@@ -5081,7 +5081,7 @@
 	)
 	(global_label "GPDI_D1-"
 		(shape bidirectional)
-		(at 238.76 26.67 180)
+		(at 238.76 39.37 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -5091,7 +5091,7 @@
 		)
 		(uuid "242dab55-994a-4ec0-b743-6621f531ee85")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 225.2292 26.67 0)
+			(at 225.2292 39.37 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5389,7 +5389,7 @@
 	)
 	(global_label "GPDI_CK-"
 		(shape bidirectional)
-		(at 238.76 39.37 180)
+		(at 238.76 26.67 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -5399,7 +5399,7 @@
 		)
 		(uuid "4b815f83-d6fc-4fc1-b506-b7893dd22f98")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 225.1687 39.37 0)
+			(at 225.1687 26.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5653,7 +5653,7 @@
 	)
 	(global_label "GPDI_D2-"
 		(shape bidirectional)
-		(at 238.76 20.32 180)
+		(at 238.76 33.02 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -5663,7 +5663,7 @@
 		)
 		(uuid "67167228-596f-41b8-993a-09f16570b20e")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 225.2292 20.32 0)
+			(at 225.2292 33.02 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5807,7 +5807,7 @@
 	)
 	(global_label "GPDI_D2+"
 		(shape bidirectional)
-		(at 238.76 17.78 180)
+		(at 238.76 30.48 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -5817,7 +5817,7 @@
 		)
 		(uuid "7b05ad73-1cc6-4d22-af1b-92a5e1f0ee04")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 225.2292 17.78 0)
+			(at 225.2292 30.48 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5917,7 +5917,7 @@
 	)
 	(global_label "GPDI_D0+"
 		(shape bidirectional)
-		(at 238.76 30.48 180)
+		(at 238.76 17.78 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -5927,7 +5927,7 @@
 		)
 		(uuid "84b2e47c-f438-4982-b040-7eb66aa0bfbe")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 225.2292 30.48 0)
+			(at 225.2292 17.78 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6599,7 +6599,7 @@
 	)
 	(global_label "GPDI_D0-"
 		(shape bidirectional)
-		(at 238.76 33.02 180)
+		(at 238.76 20.32 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -6609,7 +6609,7 @@
 		)
 		(uuid "c08c3b4e-1f4d-409e-bc44-3ad4787dfc0a")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 225.2292 33.02 0)
+			(at 225.2292 20.32 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7039,7 +7039,7 @@
 	)
 	(global_label "GPDI_CK+"
 		(shape bidirectional)
-		(at 238.76 36.83 180)
+		(at 238.76 24.13 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7049,7 +7049,7 @@
 		)
 		(uuid "e6f191e8-1a0d-4317-8503-8a75673306da")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 225.1687 36.83 0)
+			(at 225.1687 24.13 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7105,7 +7105,7 @@
 	)
 	(global_label "GPDI_D1+"
 		(shape bidirectional)
-		(at 238.76 24.13 180)
+		(at 238.76 36.83 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7115,7 +7115,7 @@
 		)
 		(uuid "ed2231b2-e703-4ad0-acba-0ad753a0ed56")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 225.2292 24.13 0)
+			(at 225.2292 36.83 0)
 			(effects
 				(font
 					(size 1.27 1.27)
