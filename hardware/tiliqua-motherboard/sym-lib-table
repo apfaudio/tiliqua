@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "pi3dhd")(type "KiCad")(uri "/home/seb/dev/tiliqua/hardware/libs/pi3dhd.kicad_sym")(options "")(descr ""))
+)
