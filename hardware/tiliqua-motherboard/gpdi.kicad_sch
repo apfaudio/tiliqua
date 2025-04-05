@@ -3646,7 +3646,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "004cf1eb-75ec-4bd0-bb79-b54e8a3214ec")
 		(property "Reference" "R9"
 			(at 182.88 115.57 0)
@@ -5509,7 +5509,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Diode_SMD:D_SOD-123"
 			(at 214.63 54.61 0)
 			(effects
 				(font
@@ -5558,7 +5558,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "a8ce5f9d-c006-41f4-8a51-68f4743b1c2d")
 		(property "Reference" "R25"
 			(at 185.42 115.57 0)
@@ -6725,7 +6725,7 @@
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
-		(dnp no)
+		(dnp yes)
 		(uuid "e99ff966-6784-4fb1-94e5-eb9576a3ae2a")
 		(property "Reference" "R26"
 			(at 193.802 93.726 90)
