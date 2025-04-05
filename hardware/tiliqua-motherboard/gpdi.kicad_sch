@@ -3644,7 +3644,7 @@
 		(at 181.61 111.76 180)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp yes)
 		(uuid "004cf1eb-75ec-4bd0-bb79-b54e8a3214ec")
@@ -3771,7 +3771,7 @@
 				)
 			)
 		)
-		(property "Value" "270R"
+		(property "Value" "220R"
 			(at 152.4 78.74 90)
 			(effects
 				(font
@@ -3826,7 +3826,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C728775"
+		(property "lcsc#" "C326868"
 			(at 152.4 78.74 0)
 			(effects
 				(font
@@ -3971,7 +3971,7 @@
 				)
 			)
 		)
-		(property "Value" "270R"
+		(property "Value" "220R"
 			(at 152.4 76.2 90)
 			(effects
 				(font
@@ -4026,7 +4026,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C728775"
+		(property "lcsc#" "C326868"
 			(at 152.4 76.2 0)
 			(effects
 				(font
@@ -4673,7 +4673,7 @@
 				)
 			)
 		)
-		(property "Value" "270R"
+		(property "Value" "220R"
 			(at 152.4 73.66 90)
 			(effects
 				(font
@@ -4728,7 +4728,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C728775"
+		(property "lcsc#" "C326868"
 			(at 152.4 73.66 0)
 			(effects
 				(font
@@ -4793,7 +4793,7 @@
 		(at 184.15 45.72 270)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp yes)
 		(uuid "3a9d5b51-5bdb-4a45-837f-8389ef51c68d")
@@ -4920,7 +4920,7 @@
 				)
 			)
 		)
-		(property "Value" "270R"
+		(property "Value" "220R"
 			(at 152.4 81.28 90)
 			(effects
 				(font
@@ -4975,7 +4975,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C728775"
+		(property "lcsc#" "C326868"
 			(at 152.4 81.28 0)
 			(effects
 				(font
@@ -5556,7 +5556,7 @@
 		(at 184.15 111.76 180)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp yes)
 		(uuid "a8ce5f9d-c006-41f4-8a51-68f4743b1c2d")
@@ -5673,10 +5673,9 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "b06b4c65-a60d-49dc-9ef6-1671b19eb748")
 		(property "Reference" "U13"
-			(at 186.2933 106.68 0)
+			(at 185.42 105.156 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5684,8 +5683,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "~"
-			(at 186.2933 107.95 0)
+		(property "Value" "PI3HDX511E"
+			(at 185.42 106.934 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5846,7 +5845,7 @@
 				)
 			)
 		)
-		(property "Value" "270R"
+		(property "Value" "220R"
 			(at 152.4 83.82 90)
 			(effects
 				(font
@@ -5901,7 +5900,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C728775"
+		(property "lcsc#" "C326868"
 			(at 152.4 83.82 0)
 			(effects
 				(font
@@ -5979,7 +5978,7 @@
 				)
 			)
 		)
-		(property "Value" "270R"
+		(property "Value" "220R"
 			(at 152.4 86.36 90)
 			(effects
 				(font
@@ -6034,7 +6033,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C728775"
+		(property "lcsc#" "C326868"
 			(at 152.4 86.36 0)
 			(effects
 				(font
@@ -6537,7 +6536,7 @@
 				)
 			)
 		)
-		(property "Value" "270R"
+		(property "Value" "220R"
 			(at 152.4 71.12 90)
 			(effects
 				(font
@@ -6592,7 +6591,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C728775"
+		(property "lcsc#" "C326868"
 			(at 152.4 71.12 0)
 			(effects
 				(font
@@ -6723,7 +6722,7 @@
 		(at 195.58 91.44 270)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp yes)
 		(uuid "e99ff966-6784-4fb1-94e5-eb9576a3ae2a")
@@ -6964,7 +6963,7 @@
 				)
 			)
 		)
-		(property "Value" "270R"
+		(property "Value" "220R"
 			(at 152.4 88.9 90)
 			(effects
 				(font
@@ -7019,7 +7018,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C728775"
+		(property "lcsc#" "C326868"
 			(at 152.4 88.9 0)
 			(effects
 				(font
