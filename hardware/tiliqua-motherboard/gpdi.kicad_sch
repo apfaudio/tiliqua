@@ -2290,7 +2290,7 @@
 	)
 	(text "DVI sink == +3V3 with 50ohm series\npin_hi == 0mA\npin_lo == 3V3 / (50 + 270) ~= 10.3mA"
 		(exclude_from_sim no)
-		(at 92.964 58.928 0)
+		(at 130.556 47.752 0)
 		(effects
 			(font
 				(size 1.27 1.27)

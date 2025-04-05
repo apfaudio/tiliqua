@@ -8834,7 +8834,7 @@
 				)
 			)
 		)
-		(property "Value" "16V 350mA"
+		(property "Value" "16V 500mA"
 			(at 55.88 45.974 90)
 			(effects
 				(font
@@ -8870,7 +8870,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C883107"
+		(property "lcsc#" "C2833485"
 			(at 55.88 48.26 90)
 			(effects
 				(font
@@ -8888,7 +8888,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C883107"
+		(property "LCSC" "C2833485"
 			(at 55.88 43.942 0)
 			(effects
 				(font

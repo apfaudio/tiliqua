@@ -4591,7 +4591,7 @@
 				)
 			)
 		)
-		(property "Value" "16V 350mA"
+		(property "Value" "16V 500mA"
 			(at 0 1.65 0)
 			(layer "F.Fab")
 			(uuid "59fa7141-b35c-4458-96b9-b16cec11f8d3")
@@ -4628,7 +4628,7 @@
 				)
 			)
 		)
-		(property "lcsc#" "C883107"
+		(property "lcsc#" "C2833485"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -4654,7 +4654,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C883107"
+		(property "LCSC" "C2833485"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -6276,7 +6276,7 @@
 			)
 		)
 		(property ki_fp_filters "DIP* SOIC* R*Array*Concave* R*Array*Convex*")
-		(path "/ed9bec48-51c5-4ee1-b57c-649b00e3f651")
+		(path "/a0017bf4-16b8-40ca-a083-8ca9ea477f07")
 		(sheetname "/")
 		(sheetfile "tiliqua-motherboard.kicad_sch")
 		(attr smd)
@@ -8653,7 +8653,7 @@
 			)
 		)
 		(property ki_fp_filters "DIP* SOIC* R*Array*Concave* R*Array*Convex*")
-		(path "/fab2810c-846b-4fd3-91f6-29ac3e93c045/37240e92-e849-4569-95c2-d9551969035d")
+		(path "/fab2810c-846b-4fd3-91f6-29ac3e93c045/e6850399-e652-4d13-bfba-842872e9b832")
 		(sheetname "/gpdi/")
 		(sheetfile "gpdi.kicad_sch")
 		(attr smd)
