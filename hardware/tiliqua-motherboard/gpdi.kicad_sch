@@ -475,6 +475,296 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Device:C_Small"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0.254)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "C"
+				(at 0.254 1.778 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Value" "C_Small"
+				(at 0.254 -2.032 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Unpolarized capacitor, small symbol"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "capacitor cap"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "C_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "C_Small_0_1"
+				(polyline
+					(pts
+						(xy -1.524 0.508) (xy 1.524 0.508)
+					)
+					(stroke
+						(width 0.3048)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.524 -0.508) (xy 1.524 -0.508)
+					)
+					(stroke
+						(width 0.3302)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "C_Small_1_1"
+				(pin passive line
+					(at 0 2.54 270)
+					(length 2.032)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -2.54 90)
+					(length 2.032)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
+		(symbol "Device:D_Schottky"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 1.016)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "D"
+				(at 0 2.54 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "D_Schottky"
+				(at 0 -2.54 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Schottky diode"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "diode Schottky"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "TO-???* *_Diode_* *SingleDiode* D_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "D_Schottky_0_1"
+				(polyline
+					(pts
+						(xy -1.905 0.635) (xy -1.905 1.27) (xy -1.27 1.27) (xy -1.27 -1.27) (xy -0.635 -1.27) (xy -0.635 -0.635)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 1.27) (xy 1.27 -1.27) (xy -1.27 0) (xy 1.27 1.27)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 0) (xy -1.27 0)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "D_Schottky_1_1"
+				(pin passive line
+					(at -3.81 0 0)
+					(length 2.54)
+					(name "K"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 3.81 0 180)
+					(length 2.54)
+					(name "A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Device:Polyfuse_Small"
 			(pin_numbers
 				(hide yes)
@@ -1998,7 +2288,7 @@
 		)
 		(uuid 77197dd1-1a44-4ad1-b433-1d2a607349e5)
 	)
-	(text "DVI sink == +3V3 with 50ohm series\npin_hi == 0mA\npin_lo == 3V3 / (50 + 270) ~= 10.3mA\n(220 adds a bit more headroom than 270, drive strength can be reduced)"
+	(text "DVI sink == +3V3 with 50ohm series\npin_hi == 0mA\npin_lo == 3V3 / (50 + 270) ~= 10.3mA"
 		(exclude_from_sim no)
 		(at 92.964 58.928 0)
 		(effects
@@ -2008,16 +2298,6 @@
 			(justify left)
 		)
 		(uuid "0c162fe5-87dd-4806-a7db-efc3a235bc7a")
-	)
-	(text "TODO: +5V DIODE!!"
-		(exclude_from_sim no)
-		(at 227.076 55.626 0)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-		)
-		(uuid "265ad8fa-4c88-44d8-9594-3fa9de00d5e3")
 	)
 	(text "Digital Video Interface / GPDI"
 		(exclude_from_sim no)
@@ -2040,10 +2320,34 @@
 		(uuid "06153ce1-06a1-4c0f-91d8-a3e9bc026489")
 	)
 	(junction
+		(at 193.04 66.04)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "0a3c6b6a-f737-46b6-8c75-fc2a62841431")
+	)
+	(junction
 		(at 179.07 116.84)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "2310a084-d585-441f-88b4-4dcbc69821d7")
+	)
+	(junction
+		(at 209.55 49.53)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "3528f370-1b29-4f3a-990d-2e74c5d66f01")
+	)
+	(junction
+		(at 142.24 124.46)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "56d69ba5-4557-4586-b3bc-2ea3ad0d1856")
+	)
+	(junction
+		(at 189.23 52.07)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "5724d478-7b0b-446e-a5df-16d2ea6a97b7")
 	)
 	(junction
 		(at 215.9 119.38)
@@ -2052,10 +2356,22 @@
 		(uuid "753f6a12-6560-437e-8410-fd12910bd5aa")
 	)
 	(junction
+		(at 214.63 49.53)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "7f815de0-f68f-46ec-bc84-3c2731368e35")
+	)
+	(junction
 		(at 175.26 52.07)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "b12888c5-678b-43fd-aa47-26b34fcc6df1")
+	)
+	(junction
+		(at 142.24 116.84)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "bf488117-ef6a-46c7-bdcd-b6a656ddf9a1")
 	)
 	(junction
 		(at 217.17 119.38)
@@ -2068,6 +2384,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "d065c387-89d6-467e-82ea-7db0f5536ee2")
+	)
+	(junction
+		(at 153.67 91.44)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "e192c9ff-9bda-40a5-ad92-26a976de3818")
 	)
 	(junction
 		(at 219.71 119.38)
@@ -2088,10 +2410,6 @@
 	(no_connect
 		(at 204.47 106.68)
 		(uuid "7390fd45-82d5-4756-95a8-ff846f7fe435")
-	)
-	(no_connect
-		(at 180.34 52.07)
-		(uuid "7eaf4e2c-b1fb-4651-b32c-1fc1c8c3c492")
 	)
 	(wire
 		(pts
@@ -2115,6 +2433,46 @@
 	)
 	(wire
 		(pts
+			(xy 142.24 124.46) (xy 142.24 125.73)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "075fb6d4-a4bf-451f-be70-4cee8fd1b162")
+	)
+	(wire
+		(pts
+			(xy 142.24 116.84) (xy 142.24 118.11)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0ca4b4d8-020d-495c-ba1e-2794c4886bfd")
+	)
+	(wire
+		(pts
+			(xy 134.62 124.46) (xy 142.24 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0d34d04b-08dd-4666-bb67-1469f60ac742")
+	)
+	(wire
+		(pts
+			(xy 149.86 123.19) (xy 149.86 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0df6f7b0-804b-48e3-81e4-fba7768ce68c")
+	)
+	(wire
+		(pts
 			(xy 194.31 109.22) (xy 204.47 109.22)
 		)
 		(stroke
@@ -2122,6 +2480,26 @@
 			(type default)
 		)
 		(uuid "1168f209-8d9c-4c9c-b259-45a12b8c4016")
+	)
+	(wire
+		(pts
+			(xy 214.63 48.26) (xy 214.63 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "117e775a-3916-41a3-96c8-8b991daf14da")
+	)
+	(wire
+		(pts
+			(xy 180.34 45.72) (xy 180.34 52.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "150b741a-3b9a-458d-a907-cb0352d71f9b")
 	)
 	(wire
 		(pts
@@ -2145,6 +2523,36 @@
 	)
 	(wire
 		(pts
+			(xy 134.62 116.84) (xy 142.24 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "247a9890-e411-4147-9598-72ed5b3aa7e3")
+	)
+	(wire
+		(pts
+			(xy 134.62 118.11) (xy 134.62 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "26605bef-20ab-49c3-991a-80e33740e711")
+	)
+	(wire
+		(pts
+			(xy 191.77 66.04) (xy 193.04 66.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2a9ea70b-6518-46e9-bdee-25747da3ef04")
+	)
+	(wire
+		(pts
 			(xy 212.09 119.38) (xy 214.63 119.38)
 		)
 		(stroke
@@ -2152,6 +2560,16 @@
 			(type default)
 		)
 		(uuid "2e06f6a1-0a31-4a72-8544-243fb64dc57d")
+	)
+	(wire
+		(pts
+			(xy 148.59 99.06) (xy 153.67 99.06)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2e993528-965c-4cdf-bcf0-0a275f5bc3e4")
 	)
 	(wire
 		(pts
@@ -2175,6 +2593,16 @@
 	)
 	(wire
 		(pts
+			(xy 193.04 66.04) (xy 193.04 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3272a45a-e31f-4259-a21a-cffb37c94039")
+	)
+	(wire
+		(pts
 			(xy 181.61 106.68) (xy 181.61 107.95)
 		)
 		(stroke
@@ -2182,6 +2610,26 @@
 			(type default)
 		)
 		(uuid "342c4954-0c0b-4b68-9913-92a83a99bc7a")
+	)
+	(wire
+		(pts
+			(xy 168.91 107.95) (xy 173.99 107.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "358565bb-f67e-4ac3-aa9a-0e0ec616a83b")
+	)
+	(wire
+		(pts
+			(xy 193.04 66.04) (xy 194.31 66.04)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "35c46b6a-efde-43e6-bacf-a90335f2baa4")
 	)
 	(wire
 		(pts
@@ -2202,6 +2650,26 @@
 			(type default)
 		)
 		(uuid "3dfbee4a-0cba-4540-8648-cf0d1442b9e2")
+	)
+	(wire
+		(pts
+			(xy 176.53 110.49) (xy 176.53 106.68)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3e0b56e4-0a52-4888-ac1c-6ffc537f7e1e")
+	)
+	(wire
+		(pts
+			(xy 205.74 49.53) (xy 209.55 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3f9b765d-ddbb-4e59-99d2-a2891fec389d")
 	)
 	(wire
 		(pts
@@ -2275,6 +2743,16 @@
 	)
 	(wire
 		(pts
+			(xy 142.24 91.44) (xy 153.67 91.44)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5691308d-b76b-49ff-ba7a-f9769575f278")
+	)
+	(wire
+		(pts
 			(xy 142.24 71.12) (xy 148.59 71.12)
 		)
 		(stroke
@@ -2325,13 +2803,33 @@
 	)
 	(wire
 		(pts
-			(xy 185.42 52.07) (xy 190.5 52.07)
+			(xy 173.99 107.95) (xy 173.99 106.68)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "630fa89f-cb46-41c1-b00e-463d24740c55")
+	)
+	(wire
+		(pts
+			(xy 185.42 52.07) (xy 189.23 52.07)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "6e33943f-5874-4f37-8660-ca8151c0bc04")
+	)
+	(wire
+		(pts
+			(xy 142.24 124.46) (xy 149.86 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7474fc5a-eb85-4d73-93fc-2ac2a077f59b")
 	)
 	(wire
 		(pts
@@ -2455,6 +2953,26 @@
 	)
 	(wire
 		(pts
+			(xy 142.24 123.19) (xy 142.24 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "95a47b18-b2a2-427b-b40b-a3b646b31352")
+	)
+	(wire
+		(pts
+			(xy 200.66 53.34) (xy 189.23 53.34)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9703bdcf-069d-47b8-af0a-4f91a2ec7563")
+	)
+	(wire
+		(pts
 			(xy 142.24 83.82) (xy 148.59 83.82)
 		)
 		(stroke
@@ -2462,6 +2980,16 @@
 			(type default)
 		)
 		(uuid "9785cbad-9ac4-4cf7-80d5-d5aba9046d3a")
+	)
+	(wire
+		(pts
+			(xy 153.67 91.44) (xy 166.37 91.44)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "99ad81cf-6db4-4c6c-8a95-bbb6c322ef4d")
 	)
 	(wire
 		(pts
@@ -2482,6 +3010,26 @@
 			(type default)
 		)
 		(uuid "9a8ebf7b-ec3d-406e-accc-a7b111cb2e2b")
+	)
+	(wire
+		(pts
+			(xy 205.74 57.15) (xy 200.66 57.15)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a1085ad8-da08-4135-8671-13d93419767d")
+	)
+	(wire
+		(pts
+			(xy 209.55 58.42) (xy 209.55 57.15)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a221c1f0-75fb-40de-a0d1-cd4a4273c475")
 	)
 	(wire
 		(pts
@@ -2515,6 +3063,26 @@
 	)
 	(wire
 		(pts
+			(xy 143.51 68.58) (xy 157.48 68.58)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ab0c0b25-d383-4582-969c-115fa7c22305")
+	)
+	(wire
+		(pts
+			(xy 189.23 53.34) (xy 189.23 52.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b4d59dc3-d7ab-4ce5-8e1f-1a8ae990cb8d")
+	)
+	(wire
+		(pts
 			(xy 142.24 86.36) (xy 148.59 86.36)
 		)
 		(stroke
@@ -2525,13 +3093,13 @@
 	)
 	(wire
 		(pts
-			(xy 191.77 66.04) (xy 194.31 66.04)
+			(xy 162.56 68.58) (xy 166.37 68.58)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "b573c8e3-52a9-4d20-aed2-aa0208d5070c")
+		(uuid "b7ecd58a-9f59-460d-bf90-633b7d231ec7")
 	)
 	(wire
 		(pts
@@ -2575,6 +3143,26 @@
 	)
 	(wire
 		(pts
+			(xy 149.86 118.11) (xy 149.86 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c46b03d8-454d-4989-885a-36fe9a665263")
+	)
+	(wire
+		(pts
+			(xy 134.62 123.19) (xy 134.62 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c7fc0299-acff-4c61-a77b-e30132dbf767")
+	)
+	(wire
+		(pts
 			(xy 142.24 76.2) (xy 148.59 76.2)
 		)
 		(stroke
@@ -2605,6 +3193,46 @@
 	)
 	(wire
 		(pts
+			(xy 142.24 116.84) (xy 149.86 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d0e52789-c78f-4b52-9fb6-14bc556e6dd3")
+	)
+	(wire
+		(pts
+			(xy 142.24 114.3) (xy 142.24 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d5070ef2-a01b-4f0b-b45d-e4150e52755f")
+	)
+	(wire
+		(pts
+			(xy 193.04 58.42) (xy 209.55 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d67f1bd0-e6d2-476f-b357-9548563414f8")
+	)
+	(wire
+		(pts
+			(xy 209.55 49.53) (xy 214.63 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d8fc0a5b-e2f5-45f3-afc0-b694c6e80dcd")
+	)
+	(wire
+		(pts
 			(xy 179.07 106.68) (xy 179.07 116.84)
 		)
 		(stroke
@@ -2612,6 +3240,26 @@
 			(type default)
 		)
 		(uuid "e5f42b72-c9c4-451a-9816-358a5262be58")
+	)
+	(wire
+		(pts
+			(xy 200.66 57.15) (xy 200.66 53.34)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e618cb66-acfd-483c-beb9-75df0336d871")
+	)
+	(wire
+		(pts
+			(xy 168.91 110.49) (xy 176.53 110.49)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e7167cd3-ba7a-4727-a2ea-5aca39adf6a1")
 	)
 	(wire
 		(pts
@@ -2635,6 +3283,16 @@
 	)
 	(wire
 		(pts
+			(xy 189.23 52.07) (xy 190.5 52.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f291fef7-cff4-4ebd-9234-1a26cc0bac0e")
+	)
+	(wire
+		(pts
 			(xy 184.15 106.68) (xy 184.15 107.95)
 		)
 		(stroke
@@ -2642,6 +3300,16 @@
 			(type default)
 		)
 		(uuid "fc998caf-9309-4f03-b3a9-548ccd79a18b")
+	)
+	(wire
+		(pts
+			(xy 214.63 49.53) (xy 214.63 50.8)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "feb9a127-fcb6-4144-a1ba-d8ed13270812")
 	)
 	(label "SCL_Sink"
 		(at 194.31 99.06 0)
@@ -2785,7 +3453,7 @@
 	)
 	(hierarchical_label "GPDI_SDA_3V3"
 		(shape bidirectional)
-		(at 43.18 101.6 180)
+		(at 168.91 107.95 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -2838,6 +3506,17 @@
 		)
 		(uuid "421b9476-18cd-4bc6-8b8a-158156df43d9")
 	)
+	(hierarchical_label "GPDI_HPD"
+		(shape input)
+		(at 142.24 91.44 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "4390eb9f-3b07-4faa-b0b0-3c9dea5073b3")
+	)
 	(hierarchical_label "GPDI_D0+"
 		(shape output)
 		(at 142.24 81.28 180)
@@ -2862,7 +3541,7 @@
 	)
 	(hierarchical_label "GPDI_SCL_3V3"
 		(shape bidirectional)
-		(at 43.18 99.06 180)
+		(at 168.91 110.49 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -3092,7 +3771,7 @@
 				)
 			)
 		)
-		(property "Value" "220R"
+		(property "Value" "270R"
 			(at 152.4 78.74 90)
 			(effects
 				(font
@@ -3137,7 +3816,7 @@
 				(hide yes)
 			)
 		)
-		(property "mfg#" "YC124-JR-07220RL"
+		(property "mfg#" "YC124-JR-07270RL"
 			(at 163.8299 80.772 0)
 			(effects
 				(font
@@ -3147,7 +3826,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C326868"
+		(property "lcsc#" "C728775"
 			(at 152.4 78.74 0)
 			(effects
 				(font
@@ -3165,7 +3844,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C326868"
+		(property "LCSC" "C728775"
 			(at 162.56 78.74 0)
 			(effects
 				(font
@@ -3208,6 +3887,73 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 142.24 125.73 0)
+		(mirror y)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "096c6b4d-afa3-451d-8590-e78f269b28fd")
+		(property "Reference" "#PWR0103"
+			(at 142.24 132.08 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 142.24 130.81 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 142.24 125.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 142.24 125.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 142.24 125.73 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "17a43637-72a1-4bbe-ad5e-c26194b2f189")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "#PWR0103")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_Pack04_Split")
 		(at 152.4 76.2 90)
 		(mirror x)
@@ -3225,7 +3971,7 @@
 				)
 			)
 		)
-		(property "Value" "220R"
+		(property "Value" "270R"
 			(at 152.4 76.2 90)
 			(effects
 				(font
@@ -3270,7 +4016,7 @@
 				(hide yes)
 			)
 		)
-		(property "mfg#" "YC124-JR-07220RL"
+		(property "mfg#" "YC124-JR-07270RL"
 			(at 163.8299 78.232 0)
 			(effects
 				(font
@@ -3280,7 +4026,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C326868"
+		(property "lcsc#" "C728775"
 			(at 152.4 76.2 0)
 			(effects
 				(font
@@ -3298,7 +4044,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C326868"
+		(property "LCSC" "C728775"
 			(at 162.56 76.2 0)
 			(effects
 				(font
@@ -3336,6 +4082,394 @@
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "RN6")
 					(unit 2)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C_Small")
+		(at 142.24 120.65 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "15ea9fb2-0529-4721-aa3d-0cb8d7f0dd06")
+		(property "Reference" "C37"
+			(at 142.494 122.682 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 142.494 118.618 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
+			(at 142.24 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
+			(at 142.24 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 142.24 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "lcsc#" "C131394"
+			(at 142.24 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "mfg#" ""
+			(at 142.24 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tol" ""
+			(at 142.24 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C307331"
+			(at 142.494 122.682 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "77b5e90e-9518-489f-acbd-85147fdb6e09")
+		)
+		(pin "2"
+			(uuid "adf0ece3-97c2-4589-941c-3f80a3e02659")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "C37")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3V3")
+		(at 187.96 45.72 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "1bbbc6cf-8081-4480-9d13-cbacd7ff7f2a")
+		(property "Reference" "#PWR0101"
+			(at 184.15 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3V3"
+			(at 193.294 45.72 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 187.96 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 187.96 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 187.96 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "c71c848f-ed10-4274-a60c-0440e840e9ae")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "#PWR0101")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C_Small")
+		(at 160.02 68.58 90)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "22bee0b2-6c13-446e-926e-1f5ed0ad7bf1")
+		(property "Reference" "C45"
+			(at 157.226 67.564 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "4.7uF"
+			(at 163.576 67.564 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+			(at 160.02 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 160.02 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Unpolarized capacitor, small symbol"
+			(at 160.02 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "dig#" ""
+			(at 167.64 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "mfg#" ""
+			(at 170.18 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "lcsc#" ""
+			(at 160.02 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tol" ""
+			(at 160.02 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" ""
+			(at 161.798 66.548 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "702c1d56-abbf-4fcf-bafa-a2cb7e0d5af1")
+		)
+		(pin "2"
+			(uuid "6d2140a7-ee89-41fa-bd10-f7dd55fd0d8b")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "C45")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C_Small")
+		(at 134.62 120.65 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "2f06d29c-67ca-4b4f-ad36-baf3e20a3729")
+		(property "Reference" "C35"
+			(at 134.874 122.682 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100nF"
+			(at 134.874 118.618 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0402_1005Metric"
+			(at 134.62 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
+			(at 134.62 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 134.62 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "lcsc#" "C131394"
+			(at 134.62 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "mfg#" ""
+			(at 134.62 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tol" ""
+			(at 134.62 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C307331"
+			(at 134.874 122.682 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "c56ce11d-9f31-4f16-9ae4-1fb546b7d194")
+		)
+		(pin "2"
+			(uuid "cea1754c-4247-4385-b8cb-5701937b7a9a")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "C35")
+					(unit 1)
 				)
 			)
 		)
@@ -3408,6 +4542,120 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 153.67 95.25 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "322d8475-4454-4b03-9fb5-a0ef368ad138")
+		(property "Reference" "R44"
+			(at 159.004 95.504 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "4K7"
+			(at 153.67 93.218 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+			(at 155.448 95.25 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 153.67 95.25 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 153.67 95.25 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Mfg" "Yageo"
+			(at 153.67 95.25 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "PN" ""
+			(at 153.67 95.25 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "lcsc#" "C25900"
+			(at 153.67 95.25 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tol" ""
+			(at 153.67 95.25 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C25900"
+			(at 156.21 93.472 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "4a517221-ed24-4997-a543-3bcb8504318d")
+		)
+		(pin "2"
+			(uuid "8b3addae-169d-40d4-b7e2-994d9b0217b9")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R44")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_Pack04_Split")
 		(at 152.4 73.66 90)
 		(mirror x)
@@ -3425,7 +4673,7 @@
 				)
 			)
 		)
-		(property "Value" "220R"
+		(property "Value" "270R"
 			(at 152.4 73.66 90)
 			(effects
 				(font
@@ -3470,7 +4718,7 @@
 				(hide yes)
 			)
 		)
-		(property "mfg#" "YC124-JR-07220RL"
+		(property "mfg#" "YC124-JR-07270RL"
 			(at 163.8299 75.692 0)
 			(effects
 				(font
@@ -3480,7 +4728,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C326868"
+		(property "lcsc#" "C728775"
 			(at 152.4 73.66 0)
 			(effects
 				(font
@@ -3498,7 +4746,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C326868"
+		(property "LCSC" "C728775"
 			(at 162.56 73.66 0)
 			(effects
 				(font
@@ -3541,6 +4789,120 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 184.15 45.72 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp yes)
+		(uuid "3a9d5b51-5bdb-4a45-837f-8389ef51c68d")
+		(property "Reference" "R50"
+			(at 182.372 43.688 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "4K7"
+			(at 182.118 45.72 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+			(at 184.15 43.942 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 184.15 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 184.15 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Mfg" "Yageo"
+			(at 184.15 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "PN" ""
+			(at 184.15 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "lcsc#" "C25900"
+			(at 184.15 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tol" ""
+			(at 184.15 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C25900"
+			(at 182.372 43.18 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "c75d123f-0cb9-4caa-94c0-af47615effbc")
+		)
+		(pin "2"
+			(uuid "7ef76b2a-34ee-4f43-b885-a30693a91834")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R50")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_Pack04_Split")
 		(at 152.4 81.28 90)
 		(mirror x)
@@ -3558,7 +4920,7 @@
 				)
 			)
 		)
-		(property "Value" "220R"
+		(property "Value" "270R"
 			(at 152.4 81.28 90)
 			(effects
 				(font
@@ -3603,7 +4965,7 @@
 				(hide yes)
 			)
 		)
-		(property "mfg#" "YC124-JR-07220RL"
+		(property "mfg#" "YC124-JR-07270RL"
 			(at 163.8299 83.312 0)
 			(effects
 				(font
@@ -3613,7 +4975,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C326868"
+		(property "lcsc#" "C728775"
 			(at 152.4 81.28 0)
 			(effects
 				(font
@@ -3631,7 +4993,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C326868"
+		(property "LCSC" "C728775"
 			(at 162.56 81.28 0)
 			(effects
 				(font
@@ -3669,6 +5031,71 @@
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "RN7")
 					(unit 4)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3V3")
+		(at 148.59 99.06 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "526cd587-cfec-4271-82c6-9c20d3838689")
+		(property "Reference" "#PWR0100"
+			(at 148.59 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3V3"
+			(at 148.336 95.25 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 148.59 99.06 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 148.59 99.06 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 148.59 99.06 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "9b564495-a29b-4e68-928a-063713790c11")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "#PWR0100")
+					(unit 1)
 				)
 			)
 		)
@@ -3921,6 +5348,74 @@
 	)
 	(symbol
 		(lib_id "power:GND")
+		(at 143.51 68.58 270)
+		(mirror x)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "6da057c5-6f7a-42d9-aad2-ca0aa1b001d0")
+		(property "Reference" "#PWR0102"
+			(at 137.16 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 139.7 68.5799 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" ""
+			(at 143.51 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 143.51 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 143.51 68.58 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "d4f99a8d-f034-49c4-a388-b92cd0a687a9")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "#PWR0102")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
 		(at 215.9 119.38 0)
 		(mirror y)
 		(unit 1)
@@ -3981,6 +5476,76 @@
 			(project "tiliqua-motherboard"
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "#PWR073")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:D_Schottky")
+		(at 214.63 54.61 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "a31451dc-5557-47d4-8f21-f25fb7c35762")
+		(property "Reference" "D4"
+			(at 217.17 53.6574 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "B0520LW"
+			(at 217.17 56.1974 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" ""
+			(at 214.63 54.61 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 214.63 54.61 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 214.63 54.61 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "02ce86bd-0bd9-42bd-96f8-28ac46d48dfc")
+		)
+		(pin "1"
+			(uuid "a750a1a4-11c6-4d9f-bbc2-ee9fdc7f05c3")
+		)
+		(instances
+			(project ""
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "D4")
 					(unit 1)
 				)
 			)
@@ -4281,7 +5846,7 @@
 				)
 			)
 		)
-		(property "Value" "220R"
+		(property "Value" "270R"
 			(at 152.4 83.82 90)
 			(effects
 				(font
@@ -4326,7 +5891,7 @@
 				(hide yes)
 			)
 		)
-		(property "mfg#" "YC124-JR-07220RL"
+		(property "mfg#" "YC124-JR-07270RL"
 			(at 163.8299 85.852 0)
 			(effects
 				(font
@@ -4336,7 +5901,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C326868"
+		(property "lcsc#" "C728775"
 			(at 152.4 83.82 0)
 			(effects
 				(font
@@ -4354,7 +5919,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C326868"
+		(property "LCSC" "C728775"
 			(at 162.56 83.82 0)
 			(effects
 				(font
@@ -4414,7 +5979,7 @@
 				)
 			)
 		)
-		(property "Value" "220R"
+		(property "Value" "270R"
 			(at 152.4 86.36 90)
 			(effects
 				(font
@@ -4459,7 +6024,7 @@
 				(hide yes)
 			)
 		)
-		(property "mfg#" "YC124-JR-07220RL"
+		(property "mfg#" "YC124-JR-07270RL"
 			(at 163.8299 88.392 0)
 			(effects
 				(font
@@ -4469,7 +6034,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C326868"
+		(property "lcsc#" "C728775"
 			(at 152.4 86.36 0)
 			(effects
 				(font
@@ -4487,7 +6052,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C326868"
+		(property "LCSC" "C728775"
 			(at 162.56 86.36 0)
 			(effects
 				(font
@@ -4525,6 +6090,120 @@
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "RN7")
 					(unit 2)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 205.74 53.34 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "d0c3db1c-cb8c-454c-a657-914226de1785")
+		(property "Reference" "R31"
+			(at 203.454 51.562 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "2K2"
+			(at 205.74 51.308 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+			(at 207.518 53.34 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 205.74 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 205.74 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Mfg" "Yageo"
+			(at 205.74 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "PN" ""
+			(at 205.74 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "lcsc#" ""
+			(at 205.74 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tol" ""
+			(at 205.74 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" ""
+			(at 208.28 51.562 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "61f98ad7-eed6-43e5-893d-cb453c3e96bb")
+		)
+		(pin "2"
+			(uuid "fadf9c03-694e-4a9f-ae7a-479e8bab1f2d")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R31")
+					(unit 1)
 				)
 			)
 		)
@@ -4597,6 +6276,119 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:C_Small")
+		(at 149.86 120.65 0)
+		(mirror y)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "d7940976-86aa-4601-adb7-d6765782e78a")
+		(property "Reference" "C44"
+			(at 151.892 122.428 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "4.7uF"
+			(at 153.416 118.618 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+			(at 149.86 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 149.86 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Unpolarized capacitor, small symbol"
+			(at 149.86 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "dig#" ""
+			(at 147.32 128.27 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "mfg#" ""
+			(at 147.32 130.81 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "lcsc#" ""
+			(at 149.86 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tol" ""
+			(at 149.86 120.65 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" ""
+			(at 151.892 122.428 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "3f324d88-cf7a-4c20-8bc0-837928193c26")
+		)
+		(pin "2"
+			(uuid "9fb84eeb-afc2-4f33-bbd6-b5e330144a7f")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "C44")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+3V3")
 		(at 166.37 66.04 90)
 		(unit 1)
@@ -4604,7 +6396,6 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "df955a8d-39fd-4520-91e4-897565a78ab9")
 		(property "Reference" "#PWR013"
 			(at 170.18 66.04 0)
@@ -4616,7 +6407,7 @@
 			)
 		)
 		(property "Value" "+3V3"
-			(at 162.56 66.0399 90)
+			(at 166.624 64.262 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4664,6 +6455,71 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3V3")
+		(at 142.24 114.3 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "e3471595-8dd4-4b48-8e34-4d6a99ab5e70")
+		(property "Reference" "#PWR0104"
+			(at 142.24 118.11 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+3V3"
+			(at 142.24 108.966 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 142.24 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 142.24 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 142.24 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "d9f80847-7200-4899-8d4b-6eb2da4766e4")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "#PWR0104")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_Pack04_Split")
 		(at 152.4 71.12 90)
 		(mirror x)
@@ -4681,7 +6537,7 @@
 				)
 			)
 		)
-		(property "Value" "220R"
+		(property "Value" "270R"
 			(at 152.4 71.12 90)
 			(effects
 				(font
@@ -4726,7 +6582,7 @@
 				(hide yes)
 			)
 		)
-		(property "mfg#" "YC124-JR-07220RL"
+		(property "mfg#" "YC124-JR-07270RL"
 			(at 163.8299 73.152 0)
 			(effects
 				(font
@@ -4736,7 +6592,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C326868"
+		(property "lcsc#" "C728775"
 			(at 152.4 71.12 0)
 			(effects
 				(font
@@ -4754,7 +6610,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C326868"
+		(property "LCSC" "C728775"
 			(at 162.56 71.12 0)
 			(effects
 				(font
@@ -4977,6 +6833,120 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 209.55 53.34 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "eab7a0e3-9892-42a2-ae43-85ef63468634")
+		(property "Reference" "R28"
+			(at 211.836 51.562 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "2K2"
+			(at 209.55 51.308 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
+			(at 211.328 53.34 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 209.55 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 209.55 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Mfg" "Yageo"
+			(at 209.55 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "PN" ""
+			(at 209.55 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "lcsc#" ""
+			(at 209.55 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Tol" ""
+			(at 209.55 53.34 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" ""
+			(at 212.09 51.562 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "e5284850-4d5a-45ef-8567-f4a848071826")
+		)
+		(pin "2"
+			(uuid "53a6cf8d-bffd-4d09-93cc-e730f664f6bf")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R28")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_Pack04_Split")
 		(at 152.4 88.9 90)
 		(mirror x)
@@ -4994,7 +6964,7 @@
 				)
 			)
 		)
-		(property "Value" "220R"
+		(property "Value" "270R"
 			(at 152.4 88.9 90)
 			(effects
 				(font
@@ -5039,7 +7009,7 @@
 				(hide yes)
 			)
 		)
-		(property "mfg#" "YC124-JR-07220RL"
+		(property "mfg#" "YC124-JR-07270RL"
 			(at 163.8299 90.932 0)
 			(effects
 				(font
@@ -5049,7 +7019,7 @@
 				(hide yes)
 			)
 		)
-		(property "lcsc#" "C326868"
+		(property "lcsc#" "C728775"
 			(at 152.4 88.9 0)
 			(effects
 				(font
@@ -5067,7 +7037,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C326868"
+		(property "LCSC" "C728775"
 			(at 162.56 88.9 0)
 			(effects
 				(font
@@ -5111,7 +7081,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 214.63 58.42 0)
+		(at 214.63 48.26 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -5120,7 +7090,7 @@
 		(fields_autoplaced yes)
 		(uuid "eeffacab-e56e-457d-a3f5-2c3f2872e1bd")
 		(property "Reference" "#PWR014"
-			(at 214.63 62.23 0)
+			(at 214.63 52.07 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5129,7 +7099,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 214.63 53.34 0)
+			(at 214.63 43.18 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5137,7 +7107,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 214.63 58.42 0)
+			(at 214.63 48.26 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5146,7 +7116,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 214.63 58.42 0)
+			(at 214.63 48.26 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5155,7 +7125,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 214.63 58.42 0)
+			(at 214.63 48.26 0)
 			(effects
 				(font
 					(size 1.27 1.27)
