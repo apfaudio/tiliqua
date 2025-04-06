@@ -24,6 +24,7 @@ import json
 import os
 import subprocess
 import sys
+import re
 import tarfile
 import tempfile
 from pathlib import Path
@@ -45,6 +46,44 @@ BOOTLOADER_BITSTREAM_ADDR = 0x000000
 FIRMWARE_BASE_SLOT0 = 0x1B0000
 # Used to detect region collisions
 FLASH_PAGE_SIZE = 1024  # 1KB
+
+
+def scan_for_tiliqua():
+    """
+    Scan for a debugger with "apfbug" in the product name using openFPGALoader.
+    """
+    print("Scan for Tiliqua...")
+    try:
+        result = subprocess.run(
+            ["sudo", "openFPGALoader", "--scan-usb"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        output = result.stdout
+    except subprocess.CalledProcessError as e:
+        print(f"Error running openFPGALoader: {e}")
+        sys.exit(1)
+    print(output)
+    lines = output.strip().split('\n')
+    data_lines = [line for line in lines if line and not line.startswith("Bus")]
+    for line in data_lines:
+        if "apfbug" in line.lower() or "apf.audio" in line.lower():
+            parts = re.split(r'\s{2,}', line.strip())
+            if len(parts) >= 5:
+                serial = parts[3].strip()
+                product = parts[4].strip()
+                hw_version_match = re.search(r'R(\d+)', product)
+                if hw_version_match:
+                    hw_version = int(hw_version_match.group(1))
+                    print(f"Found attached Tiliqua! (hw_rev={hw_version}, serial={serial})")
+                    return hw_version
+                else:
+                    print("Found tiliqua-like device, product code is malformed (update RP2040?).")
+
+    print("Could not find Tiliqua debugger.")
+    print("Check it is turned on, plugged in ('dbg' port), permissions correct, and RP2040 firmware is up to date.")
+    sys.exit(1)
 
 class Region:
     """Flash memory region descriptor."""
@@ -119,7 +158,7 @@ def check_region_overlaps(regions: List[Region], slot: Optional[int] = None) -> 
     return (False, "")
 
 
-def flash_archive(archive_path: str, slot: Optional[int] = None, noconfirm: bool = False) -> None:
+def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = None, noconfirm: bool = False) -> None:
     """
     Flash a bitstream archive to the specified slot.
 
@@ -139,6 +178,12 @@ def flash_archive(archive_path: str, slot: Optional[int] = None, noconfirm: bool
             print("Error: Could not extract manifest.json from archive")
             sys.exit(1)
         manifest = json.load(manifest_f)
+
+        hw_rev_manifest = manifest["hw_rev"]
+        if hw_rev_manifest != hw_rev_major:
+            print(f"Aborting: attached Tiliqua (hw=r{hw_rev_major}) does not match archive (hw=r{hw_rev_manifest}).")
+            sys.exit(1)
+
 
         # Check if this is an XIP firmware
         has_xip_firmware = False
@@ -445,6 +490,8 @@ def main():
 
     args = parser.parse_args()
 
+    hw_rev_major = scan_for_tiliqua()
+
     if args.command == 'archive':
         if not os.path.exists(args.archive_path):
             print(f"Error: Archive not found: {args.archive_path}")
@@ -452,7 +499,7 @@ def main():
         if args.slot is not None and not 0 <= args.slot < N_MANIFESTS:
             print(f"Error: Slot must be between 0 and {N_MANIFESTS-1}")
             sys.exit(1)
-        flash_archive(args.archive_path, args.slot, args.noconfirm)
+        flash_archive(args.archive_path, hw_rev_major, args.slot, args.noconfirm)
     elif args.command == 'status':
         flash_status()
 
