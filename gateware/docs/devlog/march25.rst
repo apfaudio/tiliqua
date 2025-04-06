@@ -2,7 +2,7 @@
 ===========================
 
 
-*Thanks for dropping by! Tiliqua is an open-source project (see* :doc:`../foss_funding` *). Feel free to join the discussion (see* :doc:`../community`).
+*Thanks for dropping by! Tiliqua is an open-source project (see* :doc:`../foss_funding` *). Feel free to join the discussion (see* :doc:`../community`) or join our mailing list LINK.
 
 What a crazy last couple of months! I've been super busy bringing up the Tiliqua R4 (latest) hardware revision and getting it ready for production. The trickiest aspect was getting it through EMC testing, so this will be our focus today.
 
@@ -22,7 +22,7 @@ Before we dive deep into EMC, a quickfire list of unrelated wins from the last c
 In this update
 --------------
 
-- **R4 Hardware & EMC**: A lot of work went into getting Tiliqua ready for EMC testing, and I learned much from the process.
+- **R4 Hardware & EMC**: A lot of work went into getting Tiliqua ready for EMC testing, I'll go through some lessons learned.
 - **Dynamic Clocking**: The latest revision adds an external PLL, useful for EMC (spread spectrum) and dynamic resolution switching. We'll cover this below.
 - **100% Amaranth**: Until recently there were some core Tiliqua components (especially audio CODEC initialization, calibration, the video subsystem) that were still re-using Verilog cores. These are now all removed and `ported to Amaranth <https://github.com/apfaudio/tiliqua/pull/89>`_, which should make the codebase easier to understand!
 
@@ -64,20 +64,27 @@ Spectrum Analyzer
 
 For a cheap spectrum analyzer, I decided to use a TinySA Pro.
 
+PHOTO: tinySA pro with fail line
+
 With a TEM cell, there are tables you can use to convert measurements from a cell like this into (rough) far-field measurements, to get an idea of whether you would pass the 'real' test or not.
 
-In my case, I used the TinySA preset found here to check my own measurements against the rough EMC standard thresholds. This results in a nice red 'fail line' that is helpful to identify the problematic areas:
-
-PHOTO: tinySA pro with fail line
+In my case, I used the TinySA preset found here to check my own measurements against the rough EMC standard thresholds. This results in a nice red 'fail line' that is helpful to identify the problematic areas (you can see the red line in the photo above).
 
 Note: I discovered the preset above requires firmware version vXXX to work properly, you might want to downgrade to that firmware version in order to use the preset
 
 Dodgy sniffer probe
 *******************
 
+To help localize the source of radio noise, I put together a super-dodgy sniffer probe using a couple of enamel wire loops:
+
 PHOTO: dodgy sniffer probe
 
-Unfortunately this probe did not end up being very useful, it often seemed to point at an area of the board that had nothing to do with the source of the noise!
+In the end, this probe did not end up being very useful, it worked, but often seemed to point at an area of the board that had nothing to do with the source of the noise. So I'd strongly lean toward just using a TEM cell, the sniffer probe did not help much.
+
+LISN
+****
+
+For measuring power-supply ripple, I built a small LISN (line impedance stabilization network) which is used to measure the amount of conducted noise (i.e emitted on the power supply cables). You can build one yourself following the design found here. It looks like this:
 
 Pre-testing: Findings
 ---------------------
@@ -85,59 +92,151 @@ Pre-testing: Findings
 Fail!
 *****
 
-PHOTO: failing the limits on R3
+On first measuring Tiliqua R2, things did not look so great. In the TEM cell, radiated emissions looked like this:
+
+PHOTO: failing the limits on R2
+
+Gross failures at XXMhz and XXMhz. And conducted emissions were not much better:
+
+PHOTO: conducted emissions on R2
+
+Clearly, some work had to be done. But where to start?
 
 Learning 1: SMPS input filtering
 ********************************
+
+At the low end around XXMHz, there is a wideband slice of spectrum suspiciously close to the switching frequency of the +5V switchmode regulator:
+
+PHOTO: failing the limits (with arrow)
+
+To address this, I added some extra input filtering on the +12V ingress, and then completely re-routed the entire SMPS section, using more polygons and being careful to keep all paths low-inductance. Here's a comparison of the routing on R2 vs. R4 in this section:
 
 PHOTO: routing on input: R2 vs R4
 
 Learning 2: FPGA drive strengths, series resistors
 **************************************************
 
+At various harmonics of 12.288MHz (audio master clock) and of 37.1MHz (video master clock), I noticed a bunch of emissions:
+
+PHOTO: failing the limits (with arrow)
+
+To address these, I tried to reduce the FPGA pad drive strength as follows:
+
 PHOTO: amaranth drive settings
 
+This improved things, but we were still way over the limit. So on Tiliqua R3 I tried adding some extra series resistors on the audio clock/data lines to increase the slew rate:
+
 PHOTO: routing on series resistors going to FFC
+
+These 2 changes got us *almost* under the limit line. Risky. More work was needed.
 
 Learning 3: Split ground planes
 *******************************
 
+Tiliqua's audio board uses split ground planes - that is, the analog and digital grounds are isolated with inductors. This is recommended in the CODEC datasheet, however there is some disagreement in the engineering community as to when it harms products vs. when it helps them.
+
+One disadvantage of this approach is that it can negatively impact EMC - if anything couples to the isolated ground plane, it can resonate as an antenna. Turns out, this was exactly what was causing most of the emissions at 12.288MHz harmonics (master audio clock).
+
+As soon as I shorted the isolated analog ground plane to Tiliqua's metal binding stubs:
+
 PHOTO: clamshell with arrow
 
-PHOTO: shorting bottom ground plane to stubs
+The emissions from 12.288MHz harmonics got almost completely squashed! Of course, I think performed a lot of testing to make sure the audio quality did not suffer, and suprisingly it made no difference. So this change was here to stay.
 
 Learning 4: Spread Spectrum
 ***************************
 
+Haunted by the above lessons and to make *absolutely* sure we would pass in the real test lab, I decided to add *another* EMC mitigation to Tiliqua R4 - an external spread-spectrum PLL. This allows the FPGA to have clocks which are modulated by some small percent (say 0.1% to 1% or so) at a low frequency (30kHz in our case). The consequence is that the energy in our harmonics is 'spread out' across the band, reducing the peak amplitude.
+
+To demonstrate this effect, here is 2 captures, Tiliqua R4 with spread-spectrum disabled and one with spread-spectrum enabled:
+
 PHOTO: capture with and without spread spectrum
 
-DETAILS: si5351 driver
+It's not a dramatic effect, but it definitely makes a difference. Here you see a reduction of around XdB.
+
+This is a feature supported internally by some modern FPGA families, but the ECP5 does not have this feature (nor does any FPGA supported by the open-source FPGA tool flow, as far as we know). So we are essentially relying on the ability of the ECP5's *internal* PLL to lock onto a slowly frequency-modulating *external* PLL. In theory, this should depend on the ECP5 PLL's loop bandwidth as to what modulation depth should work, which is unfortunately undocumented. Fortunately, this arrangement seems to work fine in my testing.
+
+Distraction: SI5351 Driver and Dynamic Clocking
+***********************************************
+
+EMC was not the only reason I decided to add an external PLL, there are 2 more reasons this made a lot of sense for Tiliqua:
+
+- The ECP5-25 only has 2 built-in PLLs. This means we can't have separate PLLs for USB/RAM/audio/video, and means that we have to sacrifice either the accuracy of the audio or video clocks. Undesirable. An extra external PLL means we don't have to make this compromise.
+- The ECP5's internal PLLs cannot be reprogrammed at runtime. This means that the display resolution or audio clocks are fixed after a bitstream has started. With an external PLL, this restriction is lifted. For tiliqua, dynamic resolution switching is a crucial feature, especially as we plan to distribute an optional screen with custom timings. Tiliqua should be able to detect which screen it is attached to and choose its resolution accordingly.
+
+Getting the external PLL to work was not trivial. I had to:
+
+- Make sure the si5351 was routed to the correct ECP5 pins (that is, they can be used as a PLL lock source)
+- Write a driver for the si5351 spread-spectrum capabilities.
+- Rework the Tiliqua clock tree / gateware so that the asynchronous external clocks generate internal resets and can drive internal signals appropriately.
+
+The si5351 Rust driver (and test cases I added) was based on an open-source driver that I heavily modified such that it can support spread-spectrum configuration and more fine-grained divider settings. You can find my implementation here (it was based on this open source driver that had no spread-spectrum support and no test cases).
+
+I won't go into more details here, but suffice it to say, if you build a bitstream for Tiliqua R4 now, all this is transparent to you, and you'll see a nice printout of the resulting clock tree:
+
+TEXT: CLOCK TREE
+
+The dynamic clock tree settings get saved into the bitstream manifest (describing user bitstreams), so the bootloader can dynamically configure the external PLL based on what any particular user bitstream wants.
 
 Lab-testing: Findings
 ---------------------
+
+After all this effort, it was finally time to take Tiliqua to an EMC test lab!
+
+PHOTO: example system
+
+To spoil the result, we passed! But it was not without hiccups.
 
 Learning 5: Long cables
 ***********************
 
 PHOTO: long cables (faraday photo)
 
-Bring backups!
+One thing that surprised us was how much the headphone cables going into our Eurorack system were affecting the results. It did not bring us over the limit lines (fortunately), but shortening or lengthening the headphone cable made quite a difference to the radiated emissions.
+
+So, be careful with this. In theory, your device should work with any sane length of headphone cable, but if you want to be more certain that things will go well, it might be safer to use something shorter than the 3 meter headphone cable I was using. And 3 meters is right in that 200-400MHz range where many devices fail EMC.
+
+Additionally, long cables are impossible to simulate with a small test chamber (or custom TEM cell like we have).
 
 Learning 6: ESD is no joke
 ***************************
 
+Part of CE testing involves zapping the DUT with an ESD gun. I was especially scared of this given Tiliqua has touch-sensitive jacks where we have the pins of a touch IC exposed to the outside world. Fortunately, I followed Cypress' recommendations of having a large series resistance to the touch pads, which is supposed to mitigate any ESD frying the touch IC. Normally, adding TVS diodes is a no-brainer for this, but since they add extra capacitance, my fear was that they would negatively effect the touch sensing capabilities.
+
+PHOTO: eurorack-pmod jack to touch IC path with line
+
+Surprisingly, however, I discovered that zapping the touchpads with extremely high voltage (i.e. a bit above the standard), the touch sensors would momentarily stop working. After some investigation, I discovered the zap was actually erasing the NVM (non-volatile memory) in the touch IC, the Tiliqua firmware was then detecting this and reprogramming the NVM.
+
+So: be prepared. Add watchdogs to your code. ESD is no joke.
+
+Learning 7: TEM cell vs. real far-field measurements
+****************************************************
+
+Because all our pre-testing was in a custom-built TEM cell, I found it interesting to compare the spectrum from our "super-cheap" option with the real thing. Here are some example plots from the TEM cell as compared with the true far-field measurements (same hardware and firmware configuration)
+
+What seems to make the biggest difference here is the long headphone cable, which can't be contained inside the TEM cell.
+
 EMC: Conclusion
 ---------------
 
-Bonus: Dynamic Clocking!
-------------------------
-
-PHOTO: edid decoding?
+So: we passed! Tiliqua R4 is now, to our knowledge, EMC compliant. Although this was a LOT of effort, we are confident that all the changes will result in a more robust instrument that stands the test of time, and doesn't interfere with anything else in your rack!
 
 Bonus: New Amaranth Cores!
 --------------------------
 
+We're happy to report that we've finally finished porting *all remaining verilog* to Amaranth! This will hopefully decrease the learning curve when getting started with this project. Specifically, we rewrote the following:
 
-Bonus: Crowd Supply and Tariffs
--------------------------------
+- The audio I2S controller gateware and online sample calibration module LINK
+- The I2C controller gateware for all I2C peripherals on the audio board (LEDs, jack detect, touch detect, codec init) LINK
+- The display serializer (tmds) and video generator LINK
 
+As a result of this rewrite we're also using a few percent less area of the ECP5. So more space for other things!
+
+Note: Our CPU is as of now the only non-amaranth component (SpinalHDL), however VexRiscv has proven faster and has better area usage than any other core we could find. For this reason, we plan to stick to VexRiscv for the CPU (and perhaps VexiiRiscv in a few monts).
+
+Bonus: Crowd Supply & Trade Tariffs
+-----------------------------------
+
+Obviously everyone in our industry is trying to figure out what to do with the ongoing trade war. For us, our plan was always to launch through CrowdSupply. But with these tariffs, this would imply an undesired price hike. We're currently talking to Crowd Supply to see what our options are here.
+
+If we launch through Crowd Supply, EU customers (and me of course) would have to eat the cost of US tariffs and then potentially any reciprocal tariffs the EU may set up - which makes zero sense as this is a project centered in the EU. I'm currently working hard to figure out what the best path forward is here and will provide an update once I have more information.
