@@ -6,7 +6,8 @@
 
 What a crazy last couple of months! I've been super busy bringing up the Tiliqua R4 (latest) hardware revision and getting it ready for production. The trickiest aspect was getting it through EMC testing, so this will be our focus today.
 
-PHOTO: tiliqua back
+.. image:: /_static/devlog_mar25/tiliqua_back_side_tilted.jpg
+  :width: 800
 
 New Features
 ------------
@@ -29,12 +30,15 @@ In this update
 CE and FCC
 ----------
 
+.. image:: /_static/devlog_mar25/ce.jpg
+  :width: 800
+
 Any kind of electronic product sold in the EU must have evidence that it meets the requirements for a CE mark, in the US the (almost) equivalent mark is FCC. For a eurorack module like Tiliqua, there 2 most interesting sets of standards:
 
 - EMC: There are hundreds of standards related to EMC (Electromagnetic Compliance: radio emissions and static discharge), however only a few are relevant to a low-voltage musical instrument like Tiliqua.
 - RoHS: Restrictions on Hazardous Substances - this means that we are not using any nasty chemicals or leaded solder for example. Usually no testing is required to meet this, you just collect documentation for every single component and assembly step of your product and make sure that each part meets RoHS.
 
-If you go to a test lab they will tell you exactly which standards are relevant to your product. For something like a Eurorack Module, it's the emissions requirements (radiated radio emissions) and ESD immunity (sparks from fingers) that are the most challenging.
+If you go to a test lab they will tell you exactly which standards are relevant to your product. For something like a Eurorack Module, it's the emissions requirements (radiated and tolerated radio emissions) and ESD immunity (simulated sparks from fingers) that are the most challenging.
 
 The Setup
 ---------
@@ -46,7 +50,9 @@ At a test lab, you are expected to bring a self-contained test system with your 
 
 For Tiliqua's testing I put together a small system like this, including not just the Tiliqua but also a screen module, display cable, headphone interface and so on:
 
-PHOTO: example system
+.. figure:: /_static/devlog_mar25/headphone_cable.jpg
+
+    Small example system with headphones and mains adapter in the professional test lab.
 
 The other modules, mains adapter, case, and DC-DC converters inside the case will all affect the test result. So, if you're going to a test lab for the first time, best to bring spares to swap out for each part.
 
@@ -55,7 +61,10 @@ Pre-test chamber
 
 Time at a test lab can be expensive. To save time and money, I built a small EMC test chamber using a slighty modified version of the `design you'll find here <https://essentialscrap.com/tem_cell/>`_. Here's a picture of mine:
 
-PHOTO: test chamber with example system inside it
+.. figure:: /_static/devlog_mar25/chamber.jpg
+
+   Homebrew TEM cell with TinySA pro and example system inside it.
+
 
 The chamber is called a "TEM cell", and you can visualize it like an oversized transmission line - a huge coax cable, which you can put your device into to take broadband measurements. A chamber like this is even allowed as an official measurement method (if you get a much more expensive and calibrated one!).
 
@@ -105,13 +114,17 @@ Clearly, some work had to be done. But where to start?
 Learning 1: SMPS input filtering
 ********************************
 
-At the low end around XXMHz, there is a wideband slice of spectrum suspiciously close to the switching frequency of the +5V switchmode regulator:
+At the low end around XXMHz, there is a wideband slice of spectrum suspiciously close to the switching frequency of the +5V switchmode regulator. Taking a closer look at the conducted noise with our LISN:
 
-PHOTO: failing the limits (with arrow)
+PHOTO: LISN failing the limits (with arrow)
 
 To address this, I added some extra input filtering on the +12V ingress, and then completely re-routed the entire SMPS section, using more polygons and being careful to keep all paths low-inductance. Here's a comparison of the routing on R2 vs. R4 in this section:
 
-PHOTO: routing on input: R2 vs R4
+.. figure:: /_static/devlog_mar25/routing_pwr_r2_r4.jpg
+
+   Left: old routing (R2). Right: new routing (R4)
+
+This made quite a dramatic difference. After this change, the conducted noise looks like this:
 
 Learning 2: FPGA drive strengths, series resistors
 **************************************************
@@ -122,11 +135,15 @@ PHOTO: failing the limits (with arrow)
 
 To address these, I tried to reduce the FPGA pad drive strength as follows:
 
-PHOTO: amaranth drive settings
+.. figure:: /_static/devlog_mar25/drive_strength.jpg
+
+   Reducing pad drive strength in Amaranth platform declaration.
 
 This improved things, but we were still way over the limit. So on Tiliqua R3 I tried adding some extra series resistors on the audio clock/data lines to increase the slew rate:
 
-PHOTO: routing on series resistors going to FFC
+.. figure:: /_static/devlog_mar25/series_r.jpg
+
+   Series 33R resistors on audio clock/data lines.
 
 These 2 changes got us *almost* under the limit line. Risky. More work was needed.
 
@@ -174,7 +191,23 @@ The si5351 Rust driver (and test cases I added) was based on an open-source driv
 
 I won't go into more details here, but suffice it to say, if you build a bitstream for Tiliqua R4 now, all this is transparent to you, and you'll see a nice printout of the resulting clock tree:
 
-TEXT: CLOCK TREE
+.. code-block:: bash
+
+    ┌─────────────[tiliqua-mobo]──────────────────────────────[soldiercrab]────────────┐
+    │                                          ┊[48MHz OSC]                            │
+    │                                          ┊└─>[ECP5 PLL]─┐                        │
+    │                                          ┊              ├>[sync]     60.0000 MHz │
+    │                                          ┊              ├>[usb]      60.0000 MHz │
+    │                                          ┊              └>[fast]    120.0000 MHz │
+    │ [25MHz OSC]─┐                            ┊                                       │
+    │             └>[si5351 PLL]─┐             ┊                                       │
+    │                (dynamic)   ├>[expll_clk0]────────────────>[audio]    12.2880 MHz │
+    │                            └>[expll_clk1]─>[ECP5 PLL]──┐                         │
+    │                                          ┊             ├─>[dvi]      74.2500 MHz │
+    │                                          ┊             └─>[dvi5x]   371.2500 MHz │
+    └──────────────────────────────────────────────────────────────────────────────────┘
+
+This gives you a picture of how all the oscillators and PLLs both inside the FPGA SoM (soldiercrab) and on the Tiliqua motherboard fit together. Most clocks go through an internal ECP5 PLL, except the audio clock, which is routed straight to the fabric.
 
 The dynamic clock tree settings get saved into the bitstream manifest (describing user bitstreams), so the bootloader can dynamically configure the external PLL based on what any particular user bitstream wants.
 
@@ -183,14 +216,15 @@ Lab-testing: Findings
 
 After all this effort, it was finally time to take Tiliqua to an EMC test lab!
 
-PHOTO: example system
-
 To spoil the result, we passed! But it was not without hiccups.
 
 Learning 5: Long cables
 ***********************
 
-PHOTO: long cables (faraday photo)
+
+.. figure:: /_static/devlog_mar25/long_cable2.jpg
+
+    Headphone cables are long!
 
 One thing that surprised us was how much the headphone cables going into our Eurorack system were affecting the results. It did not bring us over the limit lines (fortunately), but shortening or lengthening the headphone cable made quite a difference to the radiated emissions.
 
@@ -226,9 +260,9 @@ Bonus: New Amaranth Cores!
 
 We're happy to report that we've finally finished porting *all remaining verilog* to Amaranth! This will hopefully decrease the learning curve when getting started with this project. Specifically, we rewrote the following:
 
-- The audio I2S controller gateware and online sample calibration module LINK
-- The I2C controller gateware for all I2C peripherals on the audio board (LEDs, jack detect, touch detect, codec init) LINK
-- The display serializer (tmds) and video generator LINK
+- The audio I2S controller gateware and online sample calibration module `(link to PR) <https://github.com/apfaudio/tiliqua/pull/82>`_
+- The I2C controller gateware for all I2C peripherals on the audio board (LEDs, jack detect, touch detect, codec init) `(link to PR) <https://github.com/apfaudio/tiliqua/pull/72>`_
+- The display serializer (tmds) and video generator `(link to PR) <https://github.com/apfaudio/tiliqua/pull/89>`_
 
 As a result of this rewrite we're also using a few percent less area of the ECP5. So more space for other things!
 
