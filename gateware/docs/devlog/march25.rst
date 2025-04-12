@@ -2,7 +2,7 @@
 ===========================
 
 
-*Thanks for dropping by! Tiliqua is an open-source project (see* :doc:`../foss_funding` *). Feel free to join the discussion (see* :doc:`../community`) or join our mailing list LINK.
+*Thanks for dropping by! Tiliqua is an open-source project (see* :doc:`../foss_funding` *). Feel free to join the discussion (see* :doc:`../community`) or join our `mailing list <https://apf.audio>`_.
 
 What a crazy last couple of months! I've been super busy bringing up the Tiliqua R4 (latest) hardware revision and getting it ready for production. The trickiest aspect was getting it through EMC testing, so this will be our focus today.
 
@@ -73,27 +73,32 @@ Spectrum Analyzer
 
 For a cheap spectrum analyzer, I decided to use a TinySA Pro.
 
-PHOTO: tinySA pro with fail line
+.. image:: /_static/devlog_mar25/tinysa.jpg
+  :width: 400
 
 With a TEM cell, there are tables you can use to convert measurements from a cell like this into (rough) far-field measurements, to get an idea of whether you would pass the 'real' test or not.
 
 In my case, I used the TinySA preset found here to check my own measurements against the rough EMC standard thresholds. This results in a nice red 'fail line' that is helpful to identify the problematic areas (you can see the red line in the photo above).
 
-Note: I discovered the preset above requires firmware version vXXX to work properly, you might want to downgrade to that firmware version in order to use the preset
+Note: I discovered the preset above requires firmware version v1.4104 to work properly, you might want to downgrade to that firmware version in order to use the preset
 
 Dodgy sniffer probe
 *******************
 
 To help localize the source of radio noise, I put together a super-dodgy sniffer probe using a couple of enamel wire loops:
 
-PHOTO: dodgy sniffer probe
+.. image:: /_static/devlog_mar25/probe.jpg
+  :width: 400
 
 In the end, this probe did not end up being very useful, it worked, but often seemed to point at an area of the board that had nothing to do with the source of the noise. So I'd strongly lean toward just using a TEM cell, the sniffer probe did not help much.
 
 LISN
 ****
 
-For measuring power-supply ripple, I built a small LISN (line impedance stabilization network) which is used to measure the amount of conducted noise (i.e emitted on the power supply cables). You can build one yourself following the design found here. It looks like this:
+For measuring conducted noise (noise travelling back up the eurorack power cable), I built a small LISN (line impedance stabilization network) which is used to measure the amount of conducted noise (i.e emitted on the power supply cables). You can build one yourself following the design found `here <https://github.com/bvernoux/EMC_5uH_LISN>`_. It looks like this:
+
+.. image:: /_static/devlog_mar25/lisn.jpg
+  :width: 800
 
 Pre-testing: Findings
 ---------------------
@@ -103,20 +108,24 @@ Fail!
 
 On first measuring Tiliqua R2, things did not look so great. In the TEM cell, radiated emissions looked like this:
 
-PHOTO: failing the limits on R2
+.. image:: /_static/devlog_mar25/plots/r2_bootloader_850khz.png
 
-Gross failures at XXMhz and XXMhz. And conducted emissions were not much better:
+Gross failures, mostly at harmonics of the audio master clock (12.288MHz) and the video master clock (37.4MHz in this case). Conducted emissions with the LISN were not much better:
 
-PHOTO: conducted emissions on R2
+.. image:: /_static/devlog_mar25/plots/r2_lisn_17db.png
+
+For conducted emissions, our limit is roughly -40dBm. As we measure worse than -60dBm with a 17dB attenuation in-line, this is dangerously close to the limit.
+
+.. note::
+
+   In a eurorack system, there is a bus board and mains adapter between our module and the rest of the world, so likely the conducted noise would not be visible at the mains (and we wouldn't fail at a test lab), but it's still good to fix this so we don't conduct power-supply noise over to other modules in the system.
 
 Clearly, some work had to be done. But where to start?
 
 Learning 1: SMPS input filtering
 ********************************
 
-At the low end around XXMHz, there is a wideband slice of spectrum suspiciously close to the switching frequency of the +5V switchmode regulator. Taking a closer look at the conducted noise with our LISN:
-
-PHOTO: LISN failing the limits (with arrow)
+At the low end of our LISN plot, you can see some spikes and a wideband slice of spectrum suspiciously close to the switching frequency of the +5V switchmode regulator.
 
 To address this, I added some extra input filtering on the +12V ingress, and then completely re-routed the entire SMPS section, using more polygons and being careful to keep all paths low-inductance. Here's a comparison of the routing on R2 vs. R4 in this section:
 
@@ -124,14 +133,14 @@ To address this, I added some extra input filtering on the +12V ingress, and the
 
    Left: old routing (R2). Right: new routing (R4)
 
-This made quite a dramatic difference. After this change, the conducted noise looks like this:
+This made quite a dramatic difference. After this change, the conducted noise looks like this (peaks are around 20dB lower than before!):
+
+.. image:: /_static/devlog_mar25/plots/r4_lisn_17db.png
 
 Learning 2: FPGA drive strengths, series resistors
 **************************************************
 
-At various harmonics of 12.288MHz (audio master clock) and of 37.1MHz (video master clock), I noticed a bunch of emissions:
-
-PHOTO: failing the limits (with arrow)
+In our initial radiated emissions plot, at various harmonics of 12.288MHz (audio master clock) and of 37.1MHz (video master clock), you can notice a bunch of emissions.
 
 To address these, I tried to reduce the FPGA pad drive strength as follows:
 
@@ -139,13 +148,13 @@ To address these, I tried to reduce the FPGA pad drive strength as follows:
 
    Reducing pad drive strength in Amaranth platform declaration.
 
-This improved things, but we were still way over the limit. So on Tiliqua R3 I tried adding some extra series resistors on the audio clock/data lines to increase the slew rate:
+This improved things, but we were still way over the limit. So on Tiliqua R3 I tried adding some extra series resistors on the audio clock/data lines for reduced slew rate:
 
 .. figure:: /_static/devlog_mar25/series_r.jpg
 
    Series 33R resistors on audio clock/data lines.
 
-These 2 changes got us *almost* under the limit line. Risky. More work was needed.
+These 2 changes got us *almost* under the limit line. But almost = risky. More work was needed.
 
 Learning 3: Split ground planes
 *******************************
@@ -165,11 +174,17 @@ Learning 4: Spread Spectrum
 
 Haunted by the above lessons and to make *absolutely* sure we would pass in the real test lab, I decided to add *another* EMC mitigation to Tiliqua R4 - an external spread-spectrum PLL. This allows the FPGA to have clocks which are modulated by some small percent (say 0.1% to 1% or so) at a low frequency (30kHz in our case). The consequence is that the energy in our harmonics is 'spread out' across the band, reducing the peak amplitude.
 
-To demonstrate this effect, here is 2 captures, Tiliqua R4 with spread-spectrum disabled and one with spread-spectrum enabled:
+To demonstrate this effect, here is 2 captures, Tiliqua R4 with 2 different bitstreams, one configured with spread-spectrum at 0.1% and one with spread-spectrum at 1%:
 
-PHOTO: capture with and without spread spectrum
+.. figure:: /_static/devlog_mar25/plots/r4_main_macro_osc_374mhz_0p1percssc.png
 
-It's not a dramatic effect, but it definitely makes a difference. Here you see a reduction of around XdB.
+   10th harmonic of video master clock with 0.1% spread-spectrum
+
+.. figure:: /_static/devlog_mar25/plots/r4_main_macro_osc_374mhz_1percssc.png
+
+   10th harmonic of video master clock at 1% spread-spectrum
+
+It's not a magic bullet, but definitely makes a difference. Here you see a reduction in the peak amplitude of around 10dB.
 
 This is a feature supported internally by some modern FPGA families, but the ECP5 does not have this feature (nor does any FPGA supported by the open-source FPGA tool flow, as far as we know). So we are essentially relying on the ability of the ECP5's *internal* PLL to lock onto a slowly frequency-modulating *external* PLL. In theory, this should depend on the ECP5 PLL's loop bandwidth as to what modulation depth should work, which is unfortunately undocumented. Fortunately, this arrangement seems to work fine in my testing.
 
@@ -187,7 +202,7 @@ Getting the external PLL to work was not trivial. I had to:
 - Write a driver for the si5351 spread-spectrum capabilities.
 - Rework the Tiliqua clock tree / gateware so that the asynchronous external clocks generate internal resets and can drive internal signals appropriately.
 
-The si5351 Rust driver (and test cases I added) was based on an open-source driver that I heavily modified such that it can support spread-spectrum configuration and more fine-grained divider settings. You can find my implementation here (it was based on this open source driver that had no spread-spectrum support and no test cases).
+The si5351 Rust driver (and test cases I added) was based on an open-source driver that I heavily modified such that it can support spread-spectrum configuration and more fine-grained divider settings. You can find my implementation `here <https://github.com/apfaudio/tiliqua/pull/87>`_ (it was based on this open source driver that had no spread-spectrum support and no test cases).
 
 I won't go into more details here, but suffice it to say, if you build a bitstream for Tiliqua R4 now, all this is transparent to you, and you'll see a nice printout of the resulting clock tree:
 
@@ -214,9 +229,19 @@ The dynamic clock tree settings get saved into the bitstream manifest (describin
 Lab-testing: Findings
 ---------------------
 
-After all this effort, it was finally time to take Tiliqua to an EMC test lab!
+To see the effect of applying all the above changes, here's a before and after comparison:
 
-To spoil the result, we passed! But it was not without hiccups.
+.. figure:: /_static/devlog_mar25/plots/r2_bootloader_100khz.png
+
+    Tiliqua R2 (none of the above learnings applied)
+
+.. figure:: /_static/devlog_mar25/plots/r4_ea8c_100khz.png
+
+    Tiliqua R4 (all of the above learnings applied)
+
+Interestingly, in these plots it is the 300-400MHz region that seems the 'worst', however, as we'll see later, in the real test lab this region was not problematic at all and in fact the 100-200MHz region was more critical, likely due to coupling into the long headphone cable.
+
+Anyway, after all this effort, it was finally time to take Tiliqua to an EMC test lab! To spoil the result, we passed! But it was not without hiccups.
 
 Learning 5: Long cables
 ***********************
@@ -228,7 +253,7 @@ Learning 5: Long cables
 
 One thing that surprised us was how much the headphone cables going into our Eurorack system were affecting the results. It did not bring us over the limit lines (fortunately), but shortening or lengthening the headphone cable made quite a difference to the radiated emissions.
 
-So, be careful with this. In theory, your device should work with any sane length of headphone cable, but if you want to be more certain that things will go well, it might be safer to use something shorter than the 3 meter headphone cable I was using. And 3 meters is right in that 200-400MHz range where many devices fail EMC.
+So, be careful with this. In theory, your device should work with any sane length of headphone cable, but if you want to be more certain that things will go well, it might be safer to use something shorter than the 3 meter headphone cable I was using. 3 meters is right in that 100-200MHz resonance where we were close to failing with EMC.
 
 Additionally, long cables are impossible to simulate with a small test chamber (or custom TEM cell like we have).
 
