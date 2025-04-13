@@ -690,7 +690,7 @@ version = "0.2.0"
 requires_python = ">=3.9"
 git = "https://github.com/vk2seb/luna-soc"
 ref = "seb/rebase-tiliquasoc"
-revision = "bb84dc028c6816418b20157d4450c4c5ee6b4ba7"
+revision = "b34393ed8e74fe9851cba5b7f5ba479ec7903c4f"
 summary = "Amaranth HDL libary for building SoCs with LUNA USB peripherals."
 groups = ["default"]
 dependencies = [

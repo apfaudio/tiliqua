@@ -5,7 +5,9 @@
 from amaranth             import *
 from amaranth.build       import Platform
 from amaranth.lib.fifo    import SyncFIFO
+from amaranth.lib         import stream
 from luna.gateware.stream import StreamInterface
+from luna.gateware.stream.future import Packet
 from util                 import connect_fifo_to_stream
 
 class ChannelsToUSBStream(Elaboratable):
@@ -21,7 +23,12 @@ class ChannelsToUSBStream(Elaboratable):
         # ports
         self.no_channels_in      = Signal(self._channel_bits + 1)
         self.channel_stream_in   = StreamInterface(payload_width=self._sample_width, extra_fields=[("channel_nr", self._channel_bits)])
-        self.usb_stream_out      = StreamInterface()
+        self.usb_stream_out      = stream.Interface(
+            stream.Signature(
+                unsigned(8)
+            )
+        )
+
         self.audio_in_active     = Signal()
         self.data_requested_in   = Signal()
         self.frame_finished_in   = Signal()
