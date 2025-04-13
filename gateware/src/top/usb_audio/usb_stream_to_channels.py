@@ -4,7 +4,9 @@
 
 from amaranth        import *
 from amaranth.build   import Platform
+from amaranth.lib         import stream
 from luna.gateware.stream import StreamInterface
+from luna.gateware.stream.future import Packet
 
 class USBStreamToChannels(Elaboratable):
     def __init__(self, max_no_channels=2):
@@ -14,7 +16,11 @@ class USBStreamToChannels(Elaboratable):
 
         # ports
         self.no_channels_in          = Signal(self._channel_bits + 1)
-        self.usb_stream_in           = StreamInterface()
+        self.usb_stream_in           = stream.Interface(
+            stream.Signature(
+                Packet(unsigned(8))
+            )
+        )
         self.channel_stream_out      = StreamInterface(payload_width=24, extra_fields=[("channel_nr", self._channel_bits)])
         self.garbage_seen_out        = Signal()
 
@@ -31,9 +37,9 @@ class USBStreamToChannels(Elaboratable):
         last_channel = Signal(self._channel_bits)
 
         m.d.comb += [
-            usb_first.eq(self.usb_stream_in.first),
+            usb_first.eq(self.usb_stream_in.payload.first),
             usb_valid.eq(self.usb_stream_in.valid),
-            usb_payload.eq(self.usb_stream_in.payload),
+            usb_payload.eq(self.usb_stream_in.payload.data),
             out_ready.eq(self.channel_stream_out.ready),
             self.usb_stream_in.ready.eq(out_ready),
             last_channel.eq(self.no_channels_in - 1),
