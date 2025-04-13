@@ -1,4 +1,4 @@
-use tiliqua_hal::video::Video;
+use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 
 use strum_macros::{EnumIter, IntoStaticStr};
 
@@ -100,7 +100,7 @@ impl ColorPalette {
         }
     }
 
-    pub fn write_to_hardware(&self, video: &mut impl Video) {
+    pub fn write_to_hardware(&self, video: &mut impl DMAFramebuffer) {
         for i in 0..PX_INTENSITY_MAX {
             for h in 0..PX_HUE_MAX {
                 let rgb = self.compute_color(i, h);
