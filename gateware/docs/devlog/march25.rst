@@ -77,7 +77,7 @@ For a cheap spectrum analyzer, I decided to use a TinySA Pro.
 .. image:: /_static/devlog_mar25/tinysa.jpg
   :width: 400
 
-With a TEM cell, there are tables you can use to convert measurements from a cell like this into (rough) far-field measurements, to get an idea of whether you would pass the 'real' test or not. You can find lots of details in Petteri Aimonen's repository `here <https://github.com/PetteriAimonen/tem-cell/tree/main>`_.
+With a TEM cell, there are tables you can use to convert measurements from a cell like this into (rough) far-field measurements, to get an idea of whether you would pass the 'real' test or not. You can find lots of details in `Petteri Aimonen's repository <https://github.com/PetteriAimonen/tem-cell/tree/main>`_.
 
 In my case, I used the TinySA `preset found here <https://github.com/PetteriAimonen/tem-cell/blob/main/Model_L500mm_W350mm_H200mm/TinySAUltra_Preset.prs>`_ to check my own measurements against the rough EMC standard thresholds. This results in a nice red 'fail line' that is helpful to identify the problematic areas (you can see the red line in the photo above).
 
@@ -302,9 +302,9 @@ Bonus: New Amaranth Cores!
 
 We're happy to report that we've finally finished porting *all remaining verilog* to Amaranth! This will hopefully decrease the learning curve when getting started with this project. Specifically, we rewrote the following:
 
-- The audio I2S controller gateware and online sample calibration module `(link to PR) <https://github.com/apfaudio/tiliqua/pull/82>`_
+- The audio I2S controller gateware and online sample calibration module `(link to PR 82) <https://github.com/apfaudio/tiliqua/pull/82>`_
 - The I2C controller gateware for all I2C peripherals on the audio board (LEDs, jack detect, touch detect, codec init) `(link to PR) <https://github.com/apfaudio/tiliqua/pull/72>`_
-- The display serializer (tmds) and video generator `(link to PR) <https://github.com/apfaudio/tiliqua/pull/89>`_
+- The display serializer (tmds) and video generator `(link to PR 89) <https://github.com/apfaudio/tiliqua/pull/89>`_
 
 As a result of this rewrite we're also using a few percent less area of the ECP5. So more space for other things!
 
