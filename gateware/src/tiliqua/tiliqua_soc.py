@@ -49,10 +49,12 @@ from amaranth_soc                                import csr, gpio, wishbone
 from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
 
 from luna_soc.gateware.core                      import blockram, timer, uart, spiflash
-from luna_soc.gateware.cpu                       import InterruptController, VexRiscv
+from luna_soc.gateware.cpu                       import InterruptController
 from luna_soc.gateware.provider.cynthion         import UARTProvider
 from luna_soc.util                               import readbin
 from luna_soc.generate                           import introspect, svd
+
+from vendor.vexriscv                             import VexRiscv
 
 from tiliqua.tiliqua_platform                    import *
 from tiliqua.raster                              import Persistance
@@ -138,7 +140,7 @@ class VideoPeripheral(wiring.Component):
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, default_modeline, ui_name, ui_sha, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
-                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="cynthion"):
+                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im"):
 
         super().__init__({})
 

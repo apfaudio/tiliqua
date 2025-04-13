@@ -144,7 +144,6 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
         write!(s, "PASS: PSRAM memtest\r\n").ok();
     }
 
-    log::info!( "{} {}", start, endwrite);
     write!(s, "  write {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / write_ticks as u64).ok();
     write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / (read_ticks as u64)).ok();
 }
