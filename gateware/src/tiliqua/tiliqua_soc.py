@@ -50,6 +50,7 @@ from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
 
 from luna_soc.gateware.core                      import blockram, timer, uart, spiflash
 from luna_soc.gateware.cpu                       import InterruptController, VexRiscv
+from luna_soc.gateware.provider.cynthion         import UARTProvider
 from luna_soc.util                               import readbin
 from luna_soc.generate                           import introspect, svd
 
@@ -339,7 +340,7 @@ class TiliquaSoc(Component):
         # uart0
         m.submodules.uart0 = self.uart0
         if sim.is_hw(platform):
-            uart0_provider = uart.Provider(0)
+            uart0_provider = UARTProvider()
             m.submodules.uart0_provider = uart0_provider
             wiring.connect(m, self.uart0.pins, uart0_provider.pins)
 
