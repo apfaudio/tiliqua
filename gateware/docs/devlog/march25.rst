@@ -1,8 +1,9 @@
 [Devlog 1] EMC Adventures
 ===========================
 
+.. note::
 
-*Thanks for dropping by! Tiliqua is an open-source project (see* :doc:`../foss_funding` *). Feel free to join the discussion (see* :doc:`../community`) or join our `mailing list <https://apf.audio>`_.
+    *Thanks for dropping by! Tiliqua is an open-source project (see* :doc:`../foss_funding` *). Feel free to join the discussion (see* :doc:`../community`) *or join our* `mailing list <https://apf.audio>`_.
 
 What a crazy last couple of months! I've been super busy bringing up the Tiliqua R4 (latest) hardware revision and getting it ready for production. The trickiest aspect was getting it through EMC testing, so this will be our focus today.
 
@@ -17,7 +18,7 @@ Before we dive deep into EMC, a quickfire list of unrelated wins from the last c
 - **R4 Hardware Diagrams**: I put together some detailed hardware diagrams of how the different bits of Tiliqua connect together, you can find them under :doc:`/hardware_design`.
 - **Self-calibration**: Tiliqua can now semi-automatically calibrate its own CODEC for better control voltage tracking, you'll find the gruesome details under :doc:`/calibration`.
 - **Bitstream Archives**: The format used for sharing and flashing user bitstreams is implemented and relatively stable now, this means you can share a single file which contains everything a project needs (bitstream, firmware, images, description of the contents). Gruesome details under :doc:`/bootloader`.
-- **Parallel builds**: It's now possible to build all the Tiliqua projects simultaneously, which reduces the build time from about 15min for all projects (about 30 bitstreams) to about 5min on my machine. Try this out with ``gateware/scripts/build_bitstreams_soc.sh``!
+- **Parallel builds**: It's now possible to build all the Tiliqua projects simultaneously, which reduces the build time from about 15min for all projects (about 30 bitstreams) to about 5min on my machine. Try this out with `gateware/scripts/build_bitstreams_soc.sh <https://github.com/apfaudio/tiliqua/blob/main/gateware/scripts/build_bitstreams_soc.sh>`_!
 - **Menu system refactor**: The Tiliqua menu system has been `completely rewritten <https://github.com/apfaudio/tiliqua/pull/85>`_ , which should make it much easier to modify it for your own purposes. I plan to write a short tutorial on how this works soon.
 
 In this update
@@ -59,7 +60,7 @@ The other modules, mains adapter, case, and DC-DC converters inside the case wil
 Pre-test chamber
 ****************
 
-Time at a test lab can be expensive. To save time and money, I built a small EMC test chamber using a slighty modified version of the `design you'll find here <https://essentialscrap.com/tem_cell/>`_. Here's a picture of mine:
+Time at a test lab can be expensive. To save time and money, I built a small EMC test chamber using a slighty modified version of the `open-source design you'll find here <https://essentialscrap.com/tem_cell/>`_. Here's a picture of my build:
 
 .. figure:: /_static/devlog_mar25/chamber.jpg
 
@@ -76,9 +77,9 @@ For a cheap spectrum analyzer, I decided to use a TinySA Pro.
 .. image:: /_static/devlog_mar25/tinysa.jpg
   :width: 400
 
-With a TEM cell, there are tables you can use to convert measurements from a cell like this into (rough) far-field measurements, to get an idea of whether you would pass the 'real' test or not.
+With a TEM cell, there are tables you can use to convert measurements from a cell like this into (rough) far-field measurements, to get an idea of whether you would pass the 'real' test or not. You can find lots of details in Petteri Aimonen's repository `here <https://github.com/PetteriAimonen/tem-cell/tree/main>`_.
 
-In my case, I used the TinySA preset found here to check my own measurements against the rough EMC standard thresholds. This results in a nice red 'fail line' that is helpful to identify the problematic areas (you can see the red line in the photo above).
+In my case, I used the TinySA `preset found here <https://github.com/PetteriAimonen/tem-cell/blob/main/Model_L500mm_W350mm_H200mm/TinySAUltra_Preset.prs>`_ to check my own measurements against the rough EMC standard thresholds. This results in a nice red 'fail line' that is helpful to identify the problematic areas (you can see the red line in the photo above).
 
 Note: I discovered the preset above requires firmware version v1.4104 to work properly, you might want to downgrade to that firmware version in order to use the preset
 
@@ -95,7 +96,7 @@ In the end, this probe did not end up being very useful, it worked, but often se
 LISN
 ****
 
-For measuring conducted noise (noise travelling back up the eurorack power cable), I built a small LISN (line impedance stabilization network) which is used to measure the amount of conducted noise (i.e emitted on the power supply cables). You can build one yourself following the design found `here <https://github.com/bvernoux/EMC_5uH_LISN>`_. It looks like this:
+For measuring conducted noise (noise travelling back up the eurorack power cable), I built a small LISN (line impedance stabilization network) which is used to measure the amount of conducted noise (i.e emitted on the power supply cables). You can build one yourself following the `open-source design found here <https://github.com/bvernoux/EMC_5uH_LISN>`_. It looks like this:
 
 .. image:: /_static/devlog_mar25/lisn.jpg
   :width: 800
@@ -118,7 +119,7 @@ For conducted emissions, our limit is roughly -40dBm. As we measure worse than -
 
 .. note::
 
-   In a eurorack system, there is a bus board and mains adapter between our module and the rest of the world, so likely the conducted noise would not be visible at the mains (and we wouldn't fail at a test lab), but it's still good to fix this so we don't conduct power-supply noise over to other modules in the system.
+   In a eurorack system, there is a bus board and mains adapter between our module and the rest of the world, so likely the conducted noise would not be visible at the mains (and we wouldn't fail at a test lab), but it's still good to fix this so we don't conduct power-supply noise over to other modules in the system and degrade their audio performance.
 
 Clearly, some work had to be done. But where to start?
 
@@ -165,7 +166,11 @@ One disadvantage of this approach is that it can negatively impact EMC - if anyt
 
 As soon as I shorted the isolated analog ground plane to Tiliqua's metal binding stubs:
 
-PHOTO: clamshell with arrow
+.. image:: /_static/devlog_mar25/tiliqua_back_arrow.png
+  :width: 800
+
+.. image:: /_static/devlog_mar25/tiliqua_stub_bridge.png
+  :width: 400
 
 The emissions from 12.288MHz harmonics got almost completely squashed! Of course, I think performed a lot of testing to make sure the audio quality did not suffer, and suprisingly it made no difference. So this change was here to stay.
 
@@ -229,7 +234,11 @@ The dynamic clock tree settings get saved into the bitstream manifest (describin
 Lab-testing: Findings
 ---------------------
 
-To see the effect of applying all the above changes, here's a before and after comparison:
+To see the effect of applying all the above changes, here's a control (empty chamber), before (R2 hardware) and after (R4 hardware) comparison:
+
+.. figure:: /_static/devlog_mar25/plots/mipi_ttl/control_100khz.png
+
+    Control (empty chamber)
 
 .. figure:: /_static/devlog_mar25/plots/r2_bootloader_100khz.png
 
@@ -248,8 +257,7 @@ Learning 5: Long cables
 
 
 .. figure:: /_static/devlog_mar25/long_cable2.jpg
-
-    Headphone cables are long!
+   :width: 300
 
 One thing that surprised us was how much the headphone cables going into our Eurorack system were affecting the results. It did not bring us over the limit lines (fortunately), but shortening or lengthening the headphone cable made quite a difference to the radiated emissions.
 
@@ -262,23 +270,32 @@ Learning 6: ESD is no joke
 
 Part of CE testing involves zapping the DUT with an ESD gun. I was especially scared of this given Tiliqua has touch-sensitive jacks where we have the pins of a touch IC exposed to the outside world. Fortunately, I followed Cypress' recommendations of having a large series resistance to the touch pads, which is supposed to mitigate any ESD frying the touch IC. Normally, adding TVS diodes is a no-brainer for this, but since they add extra capacitance, my fear was that they would negatively effect the touch sensing capabilities.
 
-PHOTO: eurorack-pmod jack to touch IC path with line
-
 Surprisingly, however, I discovered that zapping the touchpads with extremely high voltage (i.e. a bit above the standard), the touch sensors would momentarily stop working. After some investigation, I discovered the zap was actually erasing the NVM (non-volatile memory) in the touch IC, the Tiliqua firmware was then detecting this and reprogramming the NVM.
 
 So: be prepared. Add watchdogs to your code. ESD is no joke.
 
+.. figure:: /_static/devlog_mar25/touch_route.png
+  :width: 400
+
+*Routing of one of the touch pads through a series resistor*
+
 Learning 7: TEM cell vs. real far-field measurements
 ****************************************************
 
-Because all our pre-testing was in a custom-built TEM cell, I found it interesting to compare the spectrum from our "super-cheap" option with the real thing. Here are some example plots from the TEM cell as compared with the true far-field measurements (same hardware and firmware configuration)
+Because all our pre-testing was in a custom-built TEM cell, I found it interesting to compare the spectrum from our "super-cheap" option with the real thing. In general, we noticed the 'real' measurements were about 5-10dB lower in the 300MHz+ region than the TEM cell, but in the 100-200MHz region, the real measurements were about 5-10dB higher than the TEM cell (!). I think the reasons are:
 
-What seems to make the biggest difference here is the long headphone cable, which can't be contained inside the TEM cell.
+- The long headphone cable, which couldn't be contained inside the TEM cell.
+- The Eurorack case is a bit too big for this size of TEM cell. Ideally our chamber would be larger.
+- Imperfections in the TEM cell construction itself.
+
+*(Note: I am not sure if I am allowed to publish the lab measurements here, hence the quantitative description of the differences in plots)*
 
 EMC: Conclusion
 ---------------
 
-So: we passed! Tiliqua R4 is now, to our knowledge, EMC compliant. Although this was a LOT of effort, we are confident that all the changes will result in a more robust instrument that stands the test of time, and doesn't interfere with anything else in your rack!
+Even though our cheap pre-compliance chamber was not so accurate, it allowed us to figure out which parts of the design needed changes early and squashed the need for doing a second visit.
+
+Tiliqua R4 is now, to our knowledge, EMC compliant. Although this was a LOT of effort, we are confident that all the changes will result in a more robust instrument that stands the test of time, and doesn't interfere with anything else in your rack.
 
 Bonus: New Amaranth Cores!
 --------------------------
@@ -299,3 +316,11 @@ Bonus: Crowd Supply & Trade Tariffs
 Obviously everyone in our industry is trying to figure out what to do with the ongoing trade war. For us, our plan was always to launch through CrowdSupply. But with these tariffs, this would imply an undesired price hike. We're currently talking to Crowd Supply to see what our options are here.
 
 If we launch through Crowd Supply, EU customers (and me of course) would have to eat the cost of US tariffs and then potentially any reciprocal tariffs the EU may set up - which makes zero sense as this is a project centered in the EU. I'm currently working hard to figure out what the best path forward is here and will provide an update once I have more information.
+
+Acknowledgements & further reading
+----------------------------------
+
+- Massive thanks to NLnet for supporting this project (:doc:`../foss_funding`).
+- Petteri Aimonen's `open-source TEM cell design  <https://essentialscrap.com/tem_cell/>`_ saved loads of time and worked great.
+- bvernaux' `open-source LISN design <https://github.com/bvernoux/EMC_5uH_LISN>`_ saved lots of time and worked great.
+- Mutable Instruments also has a `nice practical overview <https://pichenettes.github.io/mutable-instruments-documentation/tech_notes/emc_certification_process/>`_ of the steps involved in EMC certification of Eurorack modules.
