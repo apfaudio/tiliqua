@@ -23,9 +23,9 @@ from amaranth.lib.fifo     import SyncFIFO, AsyncFIFO, SyncFIFOBuffered
 
 from luna                import top_level_cli
 from luna.usb2           import (USBDevice,
-                                 USBIsochronousInMemoryEndpoint,
-                                 USBIsochronousOutStreamEndpoint,
-                                 USBIsochronousInStreamEndpoint,
+                                 USBIsochronousInEndpoint,
+                                 USBIsochronousStreamOutEndpoint,
+                                 USBIsochronousStreamInEndpoint,
                                  USBStreamInEndpoint,
                                  USBStreamOutEndpoint)
 
@@ -354,17 +354,17 @@ class USB2AudioInterface(Elaboratable):
             (setup.type == USBRequestType.RESERVED)
         control_ep.add_request_handler(StallOnlyRequestHandler(stall_condition))
 
-        ep1_out = USBIsochronousOutStreamEndpoint(
+        ep1_out = USBIsochronousStreamOutEndpoint(
             endpoint_number=1, # EP 1 OUT
             max_packet_size=self.MAX_PACKET_SIZE)
         usb.add_endpoint(ep1_out)
 
-        ep1_in = USBIsochronousInMemoryEndpoint(
+        ep1_in = USBIsochronousInEndpoint(
             endpoint_number=1, # EP 1 IN
             max_packet_size=4)
         usb.add_endpoint(ep1_in)
 
-        ep2_in = USBIsochronousInStreamEndpoint(
+        ep2_in = USBIsochronousStreamInEndpoint(
             endpoint_number=2, # EP 2 IN
             max_packet_size=self.MAX_PACKET_SIZE)
         usb.add_endpoint(ep2_in)
@@ -388,12 +388,12 @@ class USB2AudioInterface(Elaboratable):
             with m.If(audio_in_frame_bytes_counting):
                 m.d.usb += audio_in_frame_bytes.eq(audio_in_frame_bytes + 1)
 
-            with m.If(ep1_out.stream.first):
+            with m.If(ep1_out.stream.payload.first):
                 m.d.usb += [
                     audio_in_frame_bytes.eq(1),
                     audio_in_frame_bytes_counting.eq(1),
                 ]
-            with m.Elif(ep1_out.stream.last):
+            with m.Elif(ep1_out.stream.payload.last):
                 m.d.usb += audio_in_frame_bytes_counting.eq(0)
 
         # Connect our device as a high speed device
@@ -476,11 +476,10 @@ class USB2AudioInterface(Elaboratable):
 
         usb_audio_in_active = detect_active_audio_in(m, "usb", usb, ep2_in)
 
-        m.d.comb += [
-            # Wire USB <-> stream synchronizers
-            usb_to_channel_stream.usb_stream_in.stream_eq(ep1_out.stream),
-            ep2_in.stream.stream_eq(channels_to_usb_stream.usb_stream_out),
+        wiring.connect(m, wiring.flipped(usb_to_channel_stream.usb_stream_in), ep1_out.stream)
+        wiring.connect(m,  wiring.flipped(ep2_in.stream), channels_to_usb_stream.usb_stream_out)
 
+        m.d.comb += [
             channels_to_usb_stream.no_channels_in.eq(self.NR_CHANNELS),
             channels_to_usb_stream.data_requested_in.eq(ep2_in.data_requested),
             channels_to_usb_stream.frame_finished_in.eq(ep2_in.frame_finished),
@@ -585,14 +584,14 @@ class USB2AudioInterface(Elaboratable):
                 #usb_to_channel_stream.channel_stream_out.valid,
                 #usb_to_channel_stream.garbage_seen_out,
 
-                # interface from IsochronousOutStreamEndpoint
+                # interface from IsochronousStreamOutEndpoint
                 #usb_to_channel_stream.usb_stream_in.first,
                 #usb_to_channel_stream.usb_stream_in.valid,
                 #usb_to_channel_stream.usb_stream_in.payload,
                 #usb_to_channel_stream.usb_stream_in.last,
                 #usb_to_channel_stream.usb_stream_in.ready,
 
-                # interface to IsochronousOutStreamEndpoint
+                # interface to IsochronousStreamOutEndpoint
                 #ep1_out.interface.rx.next,
                 #ep1_out.interface.rx.valid,
                 #ep1_out.interface.rx.payload,
