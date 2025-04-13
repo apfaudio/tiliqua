@@ -13,7 +13,7 @@ from amaranth.utils        import exact_log2
 from amaranth_future       import fixed
 from amaranth_soc          import wishbone
 
-from vendor.soc.cores      import sram
+from luna_soc.gateware.core import blockram
 
 from tiliqua.eurorack_pmod import ASQ
 from tiliqua.cache         import WishboneL2Cache
@@ -185,7 +185,8 @@ class DelayLine(wiring.Component):
         # DelayLine) and read transactions (from children DelayLineTap)
         self._arbiter = wishbone.Arbiter(addr_width=self.address_width,
                                          data_width=data_width,
-                                         granularity=granularity)
+                                         granularity=granularity,
+                                         features={'bte', 'cti'} if not psram_backed else {})
         self._arbiter.add(self.internal_writer_bus)
 
         # internal signal between DelayLine and DelayLineTap
@@ -287,7 +288,7 @@ class DelayLine(wiring.Component):
             # Local SRAM-backed delay line. No need for adapters or caches.
             sram_size = self.max_delay * (self._arbiter.bus.data_width //
                                           self._arbiter.bus.granularity)
-            m.submodules.sram = sram_peripheral = sram.Peripheral(
+            m.submodules.sram = sram_peripheral = blockram.Peripheral(
                 size=sram_size, data_width=self._arbiter.bus.data_width,
                 granularity=self._arbiter.bus.granularity
             )
