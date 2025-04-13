@@ -105,8 +105,8 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let psram_ptr = PSRAM_BASE as *mut u32;
     let psram_sz_test = 1024;
 
-    timer.enable();
     timer.set_timeout_ticks(0xFFFFFFFF);
+    timer.enable();
 
     let start = timer.counter();
 
@@ -144,6 +144,7 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
         write!(s, "PASS: PSRAM memtest\r\n").ok();
     }
 
+    log::info!( "{} {}", start, endwrite);
     write!(s, "  write {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / write_ticks as u64).ok();
     write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / (read_ticks as u64)).ok();
 }
