@@ -138,7 +138,9 @@ macro_rules! impl_timer {
                 pub fn enable_tick_isr(&mut self, period_ms: u32, isr: pac::Interrupt) {
                     use core::time::Duration;
                     use tiliqua_hal::timer::Event;
+                    self.disable();
                     self.listen(Event::TimeOut);
+                    self.set_mode($crate::timer::Mode::Periodic);
                     self.set_timeout(Duration::from_millis(period_ms.into()));
                     self.enable();
                     unsafe {
