@@ -1,0 +1,276 @@
+sbt "Test/runMain vexiiriscv.Generate --xlen=32 --with-rvm --lsu-l1 --lsu-wishbone --lsu-l1-wishbone --fetch-l1 --fetch-wishbone --reset-vector 0x20200000 --region base=00000000,size=80000000,main=1,exe=1 --region base=F0000000,size=10000,main=0,exe=0 --with-btb --with-gshare --with-ras --regfile-async --with-aligner-buffer --with-dispatcher-buffer --with-late-alu --lsu-l1-ways=2 --fetch-l1-ways=2"
+
+[INFO] fps 33.4
+
+ sbt "Test/runMain vexiiriscv.Generate --xlen=32 --with-rvm --lsu-l1 --lsu-wishbone --lsu-l1-wishbone --fetch-l1 --fetch-wishbone --reset-vector 0x20200000 --region base=00000000,size=80000000,main=1,exe=1 --region base=F0000000,size=10000,main=0,exe=0 --with-btb --with-gshare --with-ras --regfile-async"
+
+Info: Device utilisation:
+Info:             TRELLIS_IO:      44/    197    22%
+Info:                   DCCA:       4/     56     7%
+Info:                 DP16KD:      22/     56    39%
+Info:             MULT18X18D:       5/     28    17%
+Info:                 ALU54B:       0/     14     0%
+Info:                EHXPLLL:       2/      2   100%
+Info:                EXTREFB:       0/      1     0%
+Info:                   DCUA:       0/      1     0%
+Info:              PCSCLKDIV:       0/      2     0%
+Info:                IOLOGIC:      12/    128     9%
+Info:               SIOLOGIC:       2/     69     2%
+Info:                    GSR:       0/      1     0%
+Info:                  JTAGG:       0/      1     0%
+Info:                   OSCG:       0/      1     0%
+Info:                  SEDGA:       0/      1     0%
+Info:                    DTR:       1/      1   100%
+Info:                USRMCLK:       1/      1   100%
+Info:                CLKDIVF:       0/      4     0%
+Info:              ECLKSYNCB:       0/     10     0%
+Info:                DLLDELD:       0/      8     0%
+Info:                 DDRDLL:       1/      4    25%
+Info:                DQSBUFM:       1/      8    12%
+Info:        TRELLIS_ECLKBUF:       1/      8    12%
+Info:           ECLKBRIDGECS:       0/      2     0%
+Info:                   DCSC:       0/      2     0%
+Info:             TRELLIS_FF:    5473/  24288    22%
+Info:           TRELLIS_COMB:   10488/  24288    43%
+Info:           TRELLIS_RAMW:     184/   3036     6%
+
+[INFO] fps 15.6
+
+sbt "Test/runMain vexiiriscv.Generate --xlen=32 --with-rvm --lsu-l1 --lsu-wishbone --lsu-l1-wishbone --fetch-l1 --fetch-wishbone --reset-vector 0x20200000 --region base=00000000,size=80000000,main=1,exe=1 --region base=F0000000,size=10000,main=0,exe=0 --with-btb --with-gshare --with-ras --regfile-async --with-aligner-buffer --with-dispatcher-buffer --with-late-alu"
+
+Info: Device utilisation:
+Info: 	          TRELLIS_IO:      44/    197    22%
+Info: 	                DCCA:       4/     56     7%
+Info: 	              DP16KD:      22/     56    39%
+Info: 	          MULT18X18D:       5/     28    17%
+Info: 	              ALU54B:       0/     14     0%
+Info: 	             EHXPLLL:       2/      2   100%
+Info: 	             EXTREFB:       0/      1     0%
+Info: 	                DCUA:       0/      1     0%
+Info: 	           PCSCLKDIV:       0/      2     0%
+Info: 	             IOLOGIC:      12/    128     9%
+Info: 	            SIOLOGIC:       2/     69     2%
+Info: 	                 GSR:       0/      1     0%
+Info: 	               JTAGG:       0/      1     0%
+Info: 	                OSCG:       0/      1     0%
+Info: 	               SEDGA:       0/      1     0%
+Info: 	                 DTR:       1/      1   100%
+Info: 	             USRMCLK:       1/      1   100%
+Info: 	             CLKDIVF:       0/      4     0%
+Info: 	           ECLKSYNCB:       0/     10     0%
+Info: 	             DLLDELD:       0/      8     0%
+Info: 	              DDRDLL:       1/      4    25%
+Info: 	             DQSBUFM:       1/      8    12%
+Info: 	     TRELLIS_ECLKBUF:       1/      8    12%
+Info: 	        ECLKBRIDGECS:       0/      2     0%
+Info: 	                DCSC:       0/      2     0%
+Info: 	          TRELLIS_FF:    5932/  24288    24%
+Info: 	        TRELLIS_COMB:   12044/  24288    49%
+Info: 	        TRELLIS_RAMW:     184/   3036     6%
+
+[INFO] fps 25.8
+
+sbt "Test/runMain vexiiriscv.Generate --xlen=32 --with-rvm --lsu-l1 --lsu-wishbone --lsu-l1-wishbone --fetch-l1 --fetch-wishbone --reset-vector 0x20200000 --region base=00000000,size=80000000,main=1,exe=1 --region base=F0000000,size=10000,main=0,exe=0 --with-btb --with-late-alu"
+
+Info: Device utilisation:
+Info: 	          TRELLIS_IO:      44/    197    22%
+Info: 	                DCCA:       4/     56     7%
+Info: 	              DP16KD:      20/     56    35%
+Info: 	          MULT18X18D:       5/     28    17%
+Info: 	              ALU54B:       0/     14     0%
+Info: 	             EHXPLLL:       2/      2   100%
+Info: 	             EXTREFB:       0/      1     0%
+Info: 	                DCUA:       0/      1     0%
+Info: 	           PCSCLKDIV:       0/      2     0%
+Info: 	             IOLOGIC:      12/    128     9%
+Info: 	            SIOLOGIC:       2/     69     2%
+Info: 	                 GSR:       0/      1     0%
+Info: 	               JTAGG:       0/      1     0%
+Info: 	                OSCG:       0/      1     0%
+Info: 	               SEDGA:       0/      1     0%
+Info: 	                 DTR:       1/      1   100%
+Info: 	             USRMCLK:       1/      1   100%
+Info: 	             CLKDIVF:       0/      4     0%
+Info: 	           ECLKSYNCB:       0/     10     0%
+Info: 	             DLLDELD:       0/      8     0%
+Info: 	              DDRDLL:       1/      4    25%
+Info: 	             DQSBUFM:       1/      8    12%
+Info: 	     TRELLIS_ECLKBUF:       1/      8    12%
+Info: 	        ECLKBRIDGECS:       0/      2     0%
+Info: 	                DCSC:       0/      2     0%
+Info: 	          TRELLIS_FF:    5824/  24288    23%
+Info: 	        TRELLIS_COMB:   11630/  24288    47%
+Info: 	        TRELLIS_RAMW:     176/   3036     5%
+
+[INFO] fps 24.2
+
+sbt "Test/runMain vexiiriscv.Generate --xlen=32 --with-rvm --lsu-l1 --lsu-wishbone --lsu-l1-wishbone --fetch-l1 --fetch-wishbone --reset-vector 0x20200000 --region base=0,size=4000,main=1,exe=0 --region base=10000000,size=1000000,main=1,exe=1 --region base=20000000,size=1000000,main=1,exe=1 --region base=F0000000,size=10000,main=0,exe=0 --with-btb --with-late-alu --lsu-hardware-prefetch rpt"
+
+Info: Device utilisation:
+Info: 	          TRELLIS_IO:      44/    197    22%
+Info: 	                DCCA:       4/     56     7%
+Info: 	              DP16KD:      22/     56    39%
+Info: 	          MULT18X18D:       6/     28    21%
+Info: 	              ALU54B:       0/     14     0%
+Info: 	             EHXPLLL:       2/      2   100%
+Info: 	             EXTREFB:       0/      1     0%
+Info: 	                DCUA:       0/      1     0%
+Info: 	           PCSCLKDIV:       0/      2     0%
+Info: 	             IOLOGIC:      12/    128     9%
+Info: 	            SIOLOGIC:       2/     69     2%
+Info: 	                 GSR:       0/      1     0%
+Info: 	               JTAGG:       0/      1     0%
+Info: 	                OSCG:       0/      1     0%
+Info: 	               SEDGA:       0/      1     0%
+Info: 	                 DTR:       1/      1   100%
+Info: 	             USRMCLK:       1/      1   100%
+Info: 	             CLKDIVF:       0/      4     0%
+Info: 	           ECLKSYNCB:       0/     10     0%
+Info: 	             DLLDELD:       0/      8     0%
+Info: 	              DDRDLL:       1/      4    25%
+Info: 	             DQSBUFM:       1/      8    12%
+Info: 	     TRELLIS_ECLKBUF:       1/      8    12%
+Info: 	        ECLKBRIDGECS:       0/      2     0%
+Info: 	                DCSC:       0/      2     0%
+Info: 	          TRELLIS_FF:    6190/  24288    25%
+Info: 	        TRELLIS_COMB:   12151/  24288    50%
+Info: 	        TRELLIS_RAMW:     189/   3036     6%
+
+[INFO] fps 24
+
+sbt "Test/runMain vexiiriscv.Generate --xlen=32 --with-rvm --lsu-l1 --lsu-wishbone --lsu-l1-wishbone --fetch-l1 --fetch-wishbone --reset-vector 0x20200000 --region base=0,size=4000,main=1,exe=0 --region base=10000000,size=1000000,main=1,exe=1 --region base=20000000,size=1000000,main=1,exe=1 --region base=F0000000,size=10000,main=0,exe=0 --with-btb --with-late-alu --lsu-hardware-prefetch rpt --lsu-l1-refill-count=4 --lsu-l1-writeback-count=4 --lsu-l1-ways=4 --fetch-l1-ways=4" 
+
+Info: Device utilisation:
+Info: 	          TRELLIS_IO:      44/    197    22%
+Info: 	                DCCA:       4/     56     7%
+Info: 	              DP16KD:      41/     56    73%
+Info: 	          MULT18X18D:       6/     28    21%
+Info: 	              ALU54B:       0/     14     0%
+Info: 	             EHXPLLL:       2/      2   100%
+Info: 	             EXTREFB:       0/      1     0%
+Info: 	                DCUA:       0/      1     0%
+Info: 	           PCSCLKDIV:       0/      2     0%
+Info: 	             IOLOGIC:      12/    128     9%
+Info: 	            SIOLOGIC:       2/     69     2%
+Info: 	                 GSR:       0/      1     0%
+Info: 	               JTAGG:       0/      1     0%
+Info: 	                OSCG:       0/      1     0%
+Info: 	               SEDGA:       0/      1     0%
+Info: 	                 DTR:       1/      1   100%
+Info: 	             USRMCLK:       1/      1   100%
+Info: 	             CLKDIVF:       0/      4     0%
+Info: 	           ECLKSYNCB:       0/     10     0%
+Info: 	             DLLDELD:       0/      8     0%
+Info: 	              DDRDLL:       1/      4    25%
+Info: 	             DQSBUFM:       1/      8    12%
+Info: 	     TRELLIS_ECLKBUF:       1/      8    12%
+Info: 	        ECLKBRIDGECS:       0/      2     0%
+Info: 	                DCSC:       0/      2     0%
+Info: 	          TRELLIS_FF:    7072/  24288    29%
+Info: 	        TRELLIS_COMB:   14924/  24288    61%
+Info: 	        TRELLIS_RAMW:     333/   3036    10%
+
+[INFO] STARTUP REPORT: PASS: PSRAM memtest
+  write 10640 KByte/sec
+  read 7181 KByte/sec
+[INFO] fps 32
+
+sbt "Test/runMain vexiiriscv.Generate --xlen=32 --with-rvm --lsu-l1 --lsu-wishbone --lsu-l1-wishbone --fetch-l1 --fetch-wishbone --reset-vector 0x20200000 --region base=0,size=4000,main=1,exe=0 --region base=10000000,size=1000000,main=1,exe=1 --region base=20000000,size=1000000,main=1,exe=1 --region base=F0000000,size=10000,main=0,exe=0 --with-btb --with-late-alu --lsu-hardware-prefetch rpt --lsu-l1-refill-count=4 --lsu-l1-writeback-count=4 --lsu-l1-ways=4 --fetch-l1-ways=4 --with-gshare --with-ras --regfile-async --with-aligner-buffer --with-dispatcher-buffer"
+
+Info: Device utilisation:
+Info: 	          TRELLIS_IO:      44/    197    22%
+Info: 	                DCCA:       4/     56     7%
+Info: 	              DP16KD:      43/     56    76%
+Info: 	          MULT18X18D:       6/     28    21%
+Info: 	              ALU54B:       0/     14     0%
+Info: 	             EHXPLLL:       2/      2   100%
+Info: 	             EXTREFB:       0/      1     0%
+Info: 	                DCUA:       0/      1     0%
+Info: 	           PCSCLKDIV:       0/      2     0%
+Info: 	             IOLOGIC:      12/    128     9%
+Info: 	            SIOLOGIC:       2/     69     2%
+Info: 	                 GSR:       0/      1     0%
+Info: 	               JTAGG:       0/      1     0%
+Info: 	                OSCG:       0/      1     0%
+Info: 	               SEDGA:       0/      1     0%
+Info: 	                 DTR:       1/      1   100%
+Info: 	             USRMCLK:       1/      1   100%
+Info: 	             CLKDIVF:       0/      4     0%
+Info: 	           ECLKSYNCB:       0/     10     0%
+Info: 	             DLLDELD:       0/      8     0%
+Info: 	              DDRDLL:       1/      4    25%
+Info: 	             DQSBUFM:       1/      8    12%
+Info: 	     TRELLIS_ECLKBUF:       1/      8    12%
+Info: 	        ECLKBRIDGECS:       0/      2     0%
+Info: 	                DCSC:       0/      2     0%
+Info: 	          TRELLIS_FF:    7178/  24288    29%
+Info: 	        TRELLIS_COMB:   15245/  24288    62%
+Info: 	        TRELLIS_RAMW:     341/   3036    11%
+
+[INFO] fps 35
+
+monster macro_osc
+
+ sbt "Test/runMain vexiiriscv.Generate --xlen=32 --with-rvc --with-rva --with-rvf --fma-reduced-accuracy --fpu-ignore-subnormal --with-rvm --lsu-l1 --lsu-wishbone --lsu-l1-wishbone --fetch-l1 --fetch-wishbone --reset-vector 0x20200000 --region base=0,size=10000,main=1,exe=0 --region base=10000000,size=1000000,main=1,exe=1 --region base=20000000,size=1000000,main=1,exe=1 --region base=F0000000,size=10000,main=0,exe=0 --with-btb --with-late-alu --lsu-hardware-prefetch rpt --lsu-l1-refill-count=4 --lsu-l1-writeback-count=4 --lsu-l1-ways=4 --fetch-l1-ways=4 --with-gshare --with-ras --regfile-async --with-aligner-buffer --with-dispatcher-buffer"
+
+4 ways doesn't fit
+
+sbt "Test/runMain vexiiriscv.Generate --xlen=32 --with-rvc --with-rva --with-rvf --fma-reduced-accuracy --fpu-ignore-subnormal --with-rvm --lsu-l1 --lsu-wishbone --lsu-l1-wishbone --fetch-l1 --fetch-wishbone --reset-vector 0x20200000 --region base=0,size=10000,main=1,exe=0 --region base=10000000,size=1000000,main=1,exe=1 --region base=20000000,size=1000000,main=1,exe=1 --region base=F0000000,size=10000,main=0,exe=0 --with-btb --with-late-alu --lsu-hardware-prefetch rpt --lsu-l1-refill-count=2 --lsu-l1-writeback-count=2 --lsu-l1-ways=2 --fetch-l1-ways=2 --with-gshare --with-ras --regfile-async --with-aligner-buffer --with-dispatcher-buffer"
+
+
+Info: Device utilisation:
+Info: 	          TRELLIS_IO:      44/    197    22%
+Info: 	                DCCA:       4/     56     7%
+Info: 	              DP16KD:      56/     56   100%
+Info: 	          MULT18X18D:      16/     28    57%
+Info: 	              ALU54B:       0/     14     0%
+Info: 	             EHXPLLL:       2/      2   100%
+Info: 	             EXTREFB:       0/      1     0%
+Info: 	                DCUA:       0/      1     0%
+Info: 	           PCSCLKDIV:       0/      2     0%
+Info: 	             IOLOGIC:      12/    128     9%
+Info: 	            SIOLOGIC:       2/     69     2%
+Info: 	                 GSR:       0/      1     0%
+Info: 	               JTAGG:       0/      1     0%
+Info: 	                OSCG:       0/      1     0%
+Info: 	               SEDGA:       0/      1     0%
+Info: 	                 DTR:       1/      1   100%
+Info: 	             USRMCLK:       1/      1   100%
+Info: 	             CLKDIVF:       0/      4     0%
+Info: 	           ECLKSYNCB:       0/     10     0%
+Info: 	             DLLDELD:       0/      8     0%
+Info: 	              DDRDLL:       1/      4    25%
+Info: 	             DQSBUFM:       1/      8    12%
+Info: 	     TRELLIS_ECLKBUF:       1/      8    12%
+Info: 	        ECLKBRIDGECS:       0/      2     0%
+Info: 	                DCSC:       0/      2     0%
+Info: 	          TRELLIS_FF:    9504/  24288    39%
+Info: 	        TRELLIS_COMB:   21300/  24288    87%
+Info: 	        TRELLIS_RAMW:     330/   3036    10%
+
+[INFO] Hello from Tiliqua MACRO-OSCILLATOR!
+[INFO] heap usage 39 KiB
+[INFO] engine 0 speed 51006 samples/sec
+[INFO] engine 1 speed 40490 samples/sec
+[INFO] engine 2 speed 43982 samples/sec
+[INFO] engine 3 speed 47168 samples/sec
+[INFO] engine 4 speed 48104 samples/sec
+[INFO] engine 5 speed 42088 samples/sec
+[INFO] engine 6 speed 95196 samples/sec
+[INFO] engine 7 speed 64515 samples/sec
+[INFO] engine 8 speed 66586 samples/sec
+[INFO] engine 9 speed 51024 samples/sec
+[INFO] engine 10 speed 30562 samples/sec
+[INFO] engine 11 speed 34100 samples/sec
+[INFO] engine 12 speed 66981 samples/sec
+[INFO] engine 13 speed 198138 samples/sec
+[INFO] engine 14 speed 63856 samples/sec
+[INFO] engine 15 speed 45457 samples/sec
+[INFO] engine 16 speed 65981 samples/sec
+[INFO] engine 17 speed 30889 samples/sec
+[INFO] engine 18 speed 67272 samples/sec
+[INFO] engine 19 speed 47352 samples/sec
+[INFO] engine 20 speed 61169 samples/sec
+[INFO] engine 21 speed 61255 samples/sec
+[INFO] engine 22 speed 61269 samples/sec
+[INFO] engine 23 speed 61258 samples/sec

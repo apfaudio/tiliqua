@@ -45,6 +45,13 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         let mut app = app.borrow_ref_mut(cs);
 
+        app.elapsed_ms += TIMER0_ISR_PERIOD_MS;
+
+        if app.elapsed_ms % 5000u32 == 0 {
+            info!("fps {}", app.frames as f32 / 5f32);
+            app.frames = 0;
+        }
+
         //
         // Update UI and options
         //
@@ -115,8 +122,6 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
             psram_ptr.offset(i as isize).write_volatile(i as u32);
         }
     }
-
-    pac::cpu::vexriscv::flush_dcache();
 
     let endwrite = timer.counter();
 
@@ -296,6 +301,8 @@ fn print_die_temperature(s: &mut ReportString, dtr: &pac::DTR0)
 
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    elapsed_ms: u32,
+    frames: u32,
 }
 
 impl App {
@@ -308,6 +315,8 @@ impl App {
         Self {
             ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
                             encoder, pca9635, pmod),
+            frames: 0u32,
+            elapsed_ms: 0u32,
         }
     }
 }
@@ -366,7 +375,7 @@ fn main() -> ! {
     };
 
     palette::ColorPalette::default().write_to_hardware(&mut video);
-    video.set_persist(512);
+    video.set_persist(128);
 
     let mut opts = Opts::default();
 
@@ -394,6 +403,7 @@ fn main() -> ! {
         loop {
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
+                app.frames += 1;
                 // Single-shot commit: when 'write' is selected and the encoder
                 // is turned, write once and change the enum back.
                 let mut commit_to_eeprom = false;
