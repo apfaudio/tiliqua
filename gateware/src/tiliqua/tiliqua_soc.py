@@ -231,9 +231,6 @@ class TiliquaSoc(Component):
         self.uart0 = uart.Peripheral(divisor=divisor)
         self.csr_decoder.add(self.uart0.bus, addr=self.uart0_base, name="uart0")
 
-        # FIXME: timer events / isrs currently not implemented, adding the event
-        # bus to the csr decoder segfaults yosys somehow ...
-
         # timer0
         self.timer0 = timer.Peripheral(width=32)
         self.csr_decoder.add(self.timer0.bus, addr=self.timer0_base, name="timer0")
@@ -249,7 +246,7 @@ class TiliquaSoc(Component):
         # psram peripheral
         self.psram_periph = psram_peripheral.Peripheral(size=self.psram_size)
         self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base,
-                            name="psram_xip" if fw_location == FirmwareLocation.PSRAM else "psram")
+                            name="psram")
 
         # video PHY (DMAs from PSRAM starting at self.psram_base)
         self.fb = dma_framebuffer.DMAFramebuffer(
