@@ -48,11 +48,10 @@ from amaranth.lib.wiring                         import Component, In, Out, flip
 from amaranth_soc                                import csr, gpio, wishbone
 from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
 
-from vendor.soc.cores                            import sram, timer, uart, spiflash
-from vendor.soc.cpu                              import InterruptController, VexRiscv
-from vendor.soc                                  import readbin
-from vendor.soc.generate                         import GenerateSVD
-
+from luna_soc.gateware.core                      import blockram, timer, uart, spiflash
+from luna_soc.gateware.cpu                       import InterruptController, VexRiscv
+from luna_soc.util                               import readbin
+from luna_soc.generate                           import introspect, svd
 
 from tiliqua.tiliqua_platform                    import *
 from tiliqua.raster                              import Persistance
@@ -138,7 +137,7 @@ class VideoPeripheral(wiring.Component):
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, default_modeline, ui_name, ui_sha, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
-                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im"):
+                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="cynthion"):
 
         super().__init__({})
 
@@ -217,7 +216,7 @@ class TiliquaSoc(Component):
         )
 
         # mainram
-        self.mainram = sram.Peripheral(size=self.mainram_size)
+        self.mainram = blockram.Peripheral(size=self.mainram_size)
         self.wb_decoder.add(self.mainram.bus, addr=self.mainram_base, name="mainram")
 
         # csr decoder
@@ -428,7 +427,10 @@ class TiliquaSoc(Component):
         """Generate top-level SVD."""
         print("Generating SVD ...", dst_svd)
         with open(dst_svd, "w") as f:
-            GenerateSVD(self).generate(file=f)
+            soc = introspect.soc(self)
+            memory_map = introspect.memory_map(soc)
+            interrupts = introspect.interrupts(soc)
+            svd.SVD(memory_map, interrupts).generate(file=f)
         print("Wrote SVD ...", dst_svd)
 
     def genmem(self, dst_mem):
