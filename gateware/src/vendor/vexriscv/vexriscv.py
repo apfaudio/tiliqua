@@ -74,23 +74,9 @@ class VexRiscv(Component):
             logging.info(f"reading verilog file: {self._source_path}")
             self._source_verilog = f.read()
 
-    #@property
-    #def reset_addr(self):
-    #    return self._reset_addr
-
-    #@property
-    #def muldiv(self):
-    #    return "hard" # "hard" if self._cpu.with_muldiv else "soft"
-
-    #@property
-    #def constant_map(self):
-    #    return ConstantMap(
-    #        VEXRISCV          = True,
-    #        RESET_ADDR        = self._reset_addr,
-    #        ARCH_RISCV        = True,
-    #        RISCV_MULDIV_SOFT = self.muldiv == "soft",
-    #        BYTEORDER_LITTLE  = True,
-    #    )
+    @property
+    def reset_addr(self):
+        return self._reset_addr
 
     def elaborate(self, platform):
         m = Module()

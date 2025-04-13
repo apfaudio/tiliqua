@@ -52,7 +52,7 @@ from luna_soc.gateware.core                      import blockram, timer, uart, s
 from luna_soc.gateware.cpu                       import InterruptController
 from luna_soc.gateware.provider.cynthion         import UARTProvider
 from luna_soc.util                               import readbin
-from luna_soc.generate                           import introspect, svd
+from luna_soc.generate                           import rust, introspect, svd
 
 from vendor.vexriscv                             import VexRiscv
 
@@ -220,7 +220,7 @@ class TiliquaSoc(Component):
 
         # mainram
         self.mainram = blockram.Peripheral(size=self.mainram_size)
-        self.wb_decoder.add(self.mainram.bus, addr=self.mainram_base, name="mainram")
+        self.wb_decoder.add(self.mainram.bus, addr=self.mainram_base, name="blockram")
 
         # csr decoder
         self.csr_decoder = csr.Decoder(addr_width=28, data_width=8)
@@ -248,7 +248,8 @@ class TiliquaSoc(Component):
 
         # psram peripheral
         self.psram_periph = psram_peripheral.Peripheral(size=self.psram_size)
-        self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base, name="psram")
+        self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base,
+                            name="psram_xip" if fw_location == FirmwareLocation.PSRAM else "psram")
 
         # video PHY (DMAs from PSRAM starting at self.psram_base)
         self.fb = dma_framebuffer.DMAFramebuffer(
@@ -439,44 +440,11 @@ class TiliquaSoc(Component):
     def genmem(self, dst_mem):
         """Generate linker regions for Rust (memory.x)."""
         print("Generating (rust) memory.x ...", dst_mem)
-        if self.fw_location == FirmwareLocation.BRAM:
-            # .text, .rodata in shared block RAM region
-            memory_x = (
-                "MEMORY {{\n"
-                "    mainram : ORIGIN = {mainram_base}, LENGTH = {mainram_size}\n"
-                "}}\n"
-                "REGION_ALIAS(\"REGION_TEXT\", mainram);\n"
-                "REGION_ALIAS(\"REGION_RODATA\", mainram);\n"
-                "REGION_ALIAS(\"REGION_DATA\", mainram);\n"
-                "REGION_ALIAS(\"REGION_BSS\", mainram);\n"
-                "REGION_ALIAS(\"REGION_HEAP\", mainram);\n"
-                "REGION_ALIAS(\"REGION_STACK\", mainram);\n"
-            )
-            with open(dst_mem, "w") as f:
-                f.write(memory_x.format(mainram_base=hex(self.mainram_base),
-                                        mainram_size=hex(self.mainram.size),
-                                        ))
-        else:
-            # .text, .rodata stored elsewhere (SPI flash or PSRAM)
-            memory_x = (
-                "MEMORY {{\n"
-                "    mainram : ORIGIN = {mainram_base}, LENGTH = {mainram_size}\n"
-                "    {text_region} : ORIGIN = {spiflash_base}, LENGTH = {spiflash_size}\n"
-                "}}\n"
-                "REGION_ALIAS(\"REGION_TEXT\", {text_region});\n"
-                "REGION_ALIAS(\"REGION_RODATA\", {text_region});\n"
-                "REGION_ALIAS(\"REGION_DATA\", mainram);\n"
-                "REGION_ALIAS(\"REGION_BSS\", mainram);\n"
-                "REGION_ALIAS(\"REGION_HEAP\", mainram);\n"
-                "REGION_ALIAS(\"REGION_STACK\", mainram);\n"
-            )
-            with open(dst_mem, "w") as f:
-                f.write(memory_x.format(mainram_base=hex(self.mainram_base),
-                                        mainram_size=hex(self.mainram.size),
-                                        spiflash_base=hex(self.fw_base),
-                                        spiflash_size=hex(self.fw_max_size),
-                                        text_region=self.fw_location.value,
-                                        ))
+        with open(dst_mem, "w") as f:
+            soc        = introspect.soc(self)
+            memory_map = introspect.memory_map(soc)
+            reset_addr = introspect.reset_addr(soc)
+            rust.LinkerScript(memory_map, reset_addr).generate(file=f)
 
     def genconst(self, dst):
         """Generate some high-level constants used by application code."""
