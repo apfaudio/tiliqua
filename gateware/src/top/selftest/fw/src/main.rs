@@ -294,6 +294,58 @@ fn print_die_temperature(s: &mut ReportString, dtr: &pac::DTR0)
            code_to_celsius[code as usize]).ok();
 }
 
+fn read_flash_uuid(spi0: &pac::SPIFLASH_CTRL) {
+    spi0.phy().write(
+        |w| unsafe {
+            w.length().bits(8);
+            w.width().bits(1);
+            w.mask().bits(1)
+        });
+
+    spi0.cs().write(|w| w.select().bit(false));
+
+    let mut timeout = 0;
+    while !spi0.status().read().tx_ready().bit() {
+        if timeout > 1000 {
+            error!("spi0: read().tx_ready() timeout");
+            return;
+        }
+        timeout += 1
+    }
+
+    let command: [u8; 13] = [0x4b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for byte in command {
+        spi0.data().write(|w| unsafe { w.tx().bits(byte as u32) });
+    }
+
+    timeout = 0;
+    while !spi0.status().read().rx_ready().bit() {
+        if timeout > 1000 {
+            error!("spi0: read().rx_ready() timeout");
+            return;
+        }
+        timeout += 1
+    }
+
+    let mut response = [0_u8; 32];
+    let mut n = 0;
+    while spi0.status().read().rx_ready().bit() {
+        response[n] = spi0.data().read().rx().bits() as u8;
+        n = n + 1;
+        if n >= response.len() {
+            error!("read overflow");
+            return;
+        }
+    }
+
+    if n != 13 {
+        error!("invalid response length: {} - {:02x?}", n, &response[..n]);
+        return;
+    }
+
+    info!("flash uuid: {:02x?}", &response[5..n]);
+}
+
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
@@ -352,6 +404,7 @@ fn main() -> ! {
     let dtr = peripherals.DTR0;
 
     let mut startup_report = ReportString::new();
+    read_flash_uuid(&peripherals.SPIFLASH_CTRL);
     psram_memtest(&mut startup_report, &mut timer);
     spiflash_memtest(&mut startup_report, &mut timer);
     tusb322i_id_test(&mut startup_report, &mut i2cdev);
