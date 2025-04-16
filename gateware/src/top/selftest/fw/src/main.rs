@@ -313,7 +313,7 @@ fn read_flash_uuid(spi0: &pac::SPIFLASH_CTRL) {
         timeout += 1
     }
 
-    let command: [u8; 13] = [0x4b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let command: [u8; 13] = [0x90, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     for byte in command {
         spi0.data().write(|w| unsafe { w.tx().bits(byte as u32) });
     }
