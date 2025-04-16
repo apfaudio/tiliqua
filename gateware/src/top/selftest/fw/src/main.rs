@@ -327,10 +327,10 @@ fn read_flash_uuid(spi0: &pac::SPIFLASH_CTRL) {
         timeout += 1
     }
 
-    let mut response = [0_u8; 32];
+    let mut response = [0_u32; 32];
     let mut n = 0;
     while spi0.status().read().rx_ready().bit() {
-        response[n] = spi0.data().read().rx().bits() as u8;
+        response[n] = spi0.data().read().rx().bits();
         n = n + 1;
         if n >= response.len() {
             error!("read overflow");
@@ -343,7 +343,7 @@ fn read_flash_uuid(spi0: &pac::SPIFLASH_CTRL) {
         return;
     }
 
-    info!("flash uuid: {:02x?}", &response[5..n]);
+    info!("flash uuid: {:02x?}", &response);
 }
 
 struct App {

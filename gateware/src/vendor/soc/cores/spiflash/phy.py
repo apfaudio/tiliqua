@@ -101,6 +101,7 @@ class SPIPHYController(wiring.Component):
         else:
             m.d.comb += cs_enable.eq(self.ctrl.cs)
 
+
         # I/Os.
         dq_o  = Signal.like(pads.dq.o)
         dq_i  = Signal.like(pads.dq.i)
@@ -114,6 +115,8 @@ class SPIPHYController(wiring.Component):
         ]
         if hasattr(pads.cs, 'oe'):
             m.d.comb += pads.cs.oe.eq(1)
+
+        m.d.comb += pads.dq.i.eq(0xf)
 
         # Data Shift Registers.
         sr_cnt       = Signal(8, reset_less=True)
