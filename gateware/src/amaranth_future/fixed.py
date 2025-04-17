@@ -11,8 +11,12 @@ class Shape(hdl.ShapeCastable):
     def __init__(self, shape, f_bits=0):
         self._storage_shape = shape
         self.i_bits, self.f_bits = shape.width-f_bits, f_bits
-        if shape.signed:
-            assert self.i_bits > 0
+        if self.i_bits < 0 or self.f_bits < 0:
+            raise TypeError(f"fixed.Shape may not be created with negative bit widths (i_bits={self.i_bits}, f_bits={self.f_bits})")
+        if shape.signed and self.i_bits == 0:
+            raise TypeError(f"A signed fixed.Shape cannot be created with i_bits=0")
+        if self.i_bits + self.f_bits == 0:
+            raise TypeError(f"fixed.Shape may not be created with zero width")
 
     @property
     def signed(self):
@@ -317,7 +321,6 @@ class Const(Value):
         self._value = value
 
     def _max_value(self):
-
         return 2**(self._shape.i_bits +
                    self._shape.f_bits - (1 if self.signed else 0)) - 1
 
@@ -336,10 +339,6 @@ class Const(Value):
         return self._value, 2**self.f_bits
 
     def as_float(self):
-        if self._value > self._max_value():
-            v = self._min_value() + self._value - self._max_value()
-        else:
-            v = self._value
-        return v / 2**self.f_bits
+        return self._value / 2**self.f_bits
 
     # TODO: Operators on constants
