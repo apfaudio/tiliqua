@@ -130,6 +130,14 @@ class Value(hdl.ValueCastable):
         else:
             return Shape(shape, f_bits)(self.numerator()[self.f_bits - f_bits:])
 
+    def truncate(self, f_bits=0):
+        if f_bits > self.f_bits:
+            raise ValueError(
+                f"`.truncate(f_bits={f_bits}) exceeds the underlying type's f_bits={self.f_bits}. "
+                "Use `.reshape()` to instead extend `f_bits`."
+            )
+        return self.reshape(f_bits)
+
     def __mul__(self, other):
         # Regular values are cast to fixed.Value
         if isinstance(other, hdl.Value):
