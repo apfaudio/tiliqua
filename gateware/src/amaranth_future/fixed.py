@@ -308,15 +308,13 @@ class Const(Value):
             if clamp:
                 value = self._max_value()
             else:
-                raise TypeError(f"{value!r} does not fit in {shape!r}, max is {self._max_value()}."
-                                f"Try using `fixed.Const(..., clamp=True)` to keep it within bounds.")
+                raise ValueError(f"Constant {value!r} does not fit in {shape!r}.")
 
         if value < self._min_value():
             if clamp:
                 value = self._min_value()
             else:
-                raise TypeError(f"{value!r} does not fit in {shape!r}, min is {self._min_value()}."
-                                f"Try using `fixed.Const(..., clamp=True)` to keep it within bounds.")
+                raise ValueError(f"Constant {value!r} does not fit in {shape!r}. ")
 
         self._value = value
 

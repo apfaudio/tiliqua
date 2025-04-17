@@ -73,12 +73,11 @@ class TestFixedShape(unittest.TestCase):
 
 class TestFixedValue(unittest.TestCase):
 
-    def assertBinaryOp(self, operator, const_a, const_b, expected):
+    def assertFixedEqual(self, expression, expected):
 
         m = Module()
-        result = getattr(const_a, operator)(const_b)
-        output = Signal.like(result)
-        m.d.comb += output.eq(result)
+        output = Signal.like(expression)
+        m.d.comb += output.eq(expression)
 
         async def testbench(ctx):
             out = ctx.get(output)
@@ -86,61 +85,75 @@ class TestFixedValue(unittest.TestCase):
             self.assertEqual(out.f_bits, expected.f_bits)
             self.assertEqual(out.as_float(), expected.as_float())
             self.assertEqual(out.as_value().value, expected.as_value().value)
+            self.assertEqual(out.signed, expected.signed)
 
         sim = Simulator(m)
         sim.add_testbench(testbench)
-        with sim.write_vcd(vcd_file=open("test_fixed_sim.vcd", "w")):
-            sim.run()
+        sim.run()
 
     def test_mul(self):
 
-        a = Signal(fixed.UQ(3, 2))
-        b = Signal(fixed.SQ(1, 2))
-        result = a * b
-
-        self.assertEqual(result.i_bits, a.i_bits + b.i_bits)
-        self.assertEqual(result.f_bits, a.f_bits + b.f_bits)
-        self.assertTrue(result.signed)
-
-        self.assertBinaryOp(
-            '__mul__',
-            fixed.Const(1.5, fixed.UQ(3, 2)),
-            fixed.Const(0.25, fixed.SQ(1, 2)),
-            fixed.Const(0.375, fixed.SQ(4, 4)),
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 2)) * fixed.Const(0.25, fixed.SQ(1, 2)),
+            fixed.Const(0.375, fixed.SQ(4, 4))
         )
 
-        self.assertBinaryOp(
-            '__mul__',
-            fixed.Const(1.5, fixed.UQ(3, 2)),
-            fixed.Const(-0.25, fixed.SQ(1, 2)),
-            fixed.Const(-0.375, fixed.SQ(4, 4)),
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 2)) * fixed.Const(-0.25, fixed.SQ(1, 2)),
+            fixed.Const(-0.375, fixed.SQ(4, 4))
         )
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 2)) * 3,
+            fixed.Const(4.5, fixed.UQ(5, 2))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 2)) * -3,
+            fixed.Const(-4.5, fixed.SQ(6, 2))
+        )
+
+        with self.assertRaises(TypeError):
+
+            self.assertFixedEqual(
+                fixed.Const(1.5, fixed.UQ(3, 2)) * 3.5,
+                fixed.Const(4.5, fixed.UQ(5, 2))
+            )
+
 
     def test_add(self):
 
-        a = Signal(fixed.UQ(3, 2))
-        b = Signal(fixed.SQ(1, 2))
-        result = a + b
-
-        self.assertEqual(result.i_bits, a.i_bits + b.i_bits + 1)
-        self.assertEqual(result.f_bits, max(a.f_bits, b.f_bits))
-        self.assertTrue(result.signed)
-
-        self.assertBinaryOp(
-            '__add__',
-            fixed.Const(1.5, fixed.UQ(3, 2)),
-            fixed.Const(0.25, fixed.SQ(1, 2)),
-            fixed.Const(1.75, fixed.SQ(5, 2)),
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 3)) + fixed.Const(0.25, fixed.SQ(1, 2)),
+            fixed.Const(1.75, fixed.SQ(5, 3)),
         )
 
-        self.assertBinaryOp(
-            '__add__',
-            fixed.Const(0.5, fixed.UQ(3, 2)),
-            fixed.Const(-0.75, fixed.SQ(1, 2)),
-            fixed.Const(-0.25, fixed.SQ(5, 2)),
+        self.assertFixedEqual(
+            fixed.Const(0.5, fixed.UQ(3, 3)) + fixed.Const(-0.75, fixed.SQ(1, 2)),
+            fixed.Const(-0.25, fixed.SQ(5, 3))
         )
 
-class TestFixedConst(unittest.TestCase):
+    def test_float_size_determination(self):
+
+        self.assertFixedEqual(
+            fixed.Const(0.03125),
+            fixed.Const(0.03125, fixed.UQ(0, 5))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(-0.5),
+            fixed.Const(-0.5, fixed.SQ(1, 1))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(10),
+            fixed.Const(10, fixed.UQ(4, 0))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(-10),
+            fixed.Const(-10, fixed.SQ(5, 0))
+        )
 
     def test_min_max(self):
 
@@ -149,7 +162,17 @@ class TestFixedConst(unittest.TestCase):
         self.assertEqual(fixed.UQ(2, 4).max().as_float(), 3.9375)
         self.assertEqual(fixed.UQ(2, 4).min().as_float(), 0)
 
+        self.assertEqual(fixed.UQ(0, 2).max().as_value().__repr__(), "(const 2'd3)")
+        self.assertEqual(fixed.UQ(0, 2).min().as_value().__repr__(), "(const 2'd0)")
+        self.assertEqual(fixed.UQ(0, 2).max().as_float(), 0.75)
+        self.assertEqual(fixed.UQ(0, 2).min().as_float(), 0)
+
         self.assertEqual(fixed.SQ(2, 4).max().as_value().__repr__(), "(const 6'sd31)")
         self.assertEqual(fixed.SQ(2, 4).min().as_value().__repr__(), "(const 6'sd-32)")
         self.assertEqual(fixed.SQ(2, 4).max().as_float(), 1.9375)
         self.assertEqual(fixed.SQ(2, 4).min().as_float(), -2)
+
+        self.assertEqual(fixed.SQ(1, 0).max().as_value().__repr__(), "(const 1'sd0)")
+        self.assertEqual(fixed.SQ(1, 0).min().as_value().__repr__(), "(const 1'sd-1)")
+        self.assertEqual(fixed.SQ(1, 0).max().as_float(), 0)
+        self.assertEqual(fixed.SQ(1, 0).min().as_float(), -1)
