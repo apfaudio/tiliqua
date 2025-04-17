@@ -263,4 +263,3 @@ class TestFixedValue(unittest.TestCase):
             fixed.Const(-10),
             fixed.Const(-10, fixed.SQ(5, 0))
         )
-

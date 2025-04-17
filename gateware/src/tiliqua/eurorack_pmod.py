@@ -156,7 +156,7 @@ class I2STDM(wiring.Component):
         return m
 
 # Native 'Audio sample SQ', shape of audio samples from CODEC.
-ASQ = fixed.SQ(0, I2STDM.S_WIDTH-1)
+ASQ = fixed.SQ(1, I2STDM.S_WIDTH-1)
 
 class I2SCalibrator(wiring.Component):
 

@@ -49,7 +49,7 @@ from tiliqua.eurorack_pmod import ASQ
 from amaranth_future       import fixed
 
 # Native 18-bit multiplier type.
-SQNative = fixed.SQ(2, ASQ.f_width)
+SQNative = fixed.SQ(3, ASQ.f_bits)
 
 class MAC(wiring.Component):
 

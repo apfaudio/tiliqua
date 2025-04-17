@@ -257,18 +257,18 @@ class GainVCA(wiring.Component):
 
     i: In(stream.Signature(data.StructLayout({
             "x": ASQ,
-            "gain": fixed.SQ(2, ASQ.f_width), # only 2 extra bits, so -3 to +3 is OK
+            "gain": fixed.SQ(2, ASQ.f_bits), # only 2 extra bits, so -3 to +3 is OK
         })))
     o: Out(stream.Signature(ASQ))
 
     def elaborate(self, platform):
         m = Module()
 
-        result = Signal(fixed.SQ(3, ASQ.f_width))
+        result = Signal(fixed.SQ(3, ASQ.f_bits))
         m.d.comb += result.eq(self.i.payload.x * self.i.payload.gain)
 
         sat_hi = fixed.Const(0, shape=ASQ)
-        sat_hi._value = 2**ASQ.f_width - 1 # move to Const.max()?
+        sat_hi._value = 2**ASQ.f_bits - 1 # move to Const.max()?
         sat_lo = fixed.Const(-1, shape=ASQ)
 
         with m.If(sat_hi < result):
@@ -314,7 +314,7 @@ class SawNCO(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        s = Signal(fixed.SQ(self.extra_bits, ASQ.f_width))
+        s = Signal(fixed.SQ(self.extra_bits, ASQ.f_bits))
 
         out_no_phase_mod = Signal(ASQ)
 
@@ -388,7 +388,7 @@ class Ramp(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        s = Signal(fixed.SQ(self.extra_bits, ASQ.f_width))
+        s = Signal(fixed.SQ(self.extra_bits, ASQ.f_bits))
 
         m.d.comb += [
             self.o.valid.eq(self.i.valid),
@@ -397,8 +397,7 @@ class Ramp(wiring.Component):
         ]
 
         with m.If(self.i.valid & self.o.ready):
-            with m.If((self.o.payload > fixed.Const(0.95, shape=ASQ)) &
-                      (self.o.payload.as_value()[15] == 0)):
+            with m.If(self.o.payload > fixed.Const(0.95, shape=ASQ)):
                 with m.If(self.i.payload.trigger):
                     m.d.sync += s.eq(ASQ.min() << self.shift)
             with m.Else():
@@ -448,7 +447,7 @@ class WaveShaper(wiring.Component):
             shape=signed(ASQ.as_shape().width), depth=self.lut_size, init=self.lut)
         rport = mem.read_port()
 
-        ltype = fixed.SQ(self.lut_addr_width-1, ASQ.f_width-self.lut_addr_width+1)
+        ltype = fixed.SQ(self.lut_addr_width-1, ASQ.f_bits-self.lut_addr_width+1)
 
         x = Signal(ltype)
         y = Signal(ASQ)
@@ -568,10 +567,9 @@ class SVF(wiring.Component):
                 with m.If(self.i.valid):
                    m.d.sync += x.eq(self.i.payload.x),
                    m.d.sync += oversample.eq(0)
-                   # FIXME: signedness (>=0)  check without working around `fixed`
-                   with m.If(self.i.payload.cutoff.as_value()[15] == 0):
+                   with m.If(self.i.payload.cutoff >= 0):
                        m.d.sync += kK.eq(self.i.payload.cutoff)
-                   with m.If(self.i.payload.resonance.as_value()[15] == 0):
+                   with m.If(self.i.payload.resonance >= 0):
                        m.d.sync += kQinv.eq(self.i.payload.resonance)
                    m.next = 'MAC0'
 
@@ -707,7 +705,7 @@ class PitchShift(wiring.Component):
                 m.d.comb += [
                     self.tap.o.ready.eq(1),
                     self.tap.i.valid.eq(1),
-                    self.tap.i.payload.eq(delay0.round() >> delay0.f_width),
+                    self.tap.i.payload.eq(delay0.round() >> delay0.f_bits),
                 ]
                 with m.If(self.tap.o.valid):
                     m.d.comb += self.tap.i.valid.eq(0),
@@ -717,7 +715,7 @@ class PitchShift(wiring.Component):
                 m.d.comb += [
                     self.tap.o.ready.eq(1),
                     self.tap.i.valid.eq(1),
-                    self.tap.i.payload.eq(delay1.round() >> delay1.f_width),
+                    self.tap.i.payload.eq(delay1.round() >> delay1.f_bits),
                 ]
                 with m.If(self.tap.o.valid):
                     m.d.comb += self.tap.i.valid.eq(0),
@@ -771,7 +769,7 @@ class MatrixMix(wiring.Component):
         self.i_channels = i_channels
         self.o_channels = o_channels
 
-        self.ctype = fixed.SQ(2, ASQ.f_width)
+        self.ctype = fixed.SQ(2, ASQ.f_bits)
 
         coefficients_flat = [
             fixed.Const(x, shape=self.ctype)._value
@@ -806,7 +804,7 @@ class MatrixMix(wiring.Component):
 
         i_latch = Signal(data.ArrayLayout(self.ctype, self.i_channels))
         o_accum = Signal(data.ArrayLayout(
-            fixed.SQ(self.ctype.i_width*2, self.ctype.f_width),
+            fixed.SQ(self.ctype.i_width*2, self.ctype.f_bits),
             self.o_channels))
 
         i_ch   = Signal(exact_log2(self.i_channels))
@@ -972,7 +970,7 @@ class FIR(wiring.Component):
 
         # Tap and accumulator sizes
 
-        self.ctype = fixed.SQ(2, ASQ.f_width)
+        self.ctype = fixed.SQ(2, ASQ.f_bits)
 
         n = len(self.taps_float)
 
@@ -1249,7 +1247,7 @@ class Boxcar(wiring.Component):
         m = Module()
 
         # accumulator should be large enough to fit N samples
-        accumulator = Signal(fixed.SQ(2 + exact_log2(self.n), ASQ.f_width))
+        accumulator = Signal(fixed.SQ(2 + exact_log2(self.n), ASQ.f_bits))
         fifo_r_asq  = Signal(ASQ)
         fifo_r_en_l = Signal()
 
