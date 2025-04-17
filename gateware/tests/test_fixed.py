@@ -60,7 +60,6 @@ class TestFixedShape(unittest.TestCase):
         self.assertEqual(s.f_bits, 4)
         self.assertTrue(s.signed)
 
-        # Try casting with invalid input
         with self.assertRaises(TypeError):
             fixed.Shape.cast("not a shape")
 
@@ -70,6 +69,34 @@ class TestFixedShape(unittest.TestCase):
         hdl_shape = fixed_shape.as_shape()
         self.assertEqual(hdl_shape.width, 11)
         self.assertFalse(hdl_shape.signed)
+
+    def test_min_max(self):
+
+        self.assertEqual(fixed.UQ(2, 4).max().as_value().__repr__(), "(const 6'd63)")
+        self.assertEqual(fixed.UQ(2, 4).min().as_value().__repr__(), "(const 6'd0)")
+        self.assertEqual(fixed.UQ(2, 4).max().as_float(), 3.9375)
+        self.assertEqual(fixed.UQ(2, 4).min().as_float(), 0)
+
+        self.assertEqual(fixed.UQ(0, 2).max().as_value().__repr__(), "(const 2'd3)")
+        self.assertEqual(fixed.UQ(0, 2).min().as_value().__repr__(), "(const 2'd0)")
+        self.assertEqual(fixed.UQ(0, 2).max().as_float(), 0.75)
+        self.assertEqual(fixed.UQ(0, 2).min().as_float(), 0)
+
+        self.assertEqual(fixed.SQ(2, 4).max().as_value().__repr__(), "(const 6'sd31)")
+        self.assertEqual(fixed.SQ(2, 4).min().as_value().__repr__(), "(const 6'sd-32)")
+        self.assertEqual(fixed.SQ(2, 4).max().as_float(), 1.9375)
+        self.assertEqual(fixed.SQ(2, 4).min().as_float(), -2)
+
+        self.assertEqual(fixed.SQ(1, 0).max().as_value().__repr__(), "(const 1'sd0)")
+        self.assertEqual(fixed.SQ(1, 0).min().as_value().__repr__(), "(const 1'sd-1)")
+        self.assertEqual(fixed.SQ(1, 0).max().as_float(), 0)
+        self.assertEqual(fixed.SQ(1, 0).min().as_float(), -1)
+
+    def test_from_bits(self):
+
+        self.assertEqual(fixed.UQ(2, 4).from_bits(0b10000).as_float(), 1.0)
+        self.assertEqual(fixed.UQ(2, 4).from_bits(0b01000).as_float(), 0.5)
+        self.assertEqual(fixed.UQ(2, 4).from_bits(0b00100).as_float(), 0.25)
 
 class TestFixedValue(unittest.TestCase):
 
@@ -86,6 +113,19 @@ class TestFixedValue(unittest.TestCase):
             self.assertEqual(out.as_float(), expected.as_float())
             self.assertEqual(out.as_value().value, expected.as_value().value)
             self.assertEqual(out.signed, expected.signed)
+
+        sim = Simulator(m)
+        sim.add_testbench(testbench)
+        sim.run()
+
+    def assertFixedBool(self, expression, expected):
+
+        m = Module()
+        output = Signal.like(expression)
+        m.d.comb += output.eq(expression)
+
+        async def testbench(ctx):
+            self.assertEqual(ctx.get(output), 1 if expected else 0)
 
         sim = Simulator(m)
         sim.add_testbench(testbench)
@@ -133,6 +173,75 @@ class TestFixedValue(unittest.TestCase):
             fixed.Const(-0.25, fixed.SQ(5, 3))
         )
 
+    def test_shift(self):
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 3)) << 1,
+            fixed.Const(3.0, fixed.UQ(4, 2)),
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 3)) >> 1,
+            fixed.Const(0.75, fixed.UQ(2, 4)),
+        )
+
+        with self.assertRaises(ValueError):
+            fixed.Const(1.5, fixed.UQ(3, 3)) << -1
+
+        with self.assertRaises(ValueError):
+            fixed.Const(1.5, fixed.UQ(3, 3)) >> -1
+
+    def test_abs(self):
+
+        self.assertFixedEqual(
+            abs(fixed.Const(-1.5, fixed.SQ(3, 3))),
+            fixed.Const(1.5, fixed.UQ(3, 3))
+        )
+
+        self.assertFixedEqual(
+            abs(fixed.Const(-1, fixed.SQ(1, 2))),
+            fixed.Const(1, fixed.UQ(1, 2))
+        )
+
+    def test_neg(self):
+
+        self.assertFixedEqual(
+            -fixed.Const(-1.5, fixed.SQ(3, 3)),
+            fixed.Const(1.5, fixed.SQ(4, 3))
+        )
+
+        self.assertFixedEqual(
+            -fixed.Const(-1, fixed.SQ(1, 2)),
+            fixed.Const(1, fixed.SQ(2, 2))
+        )
+
+    def test_lt(self):
+
+        self.assertFixedBool(
+            fixed.Const(0.75, fixed.SQ(1, 2)) < fixed.Const(0.5, fixed.SQ(1, 2)), False)
+        self.assertFixedBool(
+            fixed.Const(0.5, fixed.SQ(1, 2)) < fixed.Const(0.75, fixed.SQ(1, 2)), True)
+        self.assertFixedBool(
+            fixed.Const(0.75, fixed.SQ(1, 2)) < fixed.Const(-0.5, fixed.SQ(1, 2)), False)
+        self.assertFixedBool(
+            fixed.Const(-0.5, fixed.SQ(1, 2)) < fixed.Const(0.75, fixed.SQ(1, 2)), True)
+        self.assertFixedBool(
+            fixed.Const(-0.25, fixed.SQ(1, 2)) < fixed.Const(0, fixed.SQ(1, 2)), True)
+        self.assertFixedBool(
+            fixed.Const(0.25, fixed.SQ(1, 2)) < fixed.Const(0, fixed.SQ(1, 2)), False)
+        self.assertFixedBool(
+            fixed.Const(-0.25, fixed.SQ(1, 2)) < fixed.Const(0), True)
+        self.assertFixedBool(
+            fixed.Const(0.25, fixed.SQ(1, 2)) < fixed.Const(0), False)
+        self.assertFixedBool(
+            fixed.Const(0, fixed.SQ(1, 2)) < fixed.Const(0), False)
+        self.assertFixedBool(
+            fixed.Const(0) < fixed.Const(0), False)
+        self.assertFixedBool(
+            fixed.Const(0) < 1, True)
+        self.assertFixedBool(
+            fixed.Const(0) < -1, False)
+
     def test_float_size_determination(self):
 
         self.assertFixedEqual(
@@ -155,24 +264,3 @@ class TestFixedValue(unittest.TestCase):
             fixed.Const(-10, fixed.SQ(5, 0))
         )
 
-    def test_min_max(self):
-
-        self.assertEqual(fixed.UQ(2, 4).max().as_value().__repr__(), "(const 6'd63)")
-        self.assertEqual(fixed.UQ(2, 4).min().as_value().__repr__(), "(const 6'd0)")
-        self.assertEqual(fixed.UQ(2, 4).max().as_float(), 3.9375)
-        self.assertEqual(fixed.UQ(2, 4).min().as_float(), 0)
-
-        self.assertEqual(fixed.UQ(0, 2).max().as_value().__repr__(), "(const 2'd3)")
-        self.assertEqual(fixed.UQ(0, 2).min().as_value().__repr__(), "(const 2'd0)")
-        self.assertEqual(fixed.UQ(0, 2).max().as_float(), 0.75)
-        self.assertEqual(fixed.UQ(0, 2).min().as_float(), 0)
-
-        self.assertEqual(fixed.SQ(2, 4).max().as_value().__repr__(), "(const 6'sd31)")
-        self.assertEqual(fixed.SQ(2, 4).min().as_value().__repr__(), "(const 6'sd-32)")
-        self.assertEqual(fixed.SQ(2, 4).max().as_float(), 1.9375)
-        self.assertEqual(fixed.SQ(2, 4).min().as_float(), -2)
-
-        self.assertEqual(fixed.SQ(1, 0).max().as_value().__repr__(), "(const 1'sd0)")
-        self.assertEqual(fixed.SQ(1, 0).min().as_value().__repr__(), "(const 1'sd-1)")
-        self.assertEqual(fixed.SQ(1, 0).max().as_float(), 0)
-        self.assertEqual(fixed.SQ(1, 0).min().as_float(), -1)

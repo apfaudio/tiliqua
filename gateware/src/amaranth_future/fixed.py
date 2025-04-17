@@ -51,6 +51,7 @@ class Shape(hdl.ShapeCastable):
 
     def from_bits(self, raw):
         c = Const(0, self)
+        assert c._min_value() <= raw and raw <= c._max_value()
         c._value = raw
         return c
 
@@ -97,15 +98,10 @@ class Value(hdl.ValueCastable):
 
     def eq(self, other):
 
-        # Regular values are assigned directly to the underlying value.
         if isinstance(other, hdl.Value):
             return self.numerator().eq(other)
-
-        # int and float are cast to fixed.Const.
         elif isinstance(other, int) or isinstance(other, float):
             other = Const(other, self.shape())
-
-        # Other value types are unsupported.
         elif not isinstance(other, Value):
             raise TypeError(f"Object {other!r} cannot be converted to a fixed.Value")
 
@@ -143,15 +139,11 @@ class Value(hdl.ValueCastable):
         return self.reshape(f_bits)
 
     def __mul__(self, other):
-        # Regular values are cast to fixed.Value
+
         if isinstance(other, hdl.Value):
             other = Value.cast(other)
-
-        # int are cast to fixed.Const
         elif isinstance(other, int):
             other = Const(other)
-
-        # Other value types are unsupported.
         elif not isinstance(other, Value):
             raise TypeError(f"Object {other!r} cannot be converted to a fixed.Value")
 
@@ -248,7 +240,7 @@ class Value(hdl.ValueCastable):
 
         return Value.cast(self.reshape(f_bits).numerator() >> other, f_bits)
 
-    def __lt__(self, other):
+    def _compare(self, other, operator):
         if isinstance(other, hdl.Value):
             other = Value.cast(other)
         elif isinstance(other, int):
@@ -256,20 +248,22 @@ class Value(hdl.ValueCastable):
         elif not isinstance(other, Value):
             raise TypeError(f"Object {other!r} cannot be converted to a fixed.Value")
         f_bits = max(self.f_bits, other.f_bits)
-        return self.reshape(f_bits).numerator() < other.reshape(f_bits).numerator()
+        return getattr(self.reshape(f_bits).numerator(), operator)(other.reshape(f_bits).numerator())
+
+    def __lt__(self, other):
+        return self._compare(other, '__lt__')
 
     def __ge__(self, other):
-        return ~self.__lt__(other)
+        return self._compare(other, '__ge__')
+
+    def __gt__(self, other):
+        return self._compare(other, '__gt__')
+
+    def __le__(self, other):
+        return self._compare(other, '__le__')
 
     def __eq__(self, other):
-        if isinstance(other, hdl.Value):
-            other = Value.cast(other)
-        elif isinstance(other, int):
-            other = Const(other)
-        elif not isinstance(other, Value):
-            raise TypeError(f"Object {other!r} cannot be converted to a fixed.Value")
-        f_bits = max(self.f_bits, other.f_bits)
-        return self.reshape(f_bits).numerator() == other.reshape(f_bits).numerator()
+        return self._compare(other, '__eq__')
 
     def __repr__(self):
         return f"fixed.{'SQ' if self.signed else 'UQ'}({self.i_bits}, {self.f_bits}) {self._target!r}"
