@@ -287,10 +287,10 @@ class DSPTests(unittest.TestCase):
 
         matrix = dsp.MatrixMix(
             i_channels=4, o_channels=4,
-            coefficients=[[1, 0, 0, 0],
-                          [0, 1, 0, 0],
-                          [0, 0, 1, 0],
-                          [0, 0, 0, 1]])
+            coefficients=[[    1, 0,   0,  0],
+                          [-0.25, 1,  -2,  0],
+                          [    0, 0, 0.5,  0],
+                          [    0, 0,   0,  1]])
 
         async def testbench(ctx):
             ctx.set(matrix.i.payload[0], fixed.Const(0.2, shape=ASQ))
@@ -304,9 +304,9 @@ class DSPTests(unittest.TestCase):
             ctx.set(matrix.o.ready, 1)
             while ctx.get(matrix.o.valid) != 1:
                 await ctx.tick()
-            self.assertAlmostEqual(ctx.get(matrix.o.payload[0]).as_float(),  0.2, places=4)
+            self.assertAlmostEqual(ctx.get(matrix.o.payload[0]).as_float(),  0.3, places=4)
             self.assertAlmostEqual(ctx.get(matrix.o.payload[1]).as_float(), -0.4, places=4)
-            self.assertAlmostEqual(ctx.get(matrix.o.payload[2]).as_float(),  0.6, places=4)
+            self.assertAlmostEqual(ctx.get(matrix.o.payload[2]).as_float(), -0.9, places=4)
             self.assertAlmostEqual(ctx.get(matrix.o.payload[3]).as_float(), -0.8, places=4)
 
         sim = Simulator(matrix)
