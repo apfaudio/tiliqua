@@ -1,7 +1,7 @@
 # from https://github.com/amaranth-lang/amaranth/pull/1005
 # slightly modified to work out-of-tree with Amaranth ~= 0.4
 
-from amaranth import hdl
+from amaranth import hdl, Mux
 from amaranth.utils import bits_for
 
 __all__ = ["Shape", "SQ", "UQ", "Value", "Const"]
@@ -143,6 +143,19 @@ class Value(hdl.ValueCastable):
                 "Use `.reshape()` to instead extend `f_bits`."
             )
         return self.reshape(f_bits)
+
+    def clamp(self, lo, hi):
+        return Mux(
+            self > hi, hi,
+            Mux(self < lo, lo, self)
+        )
+
+    def saturate(self, shape):
+        if not isinstance(shape, Shape):
+            raise TypeError(f"Cannot `clamp_to` bounds of {shape!r} as it is not a fixed.Shape")
+        if not shape.i_bits < self.i_bits:
+            raise ValueError(f"Cannot `clamp_to`: i_bits={shape.i_bits} >= i_bits={value.i_bits} would have no effect.")
+        return self.reshape(shape.f_bits).clamp(shape.min(), shape.max())
 
     def __mul__(self, other):
 
