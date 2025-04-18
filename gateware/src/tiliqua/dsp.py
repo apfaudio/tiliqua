@@ -655,7 +655,7 @@ class PitchShift(wiring.Component):
         self.xfade_bits = exact_log2(xfade)
         # delay type: integer component is index into delay line
         # +1 is necessary so that we don't overflow on adding grain_sz.
-        self.dtype = fixed.SQ(self.tap.addr_width+1, 8)
+        self.dtype = fixed.SQ(self.tap.addr_width+2, 8)
         self.macp = macp or mac.MAC.default()
         super().__init__({
             "i": In(stream.Signature(data.StructLayout({
@@ -679,6 +679,7 @@ class PitchShift(wiring.Component):
         # Envelope values
         env0 = Signal(ASQ)
         env1 = Signal(ASQ)
+        output = Signal(ASQ)
 
         s    = Signal(self.dtype)
         m.d.comb += s.eq(delay0 + self.i.payload.pitch)
@@ -707,7 +708,7 @@ class PitchShift(wiring.Component):
                 m.d.comb += [
                     self.tap.o.ready.eq(1),
                     self.tap.i.valid.eq(1),
-                    self.tap.i.payload.eq(delay0.round() >> delay0.f_bits),
+                    self.tap.i.payload.eq(1+delay0.truncate() >> delay0.f_bits),
                 ]
                 with m.If(self.tap.o.valid):
                     m.d.comb += self.tap.i.valid.eq(0),
@@ -717,7 +718,7 @@ class PitchShift(wiring.Component):
                 m.d.comb += [
                     self.tap.o.ready.eq(1),
                     self.tap.i.valid.eq(1),
-                    self.tap.i.payload.eq(delay1.round() >> delay1.f_bits),
+                    self.tap.i.payload.eq(delay1.truncate() >> delay1.f_bits),
                 ]
                 with m.If(self.tap.o.valid):
                     m.d.comb += self.tap.i.valid.eq(0),
@@ -728,14 +729,14 @@ class PitchShift(wiring.Component):
                     # Map delay0 <= [0, xfade] to env0 <= [0, 1]
                     m.d.sync += [
                         env0.eq(delay0 >> self.xfade_bits),
-                        env1.eq(fixed.Const(0.99, shape=ASQ) -
+                        env1.eq(ASQ.max() -
                                 (delay0 >> self.xfade_bits)),
                     ]
                 with m.Else():
                     # If we're outside the xfade, just take tap 0
                     m.d.sync += [
-                        env0.eq(fixed.Const(0.99, shape=ASQ)),
-                        env1.eq(fixed.Const(0, shape=ASQ)),
+                        env0.eq(ASQ.max()),
+                        env1.eq(0),
                     ]
                 m.next = 'MAC0'
             with m.State('MAC0'):
@@ -749,6 +750,7 @@ class PitchShift(wiring.Component):
             with m.State('WAIT-READY'):
                 m.d.comb += self.o.valid.eq(1),
                 with m.If(self.o.ready):
+                    m.d.sync += output.eq(self.o.payload)
                     m.next = 'WAIT-VALID'
         return m
 
