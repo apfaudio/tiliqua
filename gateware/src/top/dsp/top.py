@@ -293,8 +293,8 @@ class DualVCA(wiring.Component):
         m.submodules.merge2a = merge2a = dsp.Merge(n_channels=2)
         m.submodules.merge2b = merge2b = dsp.Merge(n_channels=2)
 
-        m.submodules.vca0 = vca0 = dsp.VCA()
-        m.submodules.vca1 = vca1 = dsp.VCA()
+        m.submodules.vca0 = vca0 = dsp.VCA(itype=ASQ)
+        m.submodules.vca1 = vca1 = dsp.VCA(itype=ASQ)
 
         # connect with 'wiring.connect' to show how this works.
 
@@ -415,8 +415,8 @@ class DualWaveshaper(wiring.Component):
         def scaled_tanh(x):
             return math.tanh(3.0*x)
 
-        m.submodules.vca0 = vca0 = dsp.GainVCA()
-        m.submodules.vca1 = vca1 = dsp.GainVCA()
+        m.submodules.vca0 = vca0 = dsp.VCA()
+        m.submodules.vca1 = vca1 = dsp.VCA()
         m.submodules.waveshaper0 = waveshaper0 = dsp.WaveShaper(lut_function=scaled_tanh)
         m.submodules.waveshaper1 = waveshaper1 = dsp.WaveShaper(lut_function=scaled_tanh)
 
@@ -425,10 +425,10 @@ class DualWaveshaper(wiring.Component):
             vca1.i.valid.eq(self.i.valid),
             self.i.ready.eq(vca0.i.ready),
 
-            vca0.i.payload.x.eq(self.i.payload[0]),
-            vca1.i.payload.x.eq(self.i.payload[1]),
-            vca0.i.payload.gain.eq(self.i.payload[2] << 2),
-            vca1.i.payload.gain.eq(self.i.payload[2] << 2),
+            vca0.i.payload[0].eq(self.i.payload[0]),
+            vca1.i.payload[0].eq(self.i.payload[1]),
+            vca0.i.payload[1].eq(self.i.payload[2] << 2),
+            vca1.i.payload[1].eq(self.i.payload[2] << 2),
         ]
 
         wiring.connect(m, vca0.o, waveshaper0.i)

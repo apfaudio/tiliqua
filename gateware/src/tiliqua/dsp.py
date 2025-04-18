@@ -198,22 +198,22 @@ def channel_remap(m, stream_o, stream_i, mapping_o_to_i):
 class VCA(wiring.Component):
 
     """
-    Voltage Controlled Amplifier (simple multiplier).
+    Voltage Controlled Amplifier (simple multiplier with saturation).
+    Output values are clipped to fit in the output type.
 
     Members
     -------
-    i : :py:`In(stream.Signature(data.ArrayLayout(ASQ, 2)))`
+    i : :py:`In(stream.Signature(data.ArrayLayout(itype, 2)))`
         2-channel input stream.
-    o : :py:`Out(stream.Signature(data.ArrayLayout(ASQ, 1)))`
+    o : :py:`Out(stream.Signature(otype))`
         Output stream, :py:`i.payload[0] * i.payload[1]`.
     """
 
-    def __init__(self, dtype=ASQ, macp=None):
-        self.dtype = dtype
+    def __init__(self, itype=mac.SQNative, otype=ASQ, macp=None):
         self.macp = macp or mac.MAC.default()
         super().__init__({
-            "i": In(stream.Signature(data.ArrayLayout(self.dtype, 2))),
-            "o": Out(stream.Signature(data.ArrayLayout(self.dtype, 1)))
+            "i": In(stream.Signature(data.ArrayLayout(itype, 2))),
+            "o": Out(stream.Signature(otype))
         })
 
     def elaborate(self, platform):
@@ -230,7 +230,7 @@ class VCA(wiring.Component):
 
             with m.State('MAC'):
                 with mp.Multiply(m, a=self.i.payload[0], b=self.i.payload[1]):
-                    m.d.sync += self.o.payload[0].eq(mp.z)
+                    m.d.sync += self.o.payload.eq(mp.z.saturate(self.o.payload.shape()))
                     m.next = 'WAIT-READY'
 
             with m.State('WAIT-READY'):
@@ -238,37 +238,6 @@ class VCA(wiring.Component):
                 with m.If(self.o.ready):
                     m.next = 'WAIT-VALID'
 
-        return m
-
-class GainVCA(wiring.Component):
-
-    """
-    Voltage Controlled Amplifier where the gain amount can be > 1.
-    The output is clipped to fit in a normal ASQ.
-
-    Members
-    -------
-    i : :py:`In(stream.Signature(data.StructLayout)`
-        2-channel input stream, with fields :py:`x` (audio in) and :py:`gain`
-        (multiplier that may be >1 for saturation. legal values :py:`-3 < gain < 3`)
-    o : :py:`Out(stream.Signature(ASQ))`
-        Output stream, :py:`x * gain` with saturation.
-    """
-
-    i: In(stream.Signature(data.StructLayout({
-            "x": ASQ,
-            "gain": mac.SQNative, # only 2 extra bits, so -3 to +3 is OK
-        })))
-    o: Out(stream.Signature(ASQ))
-
-    def elaborate(self, platform):
-        m = Module()
-        m.d.comb += [
-            self.o.payload.eq(
-                (self.i.payload.x*self.i.payload.gain).saturate(self.o.payload.shape())),
-            self.o.valid.eq(self.i.valid),
-            self.i.ready.eq(self.o.ready),
-        ]
         return m
 
 class SawNCO(wiring.Component):

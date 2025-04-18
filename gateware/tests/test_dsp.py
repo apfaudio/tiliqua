@@ -359,7 +359,7 @@ class DSPTests(unittest.TestCase):
             return math.tanh(3.0*x)
 
         m = Module()
-        vca = dsp.GainVCA()
+        vca = dsp.VCA()
         waveshaper = dsp.WaveShaper(lut_function=scaled_tanh)
 
         m.submodules += [vca, waveshaper]
@@ -372,10 +372,15 @@ class DSPTests(unittest.TestCase):
             await ctx.tick()
             for n in range(0, 100):
                 x = fixed.Const(0.8*math.sin(n*0.3), shape=ASQ)
-                gain = fixed.Const(3.0*math.sin(n*0.1), shape=vca.i.payload.gain.shape())
-                ctx.set(vca.i.payload.x, x)
-                ctx.set(vca.i.payload.gain, gain)
+                gain = fixed.Const(3.0*math.sin(n*0.1), shape=vca.i.payload[0].shape())
+                ctx.set(vca.i.payload[0], x)
+                ctx.set(vca.i.payload[1], gain)
                 ctx.set(vca.i.valid, 1)
+                ctx.set(vca.o.ready, 1)
+                await ctx.tick()
+                ctx.set(vca.i.valid, 0)
+                while ctx.get(vca.o.valid) != 1:
+                    await ctx.tick()
                 await ctx.tick()
 
         sim = Simulator(m)

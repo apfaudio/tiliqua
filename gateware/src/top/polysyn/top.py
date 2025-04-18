@@ -204,7 +204,7 @@ class PolySynth(wiring.Component):
 
         outs = []
         for lr in [0, 1]:
-            vca = dsp.GainVCA()
+            vca = dsp.VCA()
             waveshaper = dsp.WaveShaper(lut_function=scaled_tanh)
             vca_merge2 = dsp.Merge(n_channels=2)
             setattr(m.submodules, f"out_gainvca_{lr}", vca)
@@ -215,9 +215,8 @@ class PolySynth(wiring.Component):
             wiring.connect(m, cv_gain_split2.o[lr],    vca_merge2.i[1])
 
             dsp.connect_remap(m, vca_merge2.o, vca.i, lambda o, i : [
-                i.payload.x   .eq(o.payload[0]),
-                #i.payload.gain.eq(o.payload[1] << 2)
-                i.payload.gain.eq(self.drive << 2)
+                i.payload[0].eq(o.payload[0]),
+                i.payload[1].eq(self.drive << 2)
             ])
 
             wiring.connect(m, vca.o, waveshaper.i)
