@@ -258,11 +258,12 @@ class DSPTests(unittest.TestCase):
                 m.submodules.svf = dut = dsp.SVF()
 
         async def stimulus(ctx):
-            for n in range(0, 100):
+            for n in range(0, 200):
                 x = fixed.Const(0.4*(math.sin(n*0.2) + math.sin(n)), shape=ASQ)
+                y = fixed.Const(0.8*(math.sin(n*0.1)), shape=ASQ)
                 ctx.set(dut.i.valid, 1)
                 ctx.set(dut.i.payload.x, x)
-                ctx.set(dut.i.payload.cutoff, fixed.Const(0.2, shape=ASQ))
+                ctx.set(dut.i.payload.cutoff, y)
                 ctx.set(dut.i.payload.resonance, fixed.Const(0.1, shape=ASQ))
                 await ctx.tick().until(dut.i.ready)
                 ctx.set(dut.i.valid, 0)
