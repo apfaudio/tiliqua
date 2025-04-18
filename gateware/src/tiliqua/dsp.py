@@ -433,7 +433,10 @@ class WaveShaper(wiring.Component):
             else:
                 x = 2*(i - lut_size) / lut_size
             fx = lut_function(x)
-            self.lut.append(fixed.Const(fx, shape=ASQ)._value)
+            if fx > ASQ.max().as_float() or fx < ASQ.min().as_float():
+                print(f"WARN: WaveShaper `lut_function` generates {fx:.5f} which is outside "
+                      f"[{ASQ.min().as_float():.5f}..{ASQ.max().as_float():.5f}] (will be clamped)")
+            self.lut.append(fixed.Const(fx, shape=ASQ, clamp=True))
 
         super().__init__()
 
@@ -442,9 +445,8 @@ class WaveShaper(wiring.Component):
 
         m.submodules.macp = mp = self.macp
 
-        # TODO (amaranth 0.5+): use native ASQ shape in LUT memory
         m.submodules.mem = mem = Memory(
-            shape=signed(ASQ.as_shape().width), depth=self.lut_size, init=self.lut)
+            shape=ASQ, depth=self.lut_size, init=self.lut)
         rport = mem.read_port()
 
         ltype = fixed.SQ(self.lut_addr_width, ASQ.f_bits-self.lut_addr_width+1)
@@ -482,7 +484,7 @@ class WaveShaper(wiring.Component):
                 m.next = 'READ0'
 
             with m.State('READ0'):
-                m.d.sync += read0.eq(fixed.Value(ASQ, rport.data))
+                m.d.sync += read0.eq(rport.data)
                 m.d.comb += [
                     rport.addr.eq(x.truncate()),
                     rport.en.eq(1),
@@ -490,7 +492,7 @@ class WaveShaper(wiring.Component):
                 m.next = 'READ1'
 
             with m.State('READ1'):
-                m.d.sync += read1.eq(fixed.Value(ASQ, rport.data))
+                m.d.sync += read1.eq(rport.data)
                 m.next = 'MAC0'
 
             with m.State('MAC0'):
