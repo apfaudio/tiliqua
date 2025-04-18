@@ -335,7 +335,7 @@ class MidiVoiceTracker(wiring.Component):
                 pb = Signal(signed(16))
                 m.d.comb += pb.eq(Cat(msg.midi_payload.pitch_bend.lsb,
                                       msg.midi_payload.pitch_bend.msb))
-                m.d.sync += last_pb.raw().eq(pb-(2*8192))
+                m.d.sync += last_pb.numerator().eq(pb-(2*8192))
                 m.next = 'UPDATE'
 
             with m.State('UPDATE'):
@@ -361,7 +361,7 @@ class MidiVoiceTracker(wiring.Component):
                 calculated_freq = Signal(ASQ)
                 f_inc_base = Signal(ASQ)
                 m.d.comb += [
-                    f_inc_base.raw().eq(f_lut_rport.data),
+                    f_inc_base.numerator().eq(f_lut_rport.data),
                     calculated_freq.eq(f_inc_base + f_inc_base*pb_scaled),
                 ]
 

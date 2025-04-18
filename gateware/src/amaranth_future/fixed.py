@@ -13,8 +13,8 @@ class Shape(hdl.ShapeCastable):
         self.i_bits, self.f_bits = shape.width-f_bits, f_bits
         if self.i_bits < 0 or self.f_bits < 0:
             raise TypeError(f"fixed.Shape may not be created with negative bit widths (i_bits={self.i_bits}, f_bits={self.f_bits})")
-        if shape.signed and self.i_bits == 0:
-            raise TypeError(f"A signed fixed.Shape cannot be created with i_bits=0")
+        # if shape.signed and self.i_bits == 0:
+        #    raise TypeError(f"A signed fixed.Shape cannot be created with i_bits=0")
         if self.i_bits + self.f_bits == 0:
             raise TypeError(f"fixed.Shape may not be created with zero width")
 

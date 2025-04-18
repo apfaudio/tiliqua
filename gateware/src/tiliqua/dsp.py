@@ -257,14 +257,14 @@ class GainVCA(wiring.Component):
 
     i: In(stream.Signature(data.StructLayout({
             "x": ASQ,
-            "gain": fixed.SQ(2, ASQ.f_bits), # only 2 extra bits, so -3 to +3 is OK
+            "gain": mac.SQNative, # only 2 extra bits, so -3 to +3 is OK
         })))
     o: Out(stream.Signature(ASQ))
 
     def elaborate(self, platform):
         m = Module()
 
-        result = Signal(fixed.SQ(3, ASQ.f_bits))
+        result = Signal(mac.SQNative)
         m.d.comb += result.eq(self.i.payload.x * self.i.payload.gain)
 
         sat_hi = fixed.Const(0, shape=ASQ)
@@ -773,7 +773,7 @@ class MatrixMix(wiring.Component):
         self.i_channels = i_channels
         self.o_channels = o_channels
 
-        self.ctype = fixed.SQ(2, ASQ.f_bits)
+        self.ctype = mac.SQNative
 
         coefficients_flat = [
             fixed.Const(x, shape=self.ctype)._value
@@ -808,7 +808,7 @@ class MatrixMix(wiring.Component):
 
         i_latch = Signal(data.ArrayLayout(self.ctype, self.i_channels))
         o_accum = Signal(data.ArrayLayout(
-            fixed.SQ(self.ctype.i_width*2, self.ctype.f_bits),
+            fixed.SQ(self.ctype.i_bits*2, self.ctype.f_bits),
             self.o_channels))
 
         i_ch   = Signal(exact_log2(self.i_channels))
