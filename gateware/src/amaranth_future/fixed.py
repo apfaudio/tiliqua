@@ -13,8 +13,8 @@ class Shape(hdl.ShapeCastable):
         self.i_bits, self.f_bits = shape.width-f_bits, f_bits
         if self.i_bits < 0 or self.f_bits < 0:
             raise TypeError(f"fixed.Shape may not be created with negative bit widths (i_bits={self.i_bits}, f_bits={self.f_bits})")
-        # if shape.signed and self.i_bits == 0:
-        #    raise TypeError(f"A signed fixed.Shape cannot be created with i_bits=0")
+        if shape.signed and self.i_bits == 0:
+           raise TypeError(f"A signed fixed.Shape cannot be created with i_bits=0")
         if self.i_bits + self.f_bits == 0:
             raise TypeError(f"fixed.Shape may not be created with zero width")
 
@@ -232,19 +232,26 @@ class Value(hdl.ValueCastable):
         if isinstance(other, int):
             if other < 0:
                 raise ValueError("Shift amount cannot be negative")
-
-            return Value.cast(self.numerator(), self.f_bits + other)
-
-        elif not isinstance(other, hdl.Value):
+            # Extend f_bits by fixed shift amount.
+            i_bits = self.i_bits - other
+            f_bits = self.f_bits + other
+            numerator = self.numerator()
+        elif isinstance(other, hdl.Value):
+            if other.shape().signed:
+                raise TypeError("Shift amount must be unsigned")
+            # Extend by maximum possible shift represented by hdl.Value.
+            f_bits = self.f_bits + 2**other.shape().width - 1
+            i_bits = self.i_bits - (f_bits - self.f_bits)
+            numerator = self.reshape(f_bits).numerator() >> other
+        else:
             raise TypeError("Shift amount must be an integer value")
 
-        if other.signed:
-            raise TypeError("Shift amount must be unsigned")
-
-        # Extend f_bits by maximal shift amount.
-        f_bits = self.f_bits + 2**other.bits - 1
-
-        return Value.cast(self.reshape(f_bits).numerator() >> other, f_bits)
+        # Always keep at least 1 sign bit and prohibit negative i_bits.
+        # TODO: concat sign extension? (likely unnecessary)
+        if self.signed:
+            return SQ(max(1, i_bits), f_bits)(numerator)
+        else:
+            return UQ(max(0, i_bits), f_bits)(numerator)
 
     def _compare(self, other, operator):
         if isinstance(other, hdl.Value):
@@ -339,4 +346,4 @@ class Const(Value):
     def as_float(self):
         return self._value / 2**self.f_bits
 
-    # TODO: Operators on constants
+    # TODO: Operators on constants?

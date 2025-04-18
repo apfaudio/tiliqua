@@ -185,11 +185,34 @@ class TestFixedValue(unittest.TestCase):
             fixed.Const(0.75, fixed.UQ(2, 4)),
         )
 
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.SQ(3, 3)) >> 3,
+            fixed.Const(0.1875, fixed.SQ(1, 6)),
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.SQ(3, 3)) >> Const(3, unsigned(2)),
+            fixed.Const(0.1875, fixed.SQ(1, 6)),
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 3)) >> Const(3, unsigned(2)),
+            fixed.Const(0.1875, fixed.UQ(0, 6)),
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 3)) >> 3,
+            fixed.Const(0.1875, fixed.UQ(0, 6)),
+        )
+
         with self.assertRaises(ValueError):
             fixed.Const(1.5, fixed.UQ(3, 3)) << -1
 
         with self.assertRaises(ValueError):
             fixed.Const(1.5, fixed.UQ(3, 3)) >> -1
+
+        with self.assertRaises(TypeError):
+            fixed.Const(1.5, fixed.UQ(3, 3)) >> Const(-1, signed(2))
 
     def test_abs(self):
 
@@ -247,6 +270,11 @@ class TestFixedValue(unittest.TestCase):
         self.assertFixedEqual(
             fixed.Const(0.03125),
             fixed.Const(0.03125, fixed.UQ(0, 5))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(-0.03125),
+            fixed.Const(-0.03125, fixed.SQ(1, 5))
         )
 
         self.assertFixedEqual(
