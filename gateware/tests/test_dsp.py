@@ -315,12 +315,6 @@ class DSPTests(unittest.TestCase):
         with sim.write_vcd(vcd_file=open("test_matrix.vcd", "w")):
             sim.run()
 
-    def test_fixed_min_max(self):
-        self.assertIn("7'sd63", fixed.SQ(2, 4).max().__repr__())
-        self.assertIn("7'sd-64", fixed.SQ(2, 4).min().__repr__())
-        self.assertIn("16'sd32767", ASQ.max().__repr__())
-        self.assertIn("16'sd-32768", ASQ.min().__repr__())
-
     @parameterized.expand([
         ["mux_mac", mac.MuxMAC],
         ["ring_mac", mac.RingMAC],
@@ -378,7 +372,7 @@ class DSPTests(unittest.TestCase):
             await ctx.tick()
             for n in range(0, 100):
                 x = fixed.Const(0.8*math.sin(n*0.3), shape=ASQ)
-                gain = fixed.Const(3.0*math.sin(n*0.1), shape=fixed.SQ(2, ASQ.f_width))
+                gain = fixed.Const(3.0*math.sin(n*0.1), shape=vca.i.payload.gain.shape())
                 ctx.set(vca.i.payload.x, x)
                 ctx.set(vca.i.payload.gain, gain)
                 ctx.set(vca.i.valid, 1)

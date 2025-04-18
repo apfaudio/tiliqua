@@ -1251,7 +1251,7 @@ class Boxcar(wiring.Component):
         m = Module()
 
         # accumulator should be large enough to fit N samples
-        accumulator = Signal(fixed.SQ(2 + exact_log2(self.n), ASQ.f_bits))
+        accumulator = Signal(fixed.SQ(3 + exact_log2(self.n), ASQ.f_bits))
         fifo_r_asq  = Signal(ASQ)
         fifo_r_en_l = Signal()
 
@@ -1264,7 +1264,7 @@ class Boxcar(wiring.Component):
 
         # accumulator maintenance
         m.d.sync += fifo_r_en_l.eq(fifo.r_en)
-        m.d.comb += fifo_r_asq.raw().eq(fifo.r_data) # raw -> ASQ
+        m.d.comb += fifo_r_asq.numerator().eq(fifo.r_data) # numerator -> ASQ
         with m.If(self.i.valid & self.i.ready):
             with m.If(fifo_r_en_l):
                 # sample in + out simultaneously (normal case)
