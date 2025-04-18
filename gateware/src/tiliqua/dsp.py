@@ -447,7 +447,7 @@ class WaveShaper(wiring.Component):
             shape=signed(ASQ.as_shape().width), depth=self.lut_size, init=self.lut)
         rport = mem.read_port()
 
-        ltype = fixed.SQ(self.lut_addr_width-1, ASQ.f_bits-self.lut_addr_width+1)
+        ltype = fixed.SQ(self.lut_addr_width, ASQ.f_bits-self.lut_addr_width+1)
 
         x = Signal(ltype)
         y = Signal(ASQ)
@@ -461,7 +461,7 @@ class WaveShaper(wiring.Component):
             with m.State('WAIT-VALID'):
                 m.d.comb += self.i.ready.eq(1),
                 with m.If(self.i.valid):
-                    m.d.sync += x.eq(self.i.payload << ltype.i_width)
+                    m.d.sync += x.eq(self.i.payload << (ltype.i_bits-1))
                     m.d.sync += y.eq(0)
                     m.next = 'ADDR0'
 
@@ -473,7 +473,7 @@ class WaveShaper(wiring.Component):
                 if self.continuous:
                     m.d.comb += rport.addr.eq(x.truncate()+1)
                 else:
-                    with m.If((x.truncate()).raw() ==
+                    with m.If((x.truncate()).numerator() ==
                               2**(self.lut_addr_width-1)-1):
                         m.d.comb += trunc.eq(1)
                         m.d.comb += rport.addr.eq(x.truncate())
