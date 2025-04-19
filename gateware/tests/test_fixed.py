@@ -94,9 +94,17 @@ class TestFixedShape(unittest.TestCase):
 
     def test_from_bits(self):
 
-        self.assertEqual(fixed.UQ(2, 4).from_bits(0b10000).as_float(), 1.0)
-        self.assertEqual(fixed.UQ(2, 4).from_bits(0b01000).as_float(), 0.5)
-        self.assertEqual(fixed.UQ(2, 4).from_bits(0b00100).as_float(), 0.25)
+        self.assertEqual(fixed.UQ(2, 4).from_bits(0b100000).as_float(), 2.0)
+        self.assertEqual(fixed.UQ(2, 4).from_bits(0b010000).as_float(), 1.0)
+        self.assertEqual(fixed.UQ(2, 4).from_bits(0b001000).as_float(), 0.5)
+        self.assertEqual(fixed.UQ(2, 4).from_bits(0b000100).as_float(), 0.25)
+        self.assertEqual(fixed.UQ(2, 4).from_bits(0b000000).as_float(), 0)
+
+        self.assertEqual(fixed.SQ(2, 4).from_bits(0b000000).as_float(), 0)
+        self.assertEqual(fixed.SQ(2, 4).from_bits(0b000001).as_float(), 0.0625)
+        self.assertEqual(fixed.SQ(2, 4).from_bits(0b111111).as_float(), -0.0625)
+        self.assertEqual(fixed.SQ(2, 4).from_bits(0b010000).as_float(), 1)
+        self.assertEqual(fixed.SQ(2, 4).from_bits(0b100000).as_float(), -2)
 
 class TestFixedValue(unittest.TestCase):
 
@@ -173,6 +181,33 @@ class TestFixedValue(unittest.TestCase):
             fixed.Const(-0.25, fixed.SQ(5, 3))
         )
 
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 3)) + fixed.Const(0.25, fixed.UQ(1, 2)),
+            fixed.Const(1.75, fixed.UQ(4, 3)),
+        )
+
+    def test_sub(self):
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.SQ(3, 3)) - fixed.Const(1.75, fixed.SQ(2, 2)),
+            fixed.Const(-0.25, fixed.SQ(4, 3)),
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 3)) - fixed.Const(2, fixed.UQ(2, 2)),
+            fixed.Const(-0.5, fixed.SQ(4, 3)),
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(1.5, fixed.UQ(3, 3)) - 3,
+            fixed.Const(-1.5, fixed.SQ(4, 3)),
+        )
+
+        self.assertFixedEqual(
+            3 - fixed.Const(1.5, fixed.UQ(3, 3)),
+            fixed.Const(1.5, fixed.SQ(5, 3)),
+        )
+
     def test_shift(self):
 
         self.assertFixedEqual(
@@ -216,6 +251,8 @@ class TestFixedValue(unittest.TestCase):
 
     def test_abs(self):
 
+        # SQ -> UQ
+
         self.assertFixedEqual(
             abs(fixed.Const(-1.5, fixed.SQ(3, 3))),
             fixed.Const(1.5, fixed.UQ(3, 3))
@@ -226,7 +263,21 @@ class TestFixedValue(unittest.TestCase):
             fixed.Const(1, fixed.UQ(1, 2))
         )
 
+        self.assertFixedEqual(
+            abs(fixed.Const(-4, fixed.SQ(3, 3))),
+            fixed.Const(4, fixed.UQ(3, 3))
+        )
+
+        # UQ -> UQ
+
+        self.assertFixedEqual(
+            abs(fixed.Const(7, fixed.UQ(3, 3))),
+            fixed.Const(7, fixed.UQ(3, 3))
+        )
+
     def test_neg(self):
+
+        # SQ -> SQ
 
         self.assertFixedEqual(
             -fixed.Const(-1.5, fixed.SQ(3, 3)),
@@ -236,6 +287,18 @@ class TestFixedValue(unittest.TestCase):
         self.assertFixedEqual(
             -fixed.Const(-1, fixed.SQ(1, 2)),
             fixed.Const(1, fixed.SQ(2, 2))
+        )
+
+        self.assertFixedEqual(
+            -fixed.Const(1.5, fixed.SQ(2, 2)),
+            fixed.Const(-1.5, fixed.SQ(3, 2))
+        )
+
+        # UQ -> SQ
+
+        self.assertFixedEqual(
+            -fixed.Const(1.5, fixed.UQ(2, 2)),
+            fixed.Const(-1.5, fixed.SQ(3, 2))
         )
 
     def test_clamp(self):

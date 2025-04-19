@@ -53,7 +53,7 @@ class Shape(hdl.ShapeCastable):
         c._value = raw
         if self.signed and raw > c._max_value():
             # 2s complement signed value, but `raw` was unsigned.
-            c._value = c._min_value() + c._value - c._max_value()
+            c._value = c._min_value() + c._value - c._max_value() - 1
         # verify we have a sane number
         if c._value < c._min_value() or c._value > c._max_value():
             raise ValueError(
