@@ -272,15 +272,9 @@ class I2SCalibrator(wiring.Component):
         # CALIBRATION ALGORITHM (simple Ax + B, clamp output to min/max storage of ASQ)
         #
 
-        # calibration logic (single MAC then clamp)
-        scaled = Signal(self.ctype)
-        m.d.comb += scaled.eq((in_sample * cal_read.data[0]) + cal_read.data[1])
-        with m.If(scaled >= ASQ.max()):
-            m.d.comb += out_sample.eq(ASQ.max())
-        with m.Elif(scaled <= ASQ.min()):
-            m.d.comb += out_sample.eq(ASQ.min())
-        with m.Else():
-            m.d.comb += out_sample.eq(scaled)
+        # calibration logic (single MAC then saturating clamp)
+        m.d.comb += out_sample.eq(
+            ((in_sample * cal_read.data[0]) + cal_read.data[1]).saturate(ASQ))
 
         # Calibrating samples happens in the 'audio' domain.
         with m.FSM(domain="audio") as cal_fsm:
