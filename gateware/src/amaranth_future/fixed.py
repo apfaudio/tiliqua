@@ -1,5 +1,4 @@
-# from https://github.com/amaranth-lang/amaranth/pull/1005
-# slightly modified to work out-of-tree with Amaranth ~= 0.4
+# Based on latest iteration of fixed point types RFC.
 
 from amaranth import hdl, Mux
 from amaranth.utils import bits_for
@@ -162,59 +161,39 @@ class Value(hdl.ValueCastable):
         clamped = self.reshape(shape.f_bits).clamp(shape.min(), shape.max())
         return Value(shape, clamped.numerator())
 
+    def _binary_op(self, rhs, operator, callable_f_bits = lambda a, b: max(a, b), pre_reshape=True, post_cast=True):
+
+        if isinstance(rhs, hdl.Value):
+            rhs = Value.cast(rhs)
+        elif isinstance(rhs, int):
+            rhs = Const(rhs)
+        elif not isinstance(rhs, Value):
+            raise TypeError(f"Object {rhs!r} cannot be converted to a fixed.Value")
+
+        lhs = self
+        f_bits = callable_f_bits(lhs.f_bits, rhs.f_bits)
+
+        if pre_reshape:
+            lhs = lhs.reshape(f_bits)
+            rhs = rhs.reshape(f_bits)
+
+        value = getattr(lhs.numerator(), operator)(rhs.numerator())
+        return Value.cast(value, f_bits) if post_cast else value
+
     def __mul__(self, other):
-
-        if isinstance(other, hdl.Value):
-            other = Value.cast(other)
-        elif isinstance(other, int):
-            other = Const(other)
-        elif not isinstance(other, Value):
-            raise TypeError(f"Object {other!r} cannot be converted to a fixed.Value")
-
-        return Value.cast(self.numerator() * other.numerator(), self.f_bits + other.f_bits)
+        return self._binary_op(other, '__mul__', lambda a, b: a + b, pre_reshape=False)
 
     def __rmul__(self, other):
         return self.__mul__(other)
 
     def __add__(self, other):
-
-        # Regular values are cast to fixed.Value
-        if isinstance(other, hdl.Value):
-            other = Value.cast(other)
-
-        # int are cast to fixed.Const
-        elif isinstance(other, int):
-            other = Const(other)
-
-        # Other value types are unsupported.
-        elif not isinstance(other, Value):
-            raise TypeError(f"Object {other!r} cannot be converted to a fixed.Value")
-
-        f_bits  = max(self.f_bits, other.f_bits)
-
-        return Value.cast(self.reshape(f_bits).numerator() +
-                          other.reshape(f_bits).numerator(), f_bits)
+        return self._binary_op(other, '__add__')
 
     def __radd__(self, other):
         return self.__add__(other)
 
     def __sub__(self, other):
-        # Regular values are cast to fixed.Value
-        if isinstance(other, hdl.Value):
-            other = Value.cast(other)
-
-        # int are cast to fixed.Const
-        elif isinstance(other, int):
-            other = Const(other)
-
-        # Other value types are unsupported.
-        elif not isinstance(other, Value):
-            raise TypeError(f"Object {other!r} cannot be converted to a fixed.Value")
-
-        f_bits = max(self.f_bits, other.f_bits)
-
-        return Value.cast(self.reshape(f_bits).numerator() -
-                          other.reshape(f_bits).numerator(), f_bits)
+        return self._binary_op(other, '__sub__')
 
     def __rsub__(self, other):
         return -self.__sub__(other)
@@ -271,30 +250,23 @@ class Value(hdl.ValueCastable):
         else:
             return UQ(max(0, i_bits), f_bits)(numerator)
 
-    def _compare(self, other, operator):
-        if isinstance(other, hdl.Value):
-            other = Value.cast(other)
-        elif isinstance(other, int):
-            other = Const(other)
-        elif not isinstance(other, Value):
-            raise TypeError(f"Object {other!r} cannot be converted to a fixed.Value")
-        f_bits = max(self.f_bits, other.f_bits)
-        return getattr(self.reshape(f_bits).numerator(), operator)(other.reshape(f_bits).numerator())
+    def _binary_compare(self, other, operator):
+        return self._binary_op(other, operator, post_cast=False)
 
     def __lt__(self, other):
-        return self._compare(other, '__lt__')
+        return self._binary_compare(other, '__lt__')
 
     def __ge__(self, other):
-        return self._compare(other, '__ge__')
+        return self._binary_compare(other, '__ge__')
 
     def __gt__(self, other):
-        return self._compare(other, '__gt__')
+        return self._binary_compare(other, '__gt__')
 
     def __le__(self, other):
-        return self._compare(other, '__le__')
+        return self._binary_compare(other, '__le__')
 
     def __eq__(self, other):
-        return self._compare(other, '__eq__')
+        return self._binary_compare(other, '__eq__')
 
     def __repr__(self):
         return f"fixed.{'SQ' if self.signed else 'UQ'}({self.i_bits}, {self.f_bits}) {self._target!r}"
