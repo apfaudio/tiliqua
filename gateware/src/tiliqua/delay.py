@@ -12,8 +12,9 @@ from amaranth.lib             import wiring, data, stream
 from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
+from amaranth.utils           import exact_log2, ceil_log2
 
-from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral
+from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay_line
 from tiliqua.cache            import WishboneL2Cache
 from tiliqua.eurorack_pmod    import ASQ
 
@@ -182,3 +183,69 @@ class Diffuser(wiring.Component):
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
         return m
+
+class Boxcar(wiring.Component):
+
+    """
+    Simple Boxcar Average.
+
+    Average of previous N samples, implemented with an accumulator
+    and delay line. The accumulator sums all incoming samples, and we
+    subtract an N-sample-delayed version of the incoming signal. This
+    is the same as taking the average over the last N samples, requiring
+    no multiplies but instead requiring space for N samples.
+
+    Can be used in low- or high-pass mode.
+    """
+
+    def __init__(self, n: int=32, hpf=False, sq=ASQ):
+        # pow2 constraint on N allows us to shift instead of divide
+        assert(2**exact_log2(n) == n)
+        self.n = n
+        self.hpf = hpf
+        self.delayln = delay_line.DelayLine(max_delay=n)
+        self.tap = self.delayln.add_tap(fixed_delay=n-1)
+        assert self.delayln.write_triggers_read
+        super().__init__({
+            "i": In(stream.Signature(sq)),
+            "o": Out(stream.Signature(sq)),
+        })
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        m.submodules.delayln = self.delayln
+
+        wiring.connect(m, wiring.flipped(self.i), self.delayln.i)
+
+        # accumulator must be large enough to fit N samples
+        accumulator = Signal(fixed.SQ(3 + exact_log2(self.n), ASQ.f_bits))
+        last_tap = Signal.like(self.tap.o.payload)
+
+        if self.hpf:
+            m.d.comb += self.o.payload.eq(last_tap - (accumulator >> exact_log2(self.n))),
+        else:
+            m.d.comb += self.o.payload.eq(accumulator >> exact_log2(self.n)),
+
+        with m.FSM() as fsm:
+            with m.State('WAIT-SAMPLE'):
+                with m.If(self.i.valid & self.i.ready):
+                    # Add an incoming sample
+                    m.d.sync += accumulator.eq(accumulator + self.i.payload)
+                    m.next = 'READ-DELAY'
+            with m.State('READ-DELAY'):
+                m.d.comb += self.tap.o.ready.eq(1)
+                with m.If(self.tap.o.valid):
+                    # Subtract the sample from N samples ago
+                    m.d.sync += accumulator.eq(accumulator - self.tap.o.payload)
+                    m.d.sync += last_tap.eq(self.tap.o.payload)
+                    m.next = 'WAIT-READY'
+            with m.State('WAIT-READY'):
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
+                    # Emit a sample
+                    m.next = 'WAIT-SAMPLE'
+
+        return m
+

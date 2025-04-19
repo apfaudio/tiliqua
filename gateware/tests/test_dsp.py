@@ -18,7 +18,7 @@ from scipy                 import signal
 from parameterized         import parameterized
 
 from tiliqua.eurorack_pmod import ASQ
-from tiliqua               import dsp, mac, delay_line
+from tiliqua               import dsp, mac, delay_line, delay
 
 class DSPTests(unittest.TestCase):
 
@@ -427,7 +427,7 @@ class DSPTests(unittest.TestCase):
 
     def test_boxcar(self):
 
-        boxcar = dsp.Boxcar(n=4, hpf=True)
+        boxcar = delay.Boxcar(n=32, hpf=True)
 
         async def testbench(ctx):
             for n in range(0, 1024):
@@ -435,12 +435,13 @@ class DSPTests(unittest.TestCase):
                 ctx.set(boxcar.i.payload, x)
                 ctx.set(boxcar.i.valid, 1)
                 await ctx.tick()
+                while ctx.get(boxcar.i.ready) != 1:
+                    await ctx.tick()
                 ctx.set(boxcar.i.valid, 0)
                 await ctx.tick()
                 ctx.set(boxcar.o.ready, 1)
-                while ctx.get(boxcar.i.ready) != 1:
+                while ctx.get(boxcar.o.ready) != 1:
                     await ctx.tick()
-                await ctx.tick()
 
         sim = Simulator(boxcar)
         sim.add_clock(1e-6)
