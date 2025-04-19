@@ -103,7 +103,7 @@ class TestFixedValue(unittest.TestCase):
     def assertFixedEqual(self, expression, expected):
 
         m = Module()
-        output = Signal.like(expression)
+        output = Signal.like(expected)
         m.d.comb += output.eq(expression)
 
         async def testbench(ctx):
@@ -236,6 +236,56 @@ class TestFixedValue(unittest.TestCase):
         self.assertFixedEqual(
             -fixed.Const(-1, fixed.SQ(1, 2)),
             fixed.Const(1, fixed.SQ(2, 2))
+        )
+
+    def test_clamp(self):
+
+        self.assertFixedEqual(
+            fixed.Const(3, fixed.SQ(3, 3)).clamp(
+                fixed.Const(-1),
+                fixed.Const(1)),
+            fixed.Const(1, fixed.SQ(3, 3))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(3, fixed.SQ(3, 3)).clamp(
+                fixed.Const(-3),
+                fixed.Const(-2)),
+            fixed.Const(-2, fixed.SQ(3, 3))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(3, fixed.SQ(3, 3)).clamp(
+                fixed.Const(-0.5),
+                fixed.Const(0.5)),
+            fixed.Const(0.5, fixed.SQ(3, 3))
+        )
+
+    def test_saturate(self):
+
+        self.assertFixedEqual(
+            fixed.Const(-2, fixed.SQ(3, 3)).saturate(fixed.SQ(1, 1)),
+            fixed.Const(-1, fixed.SQ(1, 1))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(-10.25, fixed.SQ(5, 3)).saturate(fixed.SQ(3, 1)),
+            fixed.Const(-4, fixed.SQ(3, 1))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(14.25, fixed.SQ(8, 3)).saturate(fixed.SQ(4, 2)),
+            fixed.Const(7.75, fixed.SQ(4, 2))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(14.25, fixed.SQ(8, 3)).saturate(fixed.UQ(2, 2)),
+            fixed.Const(3.75, fixed.UQ(2, 2))
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(-14.25, fixed.SQ(8, 3)).saturate(fixed.UQ(2, 2)),
+            fixed.Const(0, fixed.UQ(2, 2))
         )
 
     def test_lt(self):

@@ -145,6 +145,10 @@ class Value(hdl.ValueCastable):
         return self.reshape(f_bits)
 
     def clamp(self, lo, hi):
+        if not isinstance(lo, Value) or not isinstance(hi, Value):
+            raise TypeError(f"Cannot `clamp` as lo, hi are not fixed.Value")
+        lo = lo.reshape(self.f_bits)
+        hi = hi.reshape(self.f_bits)
         return Mux(
             self > hi, hi,
             Mux(self < lo, lo, self)
@@ -152,9 +156,9 @@ class Value(hdl.ValueCastable):
 
     def saturate(self, shape):
         if not isinstance(shape, Shape):
-            raise TypeError(f"Cannot `clamp_to` bounds of {shape!r} as it is not a fixed.Shape")
+            raise TypeError(f"Cannot `saturate` to bounds of {shape!r} as it is not a fixed.Shape")
         if not shape.i_bits < self.i_bits:
-            raise ValueError(f"Cannot `clamp_to`: i_bits={shape.i_bits} >= i_bits={value.i_bits} would have no effect.")
+            raise ValueError(f"Cannot `saturate`: i_bits={shape.i_bits} >= i_bits={value.i_bits} would have no effect.")
         return self.reshape(shape.f_bits).clamp(shape.min(), shape.max())
 
     def __mul__(self, other):
