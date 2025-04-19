@@ -412,6 +412,17 @@ class TestFixedValue(unittest.TestCase):
         self.assertFixedBool(
             fixed.Const(0) < -1, False)
 
+    def test_eq(self):
+
+        self.assertFixedBool(fixed.Const(0) == 0, True)
+        self.assertFixedBool(fixed.Const(0) == fixed.Const(0), True)
+        self.assertFixedBool(fixed.Const(0.5) == fixed.Const(0.5), True)
+        self.assertFixedBool(fixed.Const(0.5) == fixed.Const(0.75), False)
+        self.assertFixedBool(fixed.Const(0.501) == fixed.Const(0.5), False)
+
+        with self.assertRaises(TypeError):
+            self.assertFixedBool(0.5 == fixed.Const(0.5), False)
+
     def test_float_size_determination(self):
 
         self.assertFixedEqual(
