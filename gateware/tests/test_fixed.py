@@ -103,7 +103,7 @@ class TestFixedValue(unittest.TestCase):
     def assertFixedEqual(self, expression, expected):
 
         m = Module()
-        output = Signal.like(expected)
+        output = Signal.like(expression)
         m.d.comb += output.eq(expression)
 
         async def testbench(ctx):
@@ -263,6 +263,8 @@ class TestFixedValue(unittest.TestCase):
 
     def test_saturate(self):
 
+        # SQ -> SQ
+
         self.assertFixedEqual(
             fixed.Const(-2, fixed.SQ(3, 3)).saturate(fixed.SQ(1, 1)),
             fixed.Const(-1, fixed.SQ(1, 1))
@@ -279,6 +281,31 @@ class TestFixedValue(unittest.TestCase):
         )
 
         self.assertFixedEqual(
+            fixed.Const(0.995, fixed.SQ(1, 8)).saturate(fixed.SQ(1, 4)),
+            fixed.Const(0.9375, fixed.SQ(1, 4))
+        )
+
+        with self.assertRaises(ValueError):
+            fixed.Const(0, fixed.SQ(8, 0)).saturate(fixed.SQ(9, 0)),
+
+        # XXX: this 'odd' behaviour is an artifact of truncation rounding,
+        # and should be revisited when we have more rounding strategies.
+
+        self.assertFixedEqual(
+            fixed.Const(-0.995, fixed.SQ(2, 8)).saturate(fixed.SQ(2, 4)),
+            fixed.Const(-1, fixed.SQ(2, 4))
+        )
+
+        # UQ -> UQ
+
+        self.assertFixedEqual(
+            fixed.Const(15, fixed.UQ(5, 2)).saturate(fixed.UQ(3, 1)),
+            fixed.Const(7.5, fixed.UQ(3, 1))
+        )
+
+        # SQ -> UQ
+
+        self.assertFixedEqual(
             fixed.Const(14.25, fixed.SQ(8, 3)).saturate(fixed.UQ(2, 2)),
             fixed.Const(3.75, fixed.UQ(2, 2))
         )
@@ -286,6 +313,13 @@ class TestFixedValue(unittest.TestCase):
         self.assertFixedEqual(
             fixed.Const(-14.25, fixed.SQ(8, 3)).saturate(fixed.UQ(2, 2)),
             fixed.Const(0, fixed.UQ(2, 2))
+        )
+
+        # UQ -> SQ
+
+        self.assertFixedEqual(
+            fixed.Const(255, fixed.UQ(8, 2)).saturate(fixed.SQ(8, 2)),
+            fixed.Const(127.75, fixed.SQ(8, 2))
         )
 
     def test_lt(self):
