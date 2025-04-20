@@ -172,7 +172,7 @@ class PolySynth(wiring.Component):
         # Stereo HPF to remove DC from any voices in 'zero cutoff'
         # Route to audio output channels 2 & 3
 
-        output_hpfs = [dsp.SVF() for _ in range(o_channels)]
+        output_hpfs = [delay.Boxcar(n=128, hpf=True) for _ in range(o_channels)]
         dsp.named_submodules(m.submodules, output_hpfs, override_name="output_hpf")
 
         m.submodules.hpf_split2 = hpf_split2 = dsp.Split(n_channels=2, source=matrix_mix.o)
@@ -180,15 +180,8 @@ class PolySynth(wiring.Component):
         hpf_merge4.wire_valid(m, [0, 1])
 
         for lr in [0, 1]:
-            dsp.connect_remap(m, hpf_split2.o[lr], output_hpfs[lr].i, lambda o, i : [
-                i.payload.x                    .eq(o.payload),
-                i.payload.cutoff.as_value()    .eq(200),
-                i.payload.resonance.as_value() .eq(20000),
-            ])
-
-            dsp.connect_remap(m, output_hpfs[lr].o, hpf_merge4.i[2+lr], lambda o, i : [
-                i.payload.eq(o.payload.hp << 2)
-            ])
+            wiring.connect(m, hpf_split2.o[lr], output_hpfs[lr].i)
+            wiring.connect(m, output_hpfs[lr].o, hpf_merge4.i[2+lr])
 
         # Implement stereo distortion effect after diffuser.
 
