@@ -786,7 +786,7 @@ class MatrixMix(wiring.Component):
         self.ctype = mac.SQNative
 
         coefficients_flat = [
-            fixed.Const(x, shape=self.ctype)._value
+            fixed.Const(x, shape=self.ctype)
             for xs in coefficients
             for x in xs
         ]
@@ -794,9 +794,8 @@ class MatrixMix(wiring.Component):
         assert(len(coefficients_flat) == i_channels*o_channels)
 
         # matrix coefficient memory
-        # TODO (amaranth 0.5+): use native shape in LUT memory
         self.mem = Memory(
-            shape=signed(self.ctype.as_shape().width),
+            shape=self.ctype,
             depth=i_channels*o_channels, init=coefficients_flat)
 
         super().__init__({
@@ -818,8 +817,7 @@ class MatrixMix(wiring.Component):
 
         i_latch = Signal(data.ArrayLayout(self.ctype, self.i_channels))
         o_accum = Signal(data.ArrayLayout(
-            fixed.SQ(self.ctype.i_bits*2, self.ctype.f_bits),
-            self.o_channels))
+            mac.SQRNative, self.o_channels))
 
         i_ch   = Signal(exact_log2(self.i_channels))
         o_ch   = Signal(exact_log2(self.o_channels))
@@ -867,7 +865,7 @@ class MatrixMix(wiring.Component):
                     ]
                     m.next = 'NEXT'
             with m.State('NEXT'):
-                m.next = 'READ'
+                m.next = 'MAC'
                 m.d.sync += [
                     o_ch_l.eq(o_ch),
                     l_i_ch.eq(i_ch),
@@ -880,14 +878,11 @@ class MatrixMix(wiring.Component):
                         m.d.sync += i_ch.eq(i_ch+1)
                 with m.Else():
                     m.d.sync += o_ch.eq(o_ch+1)
-            with m.State('READ'):
-                m.d.sync += read0.eq(fixed.Value(self.ctype, rport.data))
-                m.next = 'MAC'
             with m.State('MAC'):
                 m.next = 'NEXT'
                 m.d.sync += [
                     o_accum[o_ch_l].eq(o_accum[o_ch_l] +
-                                       (read0 *
+                                       (rport.data *
                                         i_latch[l_i_ch]))
                 ]
                 with m.If(done):
