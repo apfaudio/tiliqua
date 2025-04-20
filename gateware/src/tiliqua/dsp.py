@@ -567,6 +567,62 @@ class SVF(wiring.Component):
 
         return m
 
+class DCBlock(wiring.Component):
+
+    """
+    Loosely based on:
+    https://dspguru.com/dsp/tricks/fixed-point-dc-blocking-filter-with-noise-shaping/
+    """
+
+    def __init__(self, pole=0.99, sq=ASQ, macp=None):
+        self.macp = macp or mac.MAC.default()
+        self.pole = pole
+        super().__init__({
+            "i": In(stream.Signature(sq)),
+            "o": Out(stream.Signature(sq)),
+        })
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        m.submodules.macp = mp = self.macp
+
+        mtype = mac.SQNative
+
+        kA    = fixed.Const(self.pole, mtype)
+
+        x     = Signal(mtype)
+        y     = Signal(mtype)
+        d     = Signal(mtype)
+
+        m.d.comb += self.o.payload.eq(y)
+
+        with m.FSM() as fsm:
+
+            with m.State('WAIT-VALID'):
+                m.d.comb += self.i.ready.eq(1)
+                with m.If(self.i.valid):
+                   m.d.sync += [
+                       d.eq(self.i.payload - x),
+                       x.eq(self.i.payload),
+                   ]
+                   m.next = 'MAC0'
+
+            with m.State('MAC0'):
+                with mp.Multiply(m, a=y, b=kA):
+                    m.d.sync += y.eq(mp.z + d)
+                    m.next = 'WAIT-READY'
+
+            with m.State('WAIT-READY'):
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
+                    m.next = 'WAIT-VALID'
+
+        return m
+
+
+
 class KickFeedback(Elaboratable):
     """
     Inject a single dummy (garbage) sample after reset between

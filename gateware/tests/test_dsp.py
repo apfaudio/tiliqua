@@ -448,3 +448,27 @@ class DSPTests(unittest.TestCase):
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_boxcar.vcd", "w")):
             sim.run()
+
+    def test_dcblock(self):
+
+        dut = dsp.DCBlock()
+
+        async def testbench(ctx):
+            for n in range(0, 1024*2):
+                x = fixed.Const(0.2+0.3*(math.sin(n*0.2) + math.sin(n)), shape=ASQ)
+                ctx.set(dut.i.payload, x)
+                ctx.set(dut.i.valid, 1)
+                await ctx.tick()
+                ctx.set(dut.i.valid, 0)
+                await ctx.tick()
+                ctx.set(dut.o.ready, 1)
+                while ctx.get(dut.o.ready) != 1:
+                    await ctx.tick()
+                while ctx.get(dut.i.ready) != 1:
+                    await ctx.tick()
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open("test_dcblock.vcd", "w")):
+            sim.run()

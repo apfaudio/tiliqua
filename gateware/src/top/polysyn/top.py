@@ -172,7 +172,7 @@ class PolySynth(wiring.Component):
         # Stereo HPF to remove DC from any voices in 'zero cutoff'
         # Route to audio output channels 2 & 3
 
-        output_hpfs = [delay.Boxcar(n=128, hpf=True) for _ in range(o_channels)]
+        output_hpfs = [dsp.DCBlock() for _ in range(o_channels)]
         dsp.named_submodules(m.submodules, output_hpfs, override_name="output_hpf")
 
         m.submodules.hpf_split2 = hpf_split2 = dsp.Split(n_channels=2, source=matrix_mix.o)
