@@ -107,13 +107,16 @@ class PolySynth(wiring.Component):
         ncos = [dsp.SawNCO(shift=0) for _ in range(n_voices)]
 
         # All SVFs share the same multiplier tile through a RingMAC.
-        m.submodules.server = server = mac.RingMACServer()
-        svfs = [dsp.SVF(macp=server.new_client()) for _ in range(n_voices)]
+        m.submodules.server1 = server1 = mac.RingMACServer()
+        svfs = [dsp.SVF(macp=server1.new_client()) for _ in range(n_voices)]
+        m.submodules.server2 = server2 = mac.RingMACServer()
+        blocks = [dsp.DCBlock(macp=server2.new_client()) for _ in range(n_voices)]
 
         m.submodules.merge = merge = dsp.Merge(n_channels=n_voices)
 
         dsp.named_submodules(m.submodules, ncos)
         dsp.named_submodules(m.submodules, svfs)
+        dsp.named_submodules(m.submodules, blocks)
 
         # Connect MIDI stream -> voice tracker
         wiring.connect(m, wiring.flipped(self.i_midi), voice_tracker.i)
@@ -150,10 +153,12 @@ class PolySynth(wiring.Component):
                 i.payload.cutoff               .eq(follower.o.payload << 5)
             ])
 
-            # Connect SVF LPF -> merge channel
-            dsp.connect_remap(m, svfs[n].o, merge.i[n], lambda o, i : [
+            # Connect SVF LPF -> DC Block
+            dsp.connect_remap(m, svfs[n].o, blocks[n].i, lambda o, i : [
                 i.payload.eq(o.payload.lp),
             ])
+
+            wiring.connect(m, blocks[n].o, merge.i[n])
 
         # Voice mixdown to stereo. Alternate left/right
         o_channels = 2
@@ -169,19 +174,13 @@ class PolySynth(wiring.Component):
         m.submodules.diffuser = diffuser = Diffuser()
         self.diffuser = diffuser
 
-        # Stereo HPF to remove DC from any voices in 'zero cutoff'
         # Route to audio output channels 2 & 3
 
-        output_hpfs = [dsp.DCBlock() for _ in range(o_channels)]
-        dsp.named_submodules(m.submodules, output_hpfs, override_name="output_hpf")
-
-        m.submodules.hpf_split2 = hpf_split2 = dsp.Split(n_channels=2, source=matrix_mix.o)
-        m.submodules.hpf_merge4 = hpf_merge4 = dsp.Merge(n_channels=4, sink=diffuser.i)
-        hpf_merge4.wire_valid(m, [0, 1])
-
+        m.submodules.end_split2 = end_split2 = dsp.Split(n_channels=2, source=matrix_mix.o)
+        m.submodules.end_merge4 = end_merge4 = dsp.Merge(n_channels=4, sink=diffuser.i)
+        end_merge4.wire_valid(m, [0, 1])
         for lr in [0, 1]:
-            wiring.connect(m, hpf_split2.o[lr], output_hpfs[lr].i)
-            wiring.connect(m, output_hpfs[lr].o, hpf_merge4.i[2+lr])
+            wiring.connect(m, end_split2.o[lr], end_merge4.i[2+lr])
 
         # Implement stereo distortion effect after diffuser.
 
