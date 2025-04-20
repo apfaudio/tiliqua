@@ -241,6 +241,11 @@ class TestFixedValue(unittest.TestCase):
             FConst(0.1875, UQ(0, 6)),
         )
 
+        self.assertFixedEqual(
+            FConst(-1.5, SQ(3, 3)) << 4,
+            FConst(-24.0, SQ(7, 0)),
+        )
+
         with self.assertRaises(ValueError):
             FConst(1.5, UQ(3, 3)) << -1
 
