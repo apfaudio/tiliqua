@@ -183,14 +183,12 @@ class Value(hdl.ValueCastable):
     def __mul__(self, other):
         return self._binary_op(other, '__mul__', lambda a, b: a + b, pre_reshape=False)
 
-    def __rmul__(self, other):
-        return self.__mul__(other)
+    __rmul__ = __mul__
 
     def __add__(self, other):
         return self._binary_op(other, '__add__')
 
-    def __radd__(self, other):
-        return self.__add__(other)
+    __radd__ = __add__
 
     def __sub__(self, other):
         return self._binary_op(other, '__sub__')
