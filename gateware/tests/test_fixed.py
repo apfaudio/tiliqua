@@ -108,10 +108,10 @@ class TestFixedShape(unittest.TestCase):
 
 class TestFixedValue(unittest.TestCase):
 
-    def assertFixedEqual(self, expression, expected):
+    def assertFixedEqual(self, expression, expected, force_expected_shape=False):
 
         m = Module()
-        output = Signal.like(expression)
+        output = Signal.like(expected if force_expected_shape else expression)
         m.d.comb += output.eq(expression)
 
         async def testbench(ctx):
@@ -412,7 +412,7 @@ class TestFixedValue(unittest.TestCase):
         self.assertFixedBool(
             fixed.Const(0) < -1, False)
 
-    def test_eq(self):
+    def test_equality(self):
 
         self.assertFixedBool(fixed.Const(0) == 0, True)
         self.assertFixedBool(fixed.Const(0) == fixed.Const(0), True)
@@ -422,6 +422,63 @@ class TestFixedValue(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             self.assertFixedBool(0.5 == fixed.Const(0.5), False)
+
+    def test_eq(self):
+
+        self.assertFixedEqual(
+            fixed.Const(-1, fixed.SQ(2, 1)),
+            fixed.Const(-1, fixed.SQ(5, 1)),
+            force_expected_shape=True
+        )
+
+        self.assertFixedEqual(
+            fixed.SQ(1, 1).max(),
+            fixed.Const(0.5, fixed.SQ(5, 1)),
+            force_expected_shape=True
+        )
+
+        self.assertFixedEqual(
+            fixed.SQ(1, 1).max(),
+            fixed.Const(0.5, fixed.SQ(5, 1)),
+            force_expected_shape=True
+        )
+
+        self.assertFixedEqual(
+            fixed.Const(0.25, fixed.SQ(5, 5)),
+            fixed.Const(0.0, fixed.SQ(5, 1)),
+            force_expected_shape=True
+        )
+
+        # XXX: truncation rounding again
+
+        self.assertFixedEqual(
+            fixed.Const(-0.25, fixed.SQ(5, 5)),
+            fixed.Const(-0.5, fixed.SQ(5, 1)),
+            force_expected_shape=True
+        )
+
+        # XXX: .eq() from SQ <-> UQ may over/underflow.
+        # SQ -> UQ: may overflow if SQ is negative
+        # UQ -> SQ: may overflow if i_bits (UQ) >= i_bits (SQ)
+        # same signedness: may overflow if i_bits > i_bits
+        # Should these really be prohibited completely?
+
+        """
+        with self.assertRaises(TypeError):
+            self.assertFixedEqual(
+                fixed.Const(-10, fixed.SQ(5, 2)),
+                fixed.Const(22, fixed.UQ(5, 2)),
+                force_expected_shape=True
+            )
+
+        with self.assertRaises(TypeError):
+            self.assertFixedEqual(
+                fixed.Const(15, fixed.UQ(4, 2)),
+                fixed.Const(-1, fixed.SQ(4, 2)),
+                force_expected_shape=True
+            )
+        """
+
 
     def test_float_size_determination(self):
 
