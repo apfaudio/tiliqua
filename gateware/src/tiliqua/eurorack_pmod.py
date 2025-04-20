@@ -282,7 +282,7 @@ class I2SCalibrator(wiring.Component):
                 with m.If(self.strobe):
                     m.d.audio += [
                         cal_read.addr.eq(self.channel),
-                        in_sample.numerator().eq(self.i_uncal)
+                        in_sample.as_value().eq(self.i_uncal)
                     ]
                     with m.If(dac_fifo.r_rdy):
                         with m.If(self.channel == (I2STDM.N_CHANNELS - 1)):
@@ -307,7 +307,7 @@ class I2SCalibrator(wiring.Component):
                 ]
                 m.next = "PROCESS_DAC"
             with m.State("PROCESS_DAC"):
-                m.d.audio += self.o_uncal.eq(out_sample.numerator())
+                m.d.audio += self.o_uncal.eq(out_sample.as_value())
                 m.next = "IDLE"
 
         #
@@ -816,12 +816,12 @@ class EurorackPmod(wiring.Component):
             with m.If(self.led_mode[n]):
                 if n <= 3:
                     with m.If(self.jack[n]):
-                        m.d.sync += i2c_master.led[n].eq(self.calibrator.o_cal_peek[n].numerator()>>8),
+                        m.d.sync += i2c_master.led[n].eq(self.calibrator.o_cal_peek[n].as_value()>>8),
                     with m.Else():
                         m.d.sync += i2c_master.led[n].eq(0),
                 else:
                     with m.If(self.i_cal.valid):
-                        m.d.sync += i2c_master.led[n].eq(self.i_cal.payload[n-4].numerator()>>8),
+                        m.d.sync += i2c_master.led[n].eq(self.i_cal.payload[n-4].as_value()>>8),
             with m.Else():
                 m.d.sync += i2c_master.led[n].eq(self.led[n]),
 

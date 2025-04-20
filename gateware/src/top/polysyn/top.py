@@ -146,7 +146,7 @@ class PolySynth(wiring.Component):
             # Connect voice.vel and NCO.o -> SVF.
             dsp.connect_remap(m, ncos[n].o, svfs[n].i, lambda o, i : [
                 i.payload.x                    .eq(o.payload >> 1),
-                i.payload.resonance.numerator().eq(self.reso),
+                i.payload.resonance.as_value().eq(self.reso),
                 i.payload.cutoff               .eq(follower.o.payload << 5)
             ])
 
@@ -181,9 +181,9 @@ class PolySynth(wiring.Component):
 
         for lr in [0, 1]:
             dsp.connect_remap(m, hpf_split2.o[lr], output_hpfs[lr].i, lambda o, i : [
-                i.payload.x                     .eq(o.payload),
-                i.payload.cutoff.numerator()    .eq(200),
-                i.payload.resonance.numerator() .eq(20000),
+                i.payload.x                    .eq(o.payload),
+                i.payload.cutoff.as_value()    .eq(200),
+                i.payload.resonance.as_value() .eq(20000),
             ])
 
             dsp.connect_remap(m, output_hpfs[lr].o, hpf_merge4.i[2+lr], lambda o, i : [

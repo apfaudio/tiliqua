@@ -430,7 +430,7 @@ class WaveShaper(wiring.Component):
                 if self.continuous:
                     m.d.comb += rport.addr.eq(x.truncate()+1)
                 else:
-                    with m.If((x.truncate()).numerator() ==
+                    with m.If((x.truncate()).as_value() ==
                               2**(self.lut_addr_width-1)-1):
                         m.d.comb += trunc.eq(1)
                         m.d.comb += rport.addr.eq(x.truncate())

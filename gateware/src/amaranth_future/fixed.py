@@ -77,7 +77,14 @@ class UQ(Shape):
 class Value(hdl.ValueCastable):
     def __init__(self, shape, target):
         self._shape = shape
-        self._target = target
+        if self.signed and not target.shape().signed:
+            # When methods bit-pick or concatenate to
+            # the _target of a Value, and then use this
+            # to reconstruct a Value, we may lose the
+            # signedness of its underlying _target.
+            self._target = target.as_signed()
+        else:
+            self._target = target
 
     @property
     def signed(self):
@@ -104,7 +111,7 @@ class Value(hdl.ValueCastable):
     def eq(self, other):
 
         if isinstance(other, hdl.Value):
-            return self.numerator().eq(other)
+            return self.as_value().eq(other)
         elif isinstance(other, int) or isinstance(other, float):
             other = Const(other, self.shape())
         elif not isinstance(other, Value):
@@ -112,16 +119,7 @@ class Value(hdl.ValueCastable):
 
         other = other.reshape(self.f_bits)
 
-        return self.numerator().eq(other.numerator())
-
-
-    def numerator(self):
-        # Adding an `s ( )` signedness wrapper in `as_value` when needed
-        # breaks lib.wiring for some reason. How to combine numerator() and
-        # `as_value()`?.
-        if self.signed:
-            return self._target.as_signed()
-        return self._target
+        return self.as_value().eq(other.as_value())
 
     def reshape(self, f_bits):
 
@@ -131,9 +129,11 @@ class Value(hdl.ValueCastable):
         shape = hdl.Shape(self.i_bits + f_bits, signed=self.signed)
 
         if f_bits > self.f_bits:
-            return Shape(shape, f_bits)(hdl.Cat(hdl.Const(0, f_bits - self.f_bits), self.numerator()))
+            result = Shape(shape, f_bits)(hdl.Cat(hdl.Const(0, f_bits - self.f_bits), self.as_value()))
         else:
-            return Shape(shape, f_bits)(self.numerator()[self.f_bits - f_bits:])
+            result = Shape(shape, f_bits)(self.as_value()[self.f_bits - f_bits:])
+
+        return result
 
     def truncate(self, f_bits=0):
         if f_bits > self.f_bits:
@@ -159,7 +159,7 @@ class Value(hdl.ValueCastable):
         if not shape.i_bits <= self.i_bits:
             raise ValueError(f"Cannot `saturate`: shape.i_bits={shape.i_bits} > self.i_bits={self.i_bits} would have no effect.")
         clamped = self.reshape(shape.f_bits).clamp(shape.min(), shape.max())
-        return Value(shape, clamped.numerator())
+        return Value(shape, clamped.as_value())
 
     def _binary_op(self, rhs, operator, callable_f_bits = lambda a, b: max(a, b), pre_reshape=True, post_cast=True):
 
@@ -177,7 +177,7 @@ class Value(hdl.ValueCastable):
             lhs = lhs.reshape(f_bits)
             rhs = rhs.reshape(f_bits)
 
-        value = getattr(lhs.numerator(), operator)(rhs.numerator())
+        value = getattr(lhs.as_value(), operator)(rhs.as_value())
         return Value.cast(value, f_bits) if post_cast else value
 
     def __mul__(self, other):
@@ -200,10 +200,10 @@ class Value(hdl.ValueCastable):
         return self
 
     def __neg__(self):
-        return Value.cast(-self.numerator(), self.f_bits)
+        return Value.cast(-self.as_value(), self.f_bits)
 
     def __abs__(self):
-        return Value.cast(abs(self.numerator()), self.f_bits)
+        return Value.cast(abs(self.as_value()), self.f_bits)
 
     def __lshift__(self, other):
         if isinstance(other, int):
@@ -211,9 +211,9 @@ class Value(hdl.ValueCastable):
                 raise ValueError("Shift amount cannot be negative")
 
             if other > self.f_bits:
-                return Value.cast(hdl.Cat(hdl.Const(0, other - self.f_bits), self.numerator()))
+                return Value.cast(hdl.Cat(hdl.Const(0, other - self.f_bits), self.as_value()))
             else:
-                return Value.cast(self.numerator(), self.f_bits - other)
+                return Value.cast(self.as_value(), self.f_bits - other)
 
         elif not isinstance(other, hdl.Value):
             raise TypeError("Shift amount must be an integer value")
@@ -221,7 +221,7 @@ class Value(hdl.ValueCastable):
         if other.signed:
             raise TypeError("Shift amount must be unsigned")
 
-        return Value.cast(self.numerator() << other, self.f_bits)
+        return Value.cast(self.as_value() << other, self.f_bits)
 
     def __rshift__(self, other):
         if isinstance(other, int):
@@ -230,14 +230,14 @@ class Value(hdl.ValueCastable):
             # Extend f_bits by fixed shift amount.
             i_bits = self.i_bits - other
             f_bits = self.f_bits + other
-            numerator = self.numerator()
+            numerator = self.as_value()
         elif isinstance(other, hdl.Value):
             if other.shape().signed:
                 raise TypeError("Shift amount must be unsigned")
             # Extend by maximum possible shift represented by hdl.Value.
             f_bits = self.f_bits + 2**other.shape().width - 1
             i_bits = self.i_bits - (f_bits - self.f_bits)
-            numerator = self.reshape(f_bits).numerator() >> other
+            numerator = self.reshape(f_bits).as_value() >> other
         else:
             raise TypeError("Shift amount must be an integer value")
 
