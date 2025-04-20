@@ -577,6 +577,7 @@ class DCBlock(wiring.Component):
     def __init__(self, pole=0.999, sq=ASQ, macp=None):
         self.macp = macp or mac.MAC.default()
         self.pole = pole
+        self.sq = sq
         super().__init__({
             "i": In(stream.Signature(sq)),
             "o": Out(stream.Signature(sq)),
@@ -588,16 +589,14 @@ class DCBlock(wiring.Component):
 
         m.submodules.macp = mp = self.macp
 
-        mtype = mac.SQNative
+        kA    = fixed.Const((1-self.pole), self.sq)
 
-        kA    = fixed.Const((1-self.pole), mtype)
+        x     = Signal(self.sq)
+        y     = Signal(self.sq)
 
-        x     = Signal(mtype)
-        y     = Signal(mtype)
+        acc   = Signal(mac.SQRNative)
 
-        acc   = Signal.like(y*kA)
-
-        m.d.comb += self.o.payload.eq(y)
+        m.d.comb += self.o.payload.eq(acc)
 
         with m.FSM() as fsm:
 
@@ -611,17 +610,14 @@ class DCBlock(wiring.Component):
                    m.next = 'MAC0'
 
             with m.State('MAC0'):
-                m.d.sync += acc.eq((acc - y*kA) + x)
-                m.next = 'MAC1'
-
-            with m.State('MAC1'):
-                # Quantization here
-                m.d.sync += y.eq(acc)
-                m.next = 'WAIT-READY'
+                with mp.Multiply(m, a=y, b=kA):
+                    m.d.sync += acc.eq((acc - mp.z) + x)
+                    m.next = 'WAIT-READY'
 
             with m.State('WAIT-READY'):
                 m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
+                    m.d.sync += y.eq(acc)
                     m.next = 'WAIT-VALID'
 
         return m

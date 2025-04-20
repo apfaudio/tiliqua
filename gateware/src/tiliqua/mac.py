@@ -50,6 +50,8 @@ from amaranth_future       import fixed
 
 # Native 18-bit multiplier type.
 SQNative = fixed.SQ(3, ASQ.f_bits)
+# Native 36-bit result type
+SQRNative = fixed.SQ(3*2, 2*ASQ.f_bits)
 
 class MAC(wiring.Component):
 
@@ -62,7 +64,7 @@ class MAC(wiring.Component):
 
     a: In(SQNative)
     b: In(SQNative)
-    z: Out(SQNative)
+    z: Out(SQRNative)
 
     # Assert strobe when a, b are valid. Keep a, b
     # valid and strobe asserted until `valid` is strobed,
@@ -131,7 +133,7 @@ class RingMessage(data.Struct):
 
     class MulServerPayload(data.Struct):
         """A MAC computation result."""
-        z: SQNative
+        z: SQRNative
 
     source  : Source
     kind    : Kind
