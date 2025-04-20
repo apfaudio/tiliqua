@@ -574,7 +574,7 @@ class DCBlock(wiring.Component):
     https://dspguru.com/dsp/tricks/fixed-point-dc-blocking-filter-with-noise-shaping/
     """
 
-    def __init__(self, pole=0.99, sq=ASQ, macp=None):
+    def __init__(self, pole=0.999, sq=ASQ, macp=None):
         self.macp = macp or mac.MAC.default()
         self.pole = pole
         super().__init__({
@@ -590,11 +590,12 @@ class DCBlock(wiring.Component):
 
         mtype = mac.SQNative
 
-        kA    = fixed.Const(self.pole, mtype)
+        kA    = fixed.Const((1-self.pole), mtype)
 
         x     = Signal(mtype)
         y     = Signal(mtype)
-        d     = Signal(mtype)
+
+        acc   = Signal.like(y*kA)
 
         m.d.comb += self.o.payload.eq(y)
 
@@ -604,15 +605,19 @@ class DCBlock(wiring.Component):
                 m.d.comb += self.i.ready.eq(1)
                 with m.If(self.i.valid):
                    m.d.sync += [
-                       d.eq(self.i.payload - x),
                        x.eq(self.i.payload),
+                       acc.eq(acc - x),
                    ]
                    m.next = 'MAC0'
 
             with m.State('MAC0'):
-                with mp.Multiply(m, a=y, b=kA):
-                    m.d.sync += y.eq(mp.z + d)
-                    m.next = 'WAIT-READY'
+                m.d.sync += acc.eq((acc - y*kA) + x)
+                m.next = 'MAC1'
+
+            with m.State('MAC1'):
+                # Quantization here
+                m.d.sync += y.eq(acc)
+                m.next = 'WAIT-READY'
 
             with m.State('WAIT-READY'):
                 m.d.comb += self.o.valid.eq(1)

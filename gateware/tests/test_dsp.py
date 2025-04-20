@@ -454,8 +454,8 @@ class DSPTests(unittest.TestCase):
         dut = dsp.DCBlock()
 
         async def testbench(ctx):
-            for n in range(0, 1024*2):
-                x = fixed.Const(0.2+0.3*(math.sin(n*0.2) + math.sin(n)), shape=ASQ)
+            for n in range(0, 1024*5):
+                x = fixed.Const(0.2+0.001*(math.sin(n*0.2) + math.sin(n)), shape=ASQ)
                 ctx.set(dut.i.payload, x)
                 ctx.set(dut.i.valid, 1)
                 await ctx.tick()
