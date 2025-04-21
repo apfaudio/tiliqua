@@ -54,7 +54,7 @@ from luna_soc.gateware.provider.cynthion         import UARTProvider
 from luna_soc.util                               import readbin
 from luna_soc.generate                           import rust, introspect, svd
 
-from vendor.vexriscv                             import VexRiscv
+from vendor.vexiiriscv                           import VexiiRiscv
 
 from tiliqua.tiliqua_platform                    import *
 from tiliqua.raster                              import Persistance
@@ -195,7 +195,7 @@ class TiliquaSoc(Component):
                 self.fw_max_size = 0x50000 # 320KiB
 
         # cpu
-        self.cpu = VexRiscv(
+        self.cpu = VexiiRiscv(
             variant=cpu_variant,
             reset_addr=self.reset_addr,
         )
@@ -325,6 +325,7 @@ class TiliquaSoc(Component):
         m.submodules.cpu = self.cpu
         self.wb_arbiter.add(self.cpu.ibus)
         self.wb_arbiter.add(self.cpu.dbus)
+        self.wb_arbiter.add(self.cpu.pbus)
 
         # interrupt controller
         m.submodules.interrupt_controller = self.interrupt_controller

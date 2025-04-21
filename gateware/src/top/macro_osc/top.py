@@ -131,11 +131,11 @@ class AudioFIFOPeripheral(wiring.Component):
 
         m.d.comb += self._fifo_len.f.fifo_len.r_data.eq(self._fifo0.level)
 
-        # Resample 12kHz to 48kHz
+        # Resample 24kHz to 48kHz
         m.submodules.resample_up0 = resample_up0 = dsp.Resample(
-                fs_in=12000, n_up=4, m_down=1)
+                fs_in=24000, n_up=2, m_down=1)
         m.submodules.resample_up1 = resample_up1 = dsp.Resample(
-                fs_in=12000, n_up=4, m_down=1)
+                fs_in=24000, n_up=2, m_down=1)
         wiring.connect(m, self._fifo0.r_stream, resample_up0.i)
         wiring.connect(m, self._fifo1.r_stream, resample_up1.i)
 
