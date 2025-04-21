@@ -482,34 +482,36 @@ class SVF(wiring.Component):
     Reference: Fig.3 in https://arxiv.org/pdf/2111.05592
     """
 
-    def __init__(self, sq=ASQ, macp=None):
-        self.sq = sq
+    def __init__(self, dtype=ASQ, macp=None):
+        self.dtype = dtype
         self.macp = macp or mac.MAC.default()
         super().__init__({
             "i": In(stream.Signature(data.StructLayout({
-                    "x": sq,
-                    "cutoff": sq,
-                    "resonance": sq,
+                    "x": dtype,
+                    "cutoff": dtype,
+                    "resonance": dtype,
                 }))),
             "o": Out(stream.Signature(data.StructLayout({
-                    "hp": sq,
-                    "lp": sq,
-                    "bp": sq,
+                    "hp": dtype,
+                    "lp": dtype,
+                    "bp": dtype,
                 }))),
         })
+
 
     def elaborate(self, platform):
         m = Module()
 
         m.submodules.macp = mp = self.macp
 
-        x     = Signal(mac.SQNative)
-        kK    = Signal(mac.SQNative)
-        kQinv = Signal(mac.SQNative)
+        mtype = mac.SQNative
 
-        abp   = Signal(mac.SQRNative)
-        alp   = Signal(mac.SQRNative)
-        ahp   = Signal(mac.SQRNative)
+        abp   = Signal(mtype)
+        alp   = Signal(mtype)
+        ahp   = Signal(mtype)
+        x     = Signal(mtype)
+        kK    = Signal(mtype)
+        kQinv = Signal(mtype)
 
         # internal oversampling iterations
         n_oversample = 2
@@ -556,9 +558,9 @@ class SVF(wiring.Component):
             with m.State('WAIT-READY'):
                 m.d.comb += [
                     self.o.valid.eq(1),
-                    self.o.payload.hp.eq(ahp),
-                    self.o.payload.lp.eq(alp),
-                    self.o.payload.bp.eq(abp),
+                    self.o.payload.hp.eq(ahp >> 1),
+                    self.o.payload.lp.eq(alp >> 1),
+                    self.o.payload.bp.eq(abp >> 1),
                 ]
                 with m.If(self.o.ready):
                     m.next = 'WAIT-VALID'
