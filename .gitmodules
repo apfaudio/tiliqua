@@ -4,3 +4,6 @@
 [submodule "gateware/deps/luna-soc"]
 	path = gateware/deps/luna-soc
 	url = git@github.com:vk2seb/luna-soc.git
+[submodule "gateware/deps/VexiiRiscv"]
+	path = gateware/deps/VexiiRiscv
+	url = git@github.com:SpinalHDL/VexiiRiscv.git
