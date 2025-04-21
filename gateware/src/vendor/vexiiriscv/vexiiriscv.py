@@ -26,22 +26,45 @@ import logging
 import shutil
 import subprocess
 
+CPU_BASE = [
+    '--xlen=32',
+    '--with-rvm',
+    '--lsu-l1',
+    '--lsu-wishbone',
+    '--lsu-l1-wishbone',
+    '--fetch-l1',
+    '--fetch-wishbone',
+]
+
 CPU_VARIANTS = {
-    "tiliqua_rv32im": [
-        '--xlen=32',
-        '--with-rvm',
-        '--lsu-l1',
-        '--lsu-wishbone',
-        '--lsu-l1-wishbone',
-        '--fetch-l1',
-        '--fetch-wishbone',
+    "tiliqua_rv32im": CPU_BASE + [
+        '--lsu-l1-sets=8',
+        '--lsu-l1-ways=1',
+        '--fetch-l1-sets=8',
+        '--fetch-l1-ways=1',
         '--with-btb',
+        '--with-late-alu',
+    ],
+    "tiliqua_rv32imafc": CPU_BASE + [
+        '--with-rvc',
+        '--with-rva',
+        '--with-rvf',
+        '--fma-reduced-accuracy',
+        '--fpu-ignore-subnormal',
+        '--with-btb',
+        '--with-late-alu',
+        '--lsu-hardware-prefetch rpt',
+        '--lsu-l1-refill-count=2',
+        '--lsu-l1-writeback-count=2',
+        '--lsu-l1-ways=2',
+        '--lsu-l1-sets=32',
+        '--fetch-l1-ways=2',
+        '--fetch-l1-sets=32',
         '--with-gshare',
         '--with-ras',
         '--regfile-async',
         '--with-aligner-buffer',
         '--with-dispatcher-buffer',
-        '--with-late-alu',
     ]
 }
 
@@ -62,7 +85,6 @@ class VexiiRiscv(Component):
     PATH_CACHE = os.path.join(os.path.dirname(__file__), "verilog")
 
     def __init__(self, variant="tiliqua", reset_addr=0x0,
-                 cached_base=0x0, cached_size=0x80000000,
                  csr_base=0xf0000000, csr_size=0x10000):
 
         self._variant    = variant
@@ -103,7 +125,9 @@ class VexiiRiscv(Component):
         # Add required reset vector and PMP region arguments.
         netlist_arguments = netlist_arguments + [
             f'--reset-vector {hex(reset_addr)}',
-            f'--region base={cached_base:x},size={cached_size:x},main=1,exe=1',
+            f'--region base=0,size=10000,main=1,exe=0', # TODO take from RAM config
+            f'--region base=10000000,size=1000000,main=1,exe=1',
+            f'--region base=20000000,size=1000000,main=1,exe=1',
             f'--region base={csr_base:x},size={csr_size:x},main=0,exe=0',
         ]
         vexiiriscv_hash = git.Repo(vexiiriscv_root).head.object.hexsha
