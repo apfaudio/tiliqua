@@ -2,10 +2,10 @@
 # It is not intended for manual editing.
 
 [metadata]
-groups = ["default", "docs", "test"]
+groups = ["default", "dev", "docs", "test"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:8484fe3c30efb0108344ba54aec1bc25aa8eba8839ff1d964e58b81c1f33ddff"
+content_hash = "sha256:d23099a19c61efcfd69502c5508cbfa4befc65b3eb94ed7b2d7b88ec878358ff"
 
 [[metadata.targets]]
 requires_python = ">=3.10"
@@ -26,7 +26,7 @@ name = "amaranth"
 version = "0.5.4"
 requires_python = "~=3.8"
 summary = "Amaranth hardware definition language"
-groups = ["default"]
+groups = ["default", "dev"]
 dependencies = [
     "Jinja2~=3.0",
     "importlib-resources; python_version < \"3.9\"",
@@ -243,7 +243,7 @@ name = "construct"
 version = "2.10.70"
 requires_python = ">=3.6"
 summary = "A powerful declarative symmetric parser/builder for binary data"
-groups = ["default"]
+groups = ["default", "dev"]
 files = [
     {file = "construct-2.10.70-py3-none-any.whl", hash = "sha256:c80be81ef595a1a821ec69dc16099550ed22197615f4320b57cc9ce2a672cb30"},
     {file = "construct-2.10.70.tar.gz", hash = "sha256:4d2472f9684731e58cc9c56c463be63baa1447d674e0d66aeb5627b22f512c29"},
@@ -560,7 +560,7 @@ name = "jinja2"
 version = "3.1.6"
 requires_python = ">=3.7"
 summary = "A very fast and expressive template engine."
-groups = ["default", "docs"]
+groups = ["default", "dev", "docs"]
 dependencies = [
     "MarkupSafe>=2.0",
 ]
@@ -574,7 +574,7 @@ name = "jschon"
 version = "0.11.1"
 requires_python = "~=3.8"
 summary = "A JSON toolkit for Python developers."
-groups = ["default"]
+groups = ["default", "dev"]
 dependencies = [
     "rfc3986",
 ]
@@ -676,7 +676,7 @@ files = [
 name = "libusb1"
 version = "3.3.1"
 summary = "Pure-python wrapper for libusb-1.0"
-groups = ["default"]
+groups = ["default", "dev"]
 files = [
     {file = "libusb1-3.3.1-py3-none-any.whl", hash = "sha256:808c9362299dcee01651aa87e71e9d681ccedb27fc4dbd70aaf14e245fb855f1"},
     {file = "libusb1-3.3.1-py3-none-win32.whl", hash = "sha256:0ef69825173ce74af34444754c081cc324233edc6acc405658b3ad784833e076"},
@@ -688,11 +688,10 @@ files = [
 name = "luna-soc"
 version = "0.2.0"
 requires_python = ">=3.9"
-git = "https://github.com/vk2seb/luna-soc"
-ref = "seb/rebase-tiliquasoc"
-revision = "b34393ed8e74fe9851cba5b7f5ba479ec7903c4f"
+editable = true
+path = "./deps/luna-soc"
 summary = "Amaranth HDL libary for building SoCs with LUNA USB peripherals."
-groups = ["default"]
+groups = ["dev"]
 dependencies = [
     "luna-usb~=0.2",
 ]
@@ -705,7 +704,7 @@ git = "https://github.com/greatscottgadgets/luna"
 ref = "main"
 revision = "6c7c93d6ff5bd2390f430949cea4baf6686f0f97"
 summary = "Amaranth HDL framework for FPGA-based USB solutions"
-groups = ["default"]
+groups = ["default", "dev"]
 dependencies = [
     "amaranth~=0.5.0",
     "libusb1>1.9.2",
@@ -720,7 +719,7 @@ name = "markupsafe"
 version = "3.0.2"
 requires_python = ">=3.9"
 summary = "Safely add untrusted strings to HTML/XML markup."
-groups = ["default", "docs"]
+groups = ["default", "dev", "docs"]
 files = [
     {file = "MarkupSafe-3.0.2-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:7e94c425039cde14257288fd61dcfb01963e658efbc0ff54f5306b06054700f8"},
     {file = "MarkupSafe-3.0.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:9e2d922824181480953426608b81967de705c3cef4d1af983af849d7bd619158"},
@@ -1082,7 +1081,7 @@ files = [
 name = "pyserial"
 version = "3.5"
 summary = "Python Serial Port Extension"
-groups = ["default"]
+groups = ["default", "dev"]
 files = [
     {file = "pyserial-3.5-py2.py3-none-any.whl", hash = "sha256:c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0"},
     {file = "pyserial-3.5.tar.gz", hash = "sha256:3c77e014170dfffbd816e6ffc205e9842efb10be9f58ec16d3e8675b4925cddb"},
@@ -1126,7 +1125,7 @@ name = "pyusb"
 version = "1.3.1"
 requires_python = ">=3.9.0"
 summary = "Easy USB access for Python"
-groups = ["default"]
+groups = ["default", "dev"]
 files = [
     {file = "pyusb-1.3.1-py3-none-any.whl", hash = "sha256:bf9b754557af4717fe80c2b07cc2b923a9151f5c08d17bdb5345dac09d6a0430"},
     {file = "pyusb-1.3.1.tar.gz", hash = "sha256:3af070b607467c1c164f49d5b0caabe8ac78dbed9298d703a8dbf9df4052d17e"},
@@ -1137,7 +1136,7 @@ name = "pyvcd"
 version = "0.4.1"
 requires_python = ">=3.7"
 summary = "Python VCD file support"
-groups = ["default"]
+groups = ["default", "dev"]
 files = [
     {file = "pyvcd-0.4.1-py2.py3-none-any.whl", hash = "sha256:3a4c71d4dce741f1155a2ed11a6278390a0816293068f6162ad9658d20f75578"},
     {file = "pyvcd-0.4.1.tar.gz", hash = "sha256:dc6275e95a7949b8236086ab2e6d03afede73441243ec5109c9ea89077f3d696"},
@@ -1165,7 +1164,7 @@ name = "rfc3986"
 version = "2.0.0"
 requires_python = ">=3.7"
 summary = "Validating URI References per RFC 3986"
-groups = ["default"]
+groups = ["default", "dev"]
 files = [
     {file = "rfc3986-2.0.0-py2.py3-none-any.whl", hash = "sha256:50b1502b60e289cb37883f3dfd34532b8873c7de9f49bb546641ce9cbd256ebd"},
     {file = "rfc3986-2.0.0.tar.gz", hash = "sha256:97aacf9dbd4bfd829baad6e6309fa6573aaf1be3f6fa735c8ab05e46cecb261c"},
@@ -1529,7 +1528,7 @@ name = "usb-protocol"
 version = "0.9.1"
 requires_python = ">=3.8"
 summary = "Python library providing utilities, data structures, constants, parsers, and tools for working with the USB protocol."
-groups = ["default"]
+groups = ["default", "dev"]
 dependencies = [
     "construct~=2.10",
 ]
