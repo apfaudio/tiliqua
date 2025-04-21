@@ -198,22 +198,22 @@ def channel_remap(m, stream_o, stream_i, mapping_o_to_i):
 class VCA(wiring.Component):
 
     """
-    Voltage Controlled Amplifier (simple multiplier).
+    Voltage Controlled Amplifier (simple multiplier with saturation).
+    Output values are clipped to fit in the output type.
 
     Members
     -------
-    i : :py:`In(stream.Signature(data.ArrayLayout(ASQ, 2)))`
+    i : :py:`In(stream.Signature(data.ArrayLayout(itype, 2)))`
         2-channel input stream.
-    o : :py:`Out(stream.Signature(data.ArrayLayout(ASQ, 1)))`
+    o : :py:`Out(stream.Signature(otype))`
         Output stream, :py:`i.payload[0] * i.payload[1]`.
     """
 
-    def __init__(self, dtype=ASQ, macp=None):
-        self.dtype = dtype
+    def __init__(self, itype=mac.SQNative, otype=ASQ, macp=None):
         self.macp = macp or mac.MAC.default()
         super().__init__({
-            "i": In(stream.Signature(data.ArrayLayout(self.dtype, 2))),
-            "o": Out(stream.Signature(data.ArrayLayout(self.dtype, 1)))
+            "i": In(stream.Signature(data.ArrayLayout(itype, 2))),
+            "o": Out(stream.Signature(otype))
         })
 
     def elaborate(self, platform):
@@ -230,58 +230,13 @@ class VCA(wiring.Component):
 
             with m.State('MAC'):
                 with mp.Multiply(m, a=self.i.payload[0], b=self.i.payload[1]):
-                    m.d.sync += self.o.payload[0].eq(mp.z)
+                    m.d.sync += self.o.payload.eq(mp.z.saturate(self.o.payload.shape()))
                     m.next = 'WAIT-READY'
 
             with m.State('WAIT-READY'):
                 m.d.comb += self.o.valid.eq(1),
                 with m.If(self.o.ready):
                     m.next = 'WAIT-VALID'
-
-        return m
-
-class GainVCA(wiring.Component):
-
-    """
-    Voltage Controlled Amplifier where the gain amount can be > 1.
-    The output is clipped to fit in a normal ASQ.
-
-    Members
-    -------
-    i : :py:`In(stream.Signature(data.StructLayout)`
-        2-channel input stream, with fields :py:`x` (audio in) and :py:`gain`
-        (multiplier that may be >1 for saturation. legal values :py:`-3 < gain < 3`)
-    o : :py:`Out(stream.Signature(ASQ))`
-        Output stream, :py:`x * gain` with saturation.
-    """
-
-    i: In(stream.Signature(data.StructLayout({
-            "x": ASQ,
-            "gain": fixed.SQ(2, ASQ.f_width), # only 2 extra bits, so -3 to +3 is OK
-        })))
-    o: Out(stream.Signature(ASQ))
-
-    def elaborate(self, platform):
-        m = Module()
-
-        result = Signal(fixed.SQ(3, ASQ.f_width))
-        m.d.comb += result.eq(self.i.payload.x * self.i.payload.gain)
-
-        sat_hi = fixed.Const(0, shape=ASQ)
-        sat_hi._value = 2**ASQ.f_width - 1 # move to Const.max()?
-        sat_lo = fixed.Const(-1, shape=ASQ)
-
-        with m.If(sat_hi < result):
-            m.d.comb += self.o.payload.eq(sat_hi),
-        with m.Elif(result < sat_lo):
-            m.d.comb += self.o.payload.eq(sat_lo),
-        with m.Else():
-            m.d.comb += self.o.payload.eq(result),
-
-        m.d.comb += [
-            self.o.valid.eq(self.i.valid),
-            self.i.ready.eq(self.o.ready),
-        ]
 
         return m
 
@@ -314,7 +269,7 @@ class SawNCO(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        s = Signal(fixed.SQ(self.extra_bits, ASQ.f_width))
+        s = Signal(fixed.SQ(self.extra_bits, ASQ.f_bits))
 
         out_no_phase_mod = Signal(ASQ)
 
@@ -388,7 +343,7 @@ class Ramp(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        s = Signal(fixed.SQ(self.extra_bits, ASQ.f_width))
+        s = Signal(fixed.SQ(self.extra_bits+1, ASQ.f_bits))
 
         m.d.comb += [
             self.o.valid.eq(self.i.valid),
@@ -397,8 +352,7 @@ class Ramp(wiring.Component):
         ]
 
         with m.If(self.i.valid & self.o.ready):
-            with m.If((self.o.payload > fixed.Const(0.95, shape=ASQ)) &
-                      (self.o.payload.as_value()[15] == 0)):
+            with m.If(self.o.payload > fixed.Const(0.95, shape=ASQ)):
                 with m.If(self.i.payload.trigger):
                     m.d.sync += s.eq(ASQ.min() << self.shift)
             with m.Else():
@@ -434,7 +388,10 @@ class WaveShaper(wiring.Component):
             else:
                 x = 2*(i - lut_size) / lut_size
             fx = lut_function(x)
-            self.lut.append(fixed.Const(fx, shape=ASQ)._value)
+            if fx > ASQ.max().as_float() or fx < ASQ.min().as_float():
+                print(f"WARN: WaveShaper `lut_function` generates {fx:.5f} which is outside "
+                      f"[{ASQ.min().as_float():.5f}..{ASQ.max().as_float():.5f}] (will be clamped)")
+            self.lut.append(fixed.Const(fx, shape=ASQ, clamp=True))
 
         super().__init__()
 
@@ -443,12 +400,11 @@ class WaveShaper(wiring.Component):
 
         m.submodules.macp = mp = self.macp
 
-        # TODO (amaranth 0.5+): use native ASQ shape in LUT memory
         m.submodules.mem = mem = Memory(
-            shape=signed(ASQ.as_shape().width), depth=self.lut_size, init=self.lut)
+            shape=ASQ, depth=self.lut_size, init=self.lut)
         rport = mem.read_port()
 
-        ltype = fixed.SQ(self.lut_addr_width-1, ASQ.f_width-self.lut_addr_width+1)
+        ltype = fixed.SQ(self.lut_addr_width, ASQ.f_bits-self.lut_addr_width+1)
 
         x = Signal(ltype)
         y = Signal(ASQ)
@@ -462,7 +418,7 @@ class WaveShaper(wiring.Component):
             with m.State('WAIT-VALID'):
                 m.d.comb += self.i.ready.eq(1),
                 with m.If(self.i.valid):
-                    m.d.sync += x.eq(self.i.payload << ltype.i_width)
+                    m.d.sync += x.eq(self.i.payload << (ltype.i_bits-1))
                     m.d.sync += y.eq(0)
                     m.next = 'ADDR0'
 
@@ -474,7 +430,7 @@ class WaveShaper(wiring.Component):
                 if self.continuous:
                     m.d.comb += rport.addr.eq(x.truncate()+1)
                 else:
-                    with m.If((x.truncate()).raw() ==
+                    with m.If((x.truncate()).as_value() ==
                               2**(self.lut_addr_width-1)-1):
                         m.d.comb += trunc.eq(1)
                         m.d.comb += rport.addr.eq(x.truncate())
@@ -483,7 +439,7 @@ class WaveShaper(wiring.Component):
                 m.next = 'READ0'
 
             with m.State('READ0'):
-                m.d.sync += read0.eq(fixed.Value(ASQ, rport.data))
+                m.d.sync += read0.eq(rport.data)
                 m.d.comb += [
                     rport.addr.eq(x.truncate()),
                     rport.en.eq(1),
@@ -491,7 +447,7 @@ class WaveShaper(wiring.Component):
                 m.next = 'READ1'
 
             with m.State('READ1'):
-                m.d.sync += read1.eq(fixed.Value(ASQ, rport.data))
+                m.d.sync += read1.eq(rport.data)
                 m.next = 'MAC0'
 
             with m.State('MAC0'):
@@ -526,36 +482,34 @@ class SVF(wiring.Component):
     Reference: Fig.3 in https://arxiv.org/pdf/2111.05592
     """
 
-    def __init__(self, dtype=ASQ, macp=None):
-        self.dtype = dtype
+    def __init__(self, sq=ASQ, macp=None):
+        self.sq = sq
         self.macp = macp or mac.MAC.default()
         super().__init__({
             "i": In(stream.Signature(data.StructLayout({
-                    "x": dtype,
-                    "cutoff": dtype,
-                    "resonance": dtype,
+                    "x": sq,
+                    "cutoff": sq,
+                    "resonance": sq,
                 }))),
             "o": Out(stream.Signature(data.StructLayout({
-                    "hp": dtype,
-                    "lp": dtype,
-                    "bp": dtype,
+                    "hp": sq,
+                    "lp": sq,
+                    "bp": sq,
                 }))),
         })
-
 
     def elaborate(self, platform):
         m = Module()
 
         m.submodules.macp = mp = self.macp
 
-        mtype = mac.SQNative
+        x     = Signal(mac.SQNative)
+        kK    = Signal.like(x)
+        kQinv = Signal.like(x)
 
-        abp   = Signal(mtype)
-        alp   = Signal(mtype)
-        ahp   = Signal(mtype)
-        x     = Signal(mtype)
-        kK    = Signal(mtype)
-        kQinv = Signal(mtype)
+        abp   = Signal(fixed.SQ(mac.SQNative.i_bits, mac.SQNative.f_bits+2))
+        alp   = Signal.like(abp)
+        ahp   = Signal.like(alp)
 
         # internal oversampling iterations
         n_oversample = 2
@@ -568,10 +522,9 @@ class SVF(wiring.Component):
                 with m.If(self.i.valid):
                    m.d.sync += x.eq(self.i.payload.x),
                    m.d.sync += oversample.eq(0)
-                   # FIXME: signedness (>=0)  check without working around `fixed`
-                   with m.If(self.i.payload.cutoff.as_value()[15] == 0):
+                   with m.If(self.i.payload.cutoff >= 0):
                        m.d.sync += kK.eq(self.i.payload.cutoff)
-                   with m.If(self.i.payload.resonance.as_value()[15] == 0):
+                   with m.If(self.i.payload.resonance >= 0):
                        m.d.sync += kQinv.eq(self.i.payload.resonance)
                    m.next = 'MAC0'
 
@@ -611,6 +564,63 @@ class SVF(wiring.Component):
                     m.next = 'WAIT-VALID'
 
         return m
+
+class DCBlock(wiring.Component):
+
+    """
+    Loosely based on:
+    https://dspguru.com/dsp/tricks/fixed-point-dc-blocking-filter-with-noise-shaping/
+    """
+
+    def __init__(self, pole=0.999, sq=ASQ, macp=None):
+        self.macp = macp or mac.MAC.default()
+        self.pole = pole
+        self.sq = sq
+        super().__init__({
+            "i": In(stream.Signature(sq)),
+            "o": Out(stream.Signature(sq)),
+        })
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        m.submodules.macp = mp = self.macp
+
+        kA    = fixed.Const((1-self.pole), self.sq)
+
+        x     = Signal(self.sq)
+        y     = Signal(self.sq)
+
+        acc   = Signal(mac.SQRNative)
+
+        m.d.comb += self.o.payload.eq(acc)
+
+        with m.FSM() as fsm:
+
+            with m.State('WAIT-VALID'):
+                m.d.comb += self.i.ready.eq(1)
+                with m.If(self.i.valid):
+                   m.d.sync += [
+                       x.eq(self.i.payload),
+                       acc.eq(acc - x),
+                   ]
+                   m.next = 'MAC0'
+
+            with m.State('MAC0'):
+                with mp.Multiply(m, a=y, b=kA):
+                    m.d.sync += acc.eq((acc - mp.z) + x)
+                    m.next = 'WAIT-READY'
+
+            with m.State('WAIT-READY'):
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
+                    m.d.sync += y.eq(acc)
+                    m.next = 'WAIT-VALID'
+
+        return m
+
+
 
 class KickFeedback(Elaboratable):
     """
@@ -655,7 +665,7 @@ class PitchShift(wiring.Component):
         self.xfade_bits = exact_log2(xfade)
         # delay type: integer component is index into delay line
         # +1 is necessary so that we don't overflow on adding grain_sz.
-        self.dtype = fixed.SQ(self.tap.addr_width+1, 8)
+        self.dtype = fixed.SQ(self.tap.addr_width+2, 8)
         self.macp = macp or mac.MAC.default()
         super().__init__({
             "i": In(stream.Signature(data.StructLayout({
@@ -679,6 +689,7 @@ class PitchShift(wiring.Component):
         # Envelope values
         env0 = Signal(ASQ)
         env1 = Signal(ASQ)
+        output = Signal(ASQ)
 
         s    = Signal(self.dtype)
         m.d.comb += s.eq(delay0 + self.i.payload.pitch)
@@ -707,7 +718,7 @@ class PitchShift(wiring.Component):
                 m.d.comb += [
                     self.tap.o.ready.eq(1),
                     self.tap.i.valid.eq(1),
-                    self.tap.i.payload.eq(delay0.round() >> delay0.f_width),
+                    self.tap.i.payload.eq(1+delay0.truncate() >> delay0.f_bits),
                 ]
                 with m.If(self.tap.o.valid):
                     m.d.comb += self.tap.i.valid.eq(0),
@@ -717,7 +728,7 @@ class PitchShift(wiring.Component):
                 m.d.comb += [
                     self.tap.o.ready.eq(1),
                     self.tap.i.valid.eq(1),
-                    self.tap.i.payload.eq(delay1.round() >> delay1.f_width),
+                    self.tap.i.payload.eq(delay1.truncate() >> delay1.f_bits),
                 ]
                 with m.If(self.tap.o.valid):
                     m.d.comb += self.tap.i.valid.eq(0),
@@ -728,14 +739,14 @@ class PitchShift(wiring.Component):
                     # Map delay0 <= [0, xfade] to env0 <= [0, 1]
                     m.d.sync += [
                         env0.eq(delay0 >> self.xfade_bits),
-                        env1.eq(fixed.Const(0.99, shape=ASQ) -
+                        env1.eq(ASQ.max() -
                                 (delay0 >> self.xfade_bits)),
                     ]
                 with m.Else():
                     # If we're outside the xfade, just take tap 0
                     m.d.sync += [
-                        env0.eq(fixed.Const(0.99, shape=ASQ)),
-                        env1.eq(fixed.Const(0, shape=ASQ)),
+                        env0.eq(ASQ.max()),
+                        env1.eq(0),
                     ]
                 m.next = 'MAC0'
             with m.State('MAC0'):
@@ -749,6 +760,7 @@ class PitchShift(wiring.Component):
             with m.State('WAIT-READY'):
                 m.d.comb += self.o.valid.eq(1),
                 with m.If(self.o.ready):
+                    m.d.sync += output.eq(self.o.payload)
                     m.next = 'WAIT-VALID'
         return m
 
@@ -771,10 +783,10 @@ class MatrixMix(wiring.Component):
         self.i_channels = i_channels
         self.o_channels = o_channels
 
-        self.ctype = fixed.SQ(2, ASQ.f_width)
+        self.ctype = mac.SQNative
 
         coefficients_flat = [
-            fixed.Const(x, shape=self.ctype)._value
+            fixed.Const(x, shape=self.ctype)
             for xs in coefficients
             for x in xs
         ]
@@ -782,9 +794,8 @@ class MatrixMix(wiring.Component):
         assert(len(coefficients_flat) == i_channels*o_channels)
 
         # matrix coefficient memory
-        # TODO (amaranth 0.5+): use native shape in LUT memory
         self.mem = Memory(
-            shape=signed(self.ctype.as_shape().width),
+            shape=self.ctype,
             depth=i_channels*o_channels, init=coefficients_flat)
 
         super().__init__({
@@ -806,8 +817,7 @@ class MatrixMix(wiring.Component):
 
         i_latch = Signal(data.ArrayLayout(self.ctype, self.i_channels))
         o_accum = Signal(data.ArrayLayout(
-            fixed.SQ(self.ctype.i_width*2, self.ctype.f_width),
-            self.o_channels))
+            mac.SQRNative, self.o_channels))
 
         i_ch   = Signal(exact_log2(self.i_channels))
         o_ch   = Signal(exact_log2(self.o_channels))
@@ -855,7 +865,7 @@ class MatrixMix(wiring.Component):
                     ]
                     m.next = 'NEXT'
             with m.State('NEXT'):
-                m.next = 'READ'
+                m.next = 'MAC'
                 m.d.sync += [
                     o_ch_l.eq(o_ch),
                     l_i_ch.eq(i_ch),
@@ -868,14 +878,11 @@ class MatrixMix(wiring.Component):
                         m.d.sync += i_ch.eq(i_ch+1)
                 with m.Else():
                     m.d.sync += o_ch.eq(o_ch+1)
-            with m.State('READ'):
-                m.d.sync += read0.eq(fixed.Value(self.ctype, rport.data))
-                m.next = 'MAC'
             with m.State('MAC'):
                 m.next = 'NEXT'
                 m.d.sync += [
                     o_accum[o_ch_l].eq(o_accum[o_ch_l] +
-                                       (read0 *
+                                       (rport.data *
                                         i_latch[l_i_ch]))
                 ]
                 with m.If(done):
@@ -972,7 +979,7 @@ class FIR(wiring.Component):
 
         # Tap and accumulator sizes
 
-        self.ctype = fixed.SQ(2, ASQ.f_width)
+        self.ctype = fixed.SQ(2, ASQ.f_bits)
 
         n = len(self.taps_float)
 
@@ -1220,71 +1227,6 @@ class Resample(wiring.Component):
 
 
         wiring.connect(m, filt.o, wiring.flipped(self.o))
-
-        return m
-
-class Boxcar(wiring.Component):
-
-    """
-    Simple Boxcar Average.
-
-    Average of previous N samples, implemented with an accumulator.
-    Requires no multiplies, often useful for simple smoothing.
-
-    Can be used in low- or high-pass mode.
-    """
-
-    i: In(stream.Signature(ASQ))
-    o: Out(stream.Signature(ASQ))
-
-    def __init__(self, n: int=32, hpf=False):
-        # pow2 constraint on N allows us to shift instead of divide
-        assert(2**exact_log2(n) == n)
-        self.n = n
-        self.hpf = hpf
-        super().__init__()
-
-    def elaborate(self, platform):
-
-        m = Module()
-
-        # accumulator should be large enough to fit N samples
-        accumulator = Signal(fixed.SQ(2 + exact_log2(self.n), ASQ.f_width))
-        fifo_r_asq  = Signal(ASQ)
-        fifo_r_en_l = Signal()
-
-        # delay element
-        fifo = m.submodules.fifo = fifo = SyncFIFOBuffered(
-            width=ASQ.as_shape().width, depth=self.n)
-
-        # route input -> fifo
-        wiring.connect(m, wiring.flipped(self.i), fifo.w_stream)
-
-        # accumulator maintenance
-        m.d.sync += fifo_r_en_l.eq(fifo.r_en)
-        m.d.comb += fifo_r_asq.raw().eq(fifo.r_data) # raw -> ASQ
-        with m.If(self.i.valid & self.i.ready):
-            with m.If(fifo_r_en_l):
-                # sample in + out simultaneously (normal case)
-                m.d.sync += accumulator.eq(accumulator + self.i.payload - fifo_r_asq)
-            with m.Else():
-                # sample in only
-                m.d.sync += accumulator.eq(accumulator + self.i.payload)
-        with m.Elif(fifo_r_en_l):
-            # sample out only
-            m.d.sync += accumulator.eq(accumulator - fifo_r_asq)
-
-        # output route to output, accumulator division
-        if self.hpf:
-            # boxcar hpf
-            m.d.comb += self.o.payload.eq(fifo_r_asq - (accumulator >> exact_log2(self.n))),
-        else:
-            # normal averaging lpf
-            m.d.comb += self.o.payload.eq(accumulator >> exact_log2(self.n)),
-        m.d.comb += [
-            self.o.valid.eq(fifo.level == self.n), # VERIFY
-            fifo.r_en.eq(self.o.valid & self.o.ready),
-        ]
 
         return m
 

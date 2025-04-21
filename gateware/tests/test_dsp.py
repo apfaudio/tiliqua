@@ -18,7 +18,7 @@ from scipy                 import signal
 from parameterized         import parameterized
 
 from tiliqua.eurorack_pmod import ASQ
-from tiliqua               import dsp, mac, delay_line
+from tiliqua               import dsp, mac, delay_line, delay
 
 class DSPTests(unittest.TestCase):
 
@@ -258,11 +258,12 @@ class DSPTests(unittest.TestCase):
                 m.submodules.svf = dut = dsp.SVF()
 
         async def stimulus(ctx):
-            for n in range(0, 100):
+            for n in range(0, 200):
                 x = fixed.Const(0.4*(math.sin(n*0.2) + math.sin(n)), shape=ASQ)
+                y = fixed.Const(0.8*(math.sin(n*0.1)), shape=ASQ)
                 ctx.set(dut.i.valid, 1)
                 ctx.set(dut.i.payload.x, x)
-                ctx.set(dut.i.payload.cutoff, fixed.Const(0.2, shape=ASQ))
+                ctx.set(dut.i.payload.cutoff, y)
                 ctx.set(dut.i.payload.resonance, fixed.Const(0.1, shape=ASQ))
                 await ctx.tick().until(dut.i.ready)
                 ctx.set(dut.i.valid, 0)
@@ -286,10 +287,10 @@ class DSPTests(unittest.TestCase):
 
         matrix = dsp.MatrixMix(
             i_channels=4, o_channels=4,
-            coefficients=[[1, 0, 0, 0],
-                          [0, 1, 0, 0],
-                          [0, 0, 1, 0],
-                          [0, 0, 0, 1]])
+            coefficients=[[    1, 0,   0,  0],
+                          [-0.25, 1,  -2,  0],
+                          [    0, 0, 0.5,  0],
+                          [    0, 0,   0,  1]])
 
         async def testbench(ctx):
             ctx.set(matrix.i.payload[0], fixed.Const(0.2, shape=ASQ))
@@ -303,9 +304,9 @@ class DSPTests(unittest.TestCase):
             ctx.set(matrix.o.ready, 1)
             while ctx.get(matrix.o.valid) != 1:
                 await ctx.tick()
-            self.assertAlmostEqual(ctx.get(matrix.o.payload[0]).as_float(),  0.2, places=4)
+            self.assertAlmostEqual(ctx.get(matrix.o.payload[0]).as_float(),  0.3, places=4)
             self.assertAlmostEqual(ctx.get(matrix.o.payload[1]).as_float(), -0.4, places=4)
-            self.assertAlmostEqual(ctx.get(matrix.o.payload[2]).as_float(),  0.6, places=4)
+            self.assertAlmostEqual(ctx.get(matrix.o.payload[2]).as_float(), -0.9, places=4)
             self.assertAlmostEqual(ctx.get(matrix.o.payload[3]).as_float(), -0.8, places=4)
 
         sim = Simulator(matrix)
@@ -313,12 +314,6 @@ class DSPTests(unittest.TestCase):
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_matrix.vcd", "w")):
             sim.run()
-
-    def test_fixed_min_max(self):
-        self.assertIn("7'sd63", fixed.SQ(2, 4).max().__repr__())
-        self.assertIn("7'sd-64", fixed.SQ(2, 4).min().__repr__())
-        self.assertIn("16'sd32767", ASQ.max().__repr__())
-        self.assertIn("16'sd-32768", ASQ.min().__repr__())
 
     @parameterized.expand([
         ["mux_mac", mac.MuxMAC],
@@ -364,7 +359,7 @@ class DSPTests(unittest.TestCase):
             return math.tanh(3.0*x)
 
         m = Module()
-        vca = dsp.GainVCA()
+        vca = dsp.VCA()
         waveshaper = dsp.WaveShaper(lut_function=scaled_tanh)
 
         m.submodules += [vca, waveshaper]
@@ -377,10 +372,15 @@ class DSPTests(unittest.TestCase):
             await ctx.tick()
             for n in range(0, 100):
                 x = fixed.Const(0.8*math.sin(n*0.3), shape=ASQ)
-                gain = fixed.Const(3.0*math.sin(n*0.1), shape=fixed.SQ(2, ASQ.f_width))
-                ctx.set(vca.i.payload.x, x)
-                ctx.set(vca.i.payload.gain, gain)
+                gain = fixed.Const(3.0*math.sin(n*0.1), shape=vca.i.payload[0].shape())
+                ctx.set(vca.i.payload[0], x)
+                ctx.set(vca.i.payload[1], gain)
                 ctx.set(vca.i.valid, 1)
+                ctx.set(vca.o.ready, 1)
+                await ctx.tick()
+                ctx.set(vca.i.valid, 0)
+                while ctx.get(vca.o.valid) != 1:
+                    await ctx.tick()
                 await ctx.tick()
 
         sim = Simulator(m)
@@ -427,7 +427,7 @@ class DSPTests(unittest.TestCase):
 
     def test_boxcar(self):
 
-        boxcar = dsp.Boxcar(n=4, hpf=True)
+        boxcar = delay.Boxcar(n=32, hpf=True)
 
         async def testbench(ctx):
             for n in range(0, 1024):
@@ -435,15 +435,40 @@ class DSPTests(unittest.TestCase):
                 ctx.set(boxcar.i.payload, x)
                 ctx.set(boxcar.i.valid, 1)
                 await ctx.tick()
+                while ctx.get(boxcar.i.ready) != 1:
+                    await ctx.tick()
                 ctx.set(boxcar.i.valid, 0)
                 await ctx.tick()
                 ctx.set(boxcar.o.ready, 1)
-                while ctx.get(boxcar.i.ready) != 1:
+                while ctx.get(boxcar.o.ready) != 1:
                     await ctx.tick()
-                await ctx.tick()
 
         sim = Simulator(boxcar)
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_boxcar.vcd", "w")):
+            sim.run()
+
+    def test_dcblock(self):
+
+        dut = dsp.DCBlock()
+
+        async def testbench(ctx):
+            for n in range(0, 1024*20):
+                x = fixed.Const(0.2+0.001*(math.sin(n*0.2) + math.sin(n)), shape=ASQ)
+                ctx.set(dut.i.payload, x)
+                ctx.set(dut.i.valid, 1)
+                await ctx.tick()
+                ctx.set(dut.i.valid, 0)
+                await ctx.tick()
+                ctx.set(dut.o.ready, 1)
+                while ctx.get(dut.o.ready) != 1:
+                    await ctx.tick()
+                while ctx.get(dut.i.ready) != 1:
+                    await ctx.tick()
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open("test_dcblock.vcd", "w")):
             sim.run()

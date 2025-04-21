@@ -156,7 +156,7 @@ class I2STDM(wiring.Component):
         return m
 
 # Native 'Audio sample SQ', shape of audio samples from CODEC.
-ASQ = fixed.SQ(0, I2STDM.S_WIDTH-1)
+ASQ = fixed.SQ(1, I2STDM.S_WIDTH-1)
 
 class I2SCalibrator(wiring.Component):
 
@@ -226,7 +226,7 @@ class I2SCalibrator(wiring.Component):
         # CALIBRATION MEMORY
         #
 
-        self.ctype = fixed.SQ(2, ASQ.f_width)
+        self.ctype = fixed.SQ(3, ASQ.f_bits)
         cal_mem = Memory(shape=data.ArrayLayout(self.ctype, 2),
                          depth=I2STDM.N_CHANNELS*2,
                          init=[
@@ -272,15 +272,9 @@ class I2SCalibrator(wiring.Component):
         # CALIBRATION ALGORITHM (simple Ax + B, clamp output to min/max storage of ASQ)
         #
 
-        # calibration logic (single MAC then clamp)
-        scaled = Signal(self.ctype)
-        m.d.comb += scaled.eq((in_sample * cal_read.data[0]) + cal_read.data[1])
-        with m.If(scaled >= ASQ.max()):
-            m.d.comb += out_sample.eq(ASQ.max())
-        with m.Elif(scaled <= ASQ.min()):
-            m.d.comb += out_sample.eq(ASQ.min())
-        with m.Else():
-            m.d.comb += out_sample.eq(scaled)
+        # calibration logic (single MAC then saturating clamp)
+        m.d.comb += out_sample.eq(
+            ((in_sample * cal_read.data[0]) + cal_read.data[1]).saturate(ASQ))
 
         # Calibrating samples happens in the 'audio' domain.
         with m.FSM(domain="audio") as cal_fsm:
@@ -288,7 +282,7 @@ class I2SCalibrator(wiring.Component):
                 with m.If(self.strobe):
                     m.d.audio += [
                         cal_read.addr.eq(self.channel),
-                        in_sample.raw().eq(self.i_uncal)
+                        in_sample.as_value().eq(self.i_uncal)
                     ]
                     with m.If(dac_fifo.r_rdy):
                         with m.If(self.channel == (I2STDM.N_CHANNELS - 1)):
@@ -313,7 +307,7 @@ class I2SCalibrator(wiring.Component):
                 ]
                 m.next = "PROCESS_DAC"
             with m.State("PROCESS_DAC"):
-                m.d.audio += self.o_uncal.eq(out_sample.raw())
+                m.d.audio += self.o_uncal.eq(out_sample.as_value())
                 m.next = "IDLE"
 
         #
@@ -822,12 +816,12 @@ class EurorackPmod(wiring.Component):
             with m.If(self.led_mode[n]):
                 if n <= 3:
                     with m.If(self.jack[n]):
-                        m.d.sync += i2c_master.led[n].eq(self.calibrator.o_cal_peek[n].raw()>>8),
+                        m.d.sync += i2c_master.led[n].eq(self.calibrator.o_cal_peek[n].as_value()>>8),
                     with m.Else():
                         m.d.sync += i2c_master.led[n].eq(0),
                 else:
                     with m.If(self.i_cal.valid):
-                        m.d.sync += i2c_master.led[n].eq(self.i_cal.payload[n-4].raw()>>8),
+                        m.d.sync += i2c_master.led[n].eq(self.i_cal.payload[n-4].as_value()>>8),
             with m.Else():
                 m.d.sync += i2c_master.led[n].eq(self.led[n]),
 

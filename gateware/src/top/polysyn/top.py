@@ -146,7 +146,7 @@ class PolySynth(wiring.Component):
             # Connect voice.vel and NCO.o -> SVF.
             dsp.connect_remap(m, ncos[n].o, svfs[n].i, lambda o, i : [
                 i.payload.x                    .eq(o.payload >> 1),
-                i.payload.resonance.raw()      .eq(self.reso),
+                i.payload.resonance.as_value().eq(self.reso),
                 i.payload.cutoff               .eq(follower.o.payload << 5)
             ])
 
@@ -172,7 +172,7 @@ class PolySynth(wiring.Component):
         # Stereo HPF to remove DC from any voices in 'zero cutoff'
         # Route to audio output channels 2 & 3
 
-        output_hpfs = [dsp.SVF() for _ in range(o_channels)]
+        output_hpfs = [dsp.DCBlock() for _ in range(o_channels)]
         dsp.named_submodules(m.submodules, output_hpfs, override_name="output_hpf")
 
         m.submodules.hpf_split2 = hpf_split2 = dsp.Split(n_channels=2, source=matrix_mix.o)
@@ -180,15 +180,8 @@ class PolySynth(wiring.Component):
         hpf_merge4.wire_valid(m, [0, 1])
 
         for lr in [0, 1]:
-            dsp.connect_remap(m, hpf_split2.o[lr], output_hpfs[lr].i, lambda o, i : [
-                i.payload.x                     .eq(o.payload),
-                i.payload.cutoff.raw()          .eq(200),
-                i.payload.resonance.raw()       .eq(20000),
-            ])
-
-            dsp.connect_remap(m, output_hpfs[lr].o, hpf_merge4.i[2+lr], lambda o, i : [
-                i.payload.eq(o.payload.hp << 2)
-            ])
+            wiring.connect(m, hpf_split2.o[lr], output_hpfs[lr].i)
+            wiring.connect(m, output_hpfs[lr].o, hpf_merge4.i[2+lr])
 
         # Implement stereo distortion effect after diffuser.
 
@@ -204,7 +197,7 @@ class PolySynth(wiring.Component):
 
         outs = []
         for lr in [0, 1]:
-            vca = dsp.GainVCA()
+            vca = dsp.VCA()
             waveshaper = dsp.WaveShaper(lut_function=scaled_tanh)
             vca_merge2 = dsp.Merge(n_channels=2)
             setattr(m.submodules, f"out_gainvca_{lr}", vca)
@@ -215,9 +208,8 @@ class PolySynth(wiring.Component):
             wiring.connect(m, cv_gain_split2.o[lr],    vca_merge2.i[1])
 
             dsp.connect_remap(m, vca_merge2.o, vca.i, lambda o, i : [
-                i.payload.x   .eq(o.payload[0]),
-                #i.payload.gain.eq(o.payload[1] << 2)
-                i.payload.gain.eq(self.drive << 2)
+                i.payload[0].eq(o.payload[0]),
+                i.payload[1].eq(self.drive << 2)
             ])
 
             wiring.connect(m, vca.o, waveshaper.i)
