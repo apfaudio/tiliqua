@@ -118,10 +118,11 @@ class WishboneL2Cache(wiring.Component):
 
         m.d.comb += [
             rd_port.addr.eq(Cat(adr_offset, adr_line)),
-            slave.dat_w.eq(rd_port.data),
             slave.sel.eq(word_select),
             master.dat_r.eq(rd_port.data),
         ]
+
+        m.d.sync += slave.dat_w.eq(rd_port.data)
 
         with m.If(write_from_slave):
             m.d.comb += [
