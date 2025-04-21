@@ -144,9 +144,8 @@ macro_rules! impl_timer {
                     self.set_timeout(Duration::from_millis(period_ms.into()));
                     self.enable();
                     unsafe {
-                            pac::csr::interrupt::enable(isr);
-                            riscv::register::mie::set_mext();
-                            riscv::interrupt::enable();
+                        riscv::register::mie::set_mext();
+                        riscv::interrupt::enable();
                     }
                 }
             }

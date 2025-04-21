@@ -170,11 +170,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 #[entry]
 fn main() -> ! {
 
-    // FIXME: doesn't seem to be needed any more?
-
-    pac::cpu::vexriscv::flush_icache();
-    pac::cpu::vexriscv::flush_dcache();
-
     let peripherals = pac::Peripherals::take().unwrap();
 
     // initialize logging
