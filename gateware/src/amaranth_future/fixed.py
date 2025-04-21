@@ -1,4 +1,13 @@
-# Based on latest iteration of fixed point types RFC.
+# Copyright (c) 2024 S. Holzapfel <me@sebholzapfel.com>
+#
+# Based on latest iteration of fixed point types RFC, which
+# is an effort undertaken by the Amaranth community, as well
+# as an early (incomplete) RFC implementation by zyp@
+#
+# RFC (community): https://github.com/amaranth-lang/rfcs/pull/41
+# Early implementation (zyp@): https://github.com/amaranth-lang/amaranth/pull/1005
+#
+# SPDX-License-Identifier: BSD-3-Clause
 
 from amaranth import hdl, Mux
 from amaranth.utils import bits_for
@@ -54,7 +63,6 @@ class Shape(hdl.ShapeCastable):
         if self.signed and raw > c._max_value():
             # 2s complement signed value, but `raw` was unsigned.
             c._value = c._min_value() + c._value - c._max_value() - 1
-        # verify we have a sane number
         if c._value < c._min_value() or c._value > c._max_value():
             raise ValueError(
                 f"{raw} outside expected range {c._min_value()}, {c._max_value()}")
@@ -109,30 +117,23 @@ class Value(hdl.ValueCastable):
         return self._target
 
     def eq(self, other):
-
         if isinstance(other, hdl.Value):
             return self.as_value().eq(other)
         elif isinstance(other, int) or isinstance(other, float):
             other = Const(other, self.shape())
         elif not isinstance(other, Value):
             raise TypeError(f"Object {other!r} cannot be converted to a fixed.Value")
-
         other = other.reshape(self.f_bits)
-
         return self.as_value().eq(other.as_value())
 
     def reshape(self, f_bits):
-
         # If we're increasing precision, extend with more fractional bits. If we're
         # reducing precision, truncate bits.
-
         shape = hdl.Shape(self.i_bits + f_bits, signed=self.signed)
-
         if f_bits > self.f_bits:
             result = Shape(shape, f_bits)(hdl.Cat(hdl.Const(0, f_bits - self.f_bits), self.as_value()))
         else:
             result = Shape(shape, f_bits)(self.as_value()[self.f_bits - f_bits:])
-
         return result
 
     def truncate(self, f_bits=0):
@@ -162,21 +163,18 @@ class Value(hdl.ValueCastable):
         return Value(shape, clamped.as_value())
 
     def _binary_op(self, rhs, operator, callable_f_bits = lambda a, b: max(a, b), pre_reshape=True, post_cast=True):
-
         if isinstance(rhs, hdl.Value):
             rhs = Value.cast(rhs)
         elif isinstance(rhs, int):
             rhs = Const(rhs)
         elif not isinstance(rhs, Value):
             raise TypeError(f"Object {rhs!r} cannot be converted to a fixed.Value")
-
-        lhs = self
-        f_bits = callable_f_bits(lhs.f_bits, rhs.f_bits)
-
+        f_bits = callable_f_bits(self.f_bits, rhs.f_bits)
         if pre_reshape:
-            lhs = lhs.reshape(f_bits)
+            lhs = self.reshape(f_bits)
             rhs = rhs.reshape(f_bits)
-
+        else:
+            lhs = self
         value = getattr(lhs.as_value(), operator)(rhs.as_value())
         return Value.cast(value, f_bits) if post_cast else value
 
@@ -215,13 +213,10 @@ class Value(hdl.ValueCastable):
                 return Value.cast(value.as_signed() if self.signed else value)
             else:
                 return Value.cast(self.as_value(), self.f_bits - other)
-
         elif not isinstance(other, hdl.Value):
             raise TypeError("Shift amount must be an integer value")
-
         if other.signed:
             raise TypeError("Shift amount must be unsigned")
-
         return Value.cast(self.as_value() << other, self.f_bits)
 
     def __rshift__(self, other):
@@ -241,9 +236,8 @@ class Value(hdl.ValueCastable):
             numerator = self.reshape(f_bits).as_value() >> other
         else:
             raise TypeError("Shift amount must be an integer value")
-
         # Always keep at least 1 sign bit and prohibit negative i_bits.
-        # TODO: concat sign extension? (likely unnecessary)
+        # TODO: should we concat to _target for sign extension? (likely unnecessary)
         if self.signed:
             return SQ(max(1, i_bits), f_bits)(numerator)
         else:
@@ -334,5 +328,3 @@ class Const(Value):
 
     def as_float(self):
         return self._value / 2**self.f_bits
-
-    # TODO: Operators on constants?

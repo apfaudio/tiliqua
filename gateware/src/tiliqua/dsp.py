@@ -343,7 +343,7 @@ class Ramp(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        s = Signal(fixed.SQ(self.extra_bits, ASQ.f_bits))
+        s = Signal(fixed.SQ(self.extra_bits+1, ASQ.f_bits))
 
         m.d.comb += [
             self.o.valid.eq(self.i.valid),
