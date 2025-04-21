@@ -1,3 +1,6 @@
 [submodule "gateware/deps/sid"]
 	path = gateware/deps/sid
 	url = https://github.com/vk2seb/reDIP-SID
+[submodule "gateware/deps/luna-soc"]
+	path = gateware/deps/luna-soc
+	url = git@github.com:vk2seb/luna-soc.git

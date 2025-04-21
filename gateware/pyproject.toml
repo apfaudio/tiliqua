@@ -10,7 +10,6 @@ dependencies = [
     "amaranth-soc @ git+https://github.com/amaranth-lang/amaranth-soc@main",
     "amaranth-stdio @ git+https://github.com/amaranth-lang/amaranth-stdio@main",
     "luna-usb @ git+https://github.com/greatscottgadgets/luna@main",
-    "luna-soc @ git+https://github.com/vk2seb/luna-soc@seb/rebase-tiliquasoc",
     "minerva @ git+https://github.com/minerva-cpu/minerva@main",
     "scipy>=1.9.3",
     "matplotlib>=3.9.0",
@@ -32,6 +31,9 @@ docs = [
   "sphinxcontrib-platformpicker~=1.4",
   "sphinx-rtd-theme~=2.0",
   "sphinx-autobuild",
+]
+dev = [
+    "-e file:///${PROJECT_ROOT}/deps/luna-soc#egg=luna-soc",
 ]
 
 [tool.pdm.scripts]
