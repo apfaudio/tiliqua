@@ -504,12 +504,12 @@ class SVF(wiring.Component):
         m.submodules.macp = mp = self.macp
 
         x     = Signal(mac.SQNative)
-        kK    = Signal(mac.SQNative)
-        kQinv = Signal(mac.SQNative)
+        kK    = Signal.like(x)
+        kQinv = Signal.like(x)
 
-        abp   = Signal(mac.SQRNative)
-        alp   = Signal(mac.SQRNative)
-        ahp   = Signal(mac.SQRNative)
+        abp   = Signal(fixed.SQ(mac.SQNative.i_bits, mac.SQNative.f_bits+2))
+        alp   = Signal.like(abp)
+        ahp   = Signal.like(alp)
 
         # internal oversampling iterations
         n_oversample = 2
@@ -556,9 +556,9 @@ class SVF(wiring.Component):
             with m.State('WAIT-READY'):
                 m.d.comb += [
                     self.o.valid.eq(1),
-                    self.o.payload.hp.eq(ahp),
-                    self.o.payload.lp.eq(alp),
-                    self.o.payload.bp.eq(abp),
+                    self.o.payload.hp.eq(ahp >> 1),
+                    self.o.payload.lp.eq(alp >> 1),
+                    self.o.payload.bp.eq(abp >> 1),
                 ]
                 with m.If(self.o.ready):
                     m.next = 'WAIT-VALID'
