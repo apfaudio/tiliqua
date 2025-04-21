@@ -70,7 +70,7 @@ class AudioFIFOPeripheral(wiring.Component):
     class FifoLenReg(csr.Register, access="r"):
         fifo_len: csr.Field(csr.action.R, unsigned(16))
 
-    def __init__(self, fifo_sz=4*4, fifo_data_width=32, granularity=8, elastic_sz=64*3):
+    def __init__(self, fifo_sz=4*4, fifo_data_width=32, granularity=8, elastic_sz=128*3):
         regs = csr.Builder(addr_width=6, data_width=8)
 
         # Out and Aux FIFOs
