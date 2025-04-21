@@ -198,6 +198,7 @@ class TiliquaSoc(Component):
         self.cpu = VexiiRiscv(
             variant=cpu_variant,
             reset_addr=self.reset_addr,
+            csr_base=self.csr_base
         )
 
         # interrupt controller
