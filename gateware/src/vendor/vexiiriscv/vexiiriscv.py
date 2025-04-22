@@ -129,6 +129,7 @@ class VexiiRiscv(Component):
             f'--region base=10000000,size=1000000,main=1,exe=1',
             f'--region base=20000000,size=1000000,main=1,exe=1',
             f'--region base={csr_base:x},size={csr_size:x},main=0,exe=0',
+            f'--region base=A0000000,size=8,main=0,exe=0',
         ]
         vexiiriscv_hash = git.Repo(vexiiriscv_root).head.object.hexsha
         netlist_name = self.generate_netlist_name(vexiiriscv_hash, netlist_arguments)
