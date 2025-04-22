@@ -254,7 +254,9 @@ class TiliquaSoc(Component):
 
         # mobo i2c
         self.i2c0 = i2c.Peripheral()
-        self.i2c_stream0 = i2c.I2CStreamer(period_cyc=256)
+        # XXX: 100kHz bus speed. DO NOT INCREASE THIS. See comment on this bus in
+        # tiliqua_platform.py for more details.
+        self.i2c_stream0 = i2c.I2CStreamer(period_cyc=600)
         self.csr_decoder.add(self.i2c0.bus, addr=self.i2c0_base, name="i2c0")
 
         # eurorack-pmod i2c

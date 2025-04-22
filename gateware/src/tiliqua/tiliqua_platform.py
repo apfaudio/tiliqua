@@ -322,10 +322,28 @@ class _TiliquaR4Mobo:
                                       Attrs(IO_TYPE="LVCMOS33"))),
 
         # Motherboard PCBA I2C bus. Includes:
+        #
         # - address 0x05: PCA9635 LED driver
         # - address 0x47: TUSB322I USB-C controller
         # - address 0x50: DVI EDID EEPROM (through 3V3 <-> 5V translator)
         # - address 0x60: SI5351A external PLL
+        #
+        # WARN: mobo i2c bus speed should never exceed 100kHz if you want to reliably
+        # be able to read the EDID of external monitors. I have seen cases where going
+        # above 100kHz causes the monitor to ACK packets that were not destined for
+        # its EEPROM (instead for other i2c peripherals on i2c0) - this is dangerous and
+        # could unintentionally write to the monitor EEPROM (!!!)
+        #
+        # There are some slave addresses on the DDC channel that are reserved according
+        # to the standard. As far as I can tell, we have no collisions. Reference:
+        #
+        #   VESA Display Data Channel Command Interface (DDC/CI)
+        #   Standard Version 1.1, October 29, 2004
+        #
+        # Reserved for VCP: 0x6E
+        # Reserved in table 4: 0xF0 - 0xFF
+        # Reserved in table 5: 0x12, 0x14, 0x16, 0x80, 0x40, 0xA0
+        #
         Resource("i2c", 0,
             Subsignal("sda", Pins("51", dir="io", conn=("m2", 0))),
             Subsignal("scl", Pins("53", dir="io", conn=("m2", 0))),
