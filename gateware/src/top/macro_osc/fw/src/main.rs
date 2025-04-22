@@ -208,6 +208,7 @@ fn main() -> ! {
 
     info!("heap usage {} KiB", HEAP.used()/1024);
 
+    /*
     critical_section::with(|cs| {
         let mut app = app.borrow_ref_mut(cs);
 
@@ -241,6 +242,7 @@ fn main() -> ! {
         use embedded_hal::delay::DelayNs;
         timer.delay_ns(0);
     });
+    */
 
     handler!(timer0 = || timer0_handler(&app));
 
