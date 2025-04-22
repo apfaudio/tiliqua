@@ -69,15 +69,6 @@ class VideoPeripheral(wiring.Component):
     class DecayReg(csr.Register, access="w"):
         decay: csr.Field(csr.action.W, unsigned(8))
 
-    class PaletteReg(csr.Register, access="w"):
-        position: csr.Field(csr.action.W, unsigned(8))
-        red:      csr.Field(csr.action.W, unsigned(8))
-        green:    csr.Field(csr.action.W, unsigned(8))
-        blue:     csr.Field(csr.action.W, unsigned(8))
-
-    class PaletteBusyReg(csr.Register, access="r"):
-        busy: csr.Field(csr.action.R, unsigned(1))
-
     def __init__(self, fb, bus_dma):
         self.en = Signal()
         self.fb = fb
@@ -88,8 +79,6 @@ class VideoPeripheral(wiring.Component):
 
         self._persist      = regs.add("persist",      self.PersistReg(),     offset=0x0)
         self._decay        = regs.add("decay",        self.DecayReg(),       offset=0x4)
-        self._palette      = regs.add("palette",      self.PaletteReg(),     offset=0x8)
-        self._palette_busy = regs.add("palette_busy", self.PaletteBusyReg(), offset=0xC)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
@@ -104,7 +93,7 @@ class VideoPeripheral(wiring.Component):
         m.submodules.persist = self.persist
         connect(m, flipped(self.bus), self._bridge.bus)
 
-        m.d.comb += self.persist.enable.eq(self.en)
+        m.d.comb += self.persist.enable.eq(self.fb.enable)
 
         with m.If(self._persist.f.persist.w_stb):
             m.d.sync += self.persist.holdoff.eq(self._persist.f.persist.w_data)
@@ -112,26 +101,6 @@ class VideoPeripheral(wiring.Component):
         with m.If(self._decay.f.decay.w_stb):
             m.d.sync += self.persist.decay.eq(self._decay.f.decay.w_data)
 
-        # palette update logic
-        palette_busy = Signal()
-        m.d.comb += self._palette_busy.f.busy.r_data.eq(palette_busy)
-
-        with m.If(self._palette.element.w_stb & ~palette_busy):
-            m.d.sync += [
-                palette_busy                            .eq(1),
-                self.fb.palette.update.valid            .eq(1),
-                self.fb.palette.update.payload.position .eq(self._palette.f.position.w_data),
-                self.fb.palette.update.payload.red      .eq(self._palette.f.red.w_data),
-                self.fb.palette.update.payload.green    .eq(self._palette.f.green.w_data),
-                self.fb.palette.update.payload.blue     .eq(self._palette.f.blue.w_data),
-            ]
-
-        with m.If(palette_busy & self.fb.palette.update.ready):
-            # coefficient has been written
-            m.d.sync += [
-                palette_busy.eq(0),
-                self.fb.palette.update.valid.eq(0),
-            ]
 
         return m
 
@@ -173,6 +142,7 @@ class TiliquaSoc(Component):
         self.pmod0_periph_base    = 0x00000700
         self.dtr0_base            = 0x00000800
         self.video_periph_base    = 0x00000900
+        self.framebuffer_periph_base       = 0x00000A00
 
         # Some settings depend on whether code is in block RAM or SPI flash
         self.fw_location = fw_location
@@ -254,7 +224,9 @@ class TiliquaSoc(Component):
 
         # mobo i2c
         self.i2c0 = i2c.Peripheral()
-        self.i2c_stream0 = i2c.I2CStreamer(period_cyc=256)
+        # XXX: 100kHz bus speed. DO NOT INCREASE THIS. See comment on this bus in
+        # tiliqua_platform.py for more details.
+        self.i2c_stream0 = i2c.I2CStreamer(period_cyc=600)
         self.csr_decoder.add(self.i2c0.bus, addr=self.i2c0_base, name="i2c0")
 
         # eurorack-pmod i2c
@@ -283,6 +255,10 @@ class TiliquaSoc(Component):
             fb=self.fb,
             bus_dma=self.psram_periph)
         self.csr_decoder.add(self.video_periph.bus, addr=self.video_periph_base, name="video_periph")
+
+        self.framebuffer_periph = dma_framebuffer.Peripheral(fb=self.fb)
+        self.csr_decoder.add(
+                self.framebuffer_periph.bus, addr=self.framebuffer_periph_base, name="framebuffer_periph")
 
         self.permit_bus_traffic = Signal()
 
@@ -372,6 +348,7 @@ class TiliquaSoc(Component):
 
         # video PHY
         m.submodules.fb = self.fb
+        m.submodules.framebuffer_periph = self.framebuffer_periph
 
         # video periph / persist
         m.submodules.video_periph = self.video_periph
@@ -410,13 +387,10 @@ class TiliquaSoc(Component):
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
         with m.If(on_delay < 0xFF):
-            m.d.comb += self.cpu.ext_reset.eq(1)
-        with m.If(on_delay < 0xFFFF):
             m.d.sync += on_delay.eq(on_delay+1)
+            m.d.comb += self.cpu.ext_reset.eq(1)
         with m.Else():
-            m.d.sync += self.permit_bus_traffic.eq(1)
-            m.d.sync += self.fb.enable.eq(1)
-            m.d.sync += self.video_periph.en.eq(1)
+            m.d.comb += self.cpu.ext_reset.eq(0)
 
         return m
 
