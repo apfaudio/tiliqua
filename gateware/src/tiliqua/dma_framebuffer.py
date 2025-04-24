@@ -47,7 +47,7 @@ class DMAFramebuffer(wiring.Component):
             })
 
     def __init__(self, *, fb_base_default=0, addr_width=22,
-                 fifo_depth=1024, bytes_per_pixel=1, burst_threshold_words=128,
+                 fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128,
                  fixed_modeline: DVIModeline = None):
 
         self.fixed_modeline = fixed_modeline
@@ -90,6 +90,10 @@ class DMAFramebuffer(wiring.Component):
         phy_vsync_sync = Signal()
         m.submodules.vsync_ff = FFSynchronizer(
                 i=dvi_tgen.ctrl.vsync, o=phy_vsync_sync, o_domain="sync")
+        phy_vsync_sync_prev = Signal()
+        vsync_rise = Signal()
+        m.d.sync += phy_vsync_sync_prev.eq(phy_vsync_sync)
+        m.d.comb += vsync_rise.eq(phy_vsync_sync & ~phy_vsync_sync_prev)
 
         # DMA master bus
         bus = self.bus
@@ -137,9 +141,7 @@ class DMAFramebuffer(wiring.Component):
                 with m.Elif(~fifo.w_rdy):
                     m.next = 'WAIT'
             with m.State('WAIT'):
-                with m.If(~phy_vsync_sync):
-                    m.d.sync += drained.eq(0)
-                with m.If(phy_vsync_sync & ~drained):
+                with m.If(vsync_rise):
                     m.next = 'VSYNC'
                 with m.Elif(fifo.w_level < self.fifo_depth-self.burst_threshold_words):
                     m.next = 'BURST'
@@ -148,7 +150,6 @@ class DMAFramebuffer(wiring.Component):
                 m.d.comb += drain_fifo.eq(1)
                 with m.If(fifo.w_level == 0):
                     m.d.sync += dma_addr.eq(0)
-                    m.d.sync += drained.eq(1)
                     m.next = 'BURST'
 
         # Tracking in DVI domain
