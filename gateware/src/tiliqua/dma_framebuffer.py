@@ -90,26 +90,16 @@ class DMAFramebuffer(wiring.Component):
         phy_vsync_sync = Signal()
         m.submodules.vsync_ff = FFSynchronizer(
                 i=dvi_tgen.ctrl.vsync, o=phy_vsync_sync, o_domain="sync")
-        phy_vsync_sync_prev = Signal()
-        vsync_rise = Signal()
-        m.d.sync += phy_vsync_sync_prev.eq(phy_vsync_sync)
-        m.d.comb += vsync_rise.eq(phy_vsync_sync & ~phy_vsync_sync_prev)
 
         # DMA master bus
         bus = self.bus
 
         # Current offset into the framebuffer
         dma_addr = Signal(32)
+        burst_cnt = Signal(16, init=0)
 
         # DMA bus master -> FIFO state machine
         # Burst until FIFO is full, then wait until half empty.
-
-        # Signal from 'dvi' to 'sync' domain to drain FIFO if we are in vsync.
-        drain_fifo = Signal(1, reset=0)
-        drain_fifo_dvi = Signal(1, reset=0)
-        m.submodules.drain_fifo_ff = FFSynchronizer(
-                i=drain_fifo, o=drain_fifo_dvi, o_domain="dvi")
-        drained = Signal()
 
         fb_size_words = (self.timings.active_pixels * self.bytes_per_pixel) // 4
 
@@ -117,7 +107,11 @@ class DMAFramebuffer(wiring.Component):
         with m.FSM() as fsm:
             with m.State('OFF'):
                 with m.If(self.enable):
-                    m.next = 'BURST'
+                    m.next = 'WAIT-VSYNC'
+            with m.State('WAIT-VSYNC'):
+                with m.If(phy_vsync_sync):
+                    m.d.sync += dma_addr.eq(0)
+                    m.next = 'WAIT'
             with m.State('BURST'):
                 m.d.comb += [
                     bus.stb.eq(1),
@@ -130,26 +124,27 @@ class DMAFramebuffer(wiring.Component):
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST),
                 ]
-                with m.If(fifo.w_level >= (self.fifo_depth-1)):
+
+                with m.If(bus.ack):
+                    m.d.sync += [
+                        burst_cnt.eq(burst_cnt + 1),
+                        dma_addr.eq(dma_addr+1),
+                    ]
+
+                with m.If((fifo.w_level == (self.fifo_depth-1)) |
+                          (burst_cnt == self.burst_threshold_words)):
                     m.d.comb += bus.cti.eq(
                             wishbone.CycleType.END_OF_BURST)
-                with m.If(bus.stb & bus.ack & fifo.w_rdy):
-                    with m.If(dma_addr < (fb_size_words-1)):
-                        m.d.sync += dma_addr.eq(dma_addr + 1)
-                    with m.Else():
-                        m.d.sync += dma_addr.eq(0)
-                with m.Elif(~fifo.w_rdy):
                     m.next = 'WAIT'
+
+                with m.If(dma_addr == (fb_size_words-1)):
+                    m.d.comb += bus.cti.eq(
+                            wishbone.CycleType.END_OF_BURST)
+                    m.next = 'WAIT-VSYNC'
+
             with m.State('WAIT'):
-                with m.If(vsync_rise):
-                    m.next = 'VSYNC'
-                with m.Elif(fifo.w_level < self.fifo_depth-self.burst_threshold_words):
-                    m.next = 'BURST'
-            with m.State('VSYNC'):
-                # drain DVI side. We only want to drain once.
-                m.d.comb += drain_fifo.eq(1)
-                with m.If(fifo.w_level == 0):
-                    m.d.sync += dma_addr.eq(0)
+                with m.If(fifo.w_level < self.fifo_depth-self.burst_threshold_words):
+                    m.d.sync += burst_cnt.eq(0)
                     m.next = 'BURST'
 
         # Tracking in DVI domain
@@ -157,9 +152,8 @@ class DMAFramebuffer(wiring.Component):
         # 'dvi' domain: read FIFO -> DVI PHY (1 fifo word is N pixels)
         bytecounter = Signal(exact_log2(4//self.bytes_per_pixel))
         last_word   = Signal(32)
-        with m.If(drain_fifo_dvi):
+        with m.If(dvi_tgen.ctrl.vsync):
             m.d.dvi += bytecounter.eq(0)
-            m.d.comb += fifo.r_en.eq(1),
         with m.Elif(dvi_tgen.ctrl.de & fifo.r_rdy):
             m.d.comb += fifo.r_en.eq(bytecounter == 0),
             m.d.dvi += bytecounter.eq(bytecounter+1)
