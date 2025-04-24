@@ -294,6 +294,25 @@ fn print_die_temperature(s: &mut ReportString, dtr: &pac::DTR0)
            code_to_celsius[code as usize]).ok();
 }
 
+fn print_psram_stats(s: &mut ReportString, psram: &pac::PSRAM_CSR)
+{
+    psram.ctrl().write(|w| w.collect().bit(false));
+    let cycles_elapsed: u32 = psram.stats0().read().cycles_elapsed().bits();
+    let cycles_idle: u32 = psram.stats1().read().cycles_idle().bits();
+    let cycles_ack_r: u32 = psram.stats2().read().cycles_ack_r().bits();
+    let cycles_ack_w: u32 = psram.stats3().read().cycles_ack_w().bits();
+    psram.ctrl().write(|w| w.collect().bit(true));
+    let sysclk = pac::clock::sysclk();
+    write!(s,
+           concat!("psram [busy={}%, wasted={}%, read={}%,\r\n",
+                   "       write={}%, refresh={}Hz]\r\n"),
+           (100.0f32 * (1.0f32 - (cycles_idle as f32 / cycles_elapsed as f32))) as u32,
+           (100.0f32 * (cycles_elapsed - cycles_idle - cycles_ack_r - cycles_ack_w) as f32 / cycles_elapsed as f32) as u32,
+           (100.0f32 * cycles_ack_r as f32 / cycles_elapsed as f32) as u32,
+           (100.0f32 * cycles_ack_w as f32 / cycles_elapsed as f32) as u32,
+           sysclk / (cycles_elapsed+1)).ok();
+}
+
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
@@ -420,18 +439,7 @@ fn main() -> ! {
                         print_pmod_state(&mut status_report, &pmod);
                         print_usb_state(&mut status_report, &mut i2cdev);
                         print_die_temperature(&mut status_report, &dtr);
-                        psram.ctrl().write(|w| w.collect().bit(false));
-                        let cycles_elapsed: u32 = psram.stats0().read().cycles_elapsed().bits();
-                        let cycles_idle: u32 = psram.stats1().read().cycles_idle().bits();
-                        let cycles_ack_r: u32 = psram.stats2().read().cycles_ack_r().bits();
-                        let cycles_ack_w: u32 = psram.stats3().read().cycles_ack_w().bits();
-                        psram.ctrl().write(|w| w.collect().bit(true));
-                        write!(&mut status_report,
-                               "psram [usage={:.2}, ack_r={:.2}, ack_w={:.2}]",
-                               1.0f32 - (cycles_idle as f32 / cycles_elapsed as f32),
-                               cycles_ack_r as f32 / cycles_elapsed as f32,
-                               cycles_ack_w as f32 / cycles_elapsed as f32);
-                        info!("STATUS REPORT: {}", status_report);
+                        print_psram_stats(&mut status_report, &psram);
                         ("[status report]", &status_report)
                     }
                 };

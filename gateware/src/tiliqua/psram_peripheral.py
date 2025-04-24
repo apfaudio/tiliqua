@@ -23,6 +23,7 @@ class Peripheral(wiring.Component):
 
     """
     Wishbone PSRAM peripheral with multiple masters and burst support.
+    Includes some CSRs for measuring PSRAM bandwidth consumption.
 
     You can add this to an SoC as an ordinary peripheral, however it also
     has an internal arbiter (for multiple DMA masters) using add_master().
@@ -31,19 +32,40 @@ class Peripheral(wiring.Component):
     as a memory region, in the future "psram" might also be acceptable.
     """
 
+    # CSRs for measuring PSRAM bandwidth usage.
+    #
+    # Intended usage:
+    # - Set 'collect' flag to 1: statistics are zeroed and collection starts.
+    # - Wait a while until 'cycles_elapsed' has enough data for you.
+    # - Set 'collect' flag to 0: all statistics are frozen.
+    # - Read each of the register contents.
+    # - When 'collect' is set to 1 again, statistics are re-zeroed before
+    #   collection starts.
+
     class PsramStatsCtrl(csr.Register, access="w"):
         collect:        csr.Field(csr.action.W, unsigned(1))
 
     class PsramStatsReg0(csr.Register, access="r"):
+        # Number of cycles we have collected statistics for.
         cycles_elapsed: csr.Field(csr.action.R, unsigned(32))
 
     class PsramStatsReg1(csr.Register, access="r"):
+        # Number of 'cycles_elapsed' where the PSRAM was idle.
+        # In general, the PSRAM busy time will be higher than
+        # the ack_w + ack_r times measured below due to the
+        # memory access latency. Thus, the difference between
+        # ~idle cycles and ack_r+ack_w is the latency overhead,
+        # usually dominated by small memory transactions.
         cycles_idle:    csr.Field(csr.action.R, unsigned(32))
 
     class PsramStatsReg2(csr.Register, access="r"):
+        # Number of 'cycles_elapsed' where we read 1 word of
+        # data (4 bytes) from the PSRAM controller.
         cycles_ack_r:   csr.Field(csr.action.R, unsigned(32))
 
     class PsramStatsReg3(csr.Register, access="r"):
+        # Number of 'cycles_elapsed' where we write 1 word of
+        # data (4 bytes) to the PSRAM controller.
         cycles_ack_w:   csr.Field(csr.action.R, unsigned(32))
 
     def __init__(self, *, size, data_width=32, granularity=8, name="psram"):
@@ -94,10 +116,8 @@ class Peripheral(wiring.Component):
                                               features={"cti", "bte"})
         self._hram_arbiter.add(flipped(self.bus))
         self.shared_bus = self._hram_arbiter.bus
-        self.dma_masters = []
 
     def add_master(self, bus):
-        self.dma_masters.append(bus)
         self._hram_arbiter.add(bus)
 
     def elaborate(self, platform):
@@ -154,28 +174,6 @@ class Peripheral(wiring.Component):
             psram.start_transfer         .eq(0),
             psram.perform_write          .eq(0),
         ]
-
-        stats_collect = Signal()
-
-        with m.If(stats_collect):
-            m.d.sync += self._stats0.f.cycles_elapsed.r_data.eq(self._stats0.f.cycles_elapsed.r_data+1)
-            with m.If(psram.idle):
-                m.d.sync += self._stats1.f.cycles_idle.r_data.eq(self._stats1.f.cycles_idle.r_data+1)
-            with m.If(psram.read_ready):
-                m.d.sync += self._stats2.f.cycles_ack_r.r_data.eq(self._stats2.f.cycles_ack_r.r_data+1)
-            with m.If(psram.write_ready):
-                m.d.sync += self._stats3.f.cycles_ack_w.r_data.eq(self._stats3.f.cycles_ack_w.r_data+1)
-
-        with m.If(self._ctrl.f.collect.w_stb):
-            m.d.sync += stats_collect.eq(self._ctrl.f.collect.w_data)
-            # Reset stats whenever collect is strobed with 1
-            with m.If(self._ctrl.f.collect.w_data):
-                m.d.sync += [
-                    self._stats0.f.cycles_elapsed.r_data.eq(0),
-                    self._stats1.f.cycles_idle.r_data.eq(0),
-                    self._stats2.f.cycles_ack_r.r_data.eq(0),
-                    self._stats3.f.cycles_ack_w.r_data.eq(0),
-                ]
 
         with m.FSM() as fsm:
 
@@ -255,5 +253,30 @@ class Peripheral(wiring.Component):
                 m.d.comb += psram.final_word.eq(1)
                 with m.If(psram.idle):
                     m.next = 'IDLE'
+
+        # Logic for tracking PSRAM bandwidth consumption.
+
+        stats_collect = Signal()
+
+        with m.If(stats_collect):
+            m.d.sync += self._stats0.f.cycles_elapsed.r_data.eq(self._stats0.f.cycles_elapsed.r_data+1)
+            with m.If(psram.idle):
+                m.d.sync += self._stats1.f.cycles_idle.r_data.eq(self._stats1.f.cycles_idle.r_data+1)
+            with m.If(psram.read_ready):
+                m.d.sync += self._stats2.f.cycles_ack_r.r_data.eq(self._stats2.f.cycles_ack_r.r_data+1)
+            with m.If(psram.write_ready):
+                m.d.sync += self._stats3.f.cycles_ack_w.r_data.eq(self._stats3.f.cycles_ack_w.r_data+1)
+
+        with m.If(self._ctrl.f.collect.w_stb):
+            m.d.sync += stats_collect.eq(self._ctrl.f.collect.w_data)
+            # Reset stats whenever collect is strobed with 1
+            with m.If(self._ctrl.f.collect.w_data):
+                m.d.sync += [
+                    self._stats0.f.cycles_elapsed.r_data.eq(0),
+                    self._stats1.f.cycles_idle.r_data.eq(0),
+                    self._stats2.f.cycles_ack_r.r_data.eq(0),
+                    self._stats3.f.cycles_ack_w.r_data.eq(0),
+                ]
+
 
         return m

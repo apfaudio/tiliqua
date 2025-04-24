@@ -248,8 +248,6 @@ fn main() -> ! {
 
     handler!(timer0 = || timer0_handler(&app));
 
-    let psram = peripherals.PSRAM_CSR;
-
     irq::scope(|s| {
 
         s.register(handlers::Interrupt::TIMER0, timer0);
@@ -293,32 +291,6 @@ fn main() -> ! {
                 draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, opts.beam.hue.value, UI_NAME, UI_SHA).ok();
             }
 
-            use heapless::String;
-            use core::fmt::Write;
-            let mut status_report: String<128> = String::new();
-            psram.ctrl().write(|w| w.collect().bit(false));
-            let cycles_elapsed: u32 = psram.stats0().read().cycles_elapsed().bits();
-            let cycles_idle: u32 = psram.stats1().read().cycles_idle().bits();
-            let cycles_ack_r: u32 = psram.stats2().read().cycles_ack_r().bits();
-            let cycles_ack_w: u32 = psram.stats3().read().cycles_ack_w().bits();
-            psram.ctrl().write(|w| w.collect().bit(true));
-            write!(&mut status_report,
-                   "psram [usage={:.2}, ack_r={:.2}, ack_w={:.2}]",
-                   1.0f32 - (cycles_idle as f32 / cycles_elapsed as f32),
-                   cycles_ack_r as f32 / cycles_elapsed as f32,
-                   cycles_ack_w as f32 / cycles_elapsed as f32);
-
-            use embedded_graphics::text::Text;
-            use embedded_graphics::mono_font::ascii::FONT_9X15;
-            use embedded_graphics::text::Alignment;
-            use embedded_graphics::mono_font::MonoTextStyle;
-            let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xF0));
-            Text::with_alignment(
-                &status_report,
-                Point::new((H_ACTIVE/2) as i32, 100i32),
-                font_small_grey,
-                Alignment::Center
-            ).draw(&mut display);
             video.set_persist(opts.beam.persist.value);
             video.set_decay(opts.beam.decay.value);
 
