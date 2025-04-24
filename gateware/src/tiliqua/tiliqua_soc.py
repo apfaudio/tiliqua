@@ -173,6 +173,7 @@ class TiliquaSoc(Component):
         self.pmod0_periph_base    = 0x00000700
         self.dtr0_base            = 0x00000800
         self.video_periph_base    = 0x00000900
+        self.psram_csr_base       = 0x00000A00
 
         # Some settings depend on whether code is in block RAM or SPI flash
         self.fw_location = fw_location
@@ -251,6 +252,7 @@ class TiliquaSoc(Component):
         self.fb = dma_framebuffer.DMAFramebuffer(
                 fb_base_default=self.psram_base, fixed_modeline=default_modeline)
         self.psram_periph.add_master(self.fb.bus)
+        self.csr_decoder.add(self.psram_periph.csr_bus, addr=self.psram_csr_base, name="psram_csr")
 
         # mobo i2c
         self.i2c0 = i2c.Peripheral()
