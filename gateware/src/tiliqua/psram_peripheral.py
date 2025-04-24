@@ -10,7 +10,7 @@ from amaranth.lib         import wiring
 from amaranth.lib.wiring  import In, flipped
 from amaranth.utils       import exact_log2
 
-from amaranth_soc         import wishbone
+from amaranth_soc         import wishbone, csr
 from amaranth_soc.memory  import MemoryMap
 
 from vendor.psram_ospi    import OSPIPSRAM
@@ -31,6 +31,21 @@ class Peripheral(wiring.Component):
     as a memory region, in the future "psram" might also be acceptable.
     """
 
+    class PsramStatsCtrl(csr.Register, access="w"):
+        collect:        csr.Field(csr.action.W, unsigned(1))
+
+    class PsramStatsReg0(csr.Register, access="r"):
+        cycles_elapsed: csr.Field(csr.action.R, unsigned(32))
+
+    class PsramStatsReg1(csr.Register, access="r"):
+        cycles_idle:    csr.Field(csr.action.R, unsigned(32))
+
+    class PsramStatsReg2(csr.Register, access="r"):
+        cycles_ack_r:   csr.Field(csr.action.R, unsigned(32))
+
+    class PsramStatsReg3(csr.Register, access="r"):
+        cycles_ack_w:   csr.Field(csr.action.R, unsigned(32))
+
     def __init__(self, *, size, data_width=32, granularity=8, name="psram"):
         if not isinstance(size, int) or size <= 0 or size & size-1:
             raise ValueError("Size must be an integer power of two, not {!r}"
@@ -49,8 +64,18 @@ class Peripheral(wiring.Component):
         memory_map = MemoryMap(addr_width=exact_log2(size), data_width=granularity)
         memory_map.add_resource(name=("memory", self.name,), size=size, resource=self)
 
+        # csrs
+        regs = csr.Builder(addr_width=5, data_width=8)
+        self._ctrl   = regs.add("ctrl",   self.PsramStatsCtrl(), offset=0x0)
+        self._stats0 = regs.add("stats0", self.PsramStatsReg0(), offset=0x4)
+        self._stats1 = regs.add("stats1", self.PsramStatsReg1(), offset=0x8)
+        self._stats2 = regs.add("stats2", self.PsramStatsReg2(), offset=0xC)
+        self._stats3 = regs.add("stats3", self.PsramStatsReg3(), offset=0x10)
+        self._bridge = csr.Bridge(regs.as_memory_map())
+
         # bus
         super().__init__({
+            "csr_bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
             "bus": In(wishbone.Signature(addr_width=exact_log2(self.mem_depth),
                                          data_width=data_width,
                                          granularity=granularity,
@@ -59,6 +84,7 @@ class Peripheral(wiring.Component):
             # should be optimized out in non-sim builds.
             "simif": In(sim.FakePSRAMSimulationInterface())
         })
+        self.csr_bus.memory_map = self._bridge.bus.memory_map
         self.bus.memory_map = memory_map
 
         # hram arbiter
@@ -68,12 +94,18 @@ class Peripheral(wiring.Component):
                                               features={"cti", "bte"})
         self._hram_arbiter.add(flipped(self.bus))
         self.shared_bus = self._hram_arbiter.bus
+        self.dma_masters = []
 
     def add_master(self, bus):
+        self.dma_masters.append(bus)
         self._hram_arbiter.add(bus)
 
     def elaborate(self, platform):
         m = Module()
+
+        # csr bus
+        m.submodules.bridge = self._bridge
+        wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
         # arbiter
         m.submodules.arbiter = self._hram_arbiter
@@ -122,6 +154,28 @@ class Peripheral(wiring.Component):
             psram.start_transfer         .eq(0),
             psram.perform_write          .eq(0),
         ]
+
+        stats_collect = Signal()
+
+        with m.If(stats_collect):
+            m.d.sync += self._stats0.f.cycles_elapsed.r_data.eq(self._stats0.f.cycles_elapsed.r_data+1)
+            with m.If(psram.idle):
+                m.d.sync += self._stats1.f.cycles_idle.r_data.eq(self._stats1.f.cycles_idle.r_data+1)
+            with m.If(psram.read_ready):
+                m.d.sync += self._stats2.f.cycles_ack_r.r_data.eq(self._stats2.f.cycles_ack_r.r_data+1)
+            with m.If(psram.write_ready):
+                m.d.sync += self._stats3.f.cycles_ack_w.r_data.eq(self._stats3.f.cycles_ack_w.r_data+1)
+
+        with m.If(self._ctrl.f.collect.w_stb):
+            m.d.sync += stats_collect.eq(self._ctrl.f.collect.w_data)
+            # Reset stats whenever collect is strobed with 1
+            with m.If(self._ctrl.f.collect.w_data):
+                m.d.sync += [
+                    self._stats0.f.cycles_elapsed.r_data.eq(0),
+                    self._stats1.f.cycles_idle.r_data.eq(0),
+                    self._stats2.f.cycles_ack_r.r_data.eq(0),
+                    self._stats3.f.cycles_ack_w.r_data.eq(0),
+                ]
 
         with m.FSM() as fsm:
 
