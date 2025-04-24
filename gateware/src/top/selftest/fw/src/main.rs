@@ -384,6 +384,8 @@ fn main() -> ! {
 
     handler!(timer0 = || timer0_handler(&app));
 
+    let psram = peripherals.PSRAM_CSR;
+
     irq::scope(|s| {
 
         s.register(handlers::Interrupt::TIMER0, timer0);
@@ -418,6 +420,17 @@ fn main() -> ! {
                         print_pmod_state(&mut status_report, &pmod);
                         print_usb_state(&mut status_report, &mut i2cdev);
                         print_die_temperature(&mut status_report, &dtr);
+                        psram.ctrl().write(|w| w.collect().bit(false));
+                        let cycles_elapsed: u32 = psram.stats0().read().cycles_elapsed().bits();
+                        let cycles_idle: u32 = psram.stats1().read().cycles_idle().bits();
+                        let cycles_ack_r: u32 = psram.stats2().read().cycles_ack_r().bits();
+                        let cycles_ack_w: u32 = psram.stats3().read().cycles_ack_w().bits();
+                        psram.ctrl().write(|w| w.collect().bit(true));
+                        write!(&mut status_report,
+                               "psram [usage={:.2}, ack_r={:.2}, ack_w={:.2}]",
+                               1.0f32 - (cycles_idle as f32 / cycles_elapsed as f32),
+                               cycles_ack_r as f32 / cycles_elapsed as f32,
+                               cycles_ack_w as f32 / cycles_elapsed as f32);
                         info!("STATUS REPORT: {}", status_report);
                         ("[status report]", &status_report)
                     }
