@@ -186,6 +186,48 @@ class MacroOscSoc(TiliquaSoc):
         self.add_rust_constant(
             f"pub const AUDIO_FIFO_ELASTIC_SZ: usize = {self.audio_fifo.elastic_sz};\n")
 
+        # DIFFUSER
+        from tiliqua import delay
+        from tiliqua.delay_line import DelayLine
+        self.delay_lines = [
+            DelayLine(
+                max_delay=0x10000,
+                psram_backed=True,
+                addr_width_o=self.fb.bus.addr_width,
+                base=0x100000>>2,
+            ),
+            DelayLine(
+                max_delay=0x10000,
+                psram_backed=True,
+                addr_width_o=self.fb.bus.addr_width,
+                base=0x110000>>2,
+            ),
+            DelayLine(
+                max_delay=0x10000,
+                psram_backed=True,
+                addr_width_o=self.fb.bus.addr_width,
+                base=0x120000>>2,
+            ),
+            DelayLine(
+                max_delay=0x10000,
+                psram_backed=True,
+                addr_width_o=self.fb.bus.addr_width,
+                base=0x130000>>2,
+            ),
+        ]
+
+        # All delay lines share our top-level bus for read/write operations.
+        self._delayln_arbiter = wishbone.Arbiter(addr_width=self.fb.bus.addr_width,
+                                         data_width=self.fb.bus.data_width,
+                                         granularity=self.fb.bus.granularity,
+                                         features=self.fb.bus.features)
+        for delayln in self.delay_lines:
+            self._delayln_arbiter.add(delayln.bus)
+
+        self.psram_periph.add_master(self._delayln_arbiter.bus)
+
+        self.diffuser = delay.Diffuser(self.delay_lines)
+
         # now we can freeze the memory map
         self.finalize_csr_bridge()
 
@@ -205,7 +247,11 @@ class MacroOscSoc(TiliquaSoc):
 
         self.scope_periph.source = pmod0.i_cal
 
-        wiring.connect(m, self.audio_fifo.stream, pmod0.i_cal)
+        #wiring.connect(m, self.audio_fifo.stream, pmod0.i_cal)
+        dsp.named_submodules(m.submodules, self.delay_lines)
+        m.submodules.delayln_arbiter = self._delayln_arbiter
+        m.submodules.diffuser = self.diffuser
+        wiring.connect(m, self.diffuser.o, pmod0.i_cal)
 
         # Extra FIFO between audio out stream and plotting components
         # This FIFO does not block the audio stream.
@@ -215,9 +261,9 @@ class MacroOscSoc(TiliquaSoc):
 
         # Route audio outputs 2/3 to plotting stream (scope / vector)
         m.d.comb += [
-            plot_fifo.w_stream.valid.eq(self.audio_fifo.stream.valid & pmod0.i_cal.ready),
-            plot_fifo.w_stream.payload[0:16] .eq(self.audio_fifo.stream.payload[2]),
-            plot_fifo.w_stream.payload[16:32].eq(self.audio_fifo.stream.payload[3]),
+            plot_fifo.w_stream.valid.eq(pmod0.i_cal.valid & pmod0.i_cal.ready),
+            plot_fifo.w_stream.payload[0:16] .eq(pmod0.i_cal.payload[2]),
+            plot_fifo.w_stream.payload[16:32].eq(pmod0.i_cal.payload[3]),
         ]
 
         # Switch to use scope or vectorscope
@@ -230,6 +276,7 @@ class MacroOscSoc(TiliquaSoc):
         with m.If(self.permit_bus_traffic):
             m.d.sync += self.vector_periph.en.eq(1)
             m.d.sync += self.scope_periph.en.eq(1)
+            wiring.connect(m, self.audio_fifo.stream, self.diffuser.i)
 
         return m
 
