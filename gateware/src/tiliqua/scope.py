@@ -11,7 +11,7 @@ from amaranth.lib.wiring                         import In, Out
 
 from amaranth_soc                                import csr
 
-from tiliqua                                     import dsp
+from tiliqua                                     import dsp, cache
 from tiliqua.raster_stroke                       import Stroke
 from tiliqua.eurorack_pmod                       import ASQ
 
@@ -36,7 +36,10 @@ class VectorTracePeripheral(wiring.Component):
     def __init__(self, fb, bus_dma, **kwargs):
 
         self.stroke = Stroke(fb=fb, **kwargs)
-        bus_dma.add_master(self.stroke.bus)
+        self.cache = cache.WishboneL2Cache(
+                addr_width=bus_dma.bus.addr_width,
+                cachesize_words=128)
+        bus_dma.add_master(self.cache.slave)
 
         regs = csr.Builder(addr_width=5, data_width=8)
 
@@ -64,6 +67,9 @@ class VectorTracePeripheral(wiring.Component):
 
         wiring.connect(m, wiring.flipped(self.i), self.stroke.i)
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
+
+        m.submodules.cache = self.cache
+        wiring.connect(m, self.stroke.bus, self.cache.master)
 
         m.d.comb += self.stroke.enable.eq(self.en & self.soc_en)
         m.d.comb += self.stroke.rotate_left.eq(self.rotate_left)
