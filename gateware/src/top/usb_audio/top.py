@@ -105,11 +105,6 @@ class USB2AudioInterface(Elaboratable):
             self.create_output_channels_descriptor(configDescr)
             self.create_input_channels_descriptor(configDescr)
 
-            # Midi descriptors
-            midi_interface, midi_streaming_interface = self.create_midi_interface_descriptor()
-            configDescr.add_subordinate_descriptor(midi_interface)
-            configDescr.add_subordinate_descriptor(midi_streaming_interface)
-
         return descriptors
 
 
@@ -275,55 +270,6 @@ class USB2AudioInterface(Elaboratable):
         # Windows wants a stereo pair as default setting, so let's have it
         self.create_input_streaming_interface(c, nr_channels=self.NR_CHANNELS, alt_setting_nr=1, channel_config=0x3)
 
-    def create_midi_interface_descriptor(self):
-        midi_interface = midi1.StandardMidiStreamingInterfaceDescriptorEmitter()
-        midi_interface.bInterfaceNumber = 3
-        midi_interface.bNumEndpoints    = 2
-
-        midi_streaming_interface = midi1.ClassSpecificMidiStreamingInterfaceDescriptorEmitter()
-
-        outToHostJack = midi1.MidiOutJackDescriptorEmitter()
-        outToHostJack.bJackID = 1
-        outToHostJack.bJackType = midi1.MidiStreamingJackTypes.EMBEDDED
-        outToHostJack.add_source(2)
-        midi_streaming_interface.add_subordinate_descriptor(outToHostJack)
-
-        inToDeviceJack = midi1.MidiInJackDescriptorEmitter()
-        inToDeviceJack.bJackID = 2
-        inToDeviceJack.bJackType = midi1.MidiStreamingJackTypes.EXTERNAL
-        midi_streaming_interface.add_subordinate_descriptor(inToDeviceJack)
-
-        inFromHostJack = midi1.MidiInJackDescriptorEmitter()
-        inFromHostJack.bJackID = 3
-        inFromHostJack.bJackType = midi1.MidiStreamingJackTypes.EMBEDDED
-        midi_streaming_interface.add_subordinate_descriptor(inFromHostJack)
-
-        outFromDeviceJack = midi1.MidiOutJackDescriptorEmitter()
-        outFromDeviceJack.bJackID = 4
-        outFromDeviceJack.bJackType = midi1.MidiStreamingJackTypes.EXTERNAL
-        outFromDeviceJack.add_source(3)
-        midi_streaming_interface.add_subordinate_descriptor(outFromDeviceJack)
-
-        outEndpoint = midi1.StandardMidiStreamingBulkDataEndpointDescriptorEmitter()
-        outEndpoint.bEndpointAddress = USBDirection.OUT.to_endpoint_address(3)
-        outEndpoint.wMaxPacketSize = self.MAX_PACKET_SIZE_MIDI
-        midi_streaming_interface.add_subordinate_descriptor(outEndpoint)
-
-        outMidiEndpoint = midi1.ClassSpecificMidiStreamingBulkDataEndpointDescriptorEmitter()
-        outMidiEndpoint.add_associated_jack(3)
-        midi_streaming_interface.add_subordinate_descriptor(outMidiEndpoint)
-
-        inEndpoint = midi1.StandardMidiStreamingBulkDataEndpointDescriptorEmitter()
-        inEndpoint.bEndpointAddress = USBDirection.IN.to_endpoint_address(3)
-        inEndpoint.wMaxPacketSize = self.MAX_PACKET_SIZE_MIDI
-        midi_streaming_interface.add_subordinate_descriptor(inEndpoint)
-
-        inMidiEndpoint = midi1.ClassSpecificMidiStreamingBulkDataEndpointDescriptorEmitter()
-        inMidiEndpoint.add_associated_jack(1)
-        midi_streaming_interface.add_subordinate_descriptor(inMidiEndpoint)
-
-        return (midi_interface, midi_streaming_interface)
-
     def elaborate(self, platform):
         m = Module()
 
@@ -368,17 +314,6 @@ class USB2AudioInterface(Elaboratable):
             endpoint_number=2, # EP 2 IN
             max_packet_size=self.MAX_PACKET_SIZE)
         usb.add_endpoint(ep2_in)
-
-        # MIDI endpoints
-        usb_ep3_out = USBStreamOutEndpoint(
-            endpoint_number=3, # EP 3 OUT
-            max_packet_size=self.MAX_PACKET_SIZE_MIDI)
-        usb.add_endpoint(usb_ep3_out)
-
-        usb_ep3_in = USBStreamInEndpoint(
-            endpoint_number=3, # EP 3 IN
-            max_packet_size=self.MAX_PACKET_SIZE_MIDI)
-        usb.add_endpoint(usb_ep3_in)
 
         # calculate bytes in frame for audio in
         audio_in_frame_bytes = Signal(range(self.MAX_PACKET_SIZE), reset=24 * self.NR_CHANNELS)
@@ -497,73 +432,6 @@ class USB2AudioInterface(Elaboratable):
                 from_usb_stream=usb_to_channel_stream.channel_stream_out)
         wiring.connect(m, pmod0.o_cal, audio_to_channels.i)
         wiring.connect(m, audio_to_channels.o, pmod0.i_cal)
-
-        jack_period = Signal(32)
-        jack_usb = Signal(8)
-        m.submodules.jack_sync = FFSynchronizer(pmod0.jack, jack_usb, o_domain="usb")
-
-        N_TOUCH_CHANNELS = 8
-        touch_usb = []
-        for n in range(N_TOUCH_CHANNELS):
-            touch_usb.append(Signal(8))
-            setattr(m.submodules, f"touch_usb_synchronizer{n}",
-                    FFSynchronizer(pmod0.touch[n], touch_usb[n], o_domain="usb"))
-
-        touch_ch = Signal(3)
-
-        with m.FSM(domain="usb") as fsm:
-            with m.State("WAIT"):
-                # 100Hz // TODO make this delta
-                with m.If(jack_period == int(60000000 / 40)):
-                    m.d.usb += [
-                        jack_period.eq(0),
-                        touch_ch.eq(0)
-                    ]
-                    m.next = "B0"
-                with m.Else():
-                    m.d.usb += jack_period.eq(jack_period + 1)
-            with m.State("B0"):
-                m.d.comb += [
-                    usb_ep3_in.stream.payload.eq(0x0B),
-                    usb_ep3_in.stream.first.eq(touch_ch == 0),
-                    usb_ep3_in.stream.valid.eq(1),
-                ]
-                with m.If(usb_ep3_in.stream.ready):
-                    m.next = "B1"
-            with m.State("B1"):
-                m.d.comb += [
-                    usb_ep3_in.stream.payload.eq(0xB0),
-                    usb_ep3_in.stream.valid.eq(1),
-                ]
-                with m.If(usb_ep3_in.stream.ready):
-                    m.next = "B2"
-            with m.State("B2"):
-                m.d.comb += [
-                    usb_ep3_in.stream.payload.eq(touch_ch),
-                    usb_ep3_in.stream.valid.eq(1),
-                ]
-                with m.If(usb_ep3_in.stream.ready):
-                    m.next = "B3"
-            with m.State("B3"):
-
-                m.d.comb += [
-                    usb_ep3_in.stream.last.eq(touch_ch == (N_TOUCH_CHANNELS - 1)),
-                    usb_ep3_in.stream.valid.eq(1),
-                ]
-
-                # Infer mux of active channel to payload
-                with m.Switch(touch_ch):
-                    for n in range(N_TOUCH_CHANNELS):
-                        with m.Case(n):
-                            # Shift to get 0-127 as MIDI CC requires
-                            m.d.comb += usb_ep3_in.stream.payload.eq(touch_usb[n] >> 1),
-
-                with m.If(usb_ep3_in.stream.ready):
-                    with m.If(touch_ch == (N_TOUCH_CHANNELS - 1)):
-                        m.next = "WAIT"
-                    with m.Else():
-                        m.d.usb += touch_ch.eq(touch_ch + 1)
-                        m.next = "B0"
 
         if platform.ila:
 
