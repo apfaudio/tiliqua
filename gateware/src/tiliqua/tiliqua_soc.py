@@ -198,6 +198,12 @@ class TiliquaSoc(Component):
         self.cpu = VexiiRiscv(
             variant=cpu_variant,
             reset_addr=self.reset_addr,
+            mainram_base=self.mainram_base,
+            mainram_size=self.mainram_size,
+            spiflash_base=self.spiflash_base,
+            spiflash_size=self.spiflash_size,
+            psram_base=self.psram_base,
+            psram_size=self.psram_size,
             csr_base=self.csr_base
         )
 

@@ -38,11 +38,12 @@ CPU_BASE = [
 
 CPU_VARIANTS = {
     "tiliqua_rv32im": CPU_BASE + [
-        '--lsu-l1-sets=8',
+        '--lsu-l1-sets=16',
         '--lsu-l1-ways=1',
-        '--fetch-l1-sets=8',
+        '--fetch-l1-sets=16',
         '--fetch-l1-ways=1',
         '--with-btb',
+        '--relaxed-btb',
         '--with-late-alu',
     ],
     "tiliqua_rv32imafc": CPU_BASE + [
@@ -52,6 +53,7 @@ CPU_VARIANTS = {
         '--fma-reduced-accuracy',
         '--fpu-ignore-subnormal',
         '--with-btb',
+        '--relaxed-btb',
         '--with-late-alu',
         '--lsu-hardware-prefetch rpt',
         '--lsu-l1-refill-count=2',
@@ -85,6 +87,9 @@ class VexiiRiscv(Component):
     PATH_CACHE = os.path.join(os.path.dirname(__file__), "verilog")
 
     def __init__(self, variant="tiliqua", reset_addr=0x0,
+                 mainram_base=0x0, mainram_size=0x10000,
+                 spiflash_base=0x10000000, spiflash_size=0x1000000,
+                 psram_base=0x20000000, psram_size=0x1000000,
                  csr_base=0xf0000000, csr_size=0x10000):
 
         self._variant    = variant
@@ -125,9 +130,9 @@ class VexiiRiscv(Component):
         # Add required reset vector and PMP region arguments.
         netlist_arguments = netlist_arguments + [
             f'--reset-vector {hex(reset_addr)}',
-            f'--region base=0,size=10000,main=1,exe=0', # TODO take from RAM config
-            f'--region base=10000000,size=1000000,main=1,exe=1',
-            f'--region base=20000000,size=1000000,main=1,exe=1',
+            f'--region base={mainram_base:x},size={mainram_size:x},main=1,exe=0',
+            f'--region base={spiflash_base:x},size={spiflash_size:x},main=1,exe=1',
+            f'--region base={psram_base:x},size={psram_size:x},main=1,exe=1',
             f'--region base={csr_base:x},size={csr_size:x},main=0,exe=0',
             f'--region base=A0000000,size=8,main=0,exe=0',
         ]
