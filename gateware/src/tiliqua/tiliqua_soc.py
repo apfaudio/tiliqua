@@ -194,17 +194,18 @@ class TiliquaSoc(Component):
                 self.reset_addr  = self.fw_base
                 self.fw_max_size = 0x50000 # 320KiB
 
+
         # cpu
         self.cpu = VexiiRiscv(
+            regions = [
+                VexiiRiscv.MemoryRegion(base=self.mainram_base, size=self.mainram_size, cacheable=True, executable=False),
+                VexiiRiscv.MemoryRegion(base=self.spiflash_base, size=self.spiflash_size, cacheable=True, executable=True),
+                VexiiRiscv.MemoryRegion(base=self.psram_base, size=self.psram_size, cacheable=True, executable=True),
+                VexiiRiscv.MemoryRegion(base=self.csr_base, size=0x10000, cacheable=False, executable=False),
+                VexiiRiscv.MemoryRegion(base=0xA0000000, size=8, cacheable=0, executable=0) # HACK: macro_osc
+            ],
             variant=cpu_variant,
             reset_addr=self.reset_addr,
-            mainram_base=self.mainram_base,
-            mainram_size=self.mainram_size,
-            spiflash_base=self.spiflash_base,
-            spiflash_size=self.spiflash_size,
-            psram_base=self.psram_base,
-            psram_size=self.psram_size,
-            csr_base=self.csr_base
         )
 
         # interrupt controller

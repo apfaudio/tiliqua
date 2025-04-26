@@ -19,6 +19,7 @@ from amaranth.lib.wiring  import Component, In, Out
 from amaranth_soc         import wishbone
 from amaranth_soc.periph  import ConstantMap
 
+from dataclasses import dataclass
 import git
 import hashlib
 import os
@@ -72,6 +73,15 @@ CPU_VARIANTS = {
 
 class VexiiRiscv(Component):
 
+    @dataclass
+    class MemoryRegion:
+        base: int
+        size: int
+        cacheable: bool
+        executable: bool
+        def get_flag(self):
+            return f'--region base={self.base:x},size={self.size:x},main={int(self.cacheable)},exe={int(self.executable)}'
+
     # Commands used to generate a VexiiRiscv netlist using SpinalHDL
     # if we miss our local cache of pre-generated netlists. In general
     # users should never need to generate their own netlists unless
@@ -86,11 +96,7 @@ class VexiiRiscv(Component):
     # Local storage (in this repository) of cached netlists
     PATH_CACHE = os.path.join(os.path.dirname(__file__), "verilog")
 
-    def __init__(self, variant="tiliqua", reset_addr=0x0,
-                 mainram_base=0x0, mainram_size=0x10000,
-                 spiflash_base=0x10000000, spiflash_size=0x1000000,
-                 psram_base=0x20000000, psram_size=0x1000000,
-                 csr_base=0xf0000000, csr_size=0x10000):
+    def __init__(self, regions, variant="tiliqua", reset_addr=0x0):
 
         self._variant    = variant
         self._reset_addr = reset_addr
@@ -130,12 +136,7 @@ class VexiiRiscv(Component):
         # Add required reset vector and PMP region arguments.
         netlist_arguments = netlist_arguments + [
             f'--reset-vector {hex(reset_addr)}',
-            f'--region base={mainram_base:x},size={mainram_size:x},main=1,exe=0',
-            f'--region base={spiflash_base:x},size={spiflash_size:x},main=1,exe=1',
-            f'--region base={psram_base:x},size={psram_size:x},main=1,exe=1',
-            f'--region base={csr_base:x},size={csr_size:x},main=0,exe=0',
-            f'--region base=A0000000,size=8,main=0,exe=0',
-        ]
+        ] + [region.get_flag() for region in regions]
         vexiiriscv_hash = git.Repo(vexiiriscv_root).head.object.hexsha
         netlist_name = self.generate_netlist_name(vexiiriscv_hash, netlist_arguments)
 
