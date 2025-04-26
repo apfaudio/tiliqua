@@ -44,7 +44,7 @@ class Stroke(wiring.Component):
     """
 
 
-    def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=4,
+    def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=16,
                  default_hue=10, default_x=0, default_y=0):
 
         self.fb = fb
@@ -93,7 +93,11 @@ class Stroke(wiring.Component):
             m.submodules.resample2 = resample2 = dsp.Resample(fs_in=self.fs, n_up=self.n_upsample, m_down=1)
             m.submodules.resample3 = resample3 = dsp.Resample(fs_in=self.fs, n_up=self.n_upsample, m_down=1)
 
-            wiring.connect(m, wiring.flipped(self.i), split.i)
+            from amaranth.lib.fifo import SyncFIFO
+            m.submodules.plot_fifo = plot_fifo = SyncFIFOBuffered(
+                width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
+            wiring.connect(m, wiring.flipped(self.i), plot_fifo.w_stream)
+            wiring.connect(m, plot_fifo.r_stream, split.i)
 
             wiring.connect(m, split.o[0], resample0.i)
             wiring.connect(m, split.o[1], resample1.i)
