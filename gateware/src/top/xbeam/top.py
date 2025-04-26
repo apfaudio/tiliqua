@@ -88,6 +88,7 @@ class XbeamSoc(TiliquaSoc):
             m.d.comb += [
                 self.vector_periph.i.valid.eq(pmod0.i_cal.valid & pmod0.i_cal.ready),
                 self.vector_periph.i.payload.eq(pmod0.i_cal.payload),
+                self.vector_periph.i.payload[2].eq(0),
             ]
 
         # Memory controller hangs if we start making requests to it straight away.
