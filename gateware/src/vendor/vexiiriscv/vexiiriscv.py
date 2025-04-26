@@ -20,9 +20,11 @@ from amaranth_soc         import wishbone
 from amaranth_soc.periph  import ConstantMap
 
 from dataclasses import dataclass
+
 import git
 import hashlib
 import os
+import portalocker
 import logging
 import shutil
 import subprocess
@@ -70,14 +72,6 @@ CPU_VARIANTS = {
 
 class VexiiRiscv(Component):
 
-    @dataclass
-    class MemoryRegion:
-        base: int
-        size: int
-        cacheable: bool
-        executable: bool
-        def get_flag(self):
-            return f'--region base={self.base:x},size={self.size:x},main={int(self.cacheable)},exe={int(self.executable)}'
 
     # Commands used to generate a VexiiRiscv netlist using SpinalHDL
     # if we miss our local cache of pre-generated netlists. In general
@@ -92,6 +86,15 @@ class VexiiRiscv(Component):
 
     # Local storage (in this repository) of cached netlists
     PATH_CACHE = os.path.join(os.path.dirname(__file__), "verilog")
+
+    @dataclass
+    class MemoryRegion:
+        base: int
+        size: int
+        cacheable: bool
+        executable: bool
+        def get_flag(self):
+            return f'--region base={self.base:x},size={self.size:x},main={int(self.cacheable)},exe={int(self.executable)}'
 
     def __init__(self, regions, variant="tiliqua", reset_addr=0x0):
 
@@ -146,9 +149,16 @@ class VexiiRiscv(Component):
             logging.info(f"VexiiRiscv source file not cached at: {self._source_path}")
             logging.info(f"Generate VexiiRiscv using 'sbt' with {netlist_arguments}...")
             cmd = self.CMD_GENERATE.format(args=' '.join(netlist_arguments))
-            subprocess.check_call(cmd, shell=True, cwd=vexiiriscv_root)
-            logging.info(f"Copy netlist from {self.PATH_GENERATE} to {self._source_file}...")
-            shutil.copyfile(self.PATH_GENERATE, self._source_path)
+            # Prohibit simultaneous netlist generation when building multiple SoCs
+            # in parallel. This only affects the first time SoCs are built with
+            # new VexiiRiscv arguments or a bumped VexiiRiscv repository.
+            with portalocker.TemporaryFileLock(
+                    os.path.join(vexiiriscv_root, "tiliqua_sbt.lock"),
+                    fail_when_locked=False,
+                    timeout=60):
+                subprocess.check_call(cmd, shell=True, cwd=vexiiriscv_root)
+                logging.info(f"Copy netlist from {self.PATH_GENERATE} to {self._source_file}...")
+                shutil.copyfile(self.PATH_GENERATE, self._source_path)
         else:
             logging.info(f"VexiiRiscv verilog netlist already present: {self._source_path}")
 
