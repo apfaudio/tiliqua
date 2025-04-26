@@ -140,7 +140,8 @@ class VideoPeripheral(wiring.Component):
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, default_modeline, ui_name, ui_sha, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
-                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im"):
+                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
+                 extra_cpu_regions=[]):
 
         super().__init__({})
 
@@ -202,8 +203,7 @@ class TiliquaSoc(Component):
                 VexiiRiscv.MemoryRegion(base=self.spiflash_base, size=self.spiflash_size, cacheable=True, executable=True),
                 VexiiRiscv.MemoryRegion(base=self.psram_base, size=self.psram_size, cacheable=True, executable=True),
                 VexiiRiscv.MemoryRegion(base=self.csr_base, size=0x10000, cacheable=False, executable=False),
-                VexiiRiscv.MemoryRegion(base=0xA0000000, size=8, cacheable=0, executable=0) # HACK: macro_osc
-            ],
+            ] + extra_cpu_regions,
             variant=cpu_variant,
             reset_addr=self.reset_addr,
         )
@@ -333,7 +333,7 @@ class TiliquaSoc(Component):
         m.submodules.cpu = self.cpu
         self.wb_arbiter.add(self.cpu.ibus)
         self.wb_arbiter.add(self.cpu.dbus)
-        self.wb_arbiter.add(self.cpu.pbus)
+        self.wb_arbiter.add(self.cpu.pbus) # TODO: isolate pbus from ibus/dbus
 
         # interrupt controller
         m.submodules.interrupt_controller = self.interrupt_controller
