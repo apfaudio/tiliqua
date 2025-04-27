@@ -40,6 +40,8 @@ CPU_BASE = [
 ]
 
 CPU_VARIANTS = {
+    # enough performance for most control plane use
+    # cases, assuming we are running from PSRAM
     "tiliqua_rv32im": CPU_BASE + [
         '--lsu-l1-sets=16',
         '--lsu-l1-ways=1',
@@ -49,6 +51,20 @@ CPU_VARIANTS = {
         '--relaxed-btb',
         '--with-late-alu',
     ],
+    # special variant with big icache, necessary if
+    # the CPU is directly fetching instructions from spiflash
+    "tiliqua_rv32im_xip": CPU_BASE + [
+        '--lsu-l1-sets=16',
+        '--lsu-l1-ways=1',
+        '--fetch-l1-sets=32',
+        '--fetch-l1-ways=2',
+        '--with-btb',
+        '--relaxed-btb',
+        '--with-late-alu',
+    ],
+    # Most performant variant that reasonably fits on the
+    # ECP5-25, consumes about half the LUTs and has FPU
+    # performance comparable to a low-end STM32.
     "tiliqua_rv32imafc": CPU_BASE + [
         '--with-rvc',
         '--with-rva',

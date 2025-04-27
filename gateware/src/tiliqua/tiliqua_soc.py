@@ -422,9 +422,8 @@ class TiliquaSoc(Component):
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
-        with m.If(on_delay < 0xFF):
+        with m.If(on_delay < 0xFFFFF):
             m.d.comb += self.cpu.ext_reset.eq(1)
-        with m.If(on_delay < 0xFFFF):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
             m.d.sync += self.permit_bus_traffic.eq(1)
