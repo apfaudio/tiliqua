@@ -92,8 +92,8 @@ class DelayLineTests(unittest.TestCase):
                 # warn: only whole-word transactions are simulated
                 if ctx.get(membus.we):
                     while ctx.get(membus.cti == wishbone.CycleType.INCR_BURST):
-                        mem[adr] = ctx.get(membus.dat_w)
                         await ctx.tick()
+                        mem[adr] = ctx.get(membus.dat_w)
                         ctx.set(membus.ack, 1)
                         adr += 1
                     await ctx.tick()
