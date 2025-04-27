@@ -60,7 +60,7 @@ class USB2AudioInterface(wiring.Component):
     brief = "USB soundcard, 4in + 4out."
 
     NR_CHANNELS = 4
-    MAX_PACKET_SIZE = int(224 // 8 * NR_CHANNELS)
+    MAX_PACKET_SIZE = int(4*224 // 8 * NR_CHANNELS)
     MAX_PACKET_SIZE_MIDI = 64
 
     i:    In(stream.Signature(data.ArrayLayout(ASQ, 4)))
@@ -557,8 +557,8 @@ class UAC2RequestHandlers(USBRequestHandler):
                         m.d.comb += [
                             Cat(transmitter.data).eq(
                                 Cat(Const(0x1, 16), # no triples
-                                    Const(48000, 32), # MIN
-                                    Const(48000, 32), # MAX
+                                    Const(192000, 32), # MIN
+                                    Const(192000, 32), # MAX
                                     Const(0, 32))),   # RES
                             transmitter.max_length.eq(setup.length)
                         ]
@@ -578,7 +578,7 @@ class UAC2RequestHandlers(USBRequestHandler):
                     m.d.comb += transmitter.stream.attach(self.interface.tx)
                     with m.If(request_clock_freq & (setup.length == 4)):
                         m.d.comb += [
-                            Cat(transmitter.data[0:4]).eq(Const(48000, 32)),
+                            Cat(transmitter.data[0:4]).eq(Const(192000, 32)),
                             transmitter.max_length.eq(4)
                         ]
                     with m.Else():
