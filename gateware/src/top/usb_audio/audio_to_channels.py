@@ -43,7 +43,7 @@ class AudioToChannels(wiring.Component):
         # eurorack-pmod calibrated INPUT samples -> USB Channel stream -> HOST
         #
 
-        m.submodules.adc_fifo = adc_fifo = AsyncFIFO(width=SW*4, depth=64, w_domain="sync", r_domain="usb")
+        m.submodules.adc_fifo = adc_fifo = AsyncFIFO(width=SW*4, depth=16, w_domain="sync", r_domain="usb")
 
         # (sync domain) on every sample strobe, latch and write all channels concatenated into one entry
         # of adc_fifo.
@@ -98,7 +98,7 @@ class AudioToChannels(wiring.Component):
         # HOST -> USB Channel stream -> eurorack-pmod calibrated OUTPUT samples.
         #
 
-        m.submodules.dac_fifo = dac_fifo = AsyncFIFO(width=SW*4, depth=64, w_domain="usb", r_domain="sync")
+        m.submodules.dac_fifo = dac_fifo = AsyncFIFO(width=SW*4, depth=16, w_domain="usb", r_domain="sync")
         wiring.connect(m, dac_fifo.r_stream, wiring.flipped(self.o));
 
         m.d.usb += dac_fifo.w_en.eq(0)

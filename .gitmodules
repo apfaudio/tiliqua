@@ -1,3 +1,6 @@
 [submodule "gateware/deps/sid"]
 	path = gateware/deps/sid
 	url = https://github.com/vk2seb/reDIP-SID
+[submodule "gateware/deps/VexiiRiscv"]
+	path = gateware/deps/VexiiRiscv
+	url = https://github.com/SpinalHDL/VexiiRiscv.git

@@ -15,8 +15,8 @@ pub enum Page {
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TriggerMode {
-    #[default]
     Always,
+    #[default]
     Rising,
 }
 
@@ -53,7 +53,7 @@ int_params!(TimbreParams<u8>      { step: 8, min: 0, max: 240 });
 int_params!(MorphParams<u8>       { step: 8, min: 0, max: 240 });
 int_params!(XScaleParams<u8>      { step: 1, min: 0, max: 15 });
 int_params!(YScaleParams<u8>      { step: 1, min: 0, max: 15 });
-int_params!(PersistParams<u16>    { step: 256, min: 512, max: 32768 });
+int_params!(PersistParams<u16>    { step: 128, min: 128, max: 8192 });
 int_params!(DecayParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
 int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
@@ -85,7 +85,7 @@ pub struct VectorOpts {
 
 #[derive(OptionPage, Clone)]
 pub struct BeamOpts {
-    #[option(1024)]
+    #[option(256)]
     pub persist: IntOption<PersistParams>,
     #[option(1)]
     pub decay: IntOption<DecayParams>,

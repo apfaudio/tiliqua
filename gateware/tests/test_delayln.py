@@ -23,22 +23,18 @@ from amaranth_future       import fixed
 class DelayLineTests(unittest.TestCase):
 
     @parameterized.expand([
-        ["b4_c64_lr_short_taps", 64,  4, True,  256, 1,   3],
-        ["b4_c16_lr_long_taps",  16,  4, True,  256, 150, 220],
-        ["b4_c64_lr_long_taps",  64,  4, True,  256, 150, 220],
-        ["b4_c256_lr_long_taps", 256, 4, True,  256, 150, 220],
-        ["b4_c64_lr_endpoints1", 64,  4, True,  256, 0,   255],
-        ["b4_c64_lr_endpoints2", 64,  4, True,  256, 255, 0],
-        ["b8_c64_lr_long_taps",  64,  8, True,  256, 150, 220],
-        ["b4_c64_dp_short_taps", 64,  4, False, 256, 1,   3],
-        ["b4_c64_dp_long_taps",  64,  4, False, 256, 150, 220],
-        ["b8_c64_dp_long_taps",  64,  8, False, 256, 150, 220],
+        ["b4_c64_lr_short_taps", 64,  4, 256, 1,   3],
+        ["b4_c16_lr_long_taps",  16,  4, 256, 150, 220],
+        ["b4_c64_lr_long_taps",  64,  4, 256, 150, 220],
+        ["b4_c256_lr_long_taps", 256, 4, 256, 150, 220],
+        ["b4_c64_lr_endpoints1", 64,  4, 256, 0,   255],
+        ["b4_c64_lr_endpoints2", 64,  4, 256, 255, 0],
+        ["b8_c64_lr_long_taps",  64,  8, 256, 150, 220],
     ])
-    def test_psram_delayln(self, name, cachesize_words, cache_burst_len, cache_lutram_backed,
+    def test_psram_delayln(self, name, cachesize_words, cache_burst_len,
                            max_delay, tap1_delay, tap2_delay):
 
         cache_kwargs = {
-            "lutram_backed":   cache_lutram_backed,
             "burst_len":       cache_burst_len,
             "cachesize_words": cachesize_words,
         }
@@ -96,8 +92,8 @@ class DelayLineTests(unittest.TestCase):
                 # warn: only whole-word transactions are simulated
                 if ctx.get(membus.we):
                     while ctx.get(membus.cti == wishbone.CycleType.INCR_BURST):
-                        mem[adr] = ctx.get(membus.dat_w)
                         await ctx.tick()
+                        mem[adr] = ctx.get(membus.dat_w)
                         ctx.set(membus.ack, 1)
                         adr += 1
                     await ctx.tick()

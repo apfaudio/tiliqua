@@ -175,6 +175,11 @@ class Peripheral(wiring.Component):
             psram.perform_write          .eq(0),
         ]
 
+        m.d.comb += [
+            psram.write_data              .eq(self.shared_bus.dat_w),
+            psram.write_mask              .eq(~self.shared_bus.sel),
+        ]
+
         with m.FSM() as fsm:
 
             # Initialize memory registers (read/write timings) before
@@ -222,8 +227,6 @@ class Peripheral(wiring.Component):
                 with m.If(self.shared_bus.cyc & self.shared_bus.stb & psram.idle):
                     m.d.sync += [
                         psram.start_transfer          .eq(1),
-                        psram.write_data              .eq(self.shared_bus.dat_w),
-                        psram.write_mask              .eq(~self.shared_bus.sel),
                         psram.address                 .eq(self.shared_bus.adr << 2),
                         psram.perform_write           .eq(self.shared_bus.we),
                     ]
@@ -235,10 +238,6 @@ class Peripheral(wiring.Component):
                     m.d.comb += [
                         self.shared_bus.dat_r         .eq(psram.read_data),
                         self.shared_bus.ack           .eq(1),
-                    ]
-                    m.d.sync += [
-                        psram.write_data              .eq(self.shared_bus.dat_w),
-                        psram.write_mask              .eq(~self.shared_bus.sel),
                     ]
                     with m.If(self.shared_bus.cti != wishbone.CycleType.INCR_BURST):
                         m.d.comb += psram.final_word  .eq(1)

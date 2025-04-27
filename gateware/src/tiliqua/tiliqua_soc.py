@@ -48,11 +48,13 @@ from amaranth.lib.wiring                         import Component, In, Out, flip
 from amaranth_soc                                import csr, gpio, wishbone
 from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
 
-from vendor.soc.cores                            import sram, timer, uart, spiflash
-from vendor.soc.cpu                              import InterruptController, VexRiscv
-from vendor.soc                                  import readbin
-from vendor.soc.generate                         import GenerateSVD
+from luna_soc.gateware.core                      import blockram, timer, uart, spiflash
+from luna_soc.gateware.cpu                       import InterruptController
+from luna_soc.gateware.provider.cynthion         import UARTProvider
+from luna_soc.util                               import readbin
+from luna_soc.generate                           import rust, introspect, svd
 
+from vendor.vexiiriscv                           import VexiiRiscv
 
 from tiliqua.tiliqua_platform                    import *
 from tiliqua.raster                              import Persistance
@@ -138,7 +140,8 @@ class VideoPeripheral(wiring.Component):
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, default_modeline, ui_name, ui_sha, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
-                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im"):
+                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
+                 extra_cpu_regions=[]):
 
         super().__init__({})
 
@@ -192,8 +195,15 @@ class TiliquaSoc(Component):
                 self.reset_addr  = self.fw_base
                 self.fw_max_size = 0x50000 # 320KiB
 
+
         # cpu
-        self.cpu = VexRiscv(
+        self.cpu = VexiiRiscv(
+            regions = [
+                VexiiRiscv.MemoryRegion(base=self.mainram_base, size=self.mainram_size, cacheable=True, executable=False),
+                VexiiRiscv.MemoryRegion(base=self.spiflash_base, size=self.spiflash_size, cacheable=True, executable=True),
+                VexiiRiscv.MemoryRegion(base=self.psram_base, size=self.psram_size, cacheable=True, executable=True),
+                VexiiRiscv.MemoryRegion(base=self.csr_base, size=0x10000, cacheable=False, executable=False),
+            ] + extra_cpu_regions,
             variant=cpu_variant,
             reset_addr=self.reset_addr,
         )
@@ -217,8 +227,8 @@ class TiliquaSoc(Component):
         )
 
         # mainram
-        self.mainram = sram.Peripheral(size=self.mainram_size)
-        self.wb_decoder.add(self.mainram.bus, addr=self.mainram_base, name="mainram")
+        self.mainram = blockram.Peripheral(size=self.mainram_size)
+        self.wb_decoder.add(self.mainram.bus, addr=self.mainram_base, name="blockram")
 
         # csr decoder
         self.csr_decoder = csr.Decoder(addr_width=28, data_width=8)
@@ -228,9 +238,6 @@ class TiliquaSoc(Component):
         divisor = int(self.clock_settings.frequencies.sync // uart_baud_rate)
         self.uart0 = uart.Peripheral(divisor=divisor)
         self.csr_decoder.add(self.uart0.bus, addr=self.uart0_base, name="uart0")
-
-        # FIXME: timer events / isrs currently not implemented, adding the event
-        # bus to the csr decoder segfaults yosys somehow ...
 
         # timer0
         self.timer0 = timer.Peripheral(width=32)
@@ -246,7 +253,8 @@ class TiliquaSoc(Component):
 
         # psram peripheral
         self.psram_periph = psram_peripheral.Peripheral(size=self.psram_size)
-        self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base, name="psram")
+        self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base,
+                            name="psram")
 
         # video PHY (DMAs from PSRAM starting at self.psram_base)
         self.fb = dma_framebuffer.DMAFramebuffer(
@@ -325,6 +333,7 @@ class TiliquaSoc(Component):
         m.submodules.cpu = self.cpu
         self.wb_arbiter.add(self.cpu.ibus)
         self.wb_arbiter.add(self.cpu.dbus)
+        self.wb_arbiter.add(self.cpu.pbus) # TODO: isolate pbus from ibus/dbus
 
         # interrupt controller
         m.submodules.interrupt_controller = self.interrupt_controller
@@ -340,7 +349,7 @@ class TiliquaSoc(Component):
         # uart0
         m.submodules.uart0 = self.uart0
         if sim.is_hw(platform):
-            uart0_provider = uart.Provider(0)
+            uart0_provider = UARTProvider()
             m.submodules.uart0_provider = uart0_provider
             wiring.connect(m, self.uart0.pins, uart0_provider.pins)
 
@@ -413,9 +422,8 @@ class TiliquaSoc(Component):
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
-        with m.If(on_delay < 0xFF):
+        with m.If(on_delay < 0xFFFFF):
             m.d.comb += self.cpu.ext_reset.eq(1)
-        with m.If(on_delay < 0xFFFF):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
             m.d.sync += self.permit_bus_traffic.eq(1)
@@ -428,50 +436,20 @@ class TiliquaSoc(Component):
         """Generate top-level SVD."""
         print("Generating SVD ...", dst_svd)
         with open(dst_svd, "w") as f:
-            GenerateSVD(self).generate(file=f)
+            soc = introspect.soc(self)
+            memory_map = introspect.memory_map(soc)
+            interrupts = introspect.interrupts(soc)
+            svd.SVD(memory_map, interrupts).generate(file=f)
         print("Wrote SVD ...", dst_svd)
 
     def genmem(self, dst_mem):
         """Generate linker regions for Rust (memory.x)."""
         print("Generating (rust) memory.x ...", dst_mem)
-        if self.fw_location == FirmwareLocation.BRAM:
-            # .text, .rodata in shared block RAM region
-            memory_x = (
-                "MEMORY {{\n"
-                "    mainram : ORIGIN = {mainram_base}, LENGTH = {mainram_size}\n"
-                "}}\n"
-                "REGION_ALIAS(\"REGION_TEXT\", mainram);\n"
-                "REGION_ALIAS(\"REGION_RODATA\", mainram);\n"
-                "REGION_ALIAS(\"REGION_DATA\", mainram);\n"
-                "REGION_ALIAS(\"REGION_BSS\", mainram);\n"
-                "REGION_ALIAS(\"REGION_HEAP\", mainram);\n"
-                "REGION_ALIAS(\"REGION_STACK\", mainram);\n"
-            )
-            with open(dst_mem, "w") as f:
-                f.write(memory_x.format(mainram_base=hex(self.mainram_base),
-                                        mainram_size=hex(self.mainram.size),
-                                        ))
-        else:
-            # .text, .rodata stored elsewhere (SPI flash or PSRAM)
-            memory_x = (
-                "MEMORY {{\n"
-                "    mainram : ORIGIN = {mainram_base}, LENGTH = {mainram_size}\n"
-                "    {text_region} : ORIGIN = {spiflash_base}, LENGTH = {spiflash_size}\n"
-                "}}\n"
-                "REGION_ALIAS(\"REGION_TEXT\", {text_region});\n"
-                "REGION_ALIAS(\"REGION_RODATA\", {text_region});\n"
-                "REGION_ALIAS(\"REGION_DATA\", mainram);\n"
-                "REGION_ALIAS(\"REGION_BSS\", mainram);\n"
-                "REGION_ALIAS(\"REGION_HEAP\", mainram);\n"
-                "REGION_ALIAS(\"REGION_STACK\", mainram);\n"
-            )
-            with open(dst_mem, "w") as f:
-                f.write(memory_x.format(mainram_base=hex(self.mainram_base),
-                                        mainram_size=hex(self.mainram.size),
-                                        spiflash_base=hex(self.fw_base),
-                                        spiflash_size=hex(self.fw_max_size),
-                                        text_region=self.fw_location.value,
-                                        ))
+        with open(dst_mem, "w") as f:
+            soc        = introspect.soc(self)
+            memory_map = introspect.memory_map(soc)
+            reset_addr = introspect.reset_addr(soc)
+            rust.LinkerScript(memory_map, reset_addr).generate(file=f)
 
     def genconst(self, dst):
         """Generate some high-level constants used by application code."""

@@ -103,10 +103,10 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
     // WARN: assume framebuffer is at the start of PSRAM - don't try memtesting that section.
 
     let psram_ptr = PSRAM_BASE as *mut u32;
-    let psram_sz_test = 1024;
+    let psram_sz_test = 1024*64;
 
-    timer.enable();
     timer.set_timeout_ticks(0xFFFFFFFF);
+    timer.enable();
 
     let start = timer.counter();
 
@@ -115,8 +115,6 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
             psram_ptr.offset(i as isize).write_volatile(i as u32);
         }
     }
-
-    pac::cpu::vexriscv::flush_dcache();
 
     let endwrite = timer.counter();
 
@@ -385,7 +383,7 @@ fn main() -> ! {
     };
 
     palette::ColorPalette::default().write_to_hardware(&mut video);
-    video.set_persist(512);
+    video.set_persist(128);
 
     let mut opts = Opts::default();
 

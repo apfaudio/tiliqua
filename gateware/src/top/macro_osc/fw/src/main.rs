@@ -29,7 +29,7 @@ use hal::pca9635::*;
 tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
-const BLOCK_SIZE: usize = 64;
+const BLOCK_SIZE: usize = 128;
 // PSRAM heap for big audio buffers.
 const HEAP_START: usize = PSRAM_BASE + (PSRAM_SZ_BYTES / 2);
 const HEAP_SIZE: usize = 128*1024;
@@ -170,11 +170,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 #[entry]
 fn main() -> ! {
 
-    // FIXME: doesn't seem to be needed any more?
-
-    pac::cpu::vexriscv::flush_icache();
-    pac::cpu::vexriscv::flush_dcache();
-
     let peripherals = pac::Peripherals::take().unwrap();
 
     // initialize logging
@@ -214,7 +209,6 @@ fn main() -> ! {
     info!("heap usage {} KiB", HEAP.used()/1024);
 
     /*
-     * NOTE: uncomment this for some basic benchmarking
     critical_section::with(|cs| {
         let mut app = app.borrow_ref_mut(cs);
 
@@ -224,10 +218,10 @@ fn main() -> ! {
         let mut patch = app.patch.clone();
         let modulations = app.modulations.clone();
 
-        for engine in 0..24 {
+        timer.set_timeout_ticks(0xFFFFFFFF);
+        timer.enable();
 
-            timer.enable();
-            timer.set_timeout_ticks(0xFFFFFFFF);
+        for engine in 0..24 {
 
             let start = timer.counter();
 
@@ -243,6 +237,10 @@ fn main() -> ! {
             let sysclk = pac::clock::sysclk();
             info!("engine {} speed {} samples/sec", engine, ((sysclk as u64) * ((BLOCK_SIZE * 8) as u64) / (read_ticks as u64)));
         }
+
+        timer.disable();
+        use embedded_hal::delay::DelayNs;
+        timer.delay_ns(0);
     });
     */
 

@@ -63,6 +63,7 @@ from tiliqua.cli                                 import top_level_cli
 
 from tiliqua.eurorack_pmod                       import ASQ
 
+from vendor.vexiiriscv                           import VexiiRiscv
 
 # Simple 2-fifo DMA peripheral for writing glitch-free audio from a softcore.
 class AudioFIFOPeripheral(wiring.Component):
@@ -70,7 +71,7 @@ class AudioFIFOPeripheral(wiring.Component):
     class FifoLenReg(csr.Register, access="r"):
         fifo_len: csr.Field(csr.action.R, unsigned(16))
 
-    def __init__(self, fifo_sz=4*4, fifo_data_width=32, granularity=8, elastic_sz=64*3):
+    def __init__(self, fifo_sz=4*4, fifo_data_width=32, granularity=8, elastic_sz=128*3):
         regs = csr.Builder(addr_width=6, data_width=8)
 
         # Out and Aux FIFOs
@@ -131,11 +132,11 @@ class AudioFIFOPeripheral(wiring.Component):
 
         m.d.comb += self._fifo_len.f.fifo_len.r_data.eq(self._fifo0.level)
 
-        # Resample 12kHz to 48kHz
+        # Resample 24kHz to 48kHz
         m.submodules.resample_up0 = resample_up0 = dsp.Resample(
-                fs_in=12000, n_up=4, m_down=1)
+                fs_in=24000, n_up=2, m_down=1)
         m.submodules.resample_up1 = resample_up1 = dsp.Resample(
-                fs_in=12000, n_up=4, m_down=1)
+                fs_in=24000, n_up=2, m_down=1)
         wiring.connect(m, self._fifo0.r_stream, resample_up0.i)
         wiring.connect(m, self._fifo1.r_stream, resample_up1.i)
 
@@ -153,16 +154,22 @@ class MacroOscSoc(TiliquaSoc):
 
     def __init__(self, **kwargs):
 
-        # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
-        super().__init__(finalize_csr_bridge=False, mainram_size=0x10000,
-                         cpu_variant="tiliqua_rv32imafc", **kwargs)
-
         # WARN: TiliquaSoc ends at 0x00000900
         self.vector_periph_base  = 0x00001000
         self.scope_periph_base   = 0x00001100
         self.audio_fifo_csr_base = 0x00001200
         # offset 0x0 is FIFO0, offset 0x4 is FIFO1
         self.audio_fifo_mem_base = 0xa0000000
+
+        # Expose a special memory-mapped region for FIFO writes to the CPU, which is not in the
+        # address range of normal CSRs so that we can perform true 32-bit wide writes.
+        extra_cpu_regions = [
+            VexiiRiscv.MemoryRegion(base=self.audio_fifo_mem_base, size=8, cacheable=0, executable=0)
+        ]
+
+        # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
+        super().__init__(finalize_csr_bridge=False, mainram_size=0x10000,
+                         cpu_variant="tiliqua_rv32imafc", extra_cpu_regions=extra_cpu_regions, **kwargs)
 
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,

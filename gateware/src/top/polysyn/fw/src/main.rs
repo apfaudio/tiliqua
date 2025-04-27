@@ -253,7 +253,7 @@ fn main() -> ! {
                     ",
                     ).ok();
                 // Enough persistance to reduce flicker on loads of text.
-                video.set_persist(2048);
+                video.set_persist(512);
                 video.set_decay(1);
                 vscope.en().write(|w| w.enable().bit(false) );
             } else {

@@ -176,7 +176,7 @@ class USBTokenPacketGenerator(wiring.Component):
             with m.State('SEND_PAYLOAD1'):
                 crc5 = Signal(5)
                 m.d.comb += [
-                    crc5.eq(USBTokenDetector.generate_crc_for_token(pkt.data.as_value())),
+                    crc5.eq(USBTokenDetector._generate_crc_for_token(pkt.data.as_value())),
                     self.tx.data .eq(Cat(pkt.data.as_value()[8:11], crc5)),
                     self.tx.valid.eq(1),
                 ]
