@@ -26,7 +26,7 @@ This project would be nothing without the hard work of many (awesome) open-sourc
 - Audio interface and gateware: my existing [eurorack-pmod](https://github.com/apfaudio/eurorack-pmod) project.
 - SID emulation gateware: [reDIP-SID](https://github.com/daglem/reDIP-SID)
 - The "mi-plaits-dsp-rs" project: [mi-plaits-dsp](https://github.com/sourcebox/mi-plaits-dsp-rs)
-- The "pico-dirtyJtag" project forms a big chunk of the RP2040 firmware [pico-dirtyJtag](github.com/phdussud/pico-dirtyJtag)
+- The "pico-dirtyJtag" project forms a big chunk of the RP2040 firmware [pico-dirtyJtag](https://github.com/phdussud/pico-dirtyJtag)
 
 ## Funding
 
