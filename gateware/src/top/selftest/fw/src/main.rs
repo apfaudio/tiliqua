@@ -224,6 +224,40 @@ fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
     ok
 }
 
+fn edid_test(s: &mut ReportString, i2cdev: &mut I2c0) {
+    const EDID_ADDR: u8 = 0x50;
+    write!(s, "EDID: ").ok();
+    let mut edid: [u8; 128] = [0; 128];
+    for i in 0..16 {
+        i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
+                                            Operation::Read(&mut edid[i*8..i*8+8])]).ok();
+    }
+    let edid_parsed = edid::Edid::parse(&edid);
+    match edid_parsed {
+        Ok(edid::Edid { header, descriptors, .. }) => {
+            write!(s, "mfg_id={:?} product={:?} serial={:?}\r\n",
+                   header.manufacturer_id,
+                   header.product_code,
+                   header.serial_number,
+                   ).ok();
+            info!("EDID header: {:?}", header);
+            for descriptor in descriptors.iter() {
+                info!("EDID descriptor: {:?}", descriptor);
+                if let edid::Descriptor::DetailedTiming(desc) = descriptor {
+                    write!(s, "      detailed [sz_x={} sz_y={} clk={}kHz]\r\n",
+                           desc.horizontal_active,
+                           desc.vertical_active,
+                           desc.pixel_clock_khz,
+                           ).ok();
+                }
+            }
+        }
+        _ => {
+            write!(s, "{:?}\r\n", edid_parsed).ok();
+        }
+    }
+}
+
 fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
 {
     if pmod.touch_err() != 0 {
@@ -374,6 +408,7 @@ fn main() -> ! {
     tusb322i_id_test(&mut startup_report, &mut i2cdev);
     print_touch_err(&mut startup_report, &pmod);
     eeprom_id_test(&mut startup_report, &mut i2cdev1);
+    edid_test(&mut startup_report, &mut i2cdev);
 
     timer.disable();
     timer.delay_ns(0);
@@ -403,6 +438,8 @@ fn main() -> ! {
 
     let psram = peripherals.PSRAM_CSR;
 
+    let mut last_hpd = video.get_hpd();
+
     irq::scope(|s| {
 
         s.register(handlers::Interrupt::TIMER0, timer0);
@@ -411,6 +448,12 @@ fn main() -> ! {
                               pac::Interrupt::TIMER0);
 
         loop {
+            let dvi_hpd = video.get_hpd();
+            if last_hpd != dvi_hpd {
+                info!("dvi_hpd: display hotplug! new state: {}", dvi_hpd);
+                last_hpd = dvi_hpd;
+            }
+
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
                 // Single-shot commit: when 'write' is selected and the encoder
@@ -438,6 +481,7 @@ fn main() -> ! {
                         print_usb_state(&mut status_report, &mut i2cdev);
                         print_die_temperature(&mut status_report, &dtr);
                         print_psram_stats(&mut status_report, &psram);
+                        write!(&mut status_report, "dvi_hpd [active={}]\r\n", dvi_hpd).ok();
                         ("[status report]", &status_report)
                     }
                 };

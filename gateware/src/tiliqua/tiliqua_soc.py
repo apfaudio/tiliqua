@@ -80,6 +80,9 @@ class VideoPeripheral(wiring.Component):
     class PaletteBusyReg(csr.Register, access="r"):
         busy: csr.Field(csr.action.R, unsigned(1))
 
+    class HpdReg(csr.Register, access="r"):
+        hpd: csr.Field(csr.action.R, unsigned(1))
+
     def __init__(self, fb, bus_dma):
         self.en = Signal()
         self.fb = fb
@@ -92,11 +95,13 @@ class VideoPeripheral(wiring.Component):
         self._decay        = regs.add("decay",        self.DecayReg(),       offset=0x4)
         self._palette      = regs.add("palette",      self.PaletteReg(),     offset=0x8)
         self._palette_busy = regs.add("palette_busy", self.PaletteBusyReg(), offset=0xC)
+        self._hpd          = regs.add("hpd",          self.HpdReg(), offset=0x10)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            "hpd": In(1)
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -117,6 +122,8 @@ class VideoPeripheral(wiring.Component):
         # palette update logic
         palette_busy = Signal()
         m.d.comb += self._palette_busy.f.busy.r_data.eq(palette_busy)
+
+        m.d.comb += self._hpd.f.hpd.r_data.eq(self.hpd)
 
         with m.If(self._palette.element.w_stb & ~palette_busy):
             m.d.sync += [
@@ -388,6 +395,8 @@ class TiliquaSoc(Component):
 
         # video periph / persist
         m.submodules.video_periph = self.video_periph
+        if sim.is_hw(platform):
+            m.d.comb += self.video_periph.hpd.eq(platform.request("dvi_hpd").i)
 
         # audio interface
         m.submodules.pmod0 = self.pmod0
