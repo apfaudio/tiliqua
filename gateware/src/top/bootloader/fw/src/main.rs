@@ -463,6 +463,13 @@ fn main() -> ! {
         }
     }
 
+    /*
+     * WAIT FOR HPD before starting EDID read / video core
+    while !peripherals.FRAMEBUFFER_PERIPH.hpd().read().hpd().bit() {
+        info!("wait hpd");
+    }
+    */
+
     // Determine display modeline
     let edid = {
         let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
@@ -470,8 +477,6 @@ fn main() -> ! {
         timer.delay_ms(10);
         edid_test(&mut i2cdev0)
     };
-
-    info!("edid: {:?}", edid);
 
     // Default rotation and modeline
     let mut video_rotate_90 = false;
@@ -489,23 +494,39 @@ fn main() -> ! {
         pixel_clk_mhz : 74.25,
     };
 
-    // If connected to 720x720 screen, use native resolution.
-    if let Ok(edid_parsed) = edid {
-        if edid_parsed.header.product_code == 0x3132 {
+    if let Ok(edid::Edid { header, descriptors, .. }) = edid {
+        if header.product_code == 0x3132 {
+            info!("Detected Tiliqua Screen R1! Rotate framebuffer 90 degrees.");
             video_rotate_90 = true;
-            modeline = DVIModeline {
-                h_active      : 720,
-                h_sync_start  : 760,
-                h_sync_end    : 780,
-                h_total       : 820,
-                h_sync_invert : false,
-                v_active      : 720,
-                v_sync_start  : 744,
-                v_sync_end    : 748,
-                v_total       : 760,
-                v_sync_invert : false,
-                pixel_clk_mhz : 37.40,
-            };
+        }
+        for descriptor in descriptors.iter() {
+            if let edid::Descriptor::DetailedTiming(desc) = descriptor {
+                if desc.pixel_clock_khz < 100_000u32 {
+                    info!("Useable EDID descriptor! Adapting to display ... {:?}", descriptor);
+                    if let edid::SyncType::DigitalSeparate { vsync_positive, hsync_positive } = desc.features.sync_type {
+                        modeline = DVIModeline {
+                            h_active      : desc.horizontal_active,
+                            h_sync_start  : desc.horizontal_active + desc.horizontal_sync_offset,
+                            h_sync_end    : desc.horizontal_active + desc.horizontal_sync_offset + desc.horizontal_sync_pulse_width,
+                            h_total       : desc.horizontal_active + desc.horizontal_blanking,
+                            h_sync_invert : !hsync_positive,
+                            v_active      : desc.vertical_active,
+                            v_sync_start  : desc.vertical_active + desc.vertical_sync_offset,
+                            v_sync_end    : desc.vertical_active + desc.vertical_sync_offset + desc.vertical_sync_pulse_width,
+                            v_total       : desc.vertical_active + desc.vertical_blanking,
+                            v_sync_invert : !vsync_positive,
+                            pixel_clk_mhz : (desc.pixel_clock_khz as f32) / 1e3f32,
+                        };
+                        info!("Instantiated custom modeline {:?}", modeline);
+                        info!("Taking first valid descriptor. Skip the rest, continue boot...");
+                        break;
+                    } else {
+                        info!("Unuseable EDID settings! Unknown sync format :( ... {:?}", descriptor);
+                    }
+                } else {
+                    info!("Unuseable EDID settings! Pixel clock too high for Tiliqua :( ... {:?}", descriptor);
+                }
+            }
         }
     }
 

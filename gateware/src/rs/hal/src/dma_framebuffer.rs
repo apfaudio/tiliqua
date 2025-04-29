@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct DVIModeline {
    pub h_active:      u16,
    pub h_sync_start:  u16,
