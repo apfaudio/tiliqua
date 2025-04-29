@@ -2,6 +2,7 @@ pub trait Video {
     fn set_palette_rgb(&mut self, intensity: u8, hue: u8, r: u8, g: u8, b: u8);
     fn set_persist(&mut self, value: u16);
     fn set_decay(&mut self, value: u8);
+    fn get_hpd(&mut self) -> bool;
 }
 
 #[macro_export]
@@ -39,6 +40,10 @@ macro_rules! impl_video {
 
                 fn set_decay(&mut self, value: u8)  {
                     self.registers.decay().write(|w| unsafe { w.decay().bits(value) } );
+                }
+
+                fn get_hpd(&mut self) -> bool  {
+                    self.registers.hpd().read().hpd().bit()
                 }
             }
         )+
