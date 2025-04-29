@@ -51,6 +51,7 @@ from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
 from luna_soc.gateware.core                      import blockram, timer, uart, spiflash
 from luna_soc.gateware.cpu                       import InterruptController
 from luna_soc.gateware.provider.cynthion         import UARTProvider
+from amaranth_soc          import wishbone, csr
 from luna_soc.util                               import readbin
 from luna_soc.generate                           import rust, introspect, svd
 
@@ -59,7 +60,7 @@ from vendor.vexiiriscv                           import VexiiRiscv
 from tiliqua.tiliqua_platform                    import *
 from tiliqua.types                               import FirmwareLocation
 
-from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster
+from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster, palette
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class TiliquaSoc(Component):
@@ -100,9 +101,10 @@ class TiliquaSoc(Component):
         self.encoder0_base        = 0x00000600
         self.pmod0_periph_base    = 0x00000700
         self.dtr0_base            = 0x00000800
-        self.video_periph_base    = 0x00000900
-        self.psram_csr_base       = 0x00000A00
+        self.persist_periph_base  = 0x00000900
+        self.palette_periph_base  = 0x00000A00
         self.fb_periph_base       = 0x00000B00
+        self.psram_csr_base       = 0x00000C00
 
         # Some settings depend on whether code is in block RAM or SPI flash
         self.fw_location = fw_location
@@ -181,11 +183,6 @@ class TiliquaSoc(Component):
         self.psram_periph = psram_peripheral.Peripheral(size=self.psram_size)
         self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base,
                             name="psram")
-
-        # video PHY (DMAs from PSRAM starting at self.psram_base)
-        self.fb = dma_framebuffer.DMAFramebuffer(
-                fb_base_default=self.psram_base, fixed_modeline=default_modeline)
-        self.psram_periph.add_master(self.fb.bus)
         self.csr_decoder.add(self.psram_periph.csr_bus, addr=self.psram_csr_base, name="psram_csr")
 
         # mobo i2c
@@ -214,17 +211,27 @@ class TiliquaSoc(Component):
         self.dtr0 = dtr.Peripheral()
         self.csr_decoder.add(self.dtr0.bus, addr=self.dtr0_base, name="dtr0")
 
-        # video persistance effect (all writes gradually fade) -
-        # this is an interesting alternative to double-buffering that looks
-        # kind of like an old CRT with slow-scanning.
-        self.video_periph = raster.Persistance.Peripheral(
-            fb=self.fb,
-            bus_dma=self.psram_periph)
-        self.csr_decoder.add(self.video_periph.bus, addr=self.video_periph_base, name="video_periph")
+        # framebuffer palette interface
+        self.palette_periph = palette.Peripheral()
+        self.csr_decoder.add(
+                self.palette_periph.bus, addr=self.palette_periph_base, name="palette_periph")
 
+        # video PHY (DMAs from PSRAM starting at self.psram_base)
+        self.fb = dma_framebuffer.DMAFramebuffer(
+                palette = self.palette_periph.palette,
+                fb_base_default=self.psram_base, fixed_modeline=default_modeline)
+        self.psram_periph.add_master(self.fb.bus)
+
+        # Timing CSRs for video PHY
         self.framebuffer_periph = dma_framebuffer.Peripheral(fb=self.fb)
         self.csr_decoder.add(
                 self.framebuffer_periph.bus, addr=self.fb_periph_base, name="framebuffer_periph")
+
+        # Video persistance DMA effect
+        self.persist_periph = raster.Persistance.Peripheral(
+            fb=self.fb,
+            bus_dma=self.psram_periph)
+        self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
 
         self.permit_bus_traffic = Signal()
 
@@ -314,11 +321,12 @@ class TiliquaSoc(Component):
         m.submodules.spiflash_periph = self.spiflash_periph
 
         # video PHY
+        m.submodules.palette_periph = self.palette_periph
         m.submodules.fb = self.fb
         m.submodules.framebuffer_periph = self.framebuffer_periph
 
         # video periph / persist
-        m.submodules.video_periph = self.video_periph
+        m.submodules.persist_periph = self.persist_periph
 
         # audio interface
         m.submodules.pmod0 = self.pmod0

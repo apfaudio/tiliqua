@@ -23,53 +23,56 @@ pub trait DMAFramebuffer {
 macro_rules! impl_dma_framebuffer {
     ($(
         $DMA_FRAMEBUFFERX:ident: $PACFRAMEBUFFERX:ty,
+        $PALETTEX:ident: $PACPALETTEX:ty,
     )+) => {
         $(
             use tiliqua_hal::dma_framebuffer::DVIModeline;
 
             struct $DMA_FRAMEBUFFERX {
-                registers: $PACFRAMEBUFFERX,
+                registers_fb: $PACFRAMEBUFFERX,
+                registers_palette: $PACPALETTEX,
                 mode: DVIModeline,
                 framebuffer_base: *mut u32,
                 rotate_90: bool,
             }
 
             impl $DMA_FRAMEBUFFERX {
-                fn new(registers: $PACFRAMEBUFFERX, fb_base: usize,
+                fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, fb_base: usize,
                        mode: DVIModeline, rotate_90: bool) -> Self {
-                    registers.flags().write(|w| unsafe {
+                    registers_fb.flags().write(|w| unsafe {
                         w.enable().bit(false)
                     });
-                    registers.fb_base().write(|w| unsafe {
+                    registers_fb.fb_base().write(|w| unsafe {
                         w.fb_base().bits(fb_base as u32)
                     });
-                    registers.h_timing().write(|w| unsafe {
+                    registers_fb.h_timing().write(|w| unsafe {
                         w.h_active().bits(mode.h_active);
                         w.h_sync_start().bits(mode.h_sync_start)
                     } );
-                    registers.h_timing2().write(|w| unsafe {
+                    registers_fb.h_timing2().write(|w| unsafe {
                         w.h_sync_end().bits(mode.h_sync_end);
                         w.h_total().bits(mode.h_total)
                     } );
-                    registers.v_timing().write(|w| unsafe {
+                    registers_fb.v_timing().write(|w| unsafe {
                         w.v_active().bits(mode.v_active);
                         w.v_sync_start().bits(mode.v_sync_start)
                     } );
-                    registers.v_timing2().write(|w| unsafe {
+                    registers_fb.v_timing2().write(|w| unsafe {
                         w.v_sync_end().bits(mode.v_sync_end);
                         w.v_total().bits(mode.v_total)
                     } );
-                    registers.hv_timing().write(|w| unsafe {
+                    registers_fb.hv_timing().write(|w| unsafe {
                         w.h_sync_invert().bit(mode.h_sync_invert);
                         w.v_sync_invert().bit(mode.h_sync_invert);
                         w.active_pixels().bits(
                             mode.h_active as u32 * mode.v_active as u32)
                     } );
-                    registers.flags().write(|w| unsafe {
+                    registers_fb.flags().write(|w| unsafe {
                         w.enable().bit(true)
                     });
                     Self {
-                        registers,
+                        registers_fb,
+                        registers_palette,
                         mode,
                         framebuffer_base: fb_base as *mut u32,
                         rotate_90
@@ -80,7 +83,7 @@ macro_rules! impl_dma_framebuffer {
 
             impl hal::dma_framebuffer::DMAFramebuffer for $DMA_FRAMEBUFFERX {
                 fn update_fb_base(&mut self, fb_base: u32) {
-                    self.registers.fb_base().write(|w| unsafe {
+                    self.registers_fb.fb_base().write(|w| unsafe {
                         w.fb_base().bits(fb_base)
                     });
                     self.framebuffer_base = fb_base as *mut u32
@@ -88,8 +91,8 @@ macro_rules! impl_dma_framebuffer {
 
                 fn set_palette_rgb(&mut self, intensity: u8, hue: u8, r: u8, g: u8, b: u8)  {
                     /* wait until last coefficient written */ 
-                    while self.registers.palette_busy().read().bits() == 1 { }
-                    self.registers.palette().write(|w| unsafe {
+                    while self.registers_palette.palette_busy().read().bits() == 1 { }
+                    self.registers_palette.palette().write(|w| unsafe {
                         w.position().bits(((intensity&0xF) << 4) | (hue&0xF));
                         w.red()     .bits(r);
                         w.green()   .bits(g);
@@ -98,7 +101,7 @@ macro_rules! impl_dma_framebuffer {
                 }
 
                 fn get_hpd(&mut self) -> bool  {
-                    self.registers.hpd().read().hpd().bit()
+                    self.registers_fb.hpd().read().hpd().bit()
                 }
             }
 
