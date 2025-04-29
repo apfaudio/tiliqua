@@ -103,7 +103,8 @@ class BitstreamArchiver:
         """Write serialized manifest file, return the BitstreamManifest object."""
         self._manifest = BitstreamManifest(
             name=self.name,
-            hw_rev=self.hw_rev.platform_class().version_major,
+            hw_rev=self.hw_rev.platform_class().version_tuple[0],
+            hw_rev_minor=self.hw_rev.platform_class().version_tuple[1],
             sha=self.sha,
             brief=self.brief,
             video=self.video if self.video else "<none>",
@@ -165,24 +166,6 @@ class BitstreamArchiver:
         if not os.path.exists(self.manifest_path):
             print(f"\nERROR: No manifest found at {self.manifest_path}")
             print("You must build the full project at least once before using --fw-only")
-            return False
-
-        try:
-            with open(self.manifest_path) as f:
-                manifest = json.load(f)
-                if manifest.get("name") != self.name:
-                    print(f"\nERROR: Existing bitstream is for '{manifest.get('name')}', "
-                          f"but last build was for '{self.name}'")
-                    print("You must build the full project at least once before using --fw-only")
-                    return False
-                if int(manifest.get("hw_rev")) != self.hw_rev.platform_class().version_major:
-                    print(f"\nERROR: Existing bitstream is for hw_rev={manifest.get('hw_rev')}, "
-                          f"but last build is for hw_rev={self.hw_rev.platform_class().version_major}")
-                    print("You must build the full project at least once before using --fw-only")
-                    return False
-        except (json.JSONDecodeError, KeyError) as e:
-            print("\nERROR: Failed to validate existing manifest:")
-            print(f"  {str(e)}")
             return False
 
         return True

@@ -369,14 +369,24 @@ class _TiliquaR4Mobo:
             Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
         ),
 
-        # DVI
-        # Note: technically DVI outputs are supposed to be open-drain, but
-        # compatibility with cheap AliExpress screens seems better with push/pull outputs.
+    ]
+
+    resource_dvi_r4p0 = [
         Resource("dvi", 0,
             Subsignal("d0", Pins("60", dir="o", conn=("m2", 0))),
             Subsignal("d1", Pins("62", dir="o", conn=("m2", 0))),
             Subsignal("d2", Pins("68", dir="o", conn=("m2", 0))),
             Subsignal("ck", Pins("52", dir="o", conn=("m2", 0))),
+            Attrs(IO_TYPE="LVCMOS33D", DRIVE="8", SLEWRATE="FAST")
+         ),
+    ]
+
+    resource_dvi_r4p1 = [
+        Resource("dvi", 0,
+            Subsignal("d0", Pins("68", dir="o", conn=("m2", 0))),
+            Subsignal("d1", Pins("52", dir="o", conn=("m2", 0))),
+            Subsignal("d2", Pins("60", dir="o", conn=("m2", 0))),
+            Subsignal("ck", Pins("62", dir="o", conn=("m2", 0))),
             Attrs(IO_TYPE="LVCMOS33D", DRIVE="8", SLEWRATE="FAST")
          ),
     ]
@@ -390,7 +400,7 @@ class _TiliquaR4Mobo:
 class TiliquaR2SC2Platform(SoldierCrabR2Platform, LUNAPlatform):
     name                   = ("Tiliqua R2 / SoldierCrab R2 "
                               f"({SoldierCrabR2Platform.device}/{SoldierCrabR2Platform.psram_id})")
-    version_major          = 2
+    version_tuple          = (2, 0, 0)
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator4PLLs
     default_audio_clock    = AudioClock.FINE_48KHZ
     default_usb_connection = "ulpi"
@@ -405,28 +415,10 @@ class TiliquaR2SC2Platform(SoldierCrabR2Platform, LUNAPlatform):
         *_TiliquaR2Mobo.connectors
     ]
 
-class TiliquaR2SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
-    name                   = ("Tiliqua R2 / SoldierCrab R3 "
-                              f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
-    version_major          = 2
-    clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
-    default_audio_clock    = AudioClock.COARSE_48KHZ
-    default_usb_connection = "ulpi"
-
-    resources = [
-        *SoldierCrabR3Platform.resources,
-        *_TiliquaR2Mobo.resources
-    ]
-
-    connectors = [
-        *SoldierCrabR3Platform.connectors,
-        *_TiliquaR2Mobo.connectors
-    ]
-
 class TiliquaR3SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
     name                   = ("Tiliqua R3 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
-    version_major          = 3
+    version_tuple          = (3, 0, 0)
     clock_domain_generator = tiliqua_pll.TiliquaDomainGenerator2PLLs
     default_audio_clock    = AudioClock.COARSE_48KHZ
     default_usb_connection = "ulpi"
@@ -441,17 +433,37 @@ class TiliquaR3SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
         *_TiliquaR3Mobo.connectors
     ]
 
-class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
-    name                   = ("Tiliqua R4 / SoldierCrab R3 "
+class TiliquaR4p0SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
+    name                   = ("Tiliqua R4.0 / SoldierCrab R3 "
                               f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
-    version_major          = 4
+    version_tuple          = (4, 0, 0)
     clock_domain_generator = tiliqua_pll.TiliquaDomainGeneratorPLLExternal
     default_audio_clock    = AudioClock.FINE_48KHZ
     default_usb_connection = "ulpi"
 
     resources = [
         *SoldierCrabR3Platform.resources,
-        *_TiliquaR4Mobo.resources
+        *_TiliquaR4Mobo.resources,
+        *_TiliquaR4Mobo.resource_dvi_r4p0
+    ]
+
+    connectors = [
+        *SoldierCrabR3Platform.connectors,
+        *_TiliquaR4Mobo.connectors
+    ]
+
+class TiliquaR4p1SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
+    name                   = ("Tiliqua R4.1 / SoldierCrab R3 "
+                              f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
+    version_tuple          = (4, 1, 0)
+    clock_domain_generator = tiliqua_pll.TiliquaDomainGeneratorPLLExternal
+    default_audio_clock    = AudioClock.FINE_48KHZ
+    default_usb_connection = "ulpi"
+
+    resources = [
+        *SoldierCrabR3Platform.resources,
+        *_TiliquaR4Mobo.resources,
+        *_TiliquaR4Mobo.resource_dvi_r4p1
     ]
 
     connectors = [
@@ -461,9 +473,9 @@ class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
 
 class TiliquaRevision(str, enum.Enum):
     R2    = "r2"
-    R2SC3 = "r2sc3"
     R3    = "r3"
-    R4    = "r4"
+    R4p0  = "r4p0"
+    R4p1  = "r4p1"
 
     def default():
         return TiliquaRevision.R2
@@ -471,17 +483,17 @@ class TiliquaRevision(str, enum.Enum):
     def all():
         return [
             TiliquaRevision.R2,
-            TiliquaRevision.R2SC3,
             TiliquaRevision.R3,
-            TiliquaRevision.R4,
+            TiliquaRevision.R4p0,
+            TiliquaRevision.R4p1,
         ]
 
     def platform_class(self):
         return {
             TiliquaRevision.R2:    TiliquaR2SC2Platform,
-            TiliquaRevision.R2SC3: TiliquaR2SC3Platform,
             TiliquaRevision.R3:    TiliquaR3SC3Platform,
-            TiliquaRevision.R4:    TiliquaR4SC3Platform,
+            TiliquaRevision.R4p0:  TiliquaR4p0SC3Platform,
+            TiliquaRevision.R4p1:  TiliquaR4p1SC3Platform,
         }[self]
 
 class RebootProvider(wiring.Component):

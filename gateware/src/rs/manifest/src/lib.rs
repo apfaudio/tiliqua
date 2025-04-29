@@ -42,6 +42,7 @@ pub struct ExternalPLLConfig {
 #[derive(Deserialize, Clone)]
 pub struct BitstreamManifest {
     pub hw_rev: u32,
+    pub hw_rev_minor: u32,
     pub name: String<32>,
     pub sha: String<8>,
     pub brief: String<128>,
@@ -57,6 +58,7 @@ impl BitstreamManifest {
         info!("BitstreamManifest {{");
         info!("\tmagic:    {:#x}", self.magic);
         info!("\thw_rev:   {}",    self.hw_rev);
+        info!("\thw_rev_minor: {}",self.hw_rev_minor);
         info!("\tname:    '{}'",   self.name);
         info!("\tsha:     '{}'",   self.sha);
         info!("\tbrief:   '{}'",   self.brief);

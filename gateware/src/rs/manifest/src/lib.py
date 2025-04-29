@@ -45,6 +45,7 @@ class ExternalPLLConfig:
 @dataclass
 class BitstreamManifest:
     hw_rev: int
+    hw_rev_minor: int
     name: str
     sha: str
     brief: str

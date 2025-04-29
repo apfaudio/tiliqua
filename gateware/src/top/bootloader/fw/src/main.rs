@@ -306,7 +306,8 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         if manifest.magic != MANIFEST_MAGIC {
                             Err(BitstreamError::InvalidManifest)?;
                         }
-                        if manifest.hw_rev != HW_REV_MAJOR {
+                        if manifest.hw_rev != HW_REV_MAJOR ||
+                           manifest.hw_rev_minor != HW_REV_MINOR {
                             Err(BitstreamError::HwVersionMismatch)?;
                         }
                         for region in &manifest.regions {
