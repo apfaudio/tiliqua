@@ -1,26 +1,26 @@
-pub trait Video {
+pub trait Persist {
     fn set_persist(&mut self, value: u16);
     fn set_decay(&mut self, value: u8);
 }
 
 #[macro_export]
-macro_rules! impl_video {
+macro_rules! impl_persist {
     ($(
-        $VIDEOX:ident: $PACVIDEOX:ty,
+        $PERSISTX:ident: $PACPERSISTX:ty,
     )+) => {
         $(
             #[derive(Debug)]
-            pub struct $VIDEOX {
-                registers: $PACVIDEOX,
+            pub struct $PERSISTX {
+                registers: $PACPERSISTX,
             }
 
-            impl $VIDEOX {
-                pub fn new(registers: $PACVIDEOX) -> Self {
+            impl $PERSISTX {
+                pub fn new(registers: $PACPERSISTX) -> Self {
                     Self { registers }
                 }
             }
 
-            impl hal::video::Video for $VIDEOX {
+            impl hal::persist::Persist for $PERSISTX {
                 fn set_persist(&mut self, value: u16)  {
                     self.registers.persist().write(|w| unsafe { w.persist().bits(value) } );
                 }

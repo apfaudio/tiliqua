@@ -45,7 +45,7 @@ class DMAFramebuffer(wiring.Component):
                 "b": Out(8),
             })
 
-    def __init__(self, *, fb_base_default=0, addr_width=22,
+    def __init__(self, *, palette, fb_base_default=0, addr_width=22,
                  fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128,
                  fixed_modeline: DVIModeline = None):
 
@@ -54,8 +54,7 @@ class DMAFramebuffer(wiring.Component):
         self.bytes_per_pixel = bytes_per_pixel
         self.burst_threshold_words = burst_threshold_words
 
-        # Color palette tweaking interface is presented by this
-        self.palette = palette.ColorPalette()
+        self.palette = palette
 
         super().__init__({
             # Start of framebuffer
@@ -80,7 +79,6 @@ class DMAFramebuffer(wiring.Component):
                 m.d.comb += getattr(self.timings, member).eq(getattr(self.fixed_modeline, member))
         """
 
-        m.submodules.palette = self.palette
         m.submodules.fifo = fifo = AsyncFIFOBuffered(
                 width=32, depth=self.fifo_depth, r_domain='dvi', w_domain='sync')
 
@@ -235,15 +233,6 @@ class Peripheral(wiring.Component):
     class FlagsReg(csr.Register, access="w"):
         enable:        csr.Field(csr.action.W, unsigned(1))
 
-    class PaletteReg(csr.Register, access="w"):
-        position: csr.Field(csr.action.W, unsigned(8))
-        red:      csr.Field(csr.action.W, unsigned(8))
-        green:    csr.Field(csr.action.W, unsigned(8))
-        blue:     csr.Field(csr.action.W, unsigned(8))
-
-    class PaletteBusyReg(csr.Register, access="r"):
-        busy: csr.Field(csr.action.R, unsigned(1))
-
     class FBBaseReg(csr.Register, access="w"):
         fb_base: csr.Field(csr.action.W, unsigned(32))
 
@@ -262,10 +251,8 @@ class Peripheral(wiring.Component):
         self._v_timing2    = regs.add("v_timing2",    self.VTimingReg2(),    offset=0x0C)
         self._hv_timing    = regs.add("hv_timing",    self.HVTimingReg(),    offset=0x10)
         self._flags        = regs.add("flags",        self.FlagsReg(),       offset=0x14)
-        self._palette      = regs.add("palette",      self.PaletteReg(),     offset=0x18)
-        self._palette_busy = regs.add("palette_busy", self.PaletteBusyReg(), offset=0x1C)
-        self._fb_base      = regs.add("fb_base",      self.FBBaseReg(),      offset=0x20)
-        self._hpd          = regs.add("hpd",          self.HpdReg(),         offset=0x24)
+        self._fb_base      = regs.add("fb_base",      self.FBBaseReg(),      offset=0x18)
+        self._hpd          = regs.add("hpd",          self.HpdReg(),         offset=0x1C)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
@@ -302,27 +289,6 @@ class Peripheral(wiring.Component):
             m.d.sync += self.fb.enable.eq(self._flags.f.enable.w_data)
         with m.If(self._fb_base.f.fb_base.w_stb):
             m.d.sync += self.fb.fb_base.eq(self._fb_base.f.fb_base.w_data)
-
-        # palette update logic
-        palette_busy = Signal()
-        m.d.comb += self._palette_busy.f.busy.r_data.eq(palette_busy)
-
-        with m.If(self._palette.element.w_stb & ~palette_busy):
-            m.d.sync += [
-                palette_busy                            .eq(1),
-                self.fb.palette.update.valid            .eq(1),
-                self.fb.palette.update.payload.position .eq(self._palette.f.position.w_data),
-                self.fb.palette.update.payload.red      .eq(self._palette.f.red.w_data),
-                self.fb.palette.update.payload.green    .eq(self._palette.f.green.w_data),
-                self.fb.palette.update.payload.blue     .eq(self._palette.f.blue.w_data),
-            ]
-
-        with m.If(palette_busy & self.fb.palette.update.ready):
-            # coefficient has been written
-            m.d.sync += [
-                palette_busy.eq(0),
-                self.fb.palette.update.valid.eq(0),
-            ]
 
         if sim.is_hw(platform):
             m.d.comb += self._hpd.f.hpd.r_data.eq(platform.request("dvi_hpd").i)

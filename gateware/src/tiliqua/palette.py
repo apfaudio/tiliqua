@@ -11,6 +11,8 @@ from amaranth.lib          import wiring, data, stream
 from amaranth.lib.wiring   import In, Out
 from amaranth.lib.memory   import Memory
 
+from amaranth_soc          import wishbone, csr
+
 
 def compute_color_palette():
     """
@@ -34,7 +36,6 @@ def compute_color_palette():
             bs.append(int(b*255))
 
     return rs, gs, bs
-
 
 class ColorPalette(wiring.Component):
     """
@@ -109,5 +110,67 @@ class ColorPalette(wiring.Component):
                     wport.addr.eq(self.update.payload.position),
                     wport.en.eq(self.update.valid),
                 ]
+
+        return m
+
+
+class Peripheral(wiring.Component):
+
+    class PaletteReg(csr.Register, access="w"):
+        position: csr.Field(csr.action.W, unsigned(8))
+        red:      csr.Field(csr.action.W, unsigned(8))
+        green:    csr.Field(csr.action.W, unsigned(8))
+        blue:     csr.Field(csr.action.W, unsigned(8))
+
+    class PaletteBusyReg(csr.Register, access="r"):
+        busy: csr.Field(csr.action.R, unsigned(1))
+
+    def __init__(self):
+
+        self.palette = ColorPalette()
+
+        regs = csr.Builder(addr_width=6, data_width=8)
+
+        self._palette      = regs.add("palette",      self.PaletteReg(),     offset=0x0)
+        self._palette_busy = regs.add("palette_busy", self.PaletteBusyReg(), offset=0x4)
+
+        self._bridge = csr.Bridge(regs.as_memory_map())
+
+        super().__init__({
+            "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+        })
+
+        self.bus.memory_map = self._bridge.bus.memory_map
+
+    def elaborate(self, platform) -> Module:
+
+        m = Module()
+
+        m.submodules.bridge = self._bridge
+
+        wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
+
+        m.submodules.palette = self.palette
+
+        # palette update logic
+        palette_busy = Signal()
+        m.d.comb += self._palette_busy.f.busy.r_data.eq(palette_busy)
+
+        with m.If(self._palette.element.w_stb & ~palette_busy):
+            m.d.sync += [
+                palette_busy                          .eq(1),
+                self.palette.update.valid            .eq(1),
+                self.palette.update.payload.position .eq(self._palette.f.position.w_data),
+                self.palette.update.payload.red      .eq(self._palette.f.red.w_data),
+                self.palette.update.payload.green    .eq(self._palette.f.green.w_data),
+                self.palette.update.payload.blue     .eq(self._palette.f.blue.w_data),
+            ]
+
+        with m.If(palette_busy & self.palette.update.ready):
+            # coefficient has been written
+            m.d.sync += [
+                palette_busy.eq(0),
+                self.palette.update.valid.eq(0),
+            ]
 
         return m

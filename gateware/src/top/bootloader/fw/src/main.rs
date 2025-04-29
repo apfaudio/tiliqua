@@ -18,7 +18,7 @@ use tiliqua_lib::*;
 use pac::constants::*;
 use tiliqua_fw::*;
 use tiliqua_hal::pmod::EurorackPmod;
-use tiliqua_hal::video::Video;
+use tiliqua_hal::persist::Persist;
 use tiliqua_hal::si5351::*;
 use tiliqua_hal::cy8cmbr3xxx::*;
 use tiliqua_manifest::*;
@@ -38,6 +38,7 @@ use hal::pca9635::Pca9635Driver;
 
 tiliqua_hal::impl_dma_framebuffer! {
     DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
+    Palette0: tiliqua_pac::PALETTE_PERIPH,
 }
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
@@ -443,7 +444,7 @@ fn main() -> ! {
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
-    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
+    let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
 
     crate::handlers::logger_init(serial);
 
@@ -605,12 +606,13 @@ fn main() -> ! {
 
         let mut display = DMAFramebuffer0::new(
             peripherals.FRAMEBUFFER_PERIPH,
+            peripherals.PALETTE_PERIPH,
             PSRAM_FB_BASE,
             modeline,
             video_rotate_90,
         );
 
-        video.set_persist(256);
+        persist.set_persist(256);
 
         let stroke = PrimitiveStyleBuilder::new()
             .stroke_color(Gray8::new(0xB0))
