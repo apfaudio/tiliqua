@@ -480,6 +480,7 @@ fn main() -> ! {
 
     // Default rotation and modeline
     let mut video_rotate_90 = false;
+    let mut modeline_from_edid = false;
     let mut modeline = DVIModeline {
         h_active      : 1280,
         h_sync_start  : 1390,
@@ -519,6 +520,7 @@ fn main() -> ! {
                         };
                         info!("Instantiated custom modeline {:?}", modeline);
                         info!("Taking first valid descriptor. Skip the rest, continue boot...");
+                        modeline_from_edid = true;
                         break;
                     } else {
                         info!("Unuseable EDID settings! Unknown sync format :( ... {:?}", descriptor);
@@ -529,6 +531,11 @@ fn main() -> ! {
             }
         }
     }
+
+    write!(startup_report, "video: {}x{}@{:.2}Hz {}",
+           modeline.h_active, modeline.v_active,
+           (modeline.pixel_clk_mhz*1e6f32) / (modeline.h_total as f32 * modeline.v_total as f32),
+           if modeline_from_edid { "(custom, from EDID)" } else {"(fallback)"} ).ok();
 
     // Setup external PLL
 
@@ -603,10 +610,7 @@ fn main() -> ! {
             video_rotate_90,
         );
 
-        write!(startup_report, "display: {}x{}\r\n",
-               display.size().width, display.size().height);
-
-        video.set_persist(1024);
+        video.set_persist(256);
 
         let stroke = PrimitiveStyleBuilder::new()
             .stroke_color(Gray8::new(0xB0))
