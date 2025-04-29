@@ -1,8 +1,6 @@
 pub trait Video {
-    fn set_palette_rgb(&mut self, intensity: u8, hue: u8, r: u8, g: u8, b: u8);
     fn set_persist(&mut self, value: u16);
     fn set_decay(&mut self, value: u8);
-    fn get_hpd(&mut self) -> bool;
 }
 
 #[macro_export]
@@ -23,17 +21,6 @@ macro_rules! impl_video {
             }
 
             impl hal::video::Video for $VIDEOX {
-                fn set_palette_rgb(&mut self, intensity: u8, hue: u8, r: u8, g: u8, b: u8)  {
-                    /* wait until last coefficient written */ 
-                    while self.registers.palette_busy().read().bits() == 1 { }
-                    self.registers.palette().write(|w| unsafe {
-                        w.position().bits(((intensity&0xF) << 4) | (hue&0xF));
-                        w.red()     .bits(r);
-                        w.green()   .bits(g);
-                        w.blue()    .bits(b)
-                    } );
-                }
-
                 fn set_persist(&mut self, value: u16)  {
                     self.registers.persist().write(|w| unsafe { w.persist().bits(value) } );
                 }
@@ -42,9 +29,6 @@ macro_rules! impl_video {
                     self.registers.decay().write(|w| unsafe { w.decay().bits(value) } );
                 }
 
-                fn get_hpd(&mut self) -> bool  {
-                    self.registers.hpd().read().hpd().bit()
-                }
             }
         )+
     };

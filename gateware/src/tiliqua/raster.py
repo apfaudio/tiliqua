@@ -20,7 +20,7 @@ from tiliqua                 import dsp
 from tiliqua.dma_framebuffer import DMAFramebuffer
 from tiliqua.eurorack_pmod   import ASQ
 
-from amaranth_soc            import wishbone
+from amaranth_soc            import wishbone, csr
 
 class Persistance(wiring.Component):
 
@@ -31,6 +31,49 @@ class Persistance(wiring.Component):
 
     'holdoff' is used to keep this core from saturating the bus between bursts.
     """
+
+    class Peripheral(wiring.Component):
+
+        class PersistReg(csr.Register, access="w"):
+            persist: csr.Field(csr.action.W, unsigned(16))
+
+        class DecayReg(csr.Register, access="w"):
+            decay: csr.Field(csr.action.W, unsigned(8))
+
+        def __init__(self, fb, bus_dma):
+            self.en = Signal()
+            self.fb = fb
+            self.persist = Persistance(fb=self.fb)
+            bus_dma.add_master(self.persist.bus)
+
+            regs = csr.Builder(addr_width=5, data_width=8)
+
+            self._persist      = regs.add("persist",      self.PersistReg(),     offset=0x0)
+            self._decay        = regs.add("decay",        self.DecayReg(),       offset=0x4)
+
+            self._bridge = csr.Bridge(regs.as_memory_map())
+
+            super().__init__({
+                "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            })
+            self.bus.memory_map = self._bridge.bus.memory_map
+
+        def elaborate(self, platform):
+            m = Module()
+            m.submodules.bridge = self._bridge
+            m.submodules.persist = self.persist
+            wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
+
+            m.d.comb += self.persist.enable.eq(self.fb.enable)
+
+            with m.If(self._persist.f.persist.w_stb):
+                m.d.sync += self.persist.holdoff.eq(self._persist.f.persist.w_data)
+
+            with m.If(self._decay.f.decay.w_stb):
+                m.d.sync += self.persist.decay.eq(self._decay.f.decay.w_data)
+
+            return m
+
 
     def __init__(self, *, fb: DMAFramebuffer,
                  fifo_depth=32, holdoff_default=256):
