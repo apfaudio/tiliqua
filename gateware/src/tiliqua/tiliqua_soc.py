@@ -60,7 +60,7 @@ from vendor.vexiiriscv                           import VexiiRiscv
 from tiliqua.tiliqua_platform                    import *
 from tiliqua.types                               import FirmwareLocation
 
-from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster, palette
+from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster_persist, palette
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class TiliquaSoc(Component):
@@ -228,7 +228,7 @@ class TiliquaSoc(Component):
                 self.framebuffer_periph.bus, addr=self.fb_periph_base, name="framebuffer_periph")
 
         # Video persistance DMA effect
-        self.persist_periph = raster.Persistance.Peripheral(
+        self.persist_periph = raster_persist.Peripheral(
             fb=self.fb,
             bus_dma=self.psram_periph)
         self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
