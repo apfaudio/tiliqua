@@ -30,13 +30,15 @@ use embedded_graphics::{
     prelude::*,
     primitives::{PrimitiveStyleBuilder, Line},
     text::{Alignment, Text},
+    geometry::OriginDimensions,
 };
 
 use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;
 
-hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
-                       VIDEO_ROTATE_90);
+tiliqua_hal::impl_dma_framebuffer! {
+    DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
+}
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
@@ -109,12 +111,14 @@ impl App {
 
 fn print_rebooting<D>(d: &mut D, rng: &mut fastrand::Rng)
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = Gray8> + OriginDimensions,
 {
     let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
+    let h_active = d.size().width as i32;
+    let v_active = d.size().height as i32;
     Text::with_alignment(
         "REBOOTING",
-        Point::new(rng.i32(0..H_ACTIVE as i32), rng.i32(0..V_ACTIVE as i32)),
+        Point::new(rng.i32(0..h_active), rng.i32(0..v_active)),
         style,
         Alignment::Center,
     )
@@ -127,48 +131,50 @@ fn draw_summary<D>(d: &mut D,
                    startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = Gray8> + OriginDimensions,
 {
+    let h_active = d.size().width as i32;
+    let v_active = d.size().height as i32;
     let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
     if let Some(bitstream) = bitstream_manifest {
         Text::with_alignment(
             "brief:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+20) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.brief,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+20) as i32 + ot),
             norm,
             Alignment::Left,
         )
         .draw(d).ok();
         Text::with_alignment(
             "video:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+40) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.video,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+40) as i32 + ot),
             norm,
             Alignment::Left,
         )
         .draw(d).ok();
         Text::with_alignment(
             "sha:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.sha,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Left,
         )
@@ -177,14 +183,14 @@ where
     if let Some(error_string) = &error {
         Text::with_alignment(
             "error:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+80) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &error_string,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+80) as i32 + ot),
             norm,
             Alignment::Left,
         )
@@ -192,7 +198,7 @@ where
     }
     Text::with_alignment(
         &startup_report,
-        Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2-70) as i32 + ot),
+        Point::new((h_active/2) as i32 + or, (v_active/2-70) as i32 + ot),
         norm,
         Alignment::Center,
     )
@@ -419,6 +425,17 @@ where
     }
 }
 
+fn edid_test(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
+    info!("Read EDID...");
+    let mut edid: [u8; 128] = [0; 128];
+    const EDID_ADDR: u8 = 0x50;
+    for i in 0..16 {
+        i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
+                                            Operation::Read(&mut edid[i*8..i*8+8])]).ok();
+    }
+    edid::Edid::parse(&edid)
+}
+
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -446,6 +463,52 @@ fn main() -> ! {
         }
     }
 
+    // Determine display modeline
+    let edid = {
+        let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
+        use embedded_hal::delay::DelayNs;
+        timer.delay_ms(10);
+        edid_test(&mut i2cdev0)
+    };
+
+    info!("edid: {:?}", edid);
+
+    // Default rotation and modeline
+    let mut video_rotate_90 = false;
+    let mut modeline = DVIModeline {
+        h_active      : 1280,
+        h_sync_start  : 1390,
+        h_sync_end    : 1430,
+        h_total       : 1650,
+        h_sync_invert : false,
+        v_active      : 720,
+        v_sync_start  : 725,
+        v_sync_end    : 730,
+        v_total       : 750,
+        v_sync_invert : false,
+        pixel_clk_mhz : 74.25,
+    };
+
+    // If connected to 720x720 screen, use native resolution.
+    if let Ok(edid_parsed) = edid {
+        if edid_parsed.header.product_code == 0x3132 {
+            video_rotate_90 = true;
+            modeline = DVIModeline {
+                h_active      : 720,
+                h_sync_start  : 760,
+                h_sync_end    : 780,
+                h_total       : 820,
+                h_sync_invert : false,
+                v_active      : 720,
+                v_sync_start  : 744,
+                v_sync_end    : 748,
+                v_total       : 760,
+                v_sync_invert : false,
+                pixel_clk_mhz : 37.40,
+            };
+        }
+    }
+
     // Setup external PLL
 
     let maybe_external_pll = if HW_REV_MAJOR >= 4 {
@@ -453,7 +516,7 @@ fn main() -> ! {
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         configure_external_pll(&ExternalPLLConfig{
             clk0_hz: CLOCK_AUDIO_HZ,
-            clk1_hz: Some(CLOCK_DVI_HZ),
+            clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
             spread_spectrum: Some(0.01),
         }, &mut si5351drv).unwrap();
         Some(si5351drv)
@@ -511,21 +574,32 @@ fn main() -> ! {
 
         let mut logo_coord_ix = 0u32;
         let mut rng = fastrand::Rng::with_seed(0);
-        let mut display = DMADisplay {
-            framebuffer_base: PSRAM_FB_BASE as *mut u32,
-        };
-        video.set_persist(256);
+
+        let mut display = DMAFramebuffer0::new(
+            peripherals.FRAMEBUFFER_PERIPH,
+            PSRAM_FB_BASE,
+            modeline,
+            video_rotate_90,
+        );
+
+        write!(startup_report, "display: {}x{}\r\n",
+               display.size().width, display.size().height);
+
+        video.set_persist(1024);
 
         let stroke = PrimitiveStyleBuilder::new()
             .stroke_color(Gray8::new(0xB0))
             .stroke_width(1)
             .build();
 
-        palette::ColorPalette::default().write_to_hardware(&mut video);
+        palette::ColorPalette::default().write_to_hardware(&mut display);
 
         log::info!("{}", startup_report);
 
         loop {
+
+            let h_active = display.size().width;
+            let v_active = display.size().height;
 
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
@@ -536,14 +610,14 @@ fn main() -> ! {
                  app.borrow_ref(cs).error_n.clone())
             });
 
-            draw::draw_options(&mut display, &opts, 100, V_ACTIVE/2-50, 0).ok();
-            draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
+            draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
+            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA).ok();
 
             if let Some(n) = opts.tracker.selected {
                 draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
                 if manifests[n].is_some() {
-                    Line::new(Point::new(255, (V_ACTIVE/2 - 55 + (n as u32)*18) as i32),
-                              Point::new((H_ACTIVE/2-90) as i32, (V_ACTIVE/2+8) as i32))
+                    Line::new(Point::new(255, (v_active/2 - 55 + (n as u32)*18) as i32),
+                              Point::new((h_active/2-90) as i32, (v_active/2+8) as i32))
                               .into_styled(stroke)
                               .draw(&mut display).ok();
                 }
@@ -551,7 +625,7 @@ fn main() -> ! {
 
             for _ in 0..5 {
                 let _ = draw::draw_boot_logo(&mut display,
-                                             (H_ACTIVE/2) as i32,
+                                             (h_active/2) as i32,
                                              150 as i32,
                                              logo_coord_ix);
                 logo_coord_ix += 1;
