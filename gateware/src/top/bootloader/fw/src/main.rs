@@ -524,19 +524,20 @@ fn main() -> ! {
                         modeline_from_edid = true;
                         break;
                     } else {
-                        info!("Unuseable EDID settings! Unknown sync format :( ... {:?}", descriptor);
+                        warn!("video/edid: unknown sync format in descriptor: {:?}", descriptor);
                     }
                 } else {
-                    info!("Unuseable EDID settings! Pixel clock too high for Tiliqua :( ... {:?}", descriptor);
+                    warn!("video/edid: skip descriptor with out-of-range pixel clock: {:?}", descriptor);
                 }
             }
         }
     }
 
-    write!(startup_report, "video: {}x{}@{:.2}Hz {}",
+    write!(startup_report, "video: {}x{}@{:.2}Hz {} {}\r\n",
            modeline.h_active, modeline.v_active,
            (modeline.pixel_clk_mhz*1e6f32) / (modeline.h_total as f32 * modeline.v_total as f32),
-           if modeline_from_edid { "(custom, from EDID)" } else {"(fallback)"} ).ok();
+           if video_rotate_90 { "-90deg" } else { "" },
+           if modeline_from_edid { "(custom, from edid)" } else {"(fallback: screen > 720p, or edid bad)"} ).ok();
 
     // Setup external PLL
 
