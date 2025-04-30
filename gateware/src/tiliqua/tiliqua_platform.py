@@ -75,7 +75,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             Subsignal("sdi",  Pins("T8",  dir="o")),
             Subsignal("sdo",  Pins("T7",  dir="i")),
             Subsignal("cs",   PinsN("N8", dir="o")),
-            Attrs(IO_TYPE="LVCMOS33")
+            Attrs(IO_TYPE="LVCMOS33", DRIVE="4")
         ),
 
         # Connection to our SPI flash but using quad mode (QSPI)
@@ -85,7 +85,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             # See interfaces/flash.py for more information.
             Subsignal("dq",  Pins("T8 T7 M7 N7",  dir="io")),
             Subsignal("cs",  PinsN("N8", dir="o")),
-            Attrs(IO_TYPE="LVCMOS33")
+            Attrs(IO_TYPE="LVCMOS33", DRIVE="4")
         ),
     ]
 
@@ -351,6 +351,7 @@ class _TiliquaR4R5Mobo:
         Resource("i2c", 0,
             Subsignal("sda", Pins("51", dir="io", conn=("m2", 0))),
             Subsignal("scl", Pins("53", dir="io", conn=("m2", 0))),
+            Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
         ),
 
         # RP2040 UART bridge
