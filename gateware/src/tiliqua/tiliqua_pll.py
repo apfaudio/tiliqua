@@ -417,7 +417,6 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             # LED off when DVI PLL locked
             m.d.comb += platform.request("led_a").o.eq(ResetSignal("dvi"))
 
-
         # Derived clocks and resets
         m.d.comb += [
             ClockSignal("sync")  .eq(feedback60),
