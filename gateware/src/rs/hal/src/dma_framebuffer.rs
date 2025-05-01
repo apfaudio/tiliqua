@@ -63,7 +63,7 @@ macro_rules! impl_dma_framebuffer {
                     } );
                     registers_fb.hv_timing().write(|w| unsafe {
                         w.h_sync_invert().bit(mode.h_sync_invert);
-                        w.v_sync_invert().bit(mode.h_sync_invert);
+                        w.v_sync_invert().bit(mode.v_sync_invert);
                         w.active_pixels().bits(
                             mode.h_active as u32 * mode.v_active as u32)
                     } );
