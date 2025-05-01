@@ -426,15 +426,78 @@ where
     }
 }
 
-fn edid_test(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
-    info!("Read EDID...");
-    let mut edid: [u8; 128] = [0; 128];
+fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
     const EDID_ADDR: u8 = 0x50;
+    info!("video/edid: read_edid from i2c0 address 0x{:x}", EDID_ADDR);
+    let mut edid: [u8; 128] = [0; 128];
     for i in 0..16 {
         i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
                                             Operation::Read(&mut edid[i*8..i*8+8])]).ok();
     }
     edid::Edid::parse(&edid)
+}
+
+fn dynamic_modeline_from_edid(i2cdev: &mut I2c0) -> Option<DVIModeline> {
+
+    let edid = read_edid(i2cdev);
+
+    info!("video/edid: read_edid returned {:?}", edid);
+
+    // Read the EDID contents and see if we can use it to dynamically create a
+    // sensible modeline. If we can't fine a reasonable descriptor, we return
+    // None and assumably the caller falls back to some default modeline.
+
+    if let Ok(edid::Edid { header, descriptors, .. }) = edid {
+        info!("video/edid: valid edid. scanning detailed timing descriptors...");
+        for descriptor in descriptors.iter() {
+            if let edid::Descriptor::DetailedTiming(desc) = descriptor {
+                info!("video/edid: checking detailed timing descriptor, contents: {:?}", descriptor);
+                if desc.pixel_clock_khz < 24_000u32 || desc.pixel_clock_khz > 100_000u32 {
+                    warn!("video/edid: skip descriptor (out-of-range pixel clock)");
+                    continue;
+                }
+                if desc.features.interlaced {
+                    warn!("video/edid: skip descriptor (interlaced timings)");
+                    continue;
+                }
+                if let edid::SyncType::DigitalSeparate { vsync_positive, hsync_positive } = desc.features.sync_type {
+                    let mut rotate = Rotate::Normal;
+                    if header.product_code == 0x3132 || header.product_code == 0xAA61 {
+                        info!("video/edid: detected tiliqua screen! rotate framebuffer 90 degrees.");
+                        rotate = Rotate::Left;
+                    }
+                    let modeline = DVIModeline {
+                        h_active      : desc.horizontal_active,
+                        h_sync_start  : desc.horizontal_active +
+                                        desc.horizontal_sync_offset,
+                        h_sync_end    : desc.horizontal_active +
+                                        desc.horizontal_sync_offset +
+                                        desc.horizontal_sync_pulse_width,
+                        h_total       : desc.horizontal_active +
+                                        desc.horizontal_blanking,
+                        h_sync_invert : !hsync_positive,
+                        v_active      : desc.vertical_active,
+                        v_sync_start  : desc.vertical_active +
+                                        desc.vertical_sync_offset,
+                        v_sync_end    : desc.vertical_active +
+                                        desc.vertical_sync_offset +
+                                        desc.vertical_sync_pulse_width,
+                        v_total       : desc.vertical_active +
+                                        desc.vertical_blanking,
+                        v_sync_invert : !vsync_positive,
+                        pixel_clk_mhz : (desc.pixel_clock_khz as f32) / 1e3f32,
+                        rotate
+                    };
+                    info!("video/edid: found useable modeline, returning: {:?}", modeline);
+                    return Some(modeline)
+                } else {
+                    warn!("video/edid: skip descriptor (unknown sync format)");
+                    continue;
+                }
+            }
+        }
+    }
+    None
 }
 
 #[entry]
@@ -464,88 +527,18 @@ fn main() -> ! {
         }
     }
 
-    /*
-     * WAIT FOR HPD before starting EDID read / video core
-    while !peripherals.FRAMEBUFFER_PERIPH.hpd().read().hpd().bit() {
-        info!("wait hpd");
-    }
-    */
+    use embedded_hal::delay::DelayNs;
+    timer.delay_ms(10);
+    let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
+    let mut modeline = dynamic_modeline_from_edid(&mut i2cdev0).unwrap_or_default();
 
-    // Determine display modeline
-    let edid = {
-        let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
-        use embedded_hal::delay::DelayNs;
-        timer.delay_ms(10);
-        edid_test(&mut i2cdev0)
-    };
-
-    // Default rotation and modeline
-    let mut video_rotate_90 = false;
-    let mut modeline_from_edid = false;
-    let mut modeline = DVIModeline {
-        h_active      : 1280,
-        h_sync_start  : 1390,
-        h_sync_end    : 1430,
-        h_total       : 1650,
-        h_sync_invert : false,
-        v_active      : 720,
-        v_sync_start  : 725,
-        v_sync_end    : 730,
-        v_total       : 750,
-        v_sync_invert : false,
-        pixel_clk_mhz : 74.25,
-    };
-
-    if let Ok(edid::Edid { header, descriptors, .. }) = edid {
-        if header.product_code == 0x3132 || header.product_code == 0xAA61 {
-            info!("Detected Tiliqua Screen R1! Rotate framebuffer 90 degrees.");
-            video_rotate_90 = true;
-        }
-        for descriptor in descriptors.iter() {
-            if let edid::Descriptor::DetailedTiming(desc) = descriptor {
-                if desc.pixel_clock_khz > 100_000u32 {
-                    warn!("video/edid: skip descriptor with out-of-range pixel clock: {:?}", descriptor);
-                    continue;
-                }
-                if desc.features.interlaced {
-                    warn!("video/edid: skip descriptor interlaced timings: {:?}", descriptor);
-                    continue;
-                }
-                info!("Useable EDID descriptor! Adapting to display ... {:?}", descriptor);
-                if let edid::SyncType::DigitalSeparate { vsync_positive, hsync_positive } = desc.features.sync_type {
-                    modeline = DVIModeline {
-                        h_active      : desc.horizontal_active,
-                        h_sync_start  : desc.horizontal_active + desc.horizontal_sync_offset,
-                        h_sync_end    : desc.horizontal_active + desc.horizontal_sync_offset + desc.horizontal_sync_pulse_width,
-                        h_total       : desc.horizontal_active + desc.horizontal_blanking,
-                        h_sync_invert : !hsync_positive,
-                        v_active      : desc.vertical_active,
-                        v_sync_start  : desc.vertical_active + desc.vertical_sync_offset,
-                        v_sync_end    : desc.vertical_active + desc.vertical_sync_offset + desc.vertical_sync_pulse_width,
-                        v_total       : desc.vertical_active + desc.vertical_blanking,
-                        v_sync_invert : !vsync_positive,
-                        pixel_clk_mhz : (desc.pixel_clock_khz as f32) / 1e3f32,
-                    };
-                    info!("Instantiated custom modeline {:?}", modeline);
-                    info!("Taking first valid descriptor. Skip the rest, continue boot...");
-                    modeline_from_edid = true;
-                    break;
-                } else {
-                    warn!("video/edid: unknown sync format in descriptor: {:?}", descriptor);
-                }
-            }
-        }
-    }
-
-    write!(startup_report, "video: {}x{}@{:.2}Hz {} {}\r\n",
+    write!(startup_report, "video: {}x{}@{:.2}Hz\r\n",
            modeline.h_active, modeline.v_active,
-           (modeline.pixel_clk_mhz*1e6f32) / (modeline.h_total as f32 * modeline.v_total as f32),
-           if video_rotate_90 { "-90deg" } else { "" },
-           if modeline_from_edid { "(custom, from edid)" } else {"(fallback: screen > 720p, or edid bad)"} ).ok();
+           (modeline.pixel_clk_mhz*1e6f32) / (modeline.h_total as f32 * modeline.v_total as f32)).ok();
 
     // Setup external PLL
 
-    let maybe_external_pll = if HW_REV_MAJOR >= 4 {
+    let mut maybe_external_pll = if HW_REV_MAJOR >= 4 {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         configure_external_pll(&ExternalPLLConfig{
@@ -594,7 +587,7 @@ fn main() -> ! {
     opts.boot.slot6.value = names[6].clone();
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
-    let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone(), maybe_external_pll)));
+    let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone(), None)));
 
 
     handler!(timer0 = || timer0_handler(&app));
@@ -603,8 +596,8 @@ fn main() -> ! {
 
         s.register(handlers::Interrupt::TIMER0, timer0);
 
-        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
-                              pac::Interrupt::TIMER0);
+        // timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
+        //                      pac::Interrupt::TIMER0);
 
         let mut logo_coord_ix = 0u32;
         let mut rng = fastrand::Rng::with_seed(0);
@@ -613,8 +606,7 @@ fn main() -> ! {
             peripherals.FRAMEBUFFER_PERIPH,
             peripherals.PALETTE_PERIPH,
             PSRAM_FB_BASE,
-            modeline,
-            video_rotate_90,
+            modeline.clone(),
         );
 
         persist.set_persist(256);
@@ -628,7 +620,28 @@ fn main() -> ! {
 
         log::info!("{}", startup_report);
 
+        use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
+
+        let mut last_hpd = display.get_hpd();
+
         loop {
+
+            if display.get_hpd() && !last_hpd {
+                modeline = dynamic_modeline_from_edid(&mut i2cdev0).unwrap_or_default();
+                configure_external_pll(&ExternalPLLConfig{
+                    clk0_hz: CLOCK_AUDIO_HZ,
+                    clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
+                    spread_spectrum: Some(0.01),
+                }, &mut maybe_external_pll.as_mut().unwrap()).unwrap();
+                let peripherals = unsafe { pac::Peripherals::steal() };
+                display = DMAFramebuffer0::new(
+                    peripherals.FRAMEBUFFER_PERIPH,
+                    peripherals.PALETTE_PERIPH,
+                    PSRAM_FB_BASE,
+                    modeline.clone(),
+                );
+            }
+            last_hpd = display.get_hpd();
 
             let h_active = display.size().width;
             let v_active = display.size().height;
