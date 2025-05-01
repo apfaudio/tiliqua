@@ -546,7 +546,7 @@ fn main() -> ! {
 
     // Setup audio clocks on external PLL
 
-    let mut maybe_external_pll = if HW_REV_MAJOR >= 4 {
+    let maybe_external_pll = if HW_REV_MAJOR >= 4 {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         configure_external_pll(&ExternalPLLConfig{
@@ -595,7 +595,8 @@ fn main() -> ! {
     opts.boot.slot6.value = names[6].clone();
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
-    let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone(), None)));
+    let app = Mutex::new(RefCell::new(
+            App::new(opts, manifests.clone(), maybe_external_pll)));
 
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
@@ -622,32 +623,11 @@ fn main() -> ! {
 
         log::info!("{}", startup_report);
 
-        use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
-
-        let mut last_hpd = display.get_hpd();
-
         s.register(handlers::Interrupt::TIMER0, timer0);
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
                               pac::Interrupt::TIMER0);
 
         loop {
-
-            if display.get_hpd() && !last_hpd {
-                let modeline = modeline_or_fallback(&mut i2cdev_edid);
-                configure_external_pll(&ExternalPLLConfig{
-                    clk0_hz: CLOCK_AUDIO_HZ,
-                    clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
-                    spread_spectrum: Some(0.01),
-                }, &mut maybe_external_pll.as_mut().unwrap()).unwrap();
-                let peripherals = unsafe { pac::Peripherals::steal() };
-                display = DMAFramebuffer0::new(
-                    peripherals.FRAMEBUFFER_PERIPH,
-                    peripherals.PALETTE_PERIPH,
-                    PSRAM_FB_BASE,
-                    modeline,
-                );
-            }
-            last_hpd = display.get_hpd();
 
             let h_active = display.size().width;
             let v_active = display.size().height;
