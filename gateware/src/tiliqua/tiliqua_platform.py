@@ -378,7 +378,7 @@ class _TiliquaR4Mobo:
             Subsignal("d1", Pins("52", dir="o", conn=("m2", 0))),
             Subsignal("d2", Pins("60", dir="o", conn=("m2", 0))),
             Subsignal("ck", Pins("62", dir="o", conn=("m2", 0))),
-            Attrs(IO_TYPE="LVCMOS33D", DRIVE="8", SLEWRATE="FAST")
+            Attrs(IO_TYPE="LVCMOS33D", DRIVE="4", SLEWRATE="FAST")
          ),
     ]
 
