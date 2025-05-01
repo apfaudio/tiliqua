@@ -1,4 +1,10 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum Rotate {
+    Normal,
+    Left,
+}
+
+#[derive(Debug, Clone)]
 pub struct DVIModeline {
    pub h_active:      u16,
    pub h_sync_start:  u16,
@@ -11,6 +17,26 @@ pub struct DVIModeline {
    pub v_total:       u16,
    pub v_sync_invert: bool,
    pub pixel_clk_mhz: f32,
+   pub rotate:        Rotate,
+}
+
+impl Default for DVIModeline {
+    fn default() -> Self {
+        Self {
+            h_active      : 1280,
+            h_sync_start  : 1390,
+            h_sync_end    : 1430,
+            h_total       : 1650,
+            h_sync_invert : false,
+            v_active      : 720,
+            v_sync_start  : 725,
+            v_sync_end    : 730,
+            v_total       : 750,
+            v_sync_invert : false,
+            pixel_clk_mhz : 74.25,
+            rotate        : Rotate::Normal,
+        }
+    }
 }
 
 pub trait DMAFramebuffer {
@@ -26,19 +52,18 @@ macro_rules! impl_dma_framebuffer {
         $PALETTEX:ident: $PACPALETTEX:ty,
     )+) => {
         $(
-            use tiliqua_hal::dma_framebuffer::DVIModeline;
+            use tiliqua_hal::dma_framebuffer::{DVIModeline, Rotate};
 
             struct $DMA_FRAMEBUFFERX {
                 registers_fb: $PACFRAMEBUFFERX,
                 registers_palette: $PACPALETTEX,
                 mode: DVIModeline,
                 framebuffer_base: *mut u32,
-                rotate_90: bool,
             }
 
             impl $DMA_FRAMEBUFFERX {
                 fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, fb_base: usize,
-                       mode: DVIModeline, rotate_90: bool) -> Self {
+                       mode: DVIModeline) -> Self {
                     registers_fb.flags().write(|w| unsafe {
                         w.enable().bit(false)
                     });
@@ -75,7 +100,6 @@ macro_rules! impl_dma_framebuffer {
                         registers_palette,
                         mode,
                         framebuffer_base: fb_base as *mut u32,
-                        rotate_90
                     }
                 }
 
@@ -124,8 +148,8 @@ macro_rules! impl_dma_framebuffer {
                     for Pixel(coord, color) in pixels.into_iter() {
                         if let Ok((x, y)) = coord.try_into() {
                             if x >= 0 && x < h_active && y >= 0 && y < v_active {
-                                let xf: u32 = if self.rotate_90 {v_active - y} else {x};
-                                let yf: u32 = if self.rotate_90 {x}             else {y};
+                                let xf: u32 = if (self.mode.rotate == Rotate::Left) {v_active - y} else {x};
+                                let yf: u32 = if (self.mode.rotate == Rotate::Left) {x}            else {y};
                                 // Calculate the index in the framebuffer.
                                 let index: u32 = (xf + yf * h_active) / 4;
                                 unsafe {
