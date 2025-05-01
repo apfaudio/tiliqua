@@ -10,6 +10,7 @@ use core::cell::RefCell;
 use heapless::String;
 use micromath::{F32Ext};
 use strum_macros::{EnumIter, IntoStaticStr};
+use embedded_hal::delay::DelayNs;
 
 use core::str::FromStr;
 use core::fmt::Write;
@@ -431,73 +432,83 @@ fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
     info!("video/edid: read_edid from i2c0 address 0x{:x}", EDID_ADDR);
     let mut edid: [u8; 128] = [0; 128];
     for i in 0..16 {
+        // Be extremely careful these transactions are not interrupted, because
+        // bad EDID transactions could brick monitors.
+        riscv::interrupt::disable();
         i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
                                             Operation::Read(&mut edid[i*8..i*8+8])]).ok();
+        unsafe { riscv::interrupt::enable(); }
     }
-    edid::Edid::parse(&edid)
+    let edid = edid::Edid::parse(&edid);
+    info!("video/edid: read_edid got {:?}", edid);
+    edid
 }
 
-fn dynamic_modeline_from_edid(i2cdev: &mut I2c0) -> Option<DVIModeline> {
-
-    let edid = read_edid(i2cdev);
-
-    info!("video/edid: read_edid returned {:?}", edid);
+fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
 
     // Read the EDID contents and see if we can use it to dynamically create a
     // sensible modeline. If we can't fine a reasonable descriptor, we return
     // None and assumably the caller falls back to some default modeline.
 
-    if let Ok(edid::Edid { header, descriptors, .. }) = edid {
-        info!("video/edid: valid edid. scanning detailed timing descriptors...");
-        for descriptor in descriptors.iter() {
-            if let edid::Descriptor::DetailedTiming(desc) = descriptor {
-                info!("video/edid: checking detailed timing descriptor, contents: {:?}", descriptor);
-                if desc.pixel_clock_khz < 24_000u32 || desc.pixel_clock_khz > 100_000u32 {
-                    warn!("video/edid: skip descriptor (out-of-range pixel clock)");
-                    continue;
+    info!("video/edid: valid edid. scanning detailed timing descriptors...");
+    for descriptor in edid.descriptors.iter() {
+        if let edid::Descriptor::DetailedTiming(desc) = descriptor {
+            info!("video/edid: checking detailed timing descriptor, contents: {:?}", descriptor);
+            if desc.pixel_clock_khz < 24_000u32 || desc.pixel_clock_khz > 100_000u32 {
+                warn!("video/edid: skip descriptor (out-of-range pixel clock)");
+                continue;
+            }
+            if desc.features.interlaced {
+                warn!("video/edid: skip descriptor (interlaced timings)");
+                continue;
+            }
+            if let edid::SyncType::DigitalSeparate { vsync_positive, hsync_positive } = desc.features.sync_type {
+                let mut rotate = Rotate::Normal;
+                if edid.header.product_code == 0x3132 || edid.header.product_code == 0xAA61 {
+                    info!("video/edid: detected tiliqua screen! rotate framebuffer 90 degrees.");
+                    rotate = Rotate::Left;
                 }
-                if desc.features.interlaced {
-                    warn!("video/edid: skip descriptor (interlaced timings)");
-                    continue;
-                }
-                if let edid::SyncType::DigitalSeparate { vsync_positive, hsync_positive } = desc.features.sync_type {
-                    let mut rotate = Rotate::Normal;
-                    if header.product_code == 0x3132 || header.product_code == 0xAA61 {
-                        info!("video/edid: detected tiliqua screen! rotate framebuffer 90 degrees.");
-                        rotate = Rotate::Left;
-                    }
-                    let modeline = DVIModeline {
-                        h_active      : desc.horizontal_active,
-                        h_sync_start  : desc.horizontal_active +
-                                        desc.horizontal_sync_offset,
-                        h_sync_end    : desc.horizontal_active +
-                                        desc.horizontal_sync_offset +
-                                        desc.horizontal_sync_pulse_width,
-                        h_total       : desc.horizontal_active +
-                                        desc.horizontal_blanking,
-                        h_sync_invert : !hsync_positive,
-                        v_active      : desc.vertical_active,
-                        v_sync_start  : desc.vertical_active +
-                                        desc.vertical_sync_offset,
-                        v_sync_end    : desc.vertical_active +
-                                        desc.vertical_sync_offset +
-                                        desc.vertical_sync_pulse_width,
-                        v_total       : desc.vertical_active +
-                                        desc.vertical_blanking,
-                        v_sync_invert : !vsync_positive,
-                        pixel_clk_mhz : (desc.pixel_clock_khz as f32) / 1e3f32,
-                        rotate
-                    };
-                    info!("video/edid: found useable modeline, returning: {:?}", modeline);
-                    return Some(modeline)
-                } else {
-                    warn!("video/edid: skip descriptor (unknown sync format)");
-                    continue;
-                }
+                let modeline = DVIModeline {
+                    h_active      : desc.horizontal_active,
+                    h_sync_start  : desc.horizontal_active +
+                                    desc.horizontal_sync_offset,
+                    h_sync_end    : desc.horizontal_active +
+                                    desc.horizontal_sync_offset +
+                                    desc.horizontal_sync_pulse_width,
+                    h_total       : desc.horizontal_active +
+                                    desc.horizontal_blanking,
+                    h_sync_invert : !hsync_positive,
+                    v_active      : desc.vertical_active,
+                    v_sync_start  : desc.vertical_active +
+                                    desc.vertical_sync_offset,
+                    v_sync_end    : desc.vertical_active +
+                                    desc.vertical_sync_offset +
+                                    desc.vertical_sync_pulse_width,
+                    v_total       : desc.vertical_active +
+                                    desc.vertical_blanking,
+                    v_sync_invert : !vsync_positive,
+                    pixel_clk_mhz : (desc.pixel_clock_khz as f32) / 1e3f32,
+                    rotate
+                };
+                info!("video/edid: found useable modeline, returning: {:?}", modeline);
+                return Some(modeline)
+            } else {
+                warn!("video/edid: skip descriptor (unknown sync format)");
+                continue;
             }
         }
     }
     None
+}
+
+fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
+    match read_edid(i2cdev) {
+        Ok(edid) => match modeline_from_edid(edid) {
+            Some(edid_modeline) => edid_modeline,
+            _ => DVIModeline::default()
+        }
+        _ => DVIModeline::default()
+    }
 }
 
 #[entry]
@@ -527,16 +538,13 @@ fn main() -> ! {
         }
     }
 
-    use embedded_hal::delay::DelayNs;
+    // Fetch initial modeline (may be used for external PLL setup)
+
     timer.delay_ms(10);
-    let mut i2cdev0 = I2c0::new(unsafe { pac::I2C0::steal() } );
-    let mut modeline = dynamic_modeline_from_edid(&mut i2cdev0).unwrap_or_default();
+    let mut i2cdev_edid = I2c0::new(unsafe { pac::I2C0::steal() } );
+    let modeline = modeline_or_fallback(&mut i2cdev_edid);
 
-    write!(startup_report, "video: {}x{}@{:.2}Hz\r\n",
-           modeline.h_active, modeline.v_active,
-           (modeline.pixel_clk_mhz*1e6f32) / (modeline.h_total as f32 * modeline.v_total as f32)).ok();
-
-    // Setup external PLL
+    // Setup audio clocks on external PLL
 
     let mut maybe_external_pll = if HW_REV_MAJOR >= 4 {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
@@ -589,25 +597,19 @@ fn main() -> ! {
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
     let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone(), None)));
 
+    let mut display = DMAFramebuffer0::new(
+        peripherals.FRAMEBUFFER_PERIPH,
+        peripherals.PALETTE_PERIPH,
+        PSRAM_FB_BASE,
+        modeline
+    );
 
     handler!(timer0 = || timer0_handler(&app));
 
     irq::scope(|s| {
 
-        s.register(handlers::Interrupt::TIMER0, timer0);
-
-        // timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
-        //                      pac::Interrupt::TIMER0);
-
         let mut logo_coord_ix = 0u32;
         let mut rng = fastrand::Rng::with_seed(0);
-
-        let mut display = DMAFramebuffer0::new(
-            peripherals.FRAMEBUFFER_PERIPH,
-            peripherals.PALETTE_PERIPH,
-            PSRAM_FB_BASE,
-            modeline.clone(),
-        );
 
         persist.set_persist(256);
 
@@ -624,10 +626,14 @@ fn main() -> ! {
 
         let mut last_hpd = display.get_hpd();
 
+        s.register(handlers::Interrupt::TIMER0, timer0);
+        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
+                              pac::Interrupt::TIMER0);
+
         loop {
 
             if display.get_hpd() && !last_hpd {
-                modeline = dynamic_modeline_from_edid(&mut i2cdev0).unwrap_or_default();
+                let modeline = modeline_or_fallback(&mut i2cdev_edid);
                 configure_external_pll(&ExternalPLLConfig{
                     clk0_hz: CLOCK_AUDIO_HZ,
                     clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
@@ -638,7 +644,7 @@ fn main() -> ! {
                     peripherals.FRAMEBUFFER_PERIPH,
                     peripherals.PALETTE_PERIPH,
                     PSRAM_FB_BASE,
-                    modeline.clone(),
+                    modeline,
                 );
             }
             last_hpd = display.get_hpd();
