@@ -497,7 +497,7 @@ fn main() -> ! {
     };
 
     if let Ok(edid::Edid { header, descriptors, .. }) = edid {
-        if header.product_code == 0x3132 {
+        if header.product_code == 0x3132 || header.product_code == 0xAA61 {
             info!("Detected Tiliqua Screen R1! Rotate framebuffer 90 degrees.");
             video_rotate_90 = true;
         }
