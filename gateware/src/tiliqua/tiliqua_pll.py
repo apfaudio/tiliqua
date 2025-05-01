@@ -375,8 +375,8 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             ]
 
             m.d.comb += [
-                platform.request("led_a").o.eq(locked60),
-                platform.request("led_b").o.eq(locked_dvi),
+                platform.request("led_a").o.eq(0),
+                platform.request("led_b").o.eq(0),
             ]
 
         # Derived clocks and resets
