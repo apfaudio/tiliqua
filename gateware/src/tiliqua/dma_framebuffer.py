@@ -82,11 +82,7 @@ class DMAFramebuffer(wiring.Component):
         m.submodules.fifo = fifo = AsyncFIFOBuffered(
                 width=32, depth=self.fifo_depth, r_domain='dvi', w_domain='sync')
 
-        # Bring self.enable into dvi clock domain for graceful PHY shutdown.
-        enable_dvi = Signal()
-        m.submodules.en_ff = FFSynchronizer(
-                i=self.enable, o=enable_dvi, o_domain="dvi")
-        m.submodules.dvi_tgen = dvi_tgen = ResetInserter({'dvi': ~enable_dvi})(dvi.DVITimingGen())
+        m.submodules.dvi_tgen = dvi_tgen = dvi.DVITimingGen()
 
         # TODO: FFSync needed? (sync -> dvi crossing, but should always be in reset when changed).
         wiring.connect(m, wiring.flipped(self.timings), dvi_tgen.timings)
@@ -111,9 +107,6 @@ class DMAFramebuffer(wiring.Component):
 
         # Read to FIFO in sync domain
         with m.FSM() as fsm:
-            with m.State('OFF'):
-                with m.If(self.enable):
-                    m.next = 'WAIT-VSYNC'
             with m.State('WAIT-VSYNC'):
                 with m.If(phy_vsync_sync):
                     m.d.sync += dma_addr.eq(0)
@@ -152,8 +145,6 @@ class DMAFramebuffer(wiring.Component):
                 with m.If(fifo.w_level < self.fifo_depth-self.burst_threshold_words):
                     m.d.sync += burst_cnt.eq(0)
                     m.next = 'BURST'
-                with m.If(~self.enable):
-                    m.next = 'OFF'
 
         # Tracking in DVI domain
 
@@ -177,7 +168,7 @@ class DMAFramebuffer(wiring.Component):
 
         if sim.is_hw(platform):
             # Instantiate the DVI PHY itself
-            m.submodules.dvi_gen = dvi_gen = ResetInserter({'dvi': ~enable_dvi})(dvi.DVIPHY())
+            m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
             m.d.dvi += [
                 dvi_gen.de.eq(dvi_tgen.ctrl_phy.de),
                 # RGB -> TMDS
@@ -200,7 +191,11 @@ class DMAFramebuffer(wiring.Component):
                 self.simif.b.eq(self.palette.pixel_out.b),
             ]
 
-        return m
+        # Bring self.enable into dvi clock domain for graceful PHY shutdown.
+        enable_dvi = Signal()
+        m.submodules.en_ff = FFSynchronizer(
+                i=self.enable, o=enable_dvi, o_domain="dvi")
+        return ResetInserter({'sync': ~self.enable, 'dvi': ~enable_dvi})(m)
 
 class Peripheral(wiring.Component):
 
