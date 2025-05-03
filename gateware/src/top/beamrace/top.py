@@ -29,11 +29,17 @@ from tiliqua.sim              import FakeTiliquaDomainGenerator
 class BeamRaceInputs(wiring.Signature):
     def __init__(self):
         super().__init__({
-            "hsync": Out(1),
-            "vsync": Out(1),
-            "de":    Out(1),
-            "x":     Out(signed(12)),
-            "y":     Out(signed(12)),
+            # Video timing inputs
+            "hsync":     Out(1),
+            "vsync":     Out(1),
+            "de":        Out(1),
+            "x":         Out(signed(12)),
+            "y":         Out(signed(12)),
+            # Audio samples (already synchronized to DVI domain)
+            "audio_in0": Out(signed(16)),
+            "audio_in1": Out(signed(16)),
+            "audio_in2": Out(signed(16)),
+            "audio_in3": Out(signed(16)),
         })
 
 class BeamRaceOutputs(wiring.Signature):
@@ -69,7 +75,7 @@ class Stripes(wiring.Component):
         with m.If(self.i.vsync & ~l_vsync):
             m.d.sync += counter.eq(counter + 1)
 
-        m.d.comb += moving_x.eq(self.i.x + counter)
+        m.d.comb += moving_x.eq(self.i.x + counter + self.i.audio_in0)
 
         with m.If(self.i.de):
             m.d.comb += [
@@ -194,7 +200,7 @@ class Checkers(wiring.Component):
         # Detect rising edge of vsync
         m.d.sync += l_vsync.eq(self.i.vsync)
         with m.If(self.i.vsync & ~l_vsync):
-            m.d.sync += counter.eq(counter + 1)
+            m.d.sync += counter.eq(counter + (self.i.audio_in0 >> 9))
 
         # Animated layer positions
         layer_a_x = Signal(10)
@@ -308,6 +314,8 @@ class BeamRaceTop(Elaboratable):
 
         m.submodules.pmod0 = pmod0 = self.pmod0
 
+        wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
+
         m.submodules.dvi_tgen = dvi_tgen = dvi.DVITimingGen()
 
         if self.fixed_modeline is not None:
@@ -318,7 +326,10 @@ class BeamRaceTop(Elaboratable):
         m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
 
         # Instantiate the beamracer core
-        m.submodules.core = core = DomainRenamer("dvi")(Checkers())
+        m.submodules.core = core = DomainRenamer("dvi")(Stripes())
+        for ch in range(4):
+            m.submodules += FFSynchronizer(
+                    i=pmod0.o_cal.payload[ch].as_value(), o=getattr(core.i, f"audio_in{ch}"), o_domain="dvi")
 
         # Hook up beamracer inputs
         m.d.comb += [
