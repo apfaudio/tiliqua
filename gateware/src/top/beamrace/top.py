@@ -1,0 +1,349 @@
+# Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+
+import os
+import math
+import shutil
+import subprocess
+
+from amaranth                 import *
+from amaranth.build           import *
+from amaranth.lib             import wiring, data, stream
+from amaranth.lib.wiring      import In, Out
+from amaranth.lib.fifo        import AsyncFIFO, SyncFIFO
+from amaranth.lib.cdc         import FFSynchronizer
+from amaranth.utils           import log2_int
+from amaranth.back            import verilog
+
+from amaranth_future          import fixed
+from amaranth_soc             import wishbone
+
+from tiliqua.tiliqua_platform import *
+from tiliqua                  import eurorack_pmod, dsp, sim, dvi
+from tiliqua.eurorack_pmod    import ASQ
+from tiliqua                  import psram_peripheral
+from tiliqua.cli              import top_level_cli
+from tiliqua.sim              import FakeTiliquaDomainGenerator
+
+class BeamRaceInputs(wiring.Signature):
+    def __init__(self):
+        super().__init__({
+            "hsync": Out(1),
+            "vsync": Out(1),
+            "de":    Out(1),
+            "x":     Out(signed(12)),
+            "y":     Out(signed(12)),
+        })
+
+class BeamRaceOutputs(wiring.Signature):
+    def __init__(self):
+        super().__init__({
+            "r":     Out(8),
+            "g":     Out(8),
+            "b":     Out(8),
+        })
+
+class Stripes(wiring.Component):
+
+    """
+    Translated from 'Stripes' from https://vga-playground.com
+
+    Original attribution:
+     Copyright (c) 2024 Uri Shaked
+     SPDX-License-Identifier: Apache-2.0
+    """
+
+    i: In(BeamRaceInputs())
+    o: Out(BeamRaceOutputs())
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        counter  = Signal(10)
+        moving_x = Signal(10)
+
+        l_vsync = Signal()
+        m.d.sync += l_vsync.eq(self.i.vsync)
+        with m.If(self.i.vsync & ~l_vsync):
+            m.d.sync += counter.eq(counter + 1)
+
+        m.d.comb += moving_x.eq(self.i.x + counter)
+
+        with m.If(self.i.de):
+            m.d.comb += [
+                self.o.r.eq(Cat(C(0, 6), self.i.y[2], moving_x[5])),
+                self.o.g.eq(Cat(C(0, 6), self.i.y[2], moving_x[6])),
+                self.o.b.eq(Cat(C(0, 6), self.i.y[5], moving_x[7])),
+            ]
+
+        return m
+
+class Balls(wiring.Component):
+
+    """
+    Translated from 'Balls' from vga-playground.com
+
+    Edits: some added registers to make timing more FPGA friendly.
+
+    Original attribution:
+     Copyright (c) 2024 Renaldas Zioma
+     based on the VGA examples by Uri Shaked
+     SPDX-License-Identifier: Apache-2.0
+    """
+
+    i: In(BeamRaceInputs())
+    o: Out(BeamRaceOutputs())
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        # Time counter for animation
+        counter = Signal(20)
+
+        # Update animation counter on vsync
+        l_vsync = Signal()
+        m.d.sync += l_vsync.eq(self.i.vsync)
+        with m.If(self.i.vsync & ~l_vsync):
+            m.d.sync += counter.eq(counter + 1)
+
+        # Points for Worley noise
+        points_x = [Signal(signed(10)) for _ in range(4)]
+        points_y = [Signal(signed(10)) for _ in range(4)]
+
+        # Calculate point positions with animation
+        m.d.comb += [
+            points_x[0].eq(100 + counter),
+            points_y[0].eq(100 - counter),
+            points_x[1].eq(300 - (counter >> 1)),
+            points_y[1].eq(200 + (counter >> 1)),
+            points_x[2].eq(500 + (counter >> 1)),
+            points_y[2].eq(400 - (counter >> 4)),
+            points_x[3].eq(100 - (counter >> 3)),
+            points_y[3].eq(500 - (counter >> 2))
+        ]
+
+        distance1 = Signal(16)
+        distance2 = Signal(16)
+        distance3 = Signal(16)
+        distance4 = Signal(16)
+        min_dist = Signal(16)
+
+        # Calculate squared distances to each point
+        m.d.sync += [
+            distance1.eq((self.i.x - points_x[0]) * (self.i.x - points_x[0]) +
+                        (self.i.y - points_y[0]) * (self.i.y - points_y[0])),
+            distance2.eq((self.i.x - points_x[1]) * (self.i.x - points_x[1]) +
+                        (self.i.y - points_y[1]) * (self.i.y - points_y[1])),
+            distance3.eq((self.i.x - points_x[2]) * (self.i.x - points_x[2]) +
+                        (self.i.y - points_y[2]) * (self.i.y - points_y[2])),
+            distance4.eq((self.i.x - points_x[3]) * (self.i.x - points_x[3]) +
+                        (self.i.y - points_y[3]) * (self.i.y - points_y[3]))
+        ]
+
+        # Find minimum distance (simplified approach)
+        min1 = Signal(16)
+        min2 = Signal(16)
+
+        m.d.comb += [
+            min1.eq(Mux(distance1 < distance2, distance1, distance2)),
+            min2.eq(Mux(distance3 < distance4, distance3, distance4)),
+            min_dist.eq(Mux(min1 < min2, min1, min2))
+        ]
+
+        # Generate noise value from minimum distance
+        noise_value = Signal(8)
+        m.d.comb += noise_value.eq(~min_dist[8:15])  # Scale down to 8-bit and invert
+
+        # Set RGB output based on noise value when display is enabled
+        with m.If(self.i.de):
+            m.d.comb += [
+                self.o.r.eq(Cat(C(0, 6), noise_value[7], noise_value[2])),
+                self.o.g.eq(Cat(C(0, 6), noise_value[6], noise_value[3])),
+                self.o.b.eq(Cat(C(0, 6), noise_value[5], noise_value[4]))
+            ]
+
+        return m
+
+class Checkers(wiring.Component):
+
+    """
+    Translated from 'Checkers' from vga-playground.com
+
+    Edits: 1 layer removed, some added registers for friendlier timing.
+
+    Original attribution:
+     Copyright (c) 2024 Renaldas Zioma
+     based on the VGA examples by Uri Shaked
+     SPDX-License-Identifier: Apache-2.0
+    """
+
+    i: In(BeamRaceInputs())
+    o: Out(BeamRaceOutputs())
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        # Animation counter that increments on vsync
+        counter = Signal(10)
+        l_vsync = Signal()
+
+        # Detect rising edge of vsync
+        m.d.sync += l_vsync.eq(self.i.vsync)
+        with m.If(self.i.vsync & ~l_vsync):
+            m.d.sync += counter.eq(counter + 1)
+
+        # Animated layer positions
+        layer_a_x = Signal(10)
+        layer_a_y = Signal(10)
+        layer_b_x = Signal(10)
+        layer_b_y = Signal(10)
+        layer_c_x = Signal(10)
+        layer_c_y = Signal(10)
+        layer_d_x = Signal(10)
+        layer_d_y = Signal(10)
+        layer_e_x = Signal(10)
+        layer_e_y = Signal(10)
+
+        # Calculate animated positions for each layer
+        m.d.sync += [
+            layer_a_x.eq(self.i.x + counter * 16),
+            layer_a_y.eq(self.i.y + counter * 2),
+            layer_b_x.eq(self.i.x + counter * 7),
+            layer_b_y.eq(self.i.y + counter + (counter >> 1)),
+            layer_c_x.eq(self.i.x + counter * 4),
+            layer_c_y.eq(self.i.y + (counter >> 1)),
+            layer_d_x.eq(self.i.x + counter * 2),
+            layer_d_y.eq(self.i.y + (counter >> 2)),
+        ]
+
+        # Layer patterns with transparency using dithering
+        layer_a = Signal()
+        layer_b = Signal()
+        layer_c = Signal()
+        layer_d = Signal()
+
+        m.d.sync += [
+            layer_a.eq((layer_a_x[8] ^ layer_a_y[8]) & (self.i.y[1] ^ self.i.x[0])),
+            layer_b.eq((layer_b_x[7] ^ layer_b_y[7]) & (~self.i.y[0] ^ self.i.x[1])),
+            layer_c.eq(layer_c_x[6] ^ layer_c_y[6]),
+            layer_d.eq(layer_d_x[5] ^ layer_d_y[5]),
+        ]
+
+        # Define layer colors
+        # For simplicity, use a constant color for color_a
+        # This could be made configurable similar to ui_in in the original
+        color_a = Signal(6)
+        color_b = Signal(6)
+        color_c = Signal(6)
+        color_de = Signal(6)
+
+        m.d.sync += [
+            color_a.eq(0x3F),  # Example color 0x3F = 0b111111
+            color_b.eq(color_a ^ 0b001010),
+            color_c.eq(color_b & 0b101010),
+            color_de.eq(color_c >> 1)
+        ]
+
+        # Output color selection based on layers
+        with m.If(layer_a):
+            m.d.sync += [
+                self.o.r.eq(Cat(C(0, 6), color_a[1], color_a[0])),
+                self.o.g.eq(Cat(C(0, 6), color_a[3], color_a[2])),
+                self.o.b.eq(Cat(C(0, 6), color_a[5], color_a[4]))
+            ]
+        with m.Elif(layer_b):
+            m.d.sync += [
+                self.o.r.eq(Cat(C(0, 6), color_b[1], color_b[0])),
+                self.o.g.eq(Cat(C(0, 6), color_b[3], color_b[2])),
+                self.o.b.eq(Cat(C(0, 6), color_b[5], color_b[4]))
+            ]
+        with m.Elif(layer_c):
+            m.d.sync += [
+                self.o.r.eq(Cat(C(0, 6), color_c[1], color_c[0])),
+                self.o.g.eq(Cat(C(0, 6), color_c[3], color_c[2])),
+                self.o.b.eq(Cat(C(0, 6), color_c[5], color_c[4]))
+            ]
+        with m.Elif(layer_d):
+            m.d.sync += [
+                self.o.r.eq(Cat(C(0, 6), color_de[1], color_de[0])),
+                self.o.g.eq(Cat(C(0, 6), color_de[3], color_de[2])),
+                self.o.b.eq(Cat(C(0, 6), color_de[5], color_de[4]))
+            ]
+        with m.Else():
+            m.d.sync += [
+                self.o.r.eq(0),
+                self.o.g.eq(0),
+                self.o.b.eq(0)
+            ]
+
+        return m
+
+class BeamRaceTop(Elaboratable):
+
+    def __init__(self, *, default_modeline, clock_settings):
+
+        self.fixed_modeline = default_modeline
+
+        self.clock_settings = clock_settings
+
+        self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
+
+        super().__init__()
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
+        m.submodules.reboot = reboot = RebootProvider(self.clock_settings.frequencies.sync)
+        m.submodules.btn = FFSynchronizer(
+                platform.request("encoder").s.i, reboot.button)
+        m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
+        wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
+        m.d.comb += self.pmod0.codec_mute.eq(reboot.mute)
+
+        m.submodules.pmod0 = pmod0 = self.pmod0
+
+        m.submodules.dvi_tgen = dvi_tgen = dvi.DVITimingGen()
+
+        if self.fixed_modeline is not None:
+            for member in dvi_tgen.timings.signature.members:
+                m.d.comb += getattr(dvi_tgen.timings, member).eq(getattr(self.fixed_modeline, member))
+
+        # Instantiate the DVI PHY itself
+        m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
+
+        # Instantiate the beamracer core
+        m.submodules.core = core = DomainRenamer("dvi")(Checkers())
+
+        # Hook up beamracer inputs
+        m.d.comb += [
+            core.i.vsync.eq(dvi_tgen.ctrl.vsync),
+            core.i.hsync.eq(dvi_tgen.ctrl.hsync),
+            core.i.de.eq(dvi_tgen.ctrl.de),
+            core.i.x.eq(dvi_tgen.x),
+            core.i.y.eq(dvi_tgen.y),
+        ]
+
+        # Hook up the DVI PHY
+        m.d.dvi += [
+            dvi_gen.de.eq(dvi_tgen.ctrl_phy.de),
+            dvi_gen.data_in_ch0.eq(core.o.b),
+            dvi_gen.data_in_ch1.eq(core.o.g),
+            dvi_gen.data_in_ch2.eq(core.o.r),
+            dvi_gen.ctrl_in_ch0.eq(Cat(dvi_tgen.ctrl_phy.hsync, dvi_tgen.ctrl_phy.vsync)),
+            dvi_gen.ctrl_in_ch1.eq(0),
+            dvi_gen.ctrl_in_ch2.eq(0),
+        ]
+
+        return m
+
+if __name__ == "__main__":
+    this_path = os.path.dirname(os.path.realpath(__file__))
+    top_level_cli(
+        BeamRaceTop,
+    )
