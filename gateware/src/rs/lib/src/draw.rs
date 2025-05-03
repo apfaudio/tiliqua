@@ -195,7 +195,8 @@ where
     Ok(())
 }
 
-pub fn draw_name<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, name: &str, sha: &str) -> Result<(), D::Error>
+use tiliqua_hal::dma_framebuffer::DVIModeline;
+pub fn draw_name<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, name: &str, sha: &str, modeline: &DVIModeline) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = Gray8>,
 {
@@ -209,8 +210,14 @@ where
         Alignment::Center
     ).draw(d)?;
 
+    let mut modeline_text: String<32> = String::new();
+    write!(modeline_text, "{}/{}x{}@{:.1}Hz\r\n",
+           sha,
+           modeline.h_active, modeline.v_active, modeline.refresh_rate()
+           ).ok();
+
     Text::with_alignment(
-        sha,
+        &modeline_text,
         Point::new(pos_x as i32, (pos_y + 18) as i32),
         font_small_grey,
         Alignment::Center
