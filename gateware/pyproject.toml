@@ -50,6 +50,7 @@ macro_osc          = "src/top/macro_osc/top.py"
 sid                = "src/top/sid/top.py"
 # (Non-SoC bitstreams)
 dsp                = "src/top/dsp/top.py"
+beamrace           = "src/top/beamrace/top.py"
 vectorscope_no_soc = "src/top/vectorscope_no_soc/top.py"
 bootstub           = "src/top/bootstub/top.py"
 usb_audio          = "src/top/usb_audio/top.py"

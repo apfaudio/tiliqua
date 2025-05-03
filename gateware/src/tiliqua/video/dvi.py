@@ -51,6 +51,11 @@ class DVITimingGen(wiring.Component):
             })
 
     def __init__(self):
+
+        # current position
+        self.x = Signal(signed(12))
+        self.y = Signal(signed(12))
+
         super().__init__({
             "timings": In(self.TimingProperties()),
             # Control signals without inversion applied.
@@ -75,10 +80,6 @@ class DVITimingGen(wiring.Component):
         self.vs_start = timings.v_sync_start - timings.v_total
         self.hs_end   = timings.h_sync_end   - timings.h_total
         self.vs_end   = timings.v_sync_end   - timings.v_total
-
-        # current position
-        self.x = Signal(signed(12))
-        self.y = Signal(signed(12))
 
         with m.If(ResetSignal("dvi")):
             m.d.dvi += [
