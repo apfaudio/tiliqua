@@ -602,7 +602,7 @@ fn main() -> ! {
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
         PSRAM_FB_BASE,
-        modeline
+        modeline.clone(),
     );
 
     handler!(timer0 = || timer0_handler(&app));
@@ -642,7 +642,7 @@ fn main() -> ! {
             });
 
             draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
-            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA).ok();
+            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA, &modeline).ok();
 
             if let Some(n) = opts.tracker.selected {
                 draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
