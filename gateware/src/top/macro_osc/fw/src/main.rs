@@ -21,12 +21,14 @@ use tiliqua_hal as hal;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
 use pac::constants::*;
-use tiliqua_hal::video::Video;
+use tiliqua_hal::persist::Persist;
 use options::*;
 use hal::pca9635::*;
 
-
-tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
+tiliqua_hal::impl_dma_framebuffer! {
+    DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
+    Palette0: tiliqua_pac::PALETTE_PERIPH,
+}
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 const BLOCK_SIZE: usize = 128;
@@ -178,21 +180,21 @@ fn main() -> ! {
 
     let sysclk = pac::clock::sysclk();
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
+    let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
 
     info!("Hello from Tiliqua MACRO-OSCILLATOR!");
+
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
+    bootinfo.manifest.print();
+    info!("bootinfo modeline {:?}", bootinfo.modeline);
+    let modeline = bootinfo.modeline;
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let mut display = DMADisplay {
-        framebuffer_base: PSRAM_FB_BASE as *mut u32,
-    };
-
     let vscope  = peripherals.VECTOR_PERIPH;
     let scope  = peripherals.SCOPE_PERIPH;
-
-    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
 
     //
     // Create application object.
@@ -244,6 +246,13 @@ fn main() -> ! {
     });
     */
 
+    let mut display = DMAFramebuffer0::new(
+        peripherals.FRAMEBUFFER_PERIPH,
+        peripherals.PALETTE_PERIPH,
+        PSRAM_FB_BASE,
+        modeline.clone(),
+    );
+
     handler!(timer0 = || timer0_handler(&app));
 
     irq::scope(|s| {
@@ -267,6 +276,9 @@ fn main() -> ! {
         // Real-time work is done in the timer interrupt.
         //
 
+        let h_active = display.size().width;
+        let v_active = display.size().height;
+
         loop {
 
             //
@@ -280,17 +292,18 @@ fn main() -> ! {
             });
 
             if opts.beam.palette.value != last_palette || first {
-                opts.beam.palette.value.write_to_hardware(&mut video);
+                opts.beam.palette.value.write_to_hardware(&mut display);
                 last_palette = opts.beam.palette.value;
             }
 
             if draw_options {
-                draw::draw_options(&mut display, &opts, H_ACTIVE-175, V_ACTIVE/2-50, opts.beam.hue.value).ok();
-                draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, opts.beam.hue.value, UI_NAME, UI_SHA).ok();
+                draw::draw_options(&mut display, &opts, h_active-175, v_active/2-50, opts.beam.hue.value).ok();
+                draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.hue.value,
+                                &bootinfo.manifest.name, &bootinfo.manifest.sha, &modeline).ok();
             }
 
-            video.set_persist(opts.beam.persist.value);
-            video.set_decay(opts.beam.decay.value);
+            persist.set_persist(opts.beam.persist.value);
+            persist.set_decay(opts.beam.decay.value);
 
             unsafe {
                 vscope.hue().write(|w| w.hue().bits(opts.beam.hue.value+4));

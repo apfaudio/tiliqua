@@ -12,7 +12,7 @@ from amaranth.lib.wiring                         import In, Out, flipped, connec
 from amaranth_soc                                import csr
 
 from tiliqua                                     import dsp
-from tiliqua.raster                              import Stroke
+from tiliqua.raster_stroke                       import Stroke
 
 class VectorTracePeripheral(wiring.Component):
 
