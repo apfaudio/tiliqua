@@ -262,12 +262,7 @@ fn main() -> ! {
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
                               pac::Interrupt::TIMER0);
 
-        //
-        // Configure initial scope settings.
-        //
 
-        scope.en().write(|w| w.enable().bit(true) );
-        vscope.en().write(|w| w.enable().bit(false) );
         let mut first = true;
 
 
@@ -325,17 +320,24 @@ fn main() -> ! {
                 scope.ypos3().write(|w| w.ypos().bits(opts.scope.ypos3.value as u16));
             }
 
-            scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always) );
 
             if opts.tracker.page.value == Page::Vector {
-                scope.en().write(|w| w.enable().bit(false) );
-                vscope.en().write(|w| w.enable().bit(true) );
+                scope.flags().write(
+                    |w| w.enable().bit(false) );
+                vscope.flags().write(
+                    |w| { w.enable().bit(true);
+                          w.rotate_left().bit(modeline.rotate == Rotate::Left)
+                    } );
             }
 
-            if opts.tracker.page.value == Page::Scope {
-                scope.en().write(|w| w.enable().bit(true) );
-                vscope.en().write(|w| w.enable().bit(false) );
+            if opts.tracker.page.value == Page::Scope || first {
+                scope.flags().write(
+                    |w| { w.enable().bit(true);
+                          w.rotate_left().bit(modeline.rotate == Rotate::Left);
+                          w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always)
+                    } );
+                vscope.flags().write(
+                    |w| w.enable().bit(false) );
             }
 
             first = false;

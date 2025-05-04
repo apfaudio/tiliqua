@@ -173,14 +173,12 @@ class MacroOscSoc(TiliquaSoc):
 
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.psram_periph,
-            video_rotate_90=self.video_rotate_90)
+            bus_dma=self.psram_periph)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
         self.scope_periph = scope.ScopeTracePeripheral(
             fb=self.fb,
-            bus_dma=self.psram_periph,
-            video_rotate_90=self.video_rotate_90)
+            bus_dma=self.psram_periph)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
 
         self.audio_fifo = AudioFIFOPeripheral()
