@@ -64,9 +64,9 @@ from tiliqua                                     import psram_peripheral, i2c, e
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class TiliquaSoc(Component):
-    def __init__(self, *, firmware_bin_path, default_modeline, ui_name, ui_sha, platform_class, clock_settings,
-                 touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
-                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
+    def __init__(self, *, firmware_bin_path, ui_name, ui_sha, platform_class, clock_settings,
+                 touch=False, finalize_csr_bridge=True, poke_outputs=False, mainram_size=0x2000,
+                 fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
                  extra_cpu_regions=[]):
 
         super().__init__({})
@@ -79,8 +79,6 @@ class TiliquaSoc(Component):
         self.firmware_bin_path = firmware_bin_path
         self.touch = touch
         self.clock_settings = clock_settings
-        self.default_modeline = default_modeline
-        self.video_rotate_90 = video_rotate_90
 
         self.platform_class = platform_class
 
@@ -219,7 +217,7 @@ class TiliquaSoc(Component):
         # video PHY (DMAs from PSRAM starting at self.psram_base)
         self.fb = dma_framebuffer.DMAFramebuffer(
                 palette = self.palette_periph.palette,
-                fb_base_default=self.psram_base, fixed_modeline=default_modeline)
+                fb_base_default=self.psram_base)
         self.psram_periph.add_master(self.fb.bus)
 
         # Timing CSRs for video PHY
@@ -397,17 +395,12 @@ class TiliquaSoc(Component):
             f.write(f"pub const UI_SHA: &str             = \"{self.ui_sha}\";\n")
             f.write(f"pub const HW_REV_MAJOR: u32        = {self.platform_class.version_major};\n")
             f.write(f"pub const CLOCK_SYNC_HZ: u32       = {self.clock_settings.frequencies.sync};\n")
-            f.write(f"pub const CLOCK_FAST_HZ: u32       = {self.clock_settings.frequencies.fast};\n")
-            f.write(f"pub const CLOCK_DVI_HZ: u32        = {self.clock_settings.frequencies.dvi};\n")
             f.write(f"pub const CLOCK_AUDIO_HZ: u32      = {self.clock_settings.frequencies.audio};\n")
             f.write(f"pub const PSRAM_BASE: usize        = 0x{self.psram_base:x};\n")
             f.write(f"pub const PSRAM_SZ_BYTES: usize    = 0x{self.psram_size:x};\n")
             f.write(f"pub const PSRAM_SZ_WORDS: usize    = PSRAM_SZ_BYTES / 4;\n")
             f.write(f"pub const SPIFLASH_BASE: usize     = 0x{self.spiflash_base:x};\n")
             f.write(f"pub const SPIFLASH_SZ_BYTES: usize = 0x{self.spiflash_size:x};\n")
-            f.write(f"pub const H_ACTIVE: u32            = {self.fb.fixed_modeline.h_active};\n")
-            f.write(f"pub const V_ACTIVE: u32            = {self.fb.fixed_modeline.v_active};\n")
-            f.write(f"pub const VIDEO_ROTATE_90: bool    = {'true' if self.video_rotate_90 else 'false'};\n")
             f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base.init:x};\n")
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")
             f.write(f"pub const BOOTINFO_SZ_BYTES: usize = 4096;\n")
