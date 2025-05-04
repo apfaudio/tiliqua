@@ -17,6 +17,7 @@ micromath = "2.1.0"
 fixed = "1.28.0"
 midi-types = "0.1.7"
 tiliqua-hal = { path="../hal", default-features = false }
+tiliqua-manifest = { path="../manifest" }
 opts = { path="../opts" }
 embedded-hal = "=1.0.0"
 
