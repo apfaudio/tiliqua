@@ -73,11 +73,9 @@ class DMAFramebuffer(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        """
         if self.fixed_modeline is not None:
             for member in self.timings.signature.members:
                 m.d.comb += getattr(self.timings, member).eq(getattr(self.fixed_modeline, member))
-        """
 
         m.submodules.fifo = fifo = AsyncFIFOBuffered(
                 width=32, depth=self.fifo_depth, r_domain='dvi', w_domain='sync')
