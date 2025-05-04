@@ -410,8 +410,8 @@ class TiliquaSoc(Component):
             f.write(f"pub const VIDEO_ROTATE_90: bool    = {'true' if self.video_rotate_90 else 'false'};\n")
             f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base.init:x};\n")
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")
-            f.write(f"pub const MANIFEST_BASE: usize     = SPIFLASH_BASE + SPIFLASH_SZ_BYTES - 4096;\n")
-            f.write(f"pub const MANIFEST_SZ_BYTES: usize = 4096;\n")
+            f.write(f"pub const BOOTINFO_SZ_BYTES: usize = 4096;\n")
+            f.write(f"pub const BOOTINFO_BASE: usize     = PSRAM_BASE + PSRAM_SZ_BYTES - BOOTINFO_SZ_BYTES;\n")
             f.write("// Extra constants specified by an SoC subclass:\n")
             for l in self.extra_rust_constants:
                 f.write(l)

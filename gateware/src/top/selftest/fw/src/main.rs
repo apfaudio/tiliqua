@@ -27,15 +27,19 @@ use pac::constants::*;
 use tiliqua_lib::draw;
 use tiliqua_lib::calibration::*;
 use tiliqua_fw::options::*;
-use tiliqua_hal::video::Video;
 use tiliqua_hal::pmod::EurorackPmod;
+use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pca9635::Pca9635Driver;
+use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 
 const TUSB322I_ADDR:  u8 = 0x47;
 
 pub type ReportString = String<512>;
 
-tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
+tiliqua_hal::impl_dma_framebuffer! {
+    DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
+    Palette0: tiliqua_pac::PALETTE_PERIPH,
+}
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
@@ -393,9 +397,14 @@ fn main() -> ! {
 
     let sysclk = pac::clock::sysclk();
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
-    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
+    let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
 
     info!("Hello from Tiliqua selftest!");
+
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
+    bootinfo.manifest.print();
+    info!("bootinfo modeline {:?}", bootinfo.modeline);
+    let modeline = bootinfo.modeline;
 
     let mut i2cdev = I2c0::new(peripherals.I2C0);
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
@@ -413,13 +422,6 @@ fn main() -> ! {
     timer.disable();
     timer.delay_ns(0);
 
-    let mut display = DMADisplay {
-        framebuffer_base: PSRAM_FB_BASE as *mut u32,
-    };
-
-    palette::ColorPalette::default().write_to_hardware(&mut video);
-    video.set_persist(128);
-
     let mut opts = Opts::default();
 
     if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
@@ -434,21 +436,34 @@ fn main() -> ! {
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 10;
 
+    let mut display = DMAFramebuffer0::new(
+        peripherals.FRAMEBUFFER_PERIPH,
+        peripherals.PALETTE_PERIPH,
+        PSRAM_FB_BASE,
+        modeline.clone(),
+    );
+
     handler!(timer0 = || timer0_handler(&app));
 
     let psram = peripherals.PSRAM_CSR;
 
-    let mut last_hpd = video.get_hpd();
+    let mut last_hpd = display.get_hpd();
 
     irq::scope(|s| {
+
+        palette::ColorPalette::default().write_to_hardware(&mut display);
+        persist.set_persist(128);
 
         s.register(handlers::Interrupt::TIMER0, timer0);
 
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
                               pac::Interrupt::TIMER0);
 
+        let h_active = display.size().width;
+        let v_active = display.size().height;
+
         loop {
-            let dvi_hpd = video.get_hpd();
+            let dvi_hpd = display.get_hpd();
             if last_hpd != dvi_hpd {
                 info!("dvi_hpd: display hotplug! new state: {}", dvi_hpd);
                 last_hpd = dvi_hpd;
@@ -468,9 +483,10 @@ fn main() -> ! {
 
             let stimulus_raw = 4000 * opts.autocal.volts.value as i16;
 
-            draw::draw_options(&mut display, &opts, H_ACTIVE/2-30, 70,
+            draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                hue).ok();
-            draw::draw_name(&mut display, H_ACTIVE/2, 30, hue, UI_NAME, UI_SHA).ok();
+            draw::draw_name(&mut display, h_active/2, 30, hue,
+                            &bootinfo.manifest.name, &bootinfo.manifest.sha, &modeline).ok();
 
             if opts.tracker.page.value == Page::Report {
                 let mut status_report = ReportString::new();
@@ -485,7 +501,7 @@ fn main() -> ! {
                         ("[status report]", &status_report)
                     }
                 };
-                draw::draw_tiliqua(&mut display, H_ACTIVE/2-80, V_ACTIVE/2-200, hue,
+                draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-200, hue,
                     [
                     //  "touch  jack "
                         "-      adc0 ",
@@ -551,16 +567,16 @@ fn main() -> ! {
             constants.write_to_pmod(&mut pmod);
 
             if opts.tracker.page.value != Page::Report {
-                draw::draw_cal(&mut display, H_ACTIVE/2-128, V_ACTIVE/2-128, hue,
+                draw::draw_cal(&mut display, h_active/2-128, v_active/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
                                &pmod.sample_i()).ok();
                 draw::draw_cal_constants(
-                    &mut display, H_ACTIVE/2-128, V_ACTIVE/2+64, hue,
+                    &mut display, h_active/2-128, v_active/2+64, hue,
                     &constants.adc_scale, &constants.adc_zero, &constants.dac_scale, &constants.dac_zero).ok();
 
                 if commit_to_eeprom {
                     constants.write_to_eeprom(&mut i2cdev1);
-                    draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE/2+64, hue, &"SAVED", &"").ok();
+                    //draw::draw_name(&mut display, h_active/2, v_active/2+64, hue, &"SAVED", &"").ok();
                 }
             }
 

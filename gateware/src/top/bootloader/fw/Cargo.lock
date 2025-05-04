@@ -441,6 +441,7 @@ dependencies = [
  "strum",
  "strum_macros 0.26.4",
  "tiliqua-hal",
+ "tiliqua-manifest",
 ]
 
 [[package]]

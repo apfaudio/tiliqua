@@ -62,11 +62,12 @@ struct App {
     time_since_reboot_requested: u32,
     manifests: [Option<BitstreamManifest>; N_MANIFESTS],
     animation_elapsed_ms: u32,
+    modeline: DVIModeline,
 }
 
 impl App {
     pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
-               pll: Option<Si5351Device<I2c0>>) -> Self {
+               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -81,6 +82,7 @@ impl App {
             time_since_reboot_requested: 0u32,
             manifests,
             animation_elapsed_ms: 0u32,
+            modeline,
         }
     }
 
@@ -317,9 +319,17 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         if manifest.hw_rev != HW_REV_MAJOR {
                             Err(BitstreamError::HwVersionMismatch)?;
                         }
+                        // Populate BootInfo at the end of PSRAM
+                        let bootinfo = bootinfo::BootInfo {
+                            manifest: manifest.clone(),
+                            modeline: app.modeline.clone(),
+                        };
+                        unsafe { bootinfo.to_addr(BOOTINFO_BASE) };
                         for region in &manifest.regions {
                             copy_spiflash_region_to_psram(region)?;
                         }
+                        riscv::asm::fence();
+                        riscv::asm::fence_i();
                         if let Some(pll_config) = manifest.external_pll_config.clone() {
                             if let Some(ref mut pll) = app.pll {
                                 configure_external_pll(&pll_config, pll).or(
@@ -595,8 +605,9 @@ fn main() -> ! {
     opts.boot.slot6.value = names[6].clone();
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
+
     let app = Mutex::new(RefCell::new(
-            App::new(opts, manifests.clone(), maybe_external_pll)));
+            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone())));
 
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
@@ -627,10 +638,10 @@ fn main() -> ! {
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
                               pac::Interrupt::TIMER0);
 
-        loop {
+        let h_active = display.size().width;
+        let v_active = display.size().height;
 
-            let h_active = display.size().width;
-            let v_active = display.size().height;
+        loop {
 
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
