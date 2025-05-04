@@ -45,18 +45,11 @@ class Stroke(wiring.Component):
 
 
     def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=4,
-                 default_hue=10, default_x=0, default_y=0, video_rotate_90=False):
-
-        self.rotate_90 = video_rotate_90
+                 default_hue=10, default_x=0, default_y=0):
 
         self.fb = fb
         self.fs = fs
         self.n_upsample = n_upsample
-
-        self.sample_x = Signal(signed(16))
-        self.sample_y = Signal(signed(16))
-        self.sample_p = Signal(signed(16)) # intensity modulation TODO
-        self.sample_c = Signal(signed(16)) # color modulation DONE
 
         self.hue       = Signal(4, init=default_hue);
         self.intensity = Signal(4, init=8);
@@ -72,6 +65,8 @@ class Stroke(wiring.Component):
             # Point stream to render
             # 4 channels: x, y, intensity, color
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            # Rotate all draws 90 degrees to the left (screen_rotation)
+            "rotate_left": In(1),
             # We are a DMA master (no burst support)
             "bus":  Out(wishbone.Signature(addr_width=fb.bus.addr_width, data_width=32, granularity=8)),
             # Kick this to start the core
@@ -86,11 +81,6 @@ class Stroke(wiring.Component):
 
         fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
         fb_hwords = ((self.fb.timings.h_active*self.fb.bytes_per_pixel)//4)
-
-        sample_x = self.sample_x
-        sample_y = self.sample_y
-        sample_p = self.sample_p
-        sample_c = self.sample_c
 
         point_stream = None
         if self.n_upsample is not None and self.n_upsample != 1:
@@ -130,15 +120,21 @@ class Stroke(wiring.Component):
         subpix_shift = Signal(unsigned(6))
         pixel_offs = Signal(unsigned(32))
 
+        # last sample
+        sample_x = Signal(signed(16))
+        sample_y = Signal(signed(16))
+        sample_p = Signal(signed(16)) # intensity modulation TODO
+        sample_c = Signal(signed(16)) # color modulation DONE
+
         m.d.comb += pixel_offs.eq(y_offs*fb_hwords + x_offs),
-        if self.rotate_90:
+        with m.If(self.rotate_left):
             # remap pixel offset for 90deg rotation
             m.d.comb += [
                 subpix_shift.eq((-sample_y)[0:2]*8),
                 x_offs.eq((fb_hwords//2) + ((-sample_y)>>2)),
                 y_offs.eq(sample_x + (self.fb.timings.v_active>>1)),
             ]
-        else:
+        with m.Else():
             m.d.comb += [
                 subpix_shift.eq(sample_x[0:2]*8),
                 x_offs.eq((fb_hwords//2) + (sample_x>>2)),
