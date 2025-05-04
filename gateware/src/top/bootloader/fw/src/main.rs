@@ -331,6 +331,12 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         riscv::asm::fence();
                         riscv::asm::fence_i();
                         if let Some(pll_config) = manifest.external_pll_config.clone() {
+                            // HACK
+                            let pll_config = ExternalPLLConfig {
+                                clk0_hz: pll_config.clk0_hz,
+                                clk1_hz: Some((bootinfo.modeline.pixel_clk_mhz * 1e6f32) as u32),
+                                spread_spectrum: pll_config.spread_spectrum,
+                            };
                             if let Some(ref mut pll) = app.pll {
                                 configure_external_pll(&pll_config, pll).or(
                                     Err(BitstreamError::PllI2cError))?;
