@@ -28,9 +28,6 @@ class ClockSettings:
     modeline: Optional[DVIModeline]
     frequencies: ClockFrequencies
 
-class DynamicModeline:
-    pass
-
 def clock_settings(audio_clock: AudioClock, modeline) -> ClockSettings:
 
     """
@@ -47,10 +44,7 @@ def clock_settings(audio_clock: AudioClock, modeline) -> ClockSettings:
     )
     frequencies.audio = audio_clock.mclk()
 
-    if isinstance(modeline, DynamicModeline):
-        frequencies.dvi = "<1x dynamic>"
-        frequencies.dvi5x = "<5x dynamic>"
-    elif isinstance(modeline, DVIModeline):
+    if modeline is not None:
         frequencies.dvi = int(modeline.pixel_clk_mhz*1_000_000)
         frequencies.dvi5x = 5*int(modeline.pixel_clk_mhz*1_000_000)
 
@@ -246,8 +240,8 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
 
     clock_tree_video = """
     │                            └>[clk1]───>[ECP5 PLL]─┐                         │
-    │                                      ┊            ├─>[dvi]    <dynamic> MHz │
-    │                                      ┊            └─>[dvi5x]  <dynamic> MHz │
+    │                                      ┊            ├─>[dvi]  {dvi:11.4f} MHz │ (dynamic)
+    │                                      ┊            └─>[dvi5x]{dvi5x:11.4f} MHz │ (dynamic)
     └─────────────────────────────────────────────────────────────────────────────┘"""
     clock_tree_no_video = """
     │                            └>[clk1]─────────────────>[disable]              │
@@ -264,7 +258,10 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             audio=self.settings.frequencies.audio/1e6,
             ))
         if self.settings.frequencies.dvi is not None:
-            print(textwrap.dedent(self.clock_tree_video[1:]))
+            print(textwrap.dedent(self.clock_tree_video[1:]).format(
+                dvi=self.settings.frequencies.dvi/1e6,
+                dvi5x=self.settings.frequencies.dvi5x/1e6,
+                ))
         else:
             print(textwrap.dedent(self.clock_tree_no_video[1:]))
 
@@ -374,7 +371,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
 
-            locked_dvi   = Signal()
+            locked_dvi = Signal()
             m.submodules.pll_dvi = create_dynamic_dvi_pll(reset, locked_dvi)
 
             m.d.comb += [
@@ -503,14 +500,7 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
 
         # Video PLL and derived signals
 
-        if isinstance(self.settings.modeline, DynamicModeline):
-
-            raise ValueError(
-                f"Modeline is '{self.settings.modeline}' but this platform does not "
-                 "have an external PLL for dynamic clocking. Append an argument like "
-                 "'--fixed-modeline=1280x720p60' to select a fixed modeline.")
-
-        if isinstance(self.settings.modeline, DVIModeline):
+        if self.settings.modeline is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
@@ -631,14 +621,7 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
                 a_LPF_RESISTOR="8"
         )
 
-        if isinstance(self.settings.modeline, DynamicModeline):
-
-            raise ValueError(
-                f"Modeline is '{self.settings.modeline}' but this platform does not "
-                 "have an external PLL for dynamic clocking. Append an argument like "
-                 "'--fixed-modeline=1280x720p60' to select a fixed modeline.")
-
-        if isinstance(self.settings.modeline, DVIModeline):
+        if self.settings.modeline is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()

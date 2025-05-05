@@ -46,10 +46,8 @@ class DMAFramebuffer(wiring.Component):
             })
 
     def __init__(self, *, palette, fb_base_default=0, addr_width=22,
-                 fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128,
-                 fixed_modeline: DVIModeline = None):
+                 fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128):
 
-        self.fixed_modeline = fixed_modeline
         self.fifo_depth = fifo_depth
         self.bytes_per_pixel = bytes_per_pixel
         self.burst_threshold_words = burst_threshold_words
@@ -72,10 +70,6 @@ class DMAFramebuffer(wiring.Component):
 
     def elaborate(self, platform) -> Module:
         m = Module()
-
-        if self.fixed_modeline is not None:
-            for member in self.timings.signature.members:
-                m.d.comb += getattr(self.timings, member).eq(getattr(self.fixed_modeline, member))
 
         m.submodules.fifo = fifo = AsyncFIFOBuffered(
                 width=32, depth=self.fifo_depth, r_domain='dvi', w_domain='sync')
