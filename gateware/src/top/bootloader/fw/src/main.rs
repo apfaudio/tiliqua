@@ -309,7 +309,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         if let Some(n) = app.reboot_n {
             app.time_since_reboot_requested += TIMER0_ISR_PERIOD_MS;
             // Give codec time to mute and display time to draw 'REBOOTING'
-            if app.time_since_reboot_requested > 500 {
+            if app.time_since_reboot_requested > 250 {
                 // Is there a firmware image to copy to PSRAM before we switch bitstreams?
                 let error = if let Some(manifest) = &app.manifests[n].clone() {
                     || -> Result<(), BitstreamError> {

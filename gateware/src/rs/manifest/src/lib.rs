@@ -87,12 +87,9 @@ impl BitstreamManifest {
         match manifest_de {
             Ok((contents, _rest)) => {
                 info!("BitstreamManifest: parse OK");
-                contents.print();
                 Some(contents)
             }
             Err(err) => {
-                info!("BitstreamManifest: parse failed with {:?}", err);
-                info!("BitstreamManifest: bad or nonexisting manifest");
                 None
             }
         }
