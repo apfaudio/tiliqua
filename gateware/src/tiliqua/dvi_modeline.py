@@ -112,8 +112,8 @@ class DVIModeline:
 
             # BEGIN ODDBALL TIMINGS
 
-            # A round AliExpress display
-            "720x720p60": DVIModeline(
+            # Tiliqua screen (early proto)
+            "720x720p60proto1": DVIModeline(
                 h_active      = 720,
                 h_sync_start  = 760,
                 h_sync_end    = 780,
@@ -125,6 +125,21 @@ class DVIModeline:
                 v_total       = 760,
                 v_sync_invert = False,
                 pixel_clk_mhz = 37.40,
+            ),
+
+            # Tiliqua screen (production version)
+            "720x720p60r2": DVIModeline(
+                h_active      = 720,
+                h_sync_start  = 760,
+                h_sync_end    = 768,
+                h_total       = 812,
+                h_sync_invert = True,
+                v_active      = 720,
+                v_sync_start  = 770,
+                v_sync_end    = 786,
+                v_total       = 802,
+                v_sync_invert = True,
+                pixel_clk_mhz = 39.07,
             ),
         }
 
