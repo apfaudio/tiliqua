@@ -85,6 +85,28 @@ class Stripes(wiring.Component):
 
         return m
 
+class SillyScope(wiring.Component):
+
+    i: In(BeamRaceInputs())
+    o: Out(BeamRaceOutputs())
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        dist = Signal(16)
+        m.d.comb += dist.eq(abs((self.i.audio_in0 >> 7) - (self.i.x - 360)))
+        m.d.comb += self.o.g.eq(self.i.audio_in1 >> 8)
+        m.d.comb += self.o.r.eq(0xff ^ self.i.audio_in1 ^ 0xDE)
+        with m.If(dist < 10):
+            m.d.comb += [
+                self.o.b.eq(0xff),
+                self.o.g.eq(self.i.audio_in0 << 8),
+                self.o.r.eq(self.i.audio_in0 ^ 0xDE),
+            ]
+
+        return m
+
 class Balls(wiring.Component):
 
     """
@@ -298,7 +320,7 @@ class BeamRaceTop(Elaboratable):
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
         self.dvi_tgen = dvi.DVITimingGen()
-        self.core = DomainRenamer("dvi")(Stripes())
+        self.core = DomainRenamer("dvi")(SillyScope())
 
         super().__init__()
 
