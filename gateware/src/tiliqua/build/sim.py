@@ -158,6 +158,15 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
            "-CFLAGS", f"-DDVI_V_ACTIVE={dvi_v_active}",
            "-CFLAGS", f"-DDVI_CLK_HZ={dvi_clk_hz}",
         ]
+    elif hasattr(fragment, "dvi_tgen"):
+        dvi_clk_hz = clock_settings.frequencies.dvi
+        dvi_h_active = fragment.fixed_modeline.h_active
+        dvi_v_active = fragment.fixed_modeline.v_active
+        video_cflags = [
+           "-CFLAGS", f"-DDVI_H_ACTIVE={dvi_h_active}",
+           "-CFLAGS", f"-DDVI_V_ACTIVE={dvi_v_active}",
+           "-CFLAGS", f"-DDVI_CLK_HZ={dvi_clk_hz}",
+        ]
     else:
         video_cflags = []
 
