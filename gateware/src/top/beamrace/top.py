@@ -269,9 +269,9 @@ class Checkers(wiring.Component):
         color_de = Signal(6)
 
         m.d.sync += [
-            color_a.eq(0x3F),  # Example color 0x3F = 0b111111
-            color_b.eq(color_a ^ 0b001010),
-            color_c.eq(color_b & 0b101010),
+            color_a.eq(0x3F + (self.i.audio_in1>>8)),  # Example color 0x3F = 0b111111
+            color_b.eq(color_a ^ 0b001010 ^ (self.i.audio_in2>>8)),
+            color_c.eq(color_b & 0b101010 + (self.i.audio_in3>>8)),
             color_de.eq(color_c >> 1)
         ]
 
@@ -285,7 +285,7 @@ class Checkers(wiring.Component):
         with m.Elif(layer_b):
             m.d.sync += [
                 self.o.r.eq(Cat(C(0, 6), color_b[1], color_b[0])),
-                self.o.g.eq(Cat(C(0, 6), color_b[3], color_b[2])),
+                self.o.g.eq((self.i.audio_in1>>8)),
                 self.o.b.eq(Cat(C(0, 6), color_b[5], color_b[4]))
             ]
         with m.Elif(layer_c):
@@ -320,7 +320,7 @@ class BeamRaceTop(Elaboratable):
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
         self.dvi_tgen = dvi.DVITimingGen()
-        self.core = DomainRenamer("dvi")(SillyScope())
+        self.core = DomainRenamer("dvi")(Checkers())
 
         super().__init__()
 
