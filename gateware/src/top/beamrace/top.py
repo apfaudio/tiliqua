@@ -22,7 +22,6 @@ from amaranth_soc             import wishbone
 from tiliqua.tiliqua_platform import *
 from tiliqua                  import eurorack_pmod, dsp, sim, dvi
 from tiliqua.eurorack_pmod    import ASQ
-from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
 from tiliqua.sim              import FakeTiliquaDomainGenerator
 
@@ -298,35 +297,38 @@ class BeamRaceTop(Elaboratable):
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
+        self.dvi_tgen = dvi.DVITimingGen()
+        self.core = DomainRenamer("dvi")(Stripes())
+
         super().__init__()
 
     def elaborate(self, platform):
 
         m = Module()
 
-        m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
-        m.submodules.reboot = reboot = RebootProvider(self.clock_settings.frequencies.sync)
-        m.submodules.btn = FFSynchronizer(
-                platform.request("encoder").s.i, reboot.button)
-        m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
-        wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
-        m.d.comb += self.pmod0.codec_mute.eq(reboot.mute)
+        if sim.is_hw(platform):
+            m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
+            m.submodules.reboot = reboot = RebootProvider(self.clock_settings.frequencies.sync)
+            m.submodules.btn = FFSynchronizer(
+                    platform.request("encoder").s.i, reboot.button)
+            m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
+            wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
+            m.d.comb += self.pmod0.codec_mute.eq(reboot.mute)
+        else:
+            m.submodules.car = FakeTiliquaDomainGenerator()
 
         m.submodules.pmod0 = pmod0 = self.pmod0
 
         wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
 
-        m.submodules.dvi_tgen = dvi_tgen = dvi.DVITimingGen()
+        m.submodules.dvi_tgen = dvi_tgen = self.dvi_tgen
 
         if self.fixed_modeline is not None:
             for member in dvi_tgen.timings.signature.members:
                 m.d.comb += getattr(dvi_tgen.timings, member).eq(getattr(self.fixed_modeline, member))
 
-        # Instantiate the DVI PHY itself
-        m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
-
         # Instantiate the beamracer core
-        m.submodules.core = core = DomainRenamer("dvi")(Stripes())
+        m.submodules.core = core = self.core
         for ch in range(4):
             m.submodules += FFSynchronizer(
                     i=pmod0.o_cal.payload[ch].as_value(), o=getattr(core.i, f"audio_in{ch}"), o_domain="dvi")
@@ -341,20 +343,44 @@ class BeamRaceTop(Elaboratable):
         ]
 
         # Hook up the DVI PHY
-        m.d.dvi += [
-            dvi_gen.de.eq(dvi_tgen.ctrl_phy.de),
-            dvi_gen.data_in_ch0.eq(core.o.b),
-            dvi_gen.data_in_ch1.eq(core.o.g),
-            dvi_gen.data_in_ch2.eq(core.o.r),
-            dvi_gen.ctrl_in_ch0.eq(Cat(dvi_tgen.ctrl_phy.hsync, dvi_tgen.ctrl_phy.vsync)),
-            dvi_gen.ctrl_in_ch1.eq(0),
-            dvi_gen.ctrl_in_ch2.eq(0),
-        ]
+        if sim.is_hw(platform):
+            m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
+            m.d.dvi += [
+                dvi_gen.de.eq(dvi_tgen.ctrl_phy.de),
+                dvi_gen.data_in_ch0.eq(core.o.b),
+                dvi_gen.data_in_ch1.eq(core.o.g),
+                dvi_gen.data_in_ch2.eq(core.o.r),
+                dvi_gen.ctrl_in_ch0.eq(Cat(dvi_tgen.ctrl_phy.hsync, dvi_tgen.ctrl_phy.vsync)),
+                dvi_gen.ctrl_in_ch1.eq(0),
+                dvi_gen.ctrl_in_ch2.eq(0),
+            ]
 
         return m
+
+def simulation_ports(fragment):
+    return {
+        "clk_sync":       (ClockSignal("sync"),              None),
+        "rst_sync":       (ResetSignal("sync"),              None),
+        "clk_dvi":        (ClockSignal("dvi"),               None),
+        "rst_dvi":        (ResetSignal("dvi"),               None),
+        "clk_audio":      (ClockSignal("audio"),             None),
+        "rst_audio":      (ResetSignal("audio"),             None),
+        "i2s_sdin1":      (fragment.pmod0.pins.i2s.sdin1,    None),
+        "i2s_sdout1":     (fragment.pmod0.pins.i2s.sdout1,   None),
+        "i2s_lrck":       (fragment.pmod0.pins.i2s.lrck,     None),
+        "i2s_bick":       (fragment.pmod0.pins.i2s.bick,     None),
+        "dvi_de":         (fragment.dvi_tgen.ctrl_phy.de,    None),
+        "dvi_vsync":      (fragment.dvi_tgen.ctrl_phy.vsync, None),
+        "dvi_hsync":      (fragment.dvi_tgen.ctrl_phy.hsync, None),
+        "dvi_r":          (fragment.core.o.r,                None),
+        "dvi_g":          (fragment.core.o.g,                None),
+        "dvi_b":          (fragment.core.o.b,                None),
+    }
 
 if __name__ == "__main__":
     this_path = os.path.dirname(os.path.realpath(__file__))
     top_level_cli(
         BeamRaceTop,
+        sim_ports=simulation_ports,
+        sim_harness="../../src/top/beamrace/sim.cpp",
     )
