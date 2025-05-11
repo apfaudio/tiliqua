@@ -37,6 +37,8 @@ use hal::pca9635::Pca9635Driver;
 use hal::dma_framebuffer::{Rotate, DVIModeline};
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
+pub const PIXEL_CLK_MIN_KHZ: u32 = 24_000u32;
+pub const PIXEL_CLK_MAX_KHZ: u32 = CLOCK_DVI_HZ / 1000u32;
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
@@ -464,7 +466,7 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
     for descriptor in edid.descriptors.iter() {
         if let edid::Descriptor::DetailedTiming(desc) = descriptor {
             info!("video/edid: checking detailed timing descriptor, contents: {:?}", descriptor);
-            if desc.pixel_clock_khz < 24_000u32 || desc.pixel_clock_khz > 100_000u32 {
+            if desc.pixel_clock_khz < PIXEL_CLK_MIN_KHZ || desc.pixel_clock_khz > PIXEL_CLK_MAX_KHZ {
                 warn!("video/edid: skip descriptor (out-of-range pixel clock)");
                 continue;
             }

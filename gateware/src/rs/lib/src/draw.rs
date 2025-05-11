@@ -211,10 +211,17 @@ where
     ).draw(d)?;
 
     let mut modeline_text: String<32> = String::new();
-    write!(modeline_text, "{}/{}x{}@{:.1}Hz\r\n",
-           sha,
-           modeline.h_active, modeline.v_active, modeline.refresh_rate()
-           ).ok();
+    if modeline.fixed() {
+        // Fixed modeline doesn't have all the info needed to calculate refresh rate.
+        write!(modeline_text, "{}/{}x{}(fxd)\r\n",
+               sha, modeline.h_active, modeline.v_active
+               ).ok();
+    } else {
+        write!(modeline_text, "{}/{}x{}@{:.1}Hz\r\n",
+               sha,
+               modeline.h_active, modeline.v_active, modeline.refresh_rate()
+               ).ok();
+    }
 
     Text::with_alignment(
         &modeline_text,

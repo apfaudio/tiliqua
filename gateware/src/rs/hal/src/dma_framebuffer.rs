@@ -24,6 +24,10 @@ impl DVIModeline {
     pub fn refresh_rate(&self) -> f32 {
         1e6f32 * self.pixel_clk_mhz / (self.h_total as u32 * self.v_total as u32) as f32
     }
+
+    pub fn fixed(&self) -> bool {
+        self.v_total == 0
+    }
 }
 
 impl Default for DVIModeline {
