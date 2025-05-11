@@ -142,14 +142,22 @@ def top_level_cli(
 
     audio_clock = platform_class.default_audio_clock
     if video_core:
-        modelines = dvi_modeline.DVIModeline.all_timings()
-        assert args.modeline in modelines, f"error: fixed modeline must be one of {modelines.keys()}"
-        kwargs["clock_settings"] = tiliqua_pll.clock_settings(
-            audio_clock.to_192khz() if args.fs_192khz else audio_clock,
-            modeline=modelines[args.modeline])
+        if hasattr(args, 'dynamic_modeline') and args.dynamic_modeline:
+            kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
+                audio_clock.to_192khz() if args.fs_192khz else audio_clock,
+                dynamic_modeline=True,
+                modeline=None)
+        else:
+            modelines = dvi_modeline.DVIModeline.all_timings()
+            assert args.modeline in modelines, f"error: fixed modeline must be one of {modelines.keys()}"
+            kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
+                audio_clock.to_192khz() if args.fs_192khz else audio_clock,
+                dynamic_modeline=False,
+                modeline=modelines[args.modeline])
     else:
-        kwargs["clock_settings"] = tiliqua_pll.clock_settings(
+        kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
             audio_clock.to_192khz() if args.fs_192khz else audio_clock,
+            dynamic_modeline=False,
             modeline=None)
 
     build_path = os.path.abspath(os.path.join(
@@ -201,17 +209,20 @@ def top_level_cli(
         video="<none>"
     )
 
+    if video_core:
+        archiver.video ="<dynamic>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
+
+    if (kwargs["clock_settings"].dynamic_modeline and
+        hw_platform.clock_domain_generator != tiliqua_pll.TiliquaDomainGeneratorPLLExternal):
+        raise ValueError(
+            "Cannot use --dynamic-modeline on a platform without an external PLL (older than "
+            "Tiliqua R4 hardware). Use --modeline instead.")
+
     if hw_platform.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal:
-        dvi_clock = kwargs["clock_settings"].frequencies.dvi
         archiver.external_pll_config = ExternalPLLConfig(
             clk0_hz=kwargs["clock_settings"].frequencies.audio,
-            clk1_hz=dvi_clock,
+            clk1_hz=kwargs["clock_settings"].frequencies.dvi,
             spread_spectrum=0.01)
-        if video_core:
-            archiver.video ="<dynamic>"
-    else:
-        if video_core:
-            archiver.video = args.modeline
 
     def maybe_flash_firmware(args, kwargs, force_flash=False):
         """Handle `--flash` option where it is supported (at the moment, only XiP)."""

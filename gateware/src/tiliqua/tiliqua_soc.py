@@ -216,8 +216,9 @@ class TiliquaSoc(Component):
 
         # video PHY (DMAs from PSRAM starting at self.psram_base)
         self.fb = dma_framebuffer.DMAFramebuffer(
-                palette = self.palette_periph.palette,
-                fb_base_default=self.psram_base)
+                palette=self.palette_periph.palette,
+                fb_base_default=self.psram_base,
+                fixed_modeline=self.clock_settings.modeline)
         self.psram_periph.add_master(self.fb.bus)
 
         # Timing CSRs for video PHY
@@ -396,6 +397,12 @@ class TiliquaSoc(Component):
             f.write(f"pub const HW_REV_MAJOR: u32        = {self.platform_class.version_major};\n")
             f.write(f"pub const CLOCK_SYNC_HZ: u32       = {self.clock_settings.frequencies.sync};\n")
             f.write(f"pub const CLOCK_AUDIO_HZ: u32      = {self.clock_settings.frequencies.audio};\n")
+            f.write(f"pub const CLOCK_DVI_HZ: u32        = {self.clock_settings.frequencies.dvi};\n")
+            if self.clock_settings.dynamic_modeline:
+                f.write(f"pub const FIXED_MODELINE: Option<(u16, u16)> = None;\n")
+            else:
+                f.write("pub const FIXED_MODELINE: Option<(u16, u16)> = Some(("
+                        f"{self.fb.fixed_modeline.h_active}, {self.fb.fixed_modeline.v_active}));")
             f.write(f"pub const PSRAM_BASE: usize        = 0x{self.psram_base:x};\n")
             f.write(f"pub const PSRAM_SZ_BYTES: usize    = 0x{self.psram_size:x};\n")
             f.write(f"pub const PSRAM_SZ_WORDS: usize    = PSRAM_SZ_BYTES / 4;\n")

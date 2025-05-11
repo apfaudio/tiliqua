@@ -46,6 +46,9 @@ class DVIModeline:
     def refresh_rate(self):
         return (self.pixel_clk_mhz*1e6)/(self.h_total * self.v_total)
 
+    def __str__(self):
+        return f"{self.h_active}x{self.v_active}p{self.refresh_rate:.2f}"
+
     @staticmethod
     def all_timings():
         return {

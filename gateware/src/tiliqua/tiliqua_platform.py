@@ -293,7 +293,8 @@ class _TiliquaR4Mobo:
         # External PLL (SI5351A) clock inputs.
         # Clock frequencies are dynamic, so set them to the maximum expected settings in each domain.
         Resource("expll_clk0", 0, Pins("44", dir="i", conn=("m2", 0)), Clock(49.152e6), Attrs(IO_TYPE="LVCMOS33")),
-        Resource("expll_clk1", 0, Pins("40", dir="i", conn=("m2", 0)), Clock(74.250e6), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("expll_clk1", 0, Pins("40", dir="i", conn=("m2", 0)),
+                 Clock(tiliqua_pll.PCLK_FMAX_DYNAMIC), Attrs(IO_TYPE="LVCMOS33")),
 
         # Quadrature rotary encoder and switch. These are already debounced by an RC filter.
         Resource("encoder", 0,

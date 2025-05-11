@@ -512,12 +512,37 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
 }
 
 fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
-    match read_edid(i2cdev) {
-        Ok(edid) => match modeline_from_edid(edid) {
-            Some(edid_modeline) => edid_modeline,
+    if let Some((h_active, v_active)) = FIXED_MODELINE {
+        warn!("video: using static video mode from bitstream");
+        // 'fake' modeline for static video modes, enough for the rust firmware
+        // to be happy but not enough to actually configure the timing generator
+        // (this is done in gateware in static timing modes).
+        let rotate = match (h_active, v_active) {
+            (720, 720) => Rotate::Left, // ... XXX hack for round screen :)
+            _ => Rotate::Normal
+        };
+        DVIModeline {
+            h_active      : h_active,
+            h_sync_start  : 0,
+            h_sync_end    : 0,
+            h_total       : 0,
+            h_sync_invert : false,
+            v_active      : v_active,
+            v_sync_start  : 0,
+            v_sync_end    : 0,
+            v_total       : 0,
+            v_sync_invert : false,
+            pixel_clk_mhz : (CLOCK_DVI_HZ as f32) / 1e6f32,
+            rotate        : rotate
+        }
+    } else {
+        match read_edid(i2cdev) {
+            Ok(edid) => match modeline_from_edid(edid) {
+                Some(edid_modeline) => edid_modeline,
+                _ => DVIModeline::default()
+            }
             _ => DVIModeline::default()
         }
-        _ => DVIModeline::default()
     }
 }
 

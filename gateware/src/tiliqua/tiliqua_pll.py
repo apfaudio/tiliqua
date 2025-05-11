@@ -14,6 +14,11 @@ from tiliqua.dvi_modeline import DVIModeline, DVIPLL
 from dataclasses          import dataclass
 from typing               import List, Optional
 
+# Maximum allowed pixel clock that may be set by external PLL when `dynamic_modeline`
+# is used. Synthesis is performed using this frequency as a constraint, even if
+# the true frequency determined at runtime may be lower.
+PCLK_FMAX_DYNAMIC = 74250000
+
 @dataclass
 class ClockFrequencies:
     sync:  int # CPU, SoC, USB, most synchronous logic
@@ -24,37 +29,45 @@ class ClockFrequencies:
 
 @dataclass
 class ClockSettings:
+
     audio_clock: AudioClock
+    dynamic_modeline: bool
     modeline: Optional[DVIModeline]
     frequencies: ClockFrequencies
 
-def clock_settings(audio_clock: AudioClock, modeline) -> ClockSettings:
+    def __init__(self, audio_clock: AudioClock, dynamic_modeline: bool,
+                       modeline: Optional[DVIModeline]):
 
-    """
-    Calculate frequency of all clocks used by Tiliqua gateware given an intended PLL configuration.
-    It should match what the PLLs end up generating, as these constants are used in downstream logic.
-    """
+        """
+        Calculate frequency of all clocks used by Tiliqua gateware given an intended PLL configuration.
+        It should match what the PLLs end up generating, as these constants are used in downstream logic.
+        """
 
-    frequencies = ClockFrequencies(
-        sync=60_000_000,
-        fast=120_000_000,
-        audio=None,
-        dvi=None,
-        dvi5x=None
-    )
-    frequencies.audio = audio_clock.mclk()
+        frequencies = ClockFrequencies(
+            sync=60_000_000,
+            fast=120_000_000,
+            audio=None,
+            dvi=None,
+            dvi5x=None
+        )
+        frequencies.audio = audio_clock.mclk()
 
-    if modeline is not None:
-        frequencies.dvi = int(modeline.pixel_clk_mhz*1_000_000)
-        frequencies.dvi5x = 5*int(modeline.pixel_clk_mhz*1_000_000)
+        if dynamic_modeline and modeline is not None:
+            raise ValueError(
+                "Both `dynamic_modeline` and fixed `modeline` are set. Only one may be set.")
 
-    settings = ClockSettings(
-        audio_clock=audio_clock,
-        modeline=modeline,
-        frequencies=frequencies
-    )
+        if modeline is not None:
+            frequencies.dvi = int(modeline.pixel_clk_mhz*1_000_000)
+            frequencies.dvi5x = 5*int(modeline.pixel_clk_mhz*1_000_000)
 
-    return settings
+        if dynamic_modeline:
+            frequencies.dvi = int(PCLK_FMAX_DYNAMIC)
+            frequencies.dvi5x = 5*int(PCLK_FMAX_DYNAMIC)
+
+        self.audio_clock = audio_clock
+        self.dynamic_modeline = dynamic_modeline
+        self.modeline = modeline
+        self.frequencies = frequencies
 
 def create_dvi_pll(pll_settings: DVIPLL, clk48, reset, feedback, locked):
     """
@@ -240,8 +253,8 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
 
     clock_tree_video = """
     │                            └>[clk1]───>[ECP5 PLL]─┐                         │
-    │                                      ┊            ├─>[dvi]  {dvi:11.4f} MHz │ (dynamic)
-    │                                      ┊            └─>[dvi5x]{dvi5x:11.4f} MHz │ (dynamic)
+    │                                      ┊            ├─>[dvi]  {dvi:11.4f} MHz │ {dyn1}
+    │                                      ┊            └─>[dvi5x]{dvi5x:11.4f} MHz │ {dyn2}
     └─────────────────────────────────────────────────────────────────────────────┘"""
     clock_tree_no_video = """
     │                            └>[clk1]─────────────────>[disable]              │
@@ -261,9 +274,16 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             print(textwrap.dedent(self.clock_tree_video[1:]).format(
                 dvi=self.settings.frequencies.dvi/1e6,
                 dvi5x=self.settings.frequencies.dvi5x/1e6,
+                dyn1='(dynamic)' if self.settings.dynamic_modeline else '',
+                dyn2='(dynamic)' if self.settings.dynamic_modeline else '',
                 ))
+            if self.settings.dynamic_modeline:
+                print("Dynamic video clock (maximum pixel clock shown).")
+            else:
+                print(f"Fixed video clock for: {self.settings.modeline}.")
         else:
             print(textwrap.dedent(self.clock_tree_no_video[1:]))
+            print("Video clocks disabled (no video out).")
 
     def elaborate(self, platform):
         m = Module()
@@ -366,7 +386,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
         )
 
         # Video PLL and derived signals
-        if self.settings.modeline is not None:
+        if self.settings.modeline or self.settings.dynamic_modeline:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()

@@ -46,11 +46,13 @@ class DMAFramebuffer(wiring.Component):
             })
 
     def __init__(self, *, palette, fb_base_default=0, addr_width=22,
-                 fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128):
+                 fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128,
+                 fixed_modeline=None):
 
         self.fifo_depth = fifo_depth
         self.bytes_per_pixel = bytes_per_pixel
         self.burst_threshold_words = burst_threshold_words
+        self.fixed_modeline = fixed_modeline
 
         self.palette = palette
 
@@ -70,6 +72,10 @@ class DMAFramebuffer(wiring.Component):
 
     def elaborate(self, platform) -> Module:
         m = Module()
+
+        if self.fixed_modeline is not None:
+            for member in self.timings.signature.members:
+                m.d.comb += getattr(self.timings, member).eq(getattr(self.fixed_modeline, member))
 
         m.submodules.fifo = fifo = AsyncFIFOBuffered(
                 width=32, depth=self.fifo_depth, r_domain='dvi', w_domain='sync')
@@ -256,22 +262,23 @@ class Peripheral(wiring.Component):
 
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
-        with m.If(self._h_timing.element.w_stb):
-            m.d.sync += self.fb.timings.h_active.eq(self._h_timing.f.h_active.w_data)
-            m.d.sync += self.fb.timings.h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
-        with m.If(self._h_timing2.element.w_stb):
-            m.d.sync += self.fb.timings.h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
-            m.d.sync += self.fb.timings.h_total.eq(self._h_timing2.f.h_total.w_data)
-        with m.If(self._v_timing.element.w_stb):
-            m.d.sync += self.fb.timings.v_active.eq(self._v_timing.f.v_active.w_data)
-            m.d.sync += self.fb.timings.v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
-        with m.If(self._v_timing2.element.w_stb):
-            m.d.sync += self.fb.timings.v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
-            m.d.sync += self.fb.timings.v_total.eq(self._v_timing2.f.v_total.w_data)
-        with m.If(self._hv_timing.element.w_stb):
-            m.d.sync += self.fb.timings.h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
-            m.d.sync += self.fb.timings.v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
-            m.d.sync += self.fb.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
+        if not self.fb.fixed_modeline:
+            with m.If(self._h_timing.element.w_stb):
+                m.d.sync += self.fb.timings.h_active.eq(self._h_timing.f.h_active.w_data)
+                m.d.sync += self.fb.timings.h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
+            with m.If(self._h_timing2.element.w_stb):
+                m.d.sync += self.fb.timings.h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
+                m.d.sync += self.fb.timings.h_total.eq(self._h_timing2.f.h_total.w_data)
+            with m.If(self._v_timing.element.w_stb):
+                m.d.sync += self.fb.timings.v_active.eq(self._v_timing.f.v_active.w_data)
+                m.d.sync += self.fb.timings.v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
+            with m.If(self._v_timing2.element.w_stb):
+                m.d.sync += self.fb.timings.v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
+                m.d.sync += self.fb.timings.v_total.eq(self._v_timing2.f.v_total.w_data)
+            with m.If(self._hv_timing.element.w_stb):
+                m.d.sync += self.fb.timings.h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
+                m.d.sync += self.fb.timings.v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
+                m.d.sync += self.fb.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
         with m.If(self._flags.f.enable.w_stb):
             m.d.sync += self.fb.enable.eq(self._flags.f.enable.w_data)
         with m.If(self._fb_base.f.fb_base.w_stb):
