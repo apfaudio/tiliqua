@@ -59,8 +59,10 @@ macro_rules! impl_dma_framebuffer {
     )+) => {
         $(
             use tiliqua_hal::dma_framebuffer::{DVIModeline, Rotate};
+            use embedded_graphics::prelude::{Pixel, Size, OriginDimensions, DrawTarget, GrayColor};
+            use embedded_graphics::pixelcolor::Gray8;
 
-            struct $DMA_FRAMEBUFFERX {
+            pub struct $DMA_FRAMEBUFFERX {
                 registers_fb: $PACFRAMEBUFFERX,
                 registers_palette: $PACPALETTEX,
                 mode: DVIModeline,
@@ -68,7 +70,7 @@ macro_rules! impl_dma_framebuffer {
             }
 
             impl $DMA_FRAMEBUFFERX {
-                fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, fb_base: usize,
+                pub fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, fb_base: usize,
                        mode: DVIModeline) -> Self {
                     registers_fb.flags().write(|w| unsafe {
                         w.enable().bit(false)

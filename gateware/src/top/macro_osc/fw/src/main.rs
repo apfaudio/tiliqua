@@ -7,14 +7,10 @@ use log::info;
 use riscv_rt::entry;
 use core::cell::RefCell;
 use critical_section::Mutex;
-use core::convert::TryInto;
 use irq::handler;
 use embedded_alloc::LlffHeap as Heap;
 use mi_plaits_dsp::dsp::voice::{Modulations, Patch, Voice};
-use embedded_graphics::{
-    pixelcolor::{Gray8, GrayColor},
-    prelude::*,
-};
+use embedded_graphics::prelude::*;
 
 use tiliqua_pac as pac;
 use tiliqua_hal as hal;
@@ -24,11 +20,7 @@ use pac::constants::*;
 use tiliqua_hal::persist::Persist;
 use options::*;
 use hal::pca9635::*;
-
-tiliqua_hal::impl_dma_framebuffer! {
-    DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
-    Palette0: tiliqua_pac::PALETTE_PERIPH,
-}
+use hal::dma_framebuffer::Rotate;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 const BLOCK_SIZE: usize = 128;

@@ -89,7 +89,7 @@ impl BitstreamManifest {
                 info!("BitstreamManifest: parse OK");
                 Some(contents)
             }
-            Err(err) => {
+            Err(_err) => {
                 None
             }
         }

@@ -2,7 +2,6 @@
 #![no_main]
 
 use critical_section::Mutex;
-use core::convert::TryInto;
 use log::{info, warn};
 use riscv_rt::entry;
 use irq::handler;
@@ -27,20 +26,15 @@ use opts::OptionString;
 
 use embedded_graphics::{
     mono_font::{ascii::FONT_9X15, ascii::FONT_9X15_BOLD, MonoTextStyle},
-    pixelcolor::{Gray8, GrayColor},
     prelude::*,
     primitives::{PrimitiveStyleBuilder, Line},
     text::{Alignment, Text},
-    geometry::OriginDimensions,
+    pixelcolor::Gray8,
 };
 
 use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;
-
-tiliqua_hal::impl_dma_framebuffer! {
-    DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
-    Palette0: tiliqua_pac::PALETTE_PERIPH,
-}
+use hal::dma_framebuffer::{Rotate, DVIModeline};
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
