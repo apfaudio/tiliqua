@@ -7,16 +7,12 @@ use log::{info, error};
 
 use critical_section::Mutex;
 use core::cell::RefCell;
-use core::convert::TryInto;
 use core::fmt::Write;
 
 use embedded_hal::i2c::Operation;
 use embedded_hal::i2c::I2c;
 use embedded_hal::delay::DelayNs;
-use embedded_graphics::{
-    pixelcolor::{Gray8, GrayColor},
-    prelude::*,
-};
+use embedded_graphics::prelude::*;
 
 use heapless::String;
 
@@ -35,11 +31,6 @@ use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 const TUSB322I_ADDR:  u8 = 0x47;
 
 pub type ReportString = String<512>;
-
-tiliqua_hal::impl_dma_framebuffer! {
-    DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
-    Palette0: tiliqua_pac::PALETTE_PERIPH,
-}
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
