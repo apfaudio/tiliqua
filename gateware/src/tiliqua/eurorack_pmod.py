@@ -101,7 +101,7 @@ class I2STDM(wiring.Component):
     """
 
     N_CHANNELS = 4
-    S_WIDTH    = 16
+    S_WIDTH    = 24
     SLOT_WIDTH = 32
 
     def __init__(self, audio_192=False):
@@ -273,8 +273,7 @@ class I2SCalibrator(wiring.Component):
         #
 
         # calibration logic (single MAC then saturating clamp)
-        m.d.comb += out_sample.eq(
-            ((in_sample * cal_read.data[0]) + cal_read.data[1]).saturate(ASQ))
+        m.d.comb += out_sample.eq(in_sample)
 
         # Calibrating samples happens in the 'audio' domain.
         with m.FSM(domain="audio") as cal_fsm:
