@@ -326,19 +326,11 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         }
                         riscv::asm::fence();
                         riscv::asm::fence_i();
-                        if let Some(pll_config) = manifest.external_pll_config.clone() {
-                            let pll_config = if manifest.video.contains("dynamic") {
-                                // Dynamic video (inherit from bootloader) - set clk1 to match
+                        if let Some(mut pll_config) = manifest.external_pll_config.clone() {
+                            if pll_config.clk1_inherit {
                                 info!("video/pll: inherit pixel clock from bootloader modeline.");
-                                ExternalPLLConfig {
-                                    clk0_hz: pll_config.clk0_hz,
-                                    clk1_hz: Some((bootinfo.modeline.pixel_clk_mhz * 1e6f32) as u32),
-                                    spread_spectrum: pll_config.spread_spectrum,
-                                }
-                            } else {
-                                // Otherwise, use the clock settings from the manifest
-                                pll_config
-                            };
+                                pll_config.clk1_hz = Some((bootinfo.modeline.pixel_clk_mhz*1e6f32) as u32);
+                            }
                             if let Some(ref mut pll) = app.pll {
                                 configure_external_pll(&pll_config, pll).or(
                                     Err(BitstreamError::PllI2cError))?;
@@ -595,6 +587,7 @@ fn main() -> ! {
         configure_external_pll(&ExternalPLLConfig{
             clk0_hz: CLOCK_AUDIO_HZ,
             clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
+            clk1_inherit: false,
             spread_spectrum: Some(0.01),
         }, &mut si5351drv).unwrap();
         Some(si5351drv)

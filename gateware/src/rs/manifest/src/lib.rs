@@ -36,6 +36,7 @@ pub struct MemoryRegion {
 pub struct ExternalPLLConfig {
     pub clk0_hz: u32,
     pub clk1_hz: Option<u32>,
+    pub clk1_inherit: bool,
     pub spread_spectrum: Option<f32>,
 }
 

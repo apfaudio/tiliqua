@@ -222,6 +222,7 @@ def top_level_cli(
         archiver.external_pll_config = ExternalPLLConfig(
             clk0_hz=kwargs["clock_settings"].frequencies.audio,
             clk1_hz=kwargs["clock_settings"].frequencies.dvi,
+            clk1_inherit=kwargs["clock_settings"].dynamic_modeline,
             spread_spectrum=0.01)
 
     def maybe_flash_firmware(args, kwargs, force_flash=False):
