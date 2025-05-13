@@ -66,6 +66,7 @@ impl BitstreamManifest {
             info!("\texternal_pll_config = {{");
             info!("\t\tclk0_hz: {}", clocks.clk0_hz);
             info!("\t\tclk1_hz: {:?}", clocks.clk1_hz);
+            info!("\t\tclk1_inherit: {:?}", clocks.clk1_inherit);
             info!("\t\tspread_spectrum: {:?}", clocks.spread_spectrum);
             info!("\t}}");
         }

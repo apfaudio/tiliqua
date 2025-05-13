@@ -318,21 +318,16 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         if manifest.hw_rev != HW_REV_MAJOR {
                             Err(BitstreamError::HwVersionMismatch)?;
                         }
-                        // Populate BootInfo at the end of PSRAM
-                        let bootinfo = bootinfo::BootInfo {
+                        // BootInfo structure placed at the end of PSRAM
+                        let mut bootinfo = bootinfo::BootInfo {
                             manifest: manifest.clone(),
                             modeline: app.modeline.clone(),
                         };
-                        unsafe { bootinfo.to_addr(BOOTINFO_BASE) };
-                        for region in &manifest.regions {
-                            copy_spiflash_region_to_psram(region)?;
-                        }
-                        riscv::asm::fence();
-                        riscv::asm::fence_i();
                         if let Some(mut pll_config) = manifest.external_pll_config.clone() {
                             if pll_config.clk1_inherit {
                                 info!("video/pll: inherit pixel clock from bootloader modeline.");
                                 pll_config.clk1_hz = Some((bootinfo.modeline.pixel_clk_mhz*1e6f32) as u32);
+                                bootinfo.manifest.external_pll_config = Some(pll_config.clone());
                             }
                             if let Some(ref mut pll) = app.pll {
                                 configure_external_pll(&pll_config, pll).or(
@@ -343,6 +338,13 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                                 Err(BitstreamError::PllBadConfigError)?;
                             }
                         }
+                        // Place BootInfo at the end of PSRAM
+                        unsafe { bootinfo.to_addr(BOOTINFO_BASE) };
+                        for region in &manifest.regions {
+                            copy_spiflash_region_to_psram(region)?;
+                        }
+                        riscv::asm::fence();
+                        riscv::asm::fence_i();
                         Ok(())
                     }()
                 } else {
