@@ -410,6 +410,8 @@ fn main() -> ! {
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
                               pac::Interrupt::TIMER0);
 
+        pmod.mute(false);
+
         loop {
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);

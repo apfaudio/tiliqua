@@ -358,6 +358,7 @@ pub enum StartupWarning {
 }
 
 use embedded_hal::i2c::{I2c, Operation};
+use embedded_hal::delay::DelayNs;
 
 // Mitigation for https://github.com/apfaudio/tiliqua/issues/81
 pub fn maybe_restart_codec<CodecI2c, Pmod>(i2cdev: &mut CodecI2c, pmod: &mut Pmod) -> Result<(), StartupWarning>
@@ -432,6 +433,13 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua bootloader!");
 
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    timer.enable();
+    timer.delay_ms(400);
+    pmod.hard_reset();
+    timer.disable();
+    timer.delay_ms(0);
+
     let mut startup_report: String<256> = Default::default();
 
     // Verify/reprogram touch sensing NVM
@@ -464,7 +472,6 @@ fn main() -> ! {
     // Setup CODEC and load audio calibration.
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
-    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     if let Err(e) = maybe_restart_codec(&mut i2cdev1, &mut pmod) {
         let s: &'static str = e.into();
         write!(startup_report, "{}\r\n", s).ok();

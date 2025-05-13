@@ -98,7 +98,7 @@ class Peripheral(wiring.Component):
             self._jack.f.jack.r_data.eq(self.pmod.jack),
         ]
 
-        mute_reg = Signal(init=0)
+        mute_reg = Signal(init=1)
         m.d.comb += self.pmod.codec_mute.eq(mute_reg | self.mute)
         with m.If(self._flags.f.mute.w_stb):
             m.d.sync += mute_reg.eq(self._flags.f.mute.w_data)
