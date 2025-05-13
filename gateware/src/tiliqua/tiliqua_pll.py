@@ -305,9 +305,9 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
         m.d.comb += [
             ClockSignal("raw48")     .eq(clk48),
             # external PLL clock domain with no synchronous reset.
-            ClockSignal("expll_clk0").eq(platform.request("expll_clk0").i),
+            ClockSignal("expll_clk0").eq(platform.request("clkex", 0).i),
             ResetSignal("expll_clk0").eq(0),
-            ClockSignal("expll_clk1").eq(platform.request("expll_clk1").i),
+            ClockSignal("expll_clk1").eq(platform.request("clkex", 1).i),
             ResetSignal("expll_clk1").eq(0),
         ]
 

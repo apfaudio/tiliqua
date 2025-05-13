@@ -224,6 +224,9 @@ def top_level_cli(
             clk1_hz=kwargs["clock_settings"].frequencies.dvi,
             clk1_inherit=kwargs["clock_settings"].dynamic_modeline,
             spread_spectrum=0.01)
+        # Ensure PnR/LPF constraints match the external PLL settings above
+        hw_platform.resources[('clkex', 0)].clock.frequency = archiver.external_pll_config.clk0_hz
+        hw_platform.resources[('clkex', 1)].clock.frequency = archiver.external_pll_config.clk1_hz
 
     def maybe_flash_firmware(args, kwargs, force_flash=False):
         """Handle `--flash` option where it is supported (at the moment, only XiP)."""
