@@ -37,6 +37,9 @@ use hal::pca9635::Pca9635Driver;
 use hal::dma_framebuffer::{Rotate, DVIModeline};
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
+// Technically this lower bound is out of the ECP5 PLL spec,
+// see the notes in `tiliqua_pll.py:create_dynamic_dvi_pll`.
+// But we keep it this low for compatibility with low res modes.
 pub const PIXEL_CLK_MIN_KHZ: u32 = 24_000u32;
 pub const PIXEL_CLK_MAX_KHZ: u32 = CLOCK_DVI_HZ / 1000u32;
 

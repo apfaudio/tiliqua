@@ -132,6 +132,14 @@ def create_dynamic_dvi_pll(reset, locked):
     """
     Create dynamic PLL to generate DVI clocks (locks to pixel frequency of external PLL).
     1x pixel clock and 5x (half DVI TDMS clock, output is DDR).
+
+    WARN: It's easy to drive this out of spec. To stay inside the VCO frequency of
+    400-800MHz (spec from Trellis), clk1 (pixel clock) should be between 40MHz and
+    80MHz. However, it seems experimentaly reliable to lock at lower frequencies,
+    at least according to the notes from [1]. Even though 25Mhz for 640x480 is
+    way out of spec for this PLL configuration, it seems to work fine.
+
+    [1] https://github.com/YosysHQ/prjtrellis/pull/117
     """
     return Instance("EHXPLLL",
             # Clock in.
