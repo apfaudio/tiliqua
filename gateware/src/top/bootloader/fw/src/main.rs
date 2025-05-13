@@ -327,11 +327,17 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         riscv::asm::fence();
                         riscv::asm::fence_i();
                         if let Some(pll_config) = manifest.external_pll_config.clone() {
-                            // HACK
-                            let pll_config = ExternalPLLConfig {
-                                clk0_hz: pll_config.clk0_hz,
-                                clk1_hz: Some((bootinfo.modeline.pixel_clk_mhz * 1e6f32) as u32),
-                                spread_spectrum: pll_config.spread_spectrum,
+                            let pll_config = if manifest.video.contains("dynamic") {
+                                // Dynamic video (inherit from bootloader) - set clk1 to match
+                                info!("video/pll: inherit pixel clock from bootloader modeline.");
+                                ExternalPLLConfig {
+                                    clk0_hz: pll_config.clk0_hz,
+                                    clk1_hz: Some((bootinfo.modeline.pixel_clk_mhz * 1e6f32) as u32),
+                                    spread_spectrum: pll_config.spread_spectrum,
+                                }
+                            } else {
+                                // Otherwise, use the clock settings from the manifest
+                                pll_config
                             };
                             if let Some(ref mut pll) = app.pll {
                                 configure_external_pll(&pll_config, pll).or(
