@@ -2,7 +2,6 @@
 #![no_main]
 
 use critical_section::Mutex;
-use core::convert::TryInto;
 use log::info;
 use riscv_rt::entry;
 use irq::handler;
@@ -14,11 +13,12 @@ use tiliqua_fw::*;
 use tiliqua_lib::*;
 use pac::constants::*;
 use tiliqua_hal::pmod::EurorackPmod;
-use tiliqua_hal::video::Video;
+use tiliqua_hal::persist::Persist;
+use tiliqua_hal::dma_framebuffer::Rotate;
 
 use embedded_graphics::{
-    pixelcolor::{Gray8, GrayColor},
     prelude::*,
+    pixelcolor::Gray8,
     mono_font::{MonoTextStyle, ascii::FONT_9X15_BOLD},
     text::Text,
 };
@@ -27,8 +27,6 @@ use options::Opts;
 use hal::pca9635::Pca9635Driver;
 
 use micromath::F32Ext;
-
-tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
@@ -180,15 +178,21 @@ fn main() -> ! {
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
-    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
-
-    let mut display = DMADisplay {
-        framebuffer_base: PSRAM_FB_BASE as *mut u32,
-    };
+    let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
 
     tiliqua_fw::handlers::logger_init(serial);
 
     info!("Hello from Tiliqua SID!");
+
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
+    let modeline = bootinfo.modeline.maybe_override_fixed(
+        FIXED_MODELINE, CLOCK_DVI_HZ);
+    let mut display = DMAFramebuffer0::new(
+        peripherals.FRAMEBUFFER_PERIPH,
+        peripherals.PALETTE_PERIPH,
+        PSRAM_FB_BASE,
+        modeline.clone(),
+    );
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
@@ -198,8 +202,8 @@ fn main() -> ! {
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 5u8;
 
-    palette::ColorPalette::default().write_to_hardware(&mut video);
-    video.set_persist(128);
+    palette::ColorPalette::default().write_to_hardware(&mut display);
+    persist.set_persist(128);
 
     handler!(timer0 = || timer0_handler(&app));
 
@@ -212,14 +216,18 @@ fn main() -> ! {
 
         let scope = peripherals.SCOPE_PERIPH;
 
+        let h_active = display.size().width;
+        let v_active = display.size().height;
+
         loop {
             let opts = critical_section::with(|cs| {
                 app.borrow_ref(cs).ui.opts.clone()
             });
 
             // Draw UI elements
-            draw::draw_options(&mut display, &opts, 100, V_ACTIVE/2, hue).ok();
-            draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, hue, UI_NAME, UI_SHA).ok();
+            draw::draw_options(&mut display, &opts, 100, v_active/2, hue).ok();
+            draw::draw_name(&mut display, h_active/2, v_active-50, hue, UI_NAME, UI_SHA,
+                            &modeline).ok();
 
             // Draw SID visualization
             let hl_wfm: Option<u8> = match opts.tracker.page.value {
@@ -249,13 +257,13 @@ fn main() -> ! {
 
             let hl_filter: bool = opts.tracker.page.value == options::Page::Filter;
 
-            draw::draw_sid(&mut display, 100, V_ACTIVE/4+25, hue, hl_wfm, gates, hl_filter, switches, filter_types).ok();
+            draw::draw_sid(&mut display, 100, v_active/4+25, hue, hl_wfm, gates, hl_filter, switches, filter_types).ok();
 
             // Draw channel labels
             {
                 let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xB0 + hue));
-                let hc = (H_ACTIVE/2) as i16;
-                let vc = (V_ACTIVE/2) as i16;
+                let hc = (h_active/2) as i16;
+                let vc = (v_active/2) as i16;
 
                 Text::new(
                     "out3: combined, post-filter",
@@ -304,10 +312,11 @@ fn main() -> ! {
 
             scope.xpos().write(|w| unsafe { w.xpos().bits(opts.scope.xpos.value as u16) } );
 
-            scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trig_mode.value == options::TriggerMode::Always));
-
-            scope.en().write(|w| w.enable().bit(true));
+            scope.flags().write(
+                |w| { w.enable().bit(true);
+                      w.rotate_left().bit(modeline.rotate == Rotate::Left);
+                      w.trigger_always().bit(opts.scope.trig_mode.value == options::TriggerMode::Always)
+                } );
         }
     })
 }

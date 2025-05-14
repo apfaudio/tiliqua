@@ -220,8 +220,7 @@ class SIDSoc(TiliquaSoc):
         # Add scope peripheral 
         self.scope_periph = scope.ScopeTracePeripheral(
             fb=self.fb,
-            bus_dma=self.psram_periph,
-            video_rotate_90=self.video_rotate_90)
+            bus_dma=self.psram_periph)
         self.csr_decoder.add(self.scope_periph.bus, addr=0x1100, name="scope_periph")
 
         # Now finalize the CSR bridge
