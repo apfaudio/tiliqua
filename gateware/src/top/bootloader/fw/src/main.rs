@@ -330,6 +330,10 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                                 bootinfo.manifest.external_pll_config = Some(pll_config.clone());
                             }
                             if let Some(ref mut pll) = app.pll {
+                                // Disable DVI PHY before playing with external PLL.
+                                unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
+                                    w.enable().bit(false)
+                                );
                                 configure_external_pll(&pll_config, pll).or(
                                     Err(BitstreamError::PllI2cError))?;
                             } else {

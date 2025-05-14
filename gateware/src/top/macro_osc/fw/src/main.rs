@@ -180,6 +180,12 @@ fn main() -> ! {
     bootinfo.manifest.print();
     info!("bootinfo modeline {:?}", bootinfo.modeline);
     let modeline = bootinfo.modeline;
+    let mut display = DMAFramebuffer0::new(
+        peripherals.FRAMEBUFFER_PERIPH,
+        peripherals.PALETTE_PERIPH,
+        PSRAM_FB_BASE,
+        modeline.clone(),
+    );
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
@@ -238,12 +244,6 @@ fn main() -> ! {
     });
     */
 
-    let mut display = DMAFramebuffer0::new(
-        peripherals.FRAMEBUFFER_PERIPH,
-        peripherals.PALETTE_PERIPH,
-        PSRAM_FB_BASE,
-        modeline.clone(),
-    );
 
     handler!(timer0 = || timer0_handler(&app));
 

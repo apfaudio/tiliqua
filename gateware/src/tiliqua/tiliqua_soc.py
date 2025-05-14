@@ -42,7 +42,7 @@ import os
 from amaranth                                    import *
 from amaranth.build                              import Attrs, Pins, PinsN, Platform, Resource, Subsignal
 from amaranth.hdl.rec                            import Record
-from amaranth.lib                                import wiring, data
+from amaranth.lib                                import wiring, data, cdc
 from amaranth.lib.wiring                         import Component, In, Out, flipped, connect
 
 from amaranth_soc                                import csr, gpio, wishbone
@@ -321,7 +321,11 @@ class TiliquaSoc(Component):
 
         # video PHY
         m.submodules.palette_periph = self.palette_periph
-        m.submodules.fb = self.fb
+        # Bring fb.enable into dvi clock domain for graceful PHY shutdown.
+        reset_dvi = Signal()
+        m.submodules.en_ff = cdc.FFSynchronizer(
+                i=~self.fb.enable, o=reset_dvi, o_domain="dvi", reset=1)
+        m.submodules.fb = ResetInserter({'sync': ~self.fb.enable, 'dvi': reset_dvi, 'dvi5x': reset_dvi})(self.fb)
         m.submodules.framebuffer_periph = self.framebuffer_periph
 
         # video periph / persist
