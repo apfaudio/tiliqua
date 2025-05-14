@@ -395,7 +395,29 @@ fn main() -> ! {
     let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
     bootinfo.manifest.print();
     info!("bootinfo modeline {:?}", bootinfo.modeline);
-    let modeline = bootinfo.modeline;
+    let modeline = if let Some((h_active, v_active)) = FIXED_MODELINE {
+         use tiliqua_hal::dma_framebuffer::{Rotate, DVIModeline};
+        let rotate = match (h_active, v_active) {
+            (720, 720) => Rotate::Left, // ... XXX hack for round screen :)
+            _ => Rotate::Normal
+        };
+        DVIModeline {
+            h_active      : h_active,
+            h_sync_start  : 0,
+            h_sync_end    : 0,
+            h_total       : 0,
+            h_sync_invert : false,
+            v_active      : v_active,
+            v_sync_start  : 0,
+            v_sync_end    : 0,
+            v_total       : 0,
+            v_sync_invert : false,
+            pixel_clk_mhz : (CLOCK_DVI_HZ as f32) / 1e6f32,
+            rotate        : rotate
+        }
+    } else {
+        bootinfo.modeline
+    };
 
     let mut i2cdev = I2c0::new(peripherals.I2C0);
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);

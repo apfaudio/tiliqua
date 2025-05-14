@@ -518,7 +518,7 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
 
 fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
     if let Some((h_active, v_active)) = FIXED_MODELINE {
-        warn!("video: using static video mode from bitstream");
+        warn!("bootloader/video: using static video mode");
         // 'fake' modeline for static video modes, enough for the rust firmware
         // to be happy but not enough to actually configure the timing generator
         // (this is done in gateware in static timing modes).
