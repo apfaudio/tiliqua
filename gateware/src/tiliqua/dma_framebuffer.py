@@ -189,11 +189,8 @@ class DMAFramebuffer(wiring.Component):
                 self.simif.b.eq(self.palette.pixel_out.b),
             ]
 
-        # Bring self.enable into dvi clock domain for graceful PHY shutdown.
-        enable_dvi = Signal()
-        m.submodules.en_ff = FFSynchronizer(
-                i=self.enable, o=enable_dvi, o_domain="dvi")
-        return ResetInserter({'sync': ~self.enable, 'dvi': ~enable_dvi})(m)
+        return m
+
 
 class Peripheral(wiring.Component):
 
