@@ -2,7 +2,6 @@
 #![no_main]
 
 use critical_section::Mutex;
-use core::convert::TryInto;
 use log::info;
 use riscv_rt::entry;
 use irq::handler;
@@ -12,17 +11,13 @@ use tiliqua_fw::*;
 use tiliqua_lib::*;
 use pac::constants::*;
 use tiliqua_lib::calibration::*;
-use tiliqua_hal::video::Video;
 
-use embedded_graphics::{
-    pixelcolor::{Gray8, GrayColor},
-    prelude::*,
-};
+use embedded_graphics::prelude::*;
 
 use options::*;
 use hal::pca9635::Pca9635Driver;
-
-tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
+use tiliqua_hal::persist::Persist;
+use tiliqua_hal::dma_framebuffer::Rotate;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
@@ -58,14 +53,21 @@ fn main() -> ! {
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
-    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
-    let mut display = DMADisplay {
-        framebuffer_base: PSRAM_FB_BASE as *mut u32,
-    };
+    let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
 
     tiliqua_fw::handlers::logger_init(serial);
 
     info!("Hello from Tiliqua XBEAM!");
+
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
+    let modeline = bootinfo.modeline.maybe_override_fixed(
+        FIXED_MODELINE, CLOCK_DVI_HZ);
+    let mut display = DMAFramebuffer0::new(
+        peripherals.FRAMEBUFFER_PERIPH,
+        peripherals.PALETTE_PERIPH,
+        PSRAM_FB_BASE,
+        modeline.clone(),
+    );
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
@@ -88,6 +90,9 @@ fn main() -> ! {
         let scope  = peripherals.SCOPE_PERIPH;
         let mut first = true;
 
+        let h_active = display.size().width;
+        let v_active = display.size().height;
+
         loop {
 
             let (opts, draw_options) = critical_section::with(|cs| {
@@ -96,17 +101,18 @@ fn main() -> ! {
             });
 
             if opts.beam.palette.value != last_palette || first {
-                opts.beam.palette.value.write_to_hardware(&mut video);
+                opts.beam.palette.value.write_to_hardware(&mut display);
                 last_palette = opts.beam.palette.value;
             }
 
             if draw_options {
-                draw::draw_options(&mut display, &opts, H_ACTIVE-200, V_ACTIVE/2, opts.beam.hue.value).ok();
-                draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, opts.beam.hue.value, UI_NAME, UI_SHA).ok();
+                draw::draw_options(&mut display, &opts, h_active-200, v_active/2, opts.beam.hue.value).ok();
+                draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.hue.value, UI_NAME, UI_SHA,
+                                &modeline).ok();
             }
 
-            video.set_persist(opts.beam.persist.value);
-            video.set_decay(opts.beam.decay.value);
+            persist.set_persist(opts.beam.persist.value);
+            persist.set_decay(opts.beam.decay.value);
 
             vscope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
             vscope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
@@ -126,17 +132,23 @@ fn main() -> ! {
             scope.ypos2().write(|w| unsafe { w.ypos().bits(opts.scope.ypos2.value as u16) } );
             scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope.ypos3.value as u16) } );
 
-            scope.trigger_always().write(
-                |w| w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always) );
-
             if opts.tracker.page.value == Page::Vector {
-                scope.en().write(|w| w.enable().bit(false) );
-                vscope.en().write(|w| w.enable().bit(true) );
+                scope.flags().write(
+                    |w| w.enable().bit(false) );
+                vscope.flags().write(
+                    |w| { w.enable().bit(true);
+                          w.rotate_left().bit(modeline.rotate == Rotate::Left)
+                    } );
             }
 
-            if opts.tracker.page.value == Page::Scope {
-                scope.en().write(|w| w.enable().bit(true) );
-                vscope.en().write(|w| w.enable().bit(false) );
+            if opts.tracker.page.value == Page::Scope || first {
+                scope.flags().write(
+                    |w| { w.enable().bit(true);
+                          w.rotate_left().bit(modeline.rotate == Rotate::Left);
+                          w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always)
+                    } );
+                vscope.flags().write(
+                    |w| w.enable().bit(false) );
             }
 
             first = false;
