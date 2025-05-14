@@ -375,8 +375,7 @@ class PolySoc(TiliquaSoc):
             fb=self.fb,
             bus_dma=self.psram_periph,
             fs=48000,
-            n_upsample=8,
-            video_rotate_90=self.video_rotate_90)
+            n_upsample=8)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
         # synth controls

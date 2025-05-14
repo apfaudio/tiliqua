@@ -2,7 +2,6 @@
 #![no_main]
 
 use critical_section::Mutex;
-use core::convert::TryInto;
 use log::info;
 use riscv_rt::entry;
 use irq::handler;
@@ -19,19 +18,15 @@ use tiliqua_lib::draw;
 use tiliqua_lib::dsp::OnePoleSmoother;
 use tiliqua_lib::midi::MidiTouchController;
 use pac::constants::*;
+use tiliqua_hal::persist::Persist;
 use tiliqua_fw::*;
 use tiliqua_fw::options::*;
 use tiliqua_hal::pmod::EurorackPmod;
-use tiliqua_hal::video::Video;
 
-use embedded_graphics::{
-    pixelcolor::{Gray8, GrayColor},
-    prelude::*,
-};
+use embedded_graphics::prelude::*;
 
 use hal::pca9635::Pca9635Driver;
-
-tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
+use hal::dma_framebuffer::Rotate;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
@@ -158,13 +153,20 @@ fn main() -> ! {
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
-    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
-    let mut display = DMADisplay {
-        framebuffer_base: PSRAM_FB_BASE as *mut u32,
-    };
+    let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
     crate::handlers::logger_init(serial);
 
     info!("Hello from Tiliqua POLYSYN!");
+
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
+    let modeline = bootinfo.modeline.maybe_override_fixed(
+        FIXED_MODELINE, CLOCK_DVI_HZ);
+    let mut display = DMAFramebuffer0::new(
+        peripherals.FRAMEBUFFER_PERIPH,
+        peripherals.PALETTE_PERIPH,
+        PSRAM_FB_BASE,
+        modeline.clone(),
+    );
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
@@ -186,6 +188,9 @@ fn main() -> ! {
         let vscope  = peripherals.VECTOR_PERIPH;
         let mut first = true;
 
+        let h_active = display.size().width;
+        let v_active = display.size().height;
+
         loop {
 
             let (opts, notes, cutoffs, draw_options) = critical_section::with(|cs| {
@@ -199,18 +204,19 @@ fn main() -> ! {
             let help_screen: bool = opts.tracker.page.value == Page::Help;
 
             if opts.beam.palette.value != last_palette || first {
-                opts.beam.palette.value.write_to_hardware(&mut video);
+                opts.beam.palette.value.write_to_hardware(&mut display);
                 last_palette = opts.beam.palette.value;
             }
 
             if draw_options || help_screen {
-                draw::draw_options(&mut display, &opts, H_ACTIVE/2-30, 70,
+                draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                    opts.beam.hue.value).ok();
-                draw::draw_name(&mut display, H_ACTIVE/2, 30, opts.beam.hue.value, UI_NAME, UI_SHA).ok();
+                draw::draw_name(&mut display, h_active/2, 30, opts.beam.hue.value, UI_NAME, UI_SHA,
+                                &modeline).ok();
             }
 
             if help_screen {
-                draw::draw_tiliqua(&mut display, H_ACTIVE/2-80, V_ACTIVE/2-200, opts.beam.hue.value,
+                draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-200, opts.beam.hue.value,
                     [
                         "C2     phase",
                         "G2     -    ",
@@ -253,13 +259,17 @@ fn main() -> ! {
                     ",
                     ).ok();
                 // Enough persistance to reduce flicker on loads of text.
-                video.set_persist(512);
-                video.set_decay(1);
-                vscope.en().write(|w| w.enable().bit(false) );
+                persist.set_persist(512);
+                persist.set_decay(1);
+                vscope.flags().write(
+                    |w| { w.enable().bit(false) } );
             } else {
-                video.set_persist(opts.beam.persist.value);
-                video.set_decay(opts.beam.decay.value);
-                vscope.en().write(|w| w.enable().bit(true) );
+                persist.set_persist(opts.beam.persist.value);
+                persist.set_decay(opts.beam.decay.value);
+                vscope.flags().write(
+                    |w| { w.enable().bit(true);
+                          w.rotate_left().bit(modeline.rotate == Rotate::Left)
+                    } );
             }
 
             vscope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
@@ -271,8 +281,8 @@ fn main() -> ! {
                 for ix in 0usize..N_VOICES {
                     let j = (N_VOICES-1)-ix;
                     draw::draw_voice(&mut display,
-                                     ((H_ACTIVE as f32)/2.0f32 + 330.0f32*f32::cos(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as i32,
-                                     ((V_ACTIVE as f32)/2.0f32 + 330.0f32*f32::sin(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as u32 - 15,
+                                     ((h_active as f32)/2.0f32 + 330.0f32*f32::cos(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as i32,
+                                     ((v_active as f32)/2.0f32 + 330.0f32*f32::sin(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as u32 - 15,
                                      notes[ix], cutoffs[ix], opts.beam.hue.value).ok();
                 }
             }
