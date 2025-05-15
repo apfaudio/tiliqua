@@ -163,7 +163,7 @@ class Persistance(wiring.Component):
                 with m.If(holdoff_count > self.holdoff):
                     m.next = 'BURST-IN'
 
-        return m
+        return ResetInserter({'sync': ~self.fb.enable})(m)
 
 class Peripheral(wiring.Component):
 
