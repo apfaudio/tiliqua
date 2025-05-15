@@ -452,12 +452,10 @@ fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
     info!("video/edid: read_edid from i2c0 address 0x{:x}", EDID_ADDR);
     let mut edid: [u8; 128] = [0; 128];
     for i in 0..16 {
-        // Be extremely careful these transactions are not interrupted, because
+        // WARN: be careful these transactions are not interrupted, because
         // bad EDID transactions could brick monitors.
-        riscv::interrupt::disable();
         i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
                                             Operation::Read(&mut edid[i*8..i*8+8])]).ok();
-        unsafe { riscv::interrupt::enable(); }
     }
     let edid = edid::Edid::parse(&edid);
     info!("video/edid: read_edid got {:?}", edid);
@@ -522,6 +520,7 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
 }
 
 fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
+    // TODO add read attempts?
     match read_edid(i2cdev) {
         Ok(edid) => match modeline_from_edid(edid) {
             Some(edid_modeline) => edid_modeline,
@@ -660,17 +659,21 @@ fn main() -> ! {
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
 
-            timer.disable();
             let (opts, reboot_n, error_n, final_modeline) = critical_section::with(|cs| {
 
                 let mut app = app.borrow_ref_mut(cs);
 
+                //
                 // Dynamic modeline switching.
+                // Rising edge hotplug checks EDID, reprograms PLL and reinitializes display.
+                //
+
                 if display.get_hpd() && !last_hpd {
+                    // Rising edge of DVI HPD
                     info!("video/hpd: display reconnected!");
                     let new_modeline = modeline_or_fallback(&mut i2cdev_edid);
-                    info!("video/hpd: previous {:?}", modeline);
-                    info!("video/hpd: infer {:?}", new_modeline);
+                    info!("video/hpd: modeline was {:?}", modeline);
+                    info!("video/hpd: modeline infer {:?}", new_modeline);
                     let mut reprogrammed_pll = false;
                     if new_modeline != modeline {
                         info!("video/hpd: display inferred different modeline to previous. switching timings...");
@@ -679,6 +682,10 @@ fn main() -> ! {
                             unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
                                 w.enable().bit(false)
                             );
+                            // Configure new pixel clock. Technically we don't need to touch
+                            // the audio clock. This might be important to separate if we decide
+                            // to support dynamic hotplug timings in user bitstreams where
+                            // we want the audio streams to not be interrupted.
                             configure_external_pll(&ExternalPLLConfig{
                                 clk0_hz: CLOCK_AUDIO_HZ,
                                 clk1_hz: Some((new_modeline.pixel_clk_mhz*1e6) as u32),
@@ -692,6 +699,7 @@ fn main() -> ! {
                     }
 
                     if reprogrammed_pll {
+                        // Finally, reinitialize the display.
                         let peripherals = unsafe { pac::Peripherals::steal() };
                         display = DMAFramebuffer0::new(
                             peripherals.FRAMEBUFFER_PERIPH,
@@ -705,12 +713,15 @@ fn main() -> ! {
 
                 last_hpd = display.get_hpd();
 
+                //
+                // Copy out mutable application state
+                //
+
                 (app.ui.opts.clone(),
                  app.reboot_n.clone(),
                  app.error_n.clone(),
                  app.modeline.clone())
             });
-            timer.enable();
 
             modeline = final_modeline;
 
