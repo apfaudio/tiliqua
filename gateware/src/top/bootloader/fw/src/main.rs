@@ -21,6 +21,7 @@ use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::si5351::*;
 use tiliqua_hal::cy8cmbr3xxx::*;
+use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 use tiliqua_manifest::*;
 use opts::OptionString;
 
@@ -561,7 +562,7 @@ fn main() -> ! {
 
     timer.delay_ms(10);
     let mut i2cdev_edid = I2c0::new(unsafe { pac::I2C0::steal() } );
-    let modeline = modeline_or_fallback(&mut i2cdev_edid);
+    let mut modeline = modeline_or_fallback(&mut i2cdev_edid);
 
     // Setup audio clocks on external PLL
 
@@ -648,19 +649,70 @@ fn main() -> ! {
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
                               pac::Interrupt::TIMER0);
 
-        let h_active = display.size().width;
-        let v_active = display.size().height;
+
+        let mut last_hpd = display.get_hpd();
 
         loop {
+
+            let h_active = display.size().width;
+            let v_active = display.size().height;
 
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
 
-            let (opts, reboot_n, error_n) = critical_section::with(|cs| {
-                (app.borrow_ref(cs).ui.opts.clone(),
-                 app.borrow_ref(cs).reboot_n.clone(),
-                 app.borrow_ref(cs).error_n.clone())
+            timer.disable();
+            let (opts, reboot_n, error_n, final_modeline) = critical_section::with(|cs| {
+
+                let mut app = app.borrow_ref_mut(cs);
+
+                // Dynamic modeline switching.
+                if display.get_hpd() && !last_hpd {
+                    info!("video/hpd: display reconnected!");
+                    let new_modeline = modeline_or_fallback(&mut i2cdev_edid);
+                    info!("video/hpd: previous {:?}", modeline);
+                    info!("video/hpd: infer {:?}", new_modeline);
+                    let mut reprogrammed_pll = false;
+                    if new_modeline != modeline {
+                        info!("video/hpd: display inferred different modeline to previous. switching timings...");
+                        if let Some(ref mut external_pll) = app.pll {
+                            // Hold DVI PHY in reset before touching the video PLL
+                            unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
+                                w.enable().bit(false)
+                            );
+                            configure_external_pll(&ExternalPLLConfig{
+                                clk0_hz: CLOCK_AUDIO_HZ,
+                                clk1_hz: Some((new_modeline.pixel_clk_mhz*1e6) as u32),
+                                clk1_inherit: false,
+                                spread_spectrum: Some(0.01),
+                            }, external_pll).unwrap();
+                            reprogrammed_pll = true;
+                        }
+                    } else {
+                        info!("video/hpd: display inferred same modeline as previous. do nothing");
+                    }
+
+                    if reprogrammed_pll {
+                        let peripherals = unsafe { pac::Peripherals::steal() };
+                        display = DMAFramebuffer0::new(
+                            peripherals.FRAMEBUFFER_PERIPH,
+                            peripherals.PALETTE_PERIPH,
+                            PSRAM_FB_BASE,
+                            new_modeline.clone()
+                        );
+                        app.modeline = new_modeline;
+                    }
+                }
+
+                last_hpd = display.get_hpd();
+
+                (app.ui.opts.clone(),
+                 app.reboot_n.clone(),
+                 app.error_n.clone(),
+                 app.modeline.clone())
             });
+            timer.enable();
+
+            modeline = final_modeline;
 
             draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
             draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA, &modeline).ok();

@@ -1,10 +1,10 @@
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub enum Rotate {
     Normal,
     Left,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct DVIModeline {
    pub h_active:      u16,
    pub h_sync_start:  u16,
