@@ -210,7 +210,7 @@ def top_level_cli(
     )
 
     if video_core:
-        archiver.video ="<dynamic>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
+        archiver.video ="<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
 
     if (kwargs["clock_settings"].dynamic_modeline and
         hw_platform.clock_domain_generator != tiliqua_pll.TiliquaDomainGeneratorPLLExternal):
