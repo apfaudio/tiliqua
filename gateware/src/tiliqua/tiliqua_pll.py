@@ -305,7 +305,8 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
         m.domains.audio      = ClockDomain()
         m.domains.raw48      = ClockDomain()
         m.domains.expll_clk0 = ClockDomain()
-        m.domains.expll_clk1 = ClockDomain()
+        if self.settings.modeline or self.settings.dynamic_modeline:
+            m.domains.expll_clk1 = ClockDomain()
 
         clk48 = platform.request(platform.default_clk, dir='i').i
         reset  = Signal(init=0)
@@ -315,9 +316,13 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             # external PLL clock domain with no synchronous reset.
             ClockSignal("expll_clk0").eq(platform.request("clkex", 0).i),
             ResetSignal("expll_clk0").eq(0),
-            ClockSignal("expll_clk1").eq(platform.request("clkex", 1).i),
-            ResetSignal("expll_clk1").eq(0),
         ]
+
+        if self.settings.modeline or self.settings.dynamic_modeline:
+            m.d.comb += [
+                ClockSignal("expll_clk1").eq(platform.request("clkex", 1).i),
+                ResetSignal("expll_clk1").eq(0),
+            ]
 
         # Generate synchronous reset for audio domain (there is no internal
         # PLL between the external PLL clock and the audio domain).
