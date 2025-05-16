@@ -57,10 +57,11 @@ def top_level_cli(
                         help="Force usage of maximum CODEC sample rate (192kHz, default is 48kHz).")
 
     if video_core:
-        parser.add_argument('--modeline', type=str, default='1280x720p60',
-                            help=("Set static video mode. For non-SoC bitstreams, this is the only option. "
-                                  "For SoC bitstreams, `--dynamic-modeline` is often preferred and enabled "
-                                  "by default, so there is no need to specify a static video mode.")
+        parser.add_argument('--modeline', type=str, default=None,
+                            help=("Set static video mode. For some bitstreams, this is the only option. "
+                                  "For SoC bitstreams, on HW R4+ it is not required, as the video mode "
+                                  "is dynamically inferred by the bootloader and passed to bitstreams.")
+                            )
 
     if sim_ports or issubclass(fragment, TiliquaSoc):
         simulation_supported = True
@@ -93,17 +94,6 @@ def top_level_cli(
                             )
         parser.add_argument('--fw-offset', type=str, default=None,
                             help="SoC designs: See `--fw-location`.")
-        parser.add_argument('--dynamic-modeline', action='store_true',
-                            help=(
-                                "SoC designs: Video mode is read from display EDID in bootloader, and used "
-                                "to determine display timings. The bootloader saves these timings in a "
-                                "`bootinfo` struct in PSRAM, so user bitstreams can read them and match "
-                                "whatever display settings were inferred in the bootloader. This is ENABLED "
-                                "by default on Hardware R4 upward (which has an external dynamic PLL). You "
-                                "can DISABLE this feature by passing a static mode with `--modeline` when "
-                                "building the bootloader and all user bitstreams. ")
-                            )
-
 
     # TODO: is this ok on windows?
     name_default = os.path.normpath(sys.argv[0]).split(os.sep)[2].replace("_", "-").upper()
@@ -152,18 +142,27 @@ def top_level_cli(
 
     audio_clock = platform_class.default_audio_clock
     if video_core:
-        if hasattr(args, 'dynamic_modeline') and args.dynamic_modeline:
-            kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
-                audio_clock.to_192khz() if args.fs_192khz else audio_clock,
-                dynamic_modeline=True,
-                modeline=None)
-        else:
+        if args.modeline is not None:
+            # Static video mode overrides other settings.
             modelines = dvi_modeline.DVIModeline.all_timings()
-            assert args.modeline in modelines, f"error: fixed modeline must be one of {modelines.keys()}"
+            assert args.modeline in modelines, f"error: fixed `--modeline` must be one of {modelines.keys()}"
             kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
                 audio_clock.to_192khz() if args.fs_192khz else audio_clock,
                 dynamic_modeline=False,
                 modeline=modelines[args.modeline])
+        elif issubclass(fragment, TiliquaSoc):
+            # No static video mode was set. Check if the platform supports dynamic video mode settings.
+            if platform_class.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal:
+                kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
+                    audio_clock.to_192khz() if args.fs_192khz else audio_clock,
+                    dynamic_modeline=True,
+                    modeline=None)
+            else:
+                raise ValueError(
+                    "Cannot infer dynamic video mode on a platform without an external PLL (HW < R4?) "
+                    "Use `--modeline` instead to specify a static resolution.")
+        else:
+            raise ValueError("Video core requires `--modeline` set to desired resolution")
     else:
         kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
             audio_clock.to_192khz() if args.fs_192khz else audio_clock,
@@ -221,12 +220,6 @@ def top_level_cli(
 
     if video_core:
         archiver.video ="<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
-
-    if (kwargs["clock_settings"].dynamic_modeline and
-        hw_platform.clock_domain_generator != tiliqua_pll.TiliquaDomainGeneratorPLLExternal):
-        raise ValueError(
-            "Cannot use --dynamic-modeline on a platform without an external PLL (HW rev older than "
-            "Tiliqua R4?). Use --modeline instead.")
 
     if hw_platform.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal:
         archiver.external_pll_config = ExternalPLLConfig(
