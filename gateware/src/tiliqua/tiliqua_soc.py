@@ -399,6 +399,8 @@ class TiliquaSoc(Component):
             f.write(f"pub const UI_NAME: &str            = \"{self.ui_name}\";\n")
             f.write(f"pub const UI_SHA: &str             = \"{self.ui_sha}\";\n")
             f.write(f"pub const HW_REV_MAJOR: u32        = {self.platform_class.version_major};\n")
+            use_external_pll = self.platform_class.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal
+            f.write(f"pub const USE_EXTERNAL_PLL: bool   = {str(use_external_pll).lower()};\n")
             f.write(f"pub const CLOCK_SYNC_HZ: u32       = {self.clock_settings.frequencies.sync};\n")
             f.write(f"pub const CLOCK_AUDIO_HZ: u32      = {self.clock_settings.frequencies.audio};\n")
             f.write(f"pub const CLOCK_DVI_HZ: u32        = {self.clock_settings.frequencies.dvi};\n")

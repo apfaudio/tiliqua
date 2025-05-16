@@ -213,10 +213,21 @@ class DVIPLL:
                 clkos2_cphase = 0,
                 clkfb_div     = 11
             ),
+            DVIPLL(
+                pixel_clk_mhz = 39.07,
+                clki_div      = 15,
+                clkop_div     = 58,
+                clkop_cphase  = 9,
+                clkos_div     = 19,
+                clkos_cphase  = 0,
+                clkos2_div    = 95,
+                clkos2_cphase = 0,
+                clkfb_div     = 4
+            ),
         ]
 
         for pll in all_plls:
             if pixel_clk_mhz == pll.pixel_clk_mhz:
                 return pll
 
-        raise ValueError(f"DVI PLL for {pixel_clk_mhz} MHz not present!")
+        raise ValueError(f"`ecppll` setting for pixel clock {pixel_clk_mhz} MHz does not exist (add it?)")

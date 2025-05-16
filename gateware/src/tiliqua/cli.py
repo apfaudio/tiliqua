@@ -215,8 +215,8 @@ def top_level_cli(
     if (kwargs["clock_settings"].dynamic_modeline and
         hw_platform.clock_domain_generator != tiliqua_pll.TiliquaDomainGeneratorPLLExternal):
         raise ValueError(
-            "Cannot use --dynamic-modeline on a platform without an external PLL (older than "
-            "Tiliqua R4 hardware). Use --modeline instead.")
+            "Cannot use --dynamic-modeline on a platform without an external PLL (HW rev older than "
+            "Tiliqua R4?). Use --modeline instead.")
 
     if hw_platform.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal:
         archiver.external_pll_config = ExternalPLLConfig(
