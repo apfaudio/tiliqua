@@ -202,7 +202,14 @@ where
     }
     Text::with_alignment(
         &startup_report,
-        Point::new((h_active/2) as i32 + or, (v_active/2-70) as i32 + ot),
+        Point::new((h_active/2) as i32, (v_active/2+130) as i32 + ot),
+        norm,
+        Alignment::Center,
+    )
+    .draw(d).ok();
+    Text::with_alignment(
+        "Select a bitstream. To return here, hold encoder down for 3sec.",
+        Point::new((h_active/2) as i32, (v_active/2-70) as i32 + ot),
         norm,
         Alignment::Center,
     )
@@ -533,7 +540,6 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
 }
 
 fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
-    // TODO add read attempts?
     match read_edid(i2cdev) {
         Ok(edid) => match modeline_from_edid(edid) {
             Some(edid_modeline) => edid_modeline,
