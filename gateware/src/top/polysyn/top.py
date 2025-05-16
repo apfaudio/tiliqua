@@ -360,7 +360,7 @@ class SynthPeripheral(wiring.Component):
 
 class PolySoc(TiliquaSoc):
 
-    brief = "Polyphonic synthesizer, touch & MIDI control."
+    brief = "Touch+MIDI Polysynth (8-voice)"
 
     def __init__(self, **kwargs):
 
