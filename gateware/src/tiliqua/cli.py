@@ -58,7 +58,9 @@ def top_level_cli(
 
     if video_core:
         parser.add_argument('--modeline', type=str, default='1280x720p60',
-                            help="Default video mode if dynamic detection is not available.")
+                            help=("Set static video mode. For non-SoC bitstreams, this is the only option. "
+                                  "For SoC bitstreams, `--dynamic-modeline` is often preferred and enabled "
+                                  "by default, so there is no need to specify a static video mode.")
 
     if sim_ports or issubclass(fragment, TiliquaSoc):
         simulation_supported = True
@@ -92,7 +94,15 @@ def top_level_cli(
         parser.add_argument('--fw-offset', type=str, default=None,
                             help="SoC designs: See `--fw-location`.")
         parser.add_argument('--dynamic-modeline', action='store_true',
-                            help="SoC designs: video modeline is inherited from bootloader")
+                            help=(
+                                "SoC designs: Video mode is read from display EDID in bootloader, and used "
+                                "to determine display timings. The bootloader saves these timings in a "
+                                "`bootinfo` struct in PSRAM, so user bitstreams can read them and match "
+                                "whatever display settings were inferred in the bootloader. This is ENABLED "
+                                "by default on Hardware R4 upward (which has an external dynamic PLL). You "
+                                "can DISABLE this feature by passing a static mode with `--modeline` when "
+                                "building the bootloader and all user bitstreams. ")
+                            )
 
 
     # TODO: is this ok on windows?
