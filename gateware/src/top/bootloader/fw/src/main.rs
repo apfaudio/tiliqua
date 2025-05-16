@@ -449,17 +449,30 @@ where
 
 fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
     const EDID_ADDR: u8 = 0x50;
-    info!("video/edid: read_edid from i2c0 address 0x{:x}", EDID_ADDR);
-    let mut edid: [u8; 128] = [0; 128];
-    for i in 0..16 {
-        // WARN: be careful these transactions are not interrupted, because
-        // bad EDID transactions could brick monitors.
-        i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
-                                            Operation::Read(&mut edid[i*8..i*8+8])]).ok();
+    const EDID_READ_ATTEMPTS: usize = 3;
+    let mut read_attempts = 0;
+    loop {
+        info!("video/edid: read_edid from i2c0 address 0x{:x}", EDID_ADDR);
+        let mut edid: [u8; 128] = [0; 128];
+        for i in 0..16 {
+            // WARN: be careful these transactions are not interrupted, because
+            // bad EDID transactions could brick monitors.
+            i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
+                                                Operation::Read(&mut edid[i*8..i*8+8])]).ok();
+        }
+        let edid = edid::Edid::parse(&edid);
+        info!("video/edid: (attempt {}) read_edid got {:?}", read_attempts, edid);
+        match edid {
+            Ok(edid_parsed) => return Ok(edid_parsed),
+            Err(error) => {
+                read_attempts += 1;
+                if read_attempts == (EDID_READ_ATTEMPTS+1) {
+                    return Err(error)
+                }
+            }
+        }
+        riscv::asm::delay(10_000_000);
     }
-    let edid = edid::Edid::parse(&edid);
-    info!("video/edid: read_edid got {:?}", edid);
-    edid
 }
 
 fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
