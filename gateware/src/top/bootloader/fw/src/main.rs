@@ -52,6 +52,7 @@ pub enum BitstreamError {
     SpiflashCrcError,
     PllBadConfigError,
     PllI2cError,
+    BootloaderStaticModeline,
 }
 
 struct App {
@@ -336,6 +337,14 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                                 info!("video/pll: inherit pixel clock from bootloader modeline.");
                                 pll_config.clk1_hz = Some((bootinfo.modeline.pixel_clk_mhz*1e6f32) as u32);
                                 bootinfo.manifest.external_pll_config = Some(pll_config.clone());
+                                if FIXED_MODELINE.is_some() {
+                                    // Can't boot a dynamic modeline bitstream if the bootloader
+                                    // itself only supports static modelines, as we haven't read
+                                    // the EDID and so can't forward it. Fix is to only flash other
+                                    // bitstreams with static modelines, or reflash the bootloader
+                                    // with support for dynamic modelines.
+                                    Err(BitstreamError::BootloaderStaticModeline)?;
+                                }
                             }
                             if let Some(ref mut pll) = app.pll {
                                 // Disable DVI PHY before playing with external PLL.
@@ -540,13 +549,17 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
 }
 
 fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
-    match read_edid(i2cdev) {
-        Ok(edid) => match modeline_from_edid(edid) {
-            Some(edid_modeline) => edid_modeline,
+    if FIXED_MODELINE.is_none() {
+        match read_edid(i2cdev) {
+            Ok(edid) => match modeline_from_edid(edid) {
+                Some(edid_modeline) => edid_modeline,
+                _ => DVIModeline::default()
+            }
             _ => DVIModeline::default()
         }
-        _ => DVIModeline::default()
-    }.maybe_override_fixed(FIXED_MODELINE, CLOCK_DVI_HZ)
+    } else {
+        DVIModeline::default().maybe_override_fixed(FIXED_MODELINE, CLOCK_DVI_HZ)
+    }
 }
 
 #[entry]
