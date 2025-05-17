@@ -248,7 +248,7 @@ class SIDSoc(TiliquaSoc):
         ]
 
         m.d.comb += [
-            self.scope_periph.i.valid.eq(pmod0.i_cal.valid),
+            self.scope_periph.i.valid.eq(pmod0.i_cal.valid & pmod0.i_cal.ready),
             self.scope_periph.i.payload[0].eq(pmod0.i_cal.payload[3]),
             self.scope_periph.i.payload[1].eq(pmod0.i_cal.payload[0]),
             self.scope_periph.i.payload[2].eq(pmod0.i_cal.payload[1]),

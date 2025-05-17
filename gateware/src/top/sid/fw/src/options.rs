@@ -16,8 +16,8 @@ pub enum Page {
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TriggerMode {
-    #[default]
     Always,
+    #[default]
     Rising,
 }
 
@@ -136,7 +136,7 @@ pub struct FilterOpts {
 
 #[derive(OptionPage, Clone)]
 pub struct ScopeOpts {
-    #[option(32)]
+    #[option(1056)]
     pub timebase: IntOption<TimebaseParams>,
     #[option]
     pub trig_mode: EnumOption<TriggerMode>,

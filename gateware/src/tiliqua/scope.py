@@ -7,7 +7,7 @@ Multi-channel oscilloscope and vectorscope SoC peripherals.
 
 from amaranth                                    import *
 from amaranth.lib                                import wiring, data, stream, fifo
-from amaranth.lib.wiring                         import In, Out, flipped, connect
+from amaranth.lib.wiring                         import In, Out
 
 from amaranth_soc                                import csr
 
@@ -34,12 +34,9 @@ class VectorTracePeripheral(wiring.Component):
         yscale: csr.Field(csr.action.W, unsigned(8))
 
     def __init__(self, fb, bus_dma, **kwargs):
+
         self.stroke = Stroke(fb=fb, **kwargs)
         bus_dma.add_master(self.stroke.bus)
-        self.i = self.stroke.i
-        self.en = Signal()
-        self.soc_en = Signal()
-        self.rotate_left = Signal()
 
         regs = csr.Builder(addr_width=5, data_width=8)
 
@@ -52,6 +49,10 @@ class VectorTracePeripheral(wiring.Component):
         self._bridge = csr.Bridge(regs.as_memory_map())
 
         super().__init__({
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            "en": In(1),
+            "soc_en": In(1),
+            "rotate_left": In(1),
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
@@ -61,7 +62,8 @@ class VectorTracePeripheral(wiring.Component):
         m.submodules.bridge = self._bridge
         m.submodules += self.stroke
 
-        connect(m, flipped(self.bus), self._bridge.bus)
+        wiring.connect(m, wiring.flipped(self.i), self.stroke.i)
+        wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         m.d.comb += self.stroke.enable.eq(self.en & self.soc_en)
         m.d.comb += self.stroke.rotate_left.eq(self.rotate_left)
@@ -118,24 +120,12 @@ class ScopeTracePeripheral(wiring.Component):
         ypos: csr.Field(csr.action.W, unsigned(16))
 
     def __init__(self, fb, bus_dma, **kwargs):
+
         self.strokes = [Stroke(fb=fb, n_upsample=None, **kwargs)
                         for _ in range(4)]
 
-        self.plot_fifo = fifo.SyncFIFOBuffered(
-            width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
-        self.i = self.plot_fifo.w_stream
-        self.isplit4 = dsp.Split(4)
-
         for s in self.strokes:
             bus_dma.add_master(s.bus)
-
-        self.en = Signal()
-        self.soc_en = Signal()
-        self.rotate_left = Signal()
-
-        self.timebase = Signal(shape=dsp.ASQ)
-        self.trigger_lvl = Signal(shape=dsp.ASQ)
-        self.trigger_always = Signal()
 
         regs = csr.Builder(addr_width=6, data_width=8)
         self._flags          = regs.add("flags",          self.Flags(),         offset=0x0)
@@ -150,6 +140,10 @@ class ScopeTracePeripheral(wiring.Component):
 
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            "en": In(1),
+            "soc_en": In(1),
+            "rotate_left": In(1),
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
@@ -157,11 +151,19 @@ class ScopeTracePeripheral(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.plot_fifo = self.plot_fifo
-        wiring.connect(m, self.plot_fifo.r_stream, self.isplit4.i)
+        timebase = Signal(shape=dsp.ASQ)
+        trigger_lvl = Signal(shape=dsp.ASQ)
+        trigger_always = Signal()
+
+        m.submodules.plot_fifo = plot_fifo = fifo.SyncFIFOBuffered(
+            width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
+        self.isplit4 = dsp.Split(4)
+
+        wiring.connect(m, wiring.flipped(self.i), plot_fifo.w_stream)
+        wiring.connect(m, plot_fifo.r_stream, self.isplit4.i)
 
         m.submodules.bridge = self._bridge
-        connect(m, flipped(self.bus), self._bridge.bus)
+        wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         m.submodules += self.strokes
 
@@ -182,12 +184,12 @@ class ScopeTracePeripheral(wiring.Component):
         # Audio => Trigger
         dsp.connect_remap(m, irep2.o[0], trig.i, lambda o, i: [
             i.payload.sample.eq(o.payload),
-            i.payload.threshold.eq(self.trigger_lvl),
+            i.payload.threshold.eq(trigger_lvl),
         ])
         # Trigger => Ramp
         dsp.connect_remap(m, trig.o, ramp.i, lambda o, i: [
-            i.payload.trigger.eq(o.payload | self.trigger_always),
-            i.payload.td.eq(self.timebase),
+            i.payload.trigger.eq(o.payload | trigger_always),
+            i.payload.td.eq(timebase),
         ])
 
         # Split ramp into 4 streams, one for each channel
@@ -213,7 +215,7 @@ class ScopeTracePeripheral(wiring.Component):
             m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
 
         with m.If(self._flags.f.trigger_always.w_stb):
-            m.d.sync += self.trigger_always.eq(self._flags.f.trigger_always.w_data)
+            m.d.sync += trigger_always.eq(self._flags.f.trigger_always.w_data)
 
         with m.If(self._flags.f.rotate_left.w_stb):
             m.d.sync += self.rotate_left.eq(self._flags.f.rotate_left.w_data)
@@ -227,7 +229,7 @@ class ScopeTracePeripheral(wiring.Component):
                 m.d.sync += s.intensity.eq(self._intensity.f.intensity.w_data)
 
         with m.If(self._timebase.f.timebase.w_stb):
-            m.d.sync += self.timebase.as_value().eq(self._timebase.f.timebase.w_data)
+            m.d.sync += timebase.as_value().eq(self._timebase.f.timebase.w_data)
 
         with m.If(self._xscale.f.xscale.w_stb):
             for s in self.strokes:
@@ -238,7 +240,7 @@ class ScopeTracePeripheral(wiring.Component):
                 m.d.sync += s.scale_y.eq(self._yscale.f.yscale.w_data)
 
         with m.If(self._trigger_lvl.f.trigger_level.w_stb):
-            m.d.sync += self.trigger_lvl.as_value().eq(self._trigger_lvl.f.trigger_level.w_data)
+            m.d.sync += trigger_lvl.as_value().eq(self._trigger_lvl.f.trigger_level.w_data)
 
         with m.If(self._xpos.f.xpos.w_stb):
             for s in self.strokes:
