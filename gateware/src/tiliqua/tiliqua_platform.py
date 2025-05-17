@@ -160,7 +160,7 @@ class _TiliquaR2Mobo:
         Resource("mobo_leds_oe", 0, PinsN("11", dir="o", conn=("m2", 0))),
 
         # DVI: Hotplug Detect
-        Resource("dvi_hpd", 0, Pins("8", dir="i", conn=("m2", 0)),
+        Resource("dvi_hpd", 0, Pins("37", dir="i", conn=("m2", 0)),
                  Attrs(IO_TYPE="LVCMOS33")),
 
         # TRS MIDI RX
