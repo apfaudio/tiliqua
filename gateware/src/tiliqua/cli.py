@@ -142,27 +142,24 @@ def top_level_cli(
 
     audio_clock = platform_class.default_audio_clock
     if video_core:
-        if args.modeline is not None:
-            # Static video mode overrides other settings.
+        if (args.modeline is None and issubclass(fragment, TiliquaSoc) and
+            platform_class.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal):
+            # If this configuration supports dynamic modelines and no modeline was set, use dynamic video mode.
+            kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
+                audio_clock.to_192khz() if args.fs_192khz else audio_clock,
+                dynamic_modeline=True,
+                modeline=None)
+        else:
+            # Use static video mode
+            if args.modeline is None:
+                # Default modeline (if no static modeline was set and dynamic modelines unsupported)
+                args.modeline = "1280x720p60"
             modelines = dvi_modeline.DVIModeline.all_timings()
             assert args.modeline in modelines, f"error: fixed `--modeline` must be one of {modelines.keys()}"
             kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
                 audio_clock.to_192khz() if args.fs_192khz else audio_clock,
                 dynamic_modeline=False,
                 modeline=modelines[args.modeline])
-        elif issubclass(fragment, TiliquaSoc):
-            # No static video mode was set. Check if the platform supports dynamic video mode settings.
-            if platform_class.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal:
-                kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
-                    audio_clock.to_192khz() if args.fs_192khz else audio_clock,
-                    dynamic_modeline=True,
-                    modeline=None)
-            else:
-                raise ValueError(
-                    "Cannot infer dynamic video mode on a platform without an external PLL (HW < R4?) "
-                    "Use `--modeline` instead to specify a static resolution.")
-        else:
-            raise ValueError("Video core requires `--modeline` set to desired resolution")
     else:
         kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
             audio_clock.to_192khz() if args.fs_192khz else audio_clock,

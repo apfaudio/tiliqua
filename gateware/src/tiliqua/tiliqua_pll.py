@@ -286,9 +286,9 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
                 dyn2='(dynamic)' if self.settings.dynamic_modeline else '',
                 ))
             if self.settings.dynamic_modeline:
-                print("Dynamic video clock (maximum pixel clock shown).")
+                print("PLL configured for DYNAMIC video mode (maximum pixel clock shown).")
             else:
-                print(f"Fixed video clock for: {self.settings.modeline}.")
+                print(f"PLL configured for STATIC video mode: {self.settings.modeline}.")
         else:
             print(textwrap.dedent(self.clock_tree_no_video[1:]))
             print("Video clocks disabled (no video out).")
@@ -443,6 +443,9 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
+        if self.settings.frequencies.dvi is not None:
+            print(f"PLL configured for STATIC video mode: {self.settings.modeline}.")
+
         # Create our domains.
         m.domains.sync   = ClockDomain()
         m.domains.usb    = ClockDomain()
@@ -580,6 +583,9 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
+
+        if self.settings.frequencies.dvi is not None:
+            print(f"PLL configured for STATIC video mode: {self.settings.modeline}.")
 
         # Create our domains.
         m.domains.sync   = ClockDomain()
