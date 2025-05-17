@@ -228,5 +228,5 @@ class Stroke(wiring.Component):
                 with m.If(bus.stb & bus.ack):
                     m.next = 'LATCH0'
 
-        return m
+        return ResetInserter({'sync': ~self.fb.enable})(m)
 
