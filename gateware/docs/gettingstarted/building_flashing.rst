@@ -11,7 +11,7 @@ Each top-level bitstream has a command-line interface. You can see the options b
    # from `gateware` directory
    pdm dsp
 
-The available options change depending on the top-level project. For example, many projects have video output, and from the CLI you can select the video resolution.
+The available options change depending on the top-level project. For example, many projects have video output, and from the CLI you can select the video modeline.
 
 .. warning::
 
@@ -84,3 +84,21 @@ For non-SoC projects that don't require extra firmware, note that you can also d
    sudo openFPGALoader -c dirtyJtag build/dsp-mirror-r4/top.bit
 
 This flashes much quicker, as we don't have to wait for flash pages to update. This can be useful for quickly iterating on DSP gateware. In the future, this will be possible with SoC bitstreams as well, but requires an extra bridge to directly stream debug firmware to the PSRAM from the host, which isn't implemented yet.
+
+Video Modes
+-----------
+
+From the Tiliqua bootloader (or whenever a display is hotplugged whilst in the bootloader), Tiliqua reads the attached display EDID to determine which display timings to use. Tiliqua will adapt to the first timing descriptor it finds, and if none of them can be met (usually if the pixel clock is too fast), it falls back to 1280x720p60. You can inspect the logs as to how the bootloader decided which display mode to use by looking at the serial telemetry on the debug port.
+
+Depending on the project, Tiliqua user bitstreams may:
+
+- Not use the video output at all (for example ``pdm dsp`` and ``pdm usb_audio`` are audio-only)
+- Use a static video mode (for example ``pdm vectorscope_no_soc``)
+- Support dynamic video modes (all SoC bitstreams)
+
+Dynamic video modes are useful as the same bitstream can be used/shared, regardless of which screen is plugged in. When dynamic video modes are supported, the user bitstream will inherit the video mode that was autodetected by the bootloader (this is communicated by a ``bootinfo`` struct saved to PSRAM before the user bitstream is booted).
+
+
+.. note::
+
+   If for some reason you want to disable EDID reading and use a static/specific mode, you can always re-build and re-flash all bitstreams using a flag like ``--modeline 1280x720p60`` to force a static modeline, disabling dynamic mode detection. Note that the bootloader built with a static modeline can *only* start bitstreams that are also built with a static modeline, however a bootloader built for dynamic modelines can start *both* types of bitstreams. The bootloader will display an error if these conditions are not met.

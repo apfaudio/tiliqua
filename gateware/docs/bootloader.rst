@@ -104,7 +104,7 @@ Flashing Steps
 
     # Flash bootloader to start of flash, build assuming XIP (execute directly from SPI flash, not PSRAM)
     # Be careful to replace `--hw r4` with your hardware revision!
-    pdm bootloader build --hw r4 --fw-location=spiflash --resolution 1280x720p60
+    pdm bootloader build --hw r4 --fw-location=spiflash
     pdm flash archive build/bootloader-r4/bootloader-*.tar.gz
 
 3. Build and flash any other bitstreams you want to slots 0..7 (you can also download these archives from CI artifacts):
