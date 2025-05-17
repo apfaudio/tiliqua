@@ -597,7 +597,7 @@ fn main() -> ! {
 
     // Setup audio clocks on external PLL
 
-    let maybe_external_pll = if HW_REV_MAJOR >= 4 {
+    let maybe_external_pll = if USE_EXTERNAL_PLL {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         configure_external_pll(&ExternalPLLConfig{
