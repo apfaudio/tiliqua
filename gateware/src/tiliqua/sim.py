@@ -120,6 +120,8 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
     tracing_flags = ["--trace-fst", "--trace-structs"] if tracing else []
 
     if hasattr(fragment, "fb"):
+        if fragment.fb.fixed_modeline is None:
+            raise ValueError("Simulation requires specifying a static video mode with `--modeline`")
         dvi_clk_hz = clock_settings.frequencies.dvi
         dvi_h_active = fragment.fb.fixed_modeline.h_active
         dvi_v_active = fragment.fb.fixed_modeline.v_active
