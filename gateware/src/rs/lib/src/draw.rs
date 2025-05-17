@@ -736,7 +736,7 @@ mod tests {
         opts.tick_up();
         opts.toggle_modify();
 
-        draw_name(&mut disp, H_ACTIVE/2, 30, 0, "MACRO-OSC", "b2d3aa").ok();
+        draw_name(&mut disp, H_ACTIVE/2, 30, 0, "MACRO-OSC", "b2d3aa", &DVIModeline::default()).ok();
         draw_options(&mut disp, &opts, H_ACTIVE/2-30, 70, 0).ok();
         disp.img.save("draw_options.png").unwrap();
     }
