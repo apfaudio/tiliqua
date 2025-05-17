@@ -2,7 +2,6 @@
 #![no_main]
 
 use critical_section::Mutex;
-use core::convert::TryInto;
 use log::{info, warn};
 use riscv_rt::entry;
 use irq::handler;
@@ -10,6 +9,7 @@ use core::cell::RefCell;
 use heapless::String;
 use micromath::{F32Ext};
 use strum_macros::{EnumIter, IntoStaticStr};
+use embedded_hal::delay::DelayNs;
 
 use core::str::FromStr;
 use core::fmt::Write;
@@ -18,27 +18,31 @@ use tiliqua_lib::*;
 use pac::constants::*;
 use tiliqua_fw::*;
 use tiliqua_hal::pmod::EurorackPmod;
-use tiliqua_hal::video::Video;
+use tiliqua_hal::persist::Persist;
 use tiliqua_hal::si5351::*;
 use tiliqua_hal::cy8cmbr3xxx::*;
+use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 use tiliqua_manifest::*;
 use opts::OptionString;
 
 use embedded_graphics::{
     mono_font::{ascii::FONT_9X15, ascii::FONT_9X15_BOLD, MonoTextStyle},
-    pixelcolor::{Gray8, GrayColor},
     prelude::*,
     primitives::{PrimitiveStyleBuilder, Line},
     text::{Alignment, Text},
+    pixelcolor::Gray8,
 };
 
 use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;
-
-hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE,
-                       VIDEO_ROTATE_90);
+use hal::dma_framebuffer::{Rotate, DVIModeline};
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
+// Technically this lower bound is out of the ECP5 PLL spec,
+// see the notes in `tiliqua_pll.py:create_dynamic_dvi_pll`.
+// But we keep it this low for compatibility with low res modes.
+pub const PIXEL_CLK_MIN_KHZ: u32 = 24_000u32;
+pub const PIXEL_CLK_MAX_KHZ: u32 = CLOCK_DVI_HZ / 1000u32;
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
@@ -48,6 +52,7 @@ pub enum BitstreamError {
     SpiflashCrcError,
     PllBadConfigError,
     PllI2cError,
+    BootloaderStaticModeline,
 }
 
 struct App {
@@ -58,11 +63,12 @@ struct App {
     time_since_reboot_requested: u32,
     manifests: [Option<BitstreamManifest>; N_MANIFESTS],
     animation_elapsed_ms: u32,
+    modeline: DVIModeline,
 }
 
 impl App {
     pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
-               pll: Option<Si5351Device<I2c0>>) -> Self {
+               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -77,6 +83,7 @@ impl App {
             time_since_reboot_requested: 0u32,
             manifests,
             animation_elapsed_ms: 0u32,
+            modeline,
         }
     }
 
@@ -109,12 +116,14 @@ impl App {
 
 fn print_rebooting<D>(d: &mut D, rng: &mut fastrand::Rng)
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = Gray8> + OriginDimensions,
 {
     let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
+    let h_active = d.size().width as i32;
+    let v_active = d.size().height as i32;
     Text::with_alignment(
         "REBOOTING",
-        Point::new(rng.i32(0..H_ACTIVE as i32), rng.i32(0..V_ACTIVE as i32)),
+        Point::new(rng.i32(0..h_active), rng.i32(0..v_active)),
         style,
         Alignment::Center,
     )
@@ -127,48 +136,50 @@ fn draw_summary<D>(d: &mut D,
                    startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = Gray8> + OriginDimensions,
 {
+    let h_active = d.size().width as i32;
+    let v_active = d.size().height as i32;
     let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
     if let Some(bitstream) = bitstream_manifest {
         Text::with_alignment(
             "brief:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+20) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.brief,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+20) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+20) as i32 + ot),
             norm,
             Alignment::Left,
         )
         .draw(d).ok();
         Text::with_alignment(
             "video:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+40) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.video,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+40) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+40) as i32 + ot),
             norm,
             Alignment::Left,
         )
         .draw(d).ok();
         Text::with_alignment(
             "sha:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.sha,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+60) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Left,
         )
@@ -177,14 +188,14 @@ where
     if let Some(error_string) = &error {
         Text::with_alignment(
             "error:".into(),
-            Point::new((H_ACTIVE/2 - 10) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
+            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+80) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &error_string,
-            Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2+80) as i32 + ot),
+            Point::new((h_active/2) as i32 + or, (v_active/2+80) as i32 + ot),
             norm,
             Alignment::Left,
         )
@@ -192,7 +203,14 @@ where
     }
     Text::with_alignment(
         &startup_report,
-        Point::new((H_ACTIVE/2) as i32 + or, (V_ACTIVE/2-70) as i32 + ot),
+        Point::new((h_active/2) as i32, (v_active/2+130) as i32 + ot),
+        norm,
+        Alignment::Center,
+    )
+    .draw(d).ok();
+    Text::with_alignment(
+        "Select a bitstream. To return here, hold encoder down for 3sec.",
+        Point::new((h_active/2) as i32, (v_active/2-70) as i32 + ot),
         norm,
         Alignment::Center,
     )
@@ -299,7 +317,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         if let Some(n) = app.reboot_n {
             app.time_since_reboot_requested += TIMER0_ISR_PERIOD_MS;
             // Give codec time to mute and display time to draw 'REBOOTING'
-            if app.time_since_reboot_requested > 500 {
+            if app.time_since_reboot_requested > 250 {
                 // Is there a firmware image to copy to PSRAM before we switch bitstreams?
                 let error = if let Some(manifest) = &app.manifests[n].clone() {
                     || -> Result<(), BitstreamError> {
@@ -309,11 +327,30 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         if manifest.hw_rev != HW_REV_MAJOR {
                             Err(BitstreamError::HwVersionMismatch)?;
                         }
-                        for region in &manifest.regions {
-                            copy_spiflash_region_to_psram(region)?;
-                        }
-                        if let Some(pll_config) = manifest.external_pll_config.clone() {
+                        // BootInfo structure placed at the end of PSRAM
+                        let mut bootinfo = bootinfo::BootInfo {
+                            manifest: manifest.clone(),
+                            modeline: app.modeline.clone(),
+                        };
+                        if let Some(mut pll_config) = manifest.external_pll_config.clone() {
+                            if pll_config.clk1_inherit {
+                                info!("video/pll: inherit pixel clock from bootloader modeline.");
+                                pll_config.clk1_hz = Some((bootinfo.modeline.pixel_clk_mhz*1e6f32) as u32);
+                                bootinfo.manifest.external_pll_config = Some(pll_config.clone());
+                                if FIXED_MODELINE.is_some() {
+                                    // Can't boot a dynamic modeline bitstream if the bootloader
+                                    // itself only supports static modelines, as we haven't read
+                                    // the EDID and so can't forward it. Fix is to only flash other
+                                    // bitstreams with static modelines, or reflash the bootloader
+                                    // with support for dynamic modelines.
+                                    Err(BitstreamError::BootloaderStaticModeline)?;
+                                }
+                            }
                             if let Some(ref mut pll) = app.pll {
+                                // Disable DVI PHY before playing with external PLL.
+                                unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
+                                    w.enable().bit(false)
+                                );
                                 configure_external_pll(&pll_config, pll).or(
                                     Err(BitstreamError::PllI2cError))?;
                             } else {
@@ -322,6 +359,13 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                                 Err(BitstreamError::PllBadConfigError)?;
                             }
                         }
+                        // Place BootInfo at the end of PSRAM
+                        unsafe { bootinfo.to_addr(BOOTINFO_BASE) };
+                        for region in &manifest.regions {
+                            copy_spiflash_region_to_psram(region)?;
+                        }
+                        riscv::asm::fence();
+                        riscv::asm::fence_i();
                         Ok(())
                     }()
                 } else {
@@ -419,6 +463,105 @@ where
     }
 }
 
+fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
+    const EDID_ADDR: u8 = 0x50;
+    const EDID_READ_ATTEMPTS: usize = 3;
+    let mut read_attempts = 0;
+    loop {
+        info!("video/edid: read_edid from i2c0 address 0x{:x}", EDID_ADDR);
+        let mut edid: [u8; 128] = [0; 128];
+        for i in 0..16 {
+            // WARN: be careful these transactions are not interrupted, because
+            // bad EDID transactions could brick monitors.
+            i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
+                                                Operation::Read(&mut edid[i*8..i*8+8])]).ok();
+        }
+        let edid = edid::Edid::parse(&edid);
+        info!("video/edid: (attempt {}) read_edid got {:?}", read_attempts, edid);
+        match edid {
+            Ok(edid_parsed) => return Ok(edid_parsed),
+            Err(error) => {
+                read_attempts += 1;
+                if read_attempts == (EDID_READ_ATTEMPTS+1) {
+                    return Err(error)
+                }
+            }
+        }
+        riscv::asm::delay(10_000_000);
+    }
+}
+
+fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
+
+    // Read the EDID contents and see if we can use it to dynamically create a
+    // sensible modeline. If we can't fine a reasonable descriptor, we return
+    // None and assumably the caller falls back to some default modeline.
+
+    info!("video/edid: valid edid. scanning detailed timing descriptors...");
+    for descriptor in edid.descriptors.iter() {
+        if let edid::Descriptor::DetailedTiming(desc) = descriptor {
+            info!("video/edid: checking detailed timing descriptor, contents: {:?}", descriptor);
+            if desc.pixel_clock_khz < PIXEL_CLK_MIN_KHZ || desc.pixel_clock_khz > PIXEL_CLK_MAX_KHZ {
+                warn!("video/edid: skip descriptor (out-of-range pixel clock)");
+                continue;
+            }
+            if desc.features.interlaced {
+                warn!("video/edid: skip descriptor (interlaced timings)");
+                continue;
+            }
+            if let edid::SyncType::DigitalSeparate { vsync_positive, hsync_positive } = desc.features.sync_type {
+                let mut rotate = Rotate::Normal;
+                if edid.header.product_code == 0x3132 || edid.header.product_code == 0xAA61 {
+                    info!("video/edid: detected tiliqua screen! rotate framebuffer 90 degrees.");
+                    rotate = Rotate::Left;
+                }
+                let modeline = DVIModeline {
+                    h_active      : desc.horizontal_active,
+                    h_sync_start  : desc.horizontal_active +
+                                    desc.horizontal_sync_offset,
+                    h_sync_end    : desc.horizontal_active +
+                                    desc.horizontal_sync_offset +
+                                    desc.horizontal_sync_pulse_width,
+                    h_total       : desc.horizontal_active +
+                                    desc.horizontal_blanking,
+                    h_sync_invert : !hsync_positive,
+                    v_active      : desc.vertical_active,
+                    v_sync_start  : desc.vertical_active +
+                                    desc.vertical_sync_offset,
+                    v_sync_end    : desc.vertical_active +
+                                    desc.vertical_sync_offset +
+                                    desc.vertical_sync_pulse_width,
+                    v_total       : desc.vertical_active +
+                                    desc.vertical_blanking,
+                    v_sync_invert : !vsync_positive,
+                    pixel_clk_mhz : (desc.pixel_clock_khz as f32) / 1e3f32,
+                    rotate
+                };
+                info!("video/edid: found useable modeline, returning: {:?}", modeline);
+                return Some(modeline)
+            } else {
+                warn!("video/edid: skip descriptor (unknown sync format)");
+                continue;
+            }
+        }
+    }
+    None
+}
+
+fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
+    if FIXED_MODELINE.is_none() {
+        match read_edid(i2cdev) {
+            Ok(edid) => match modeline_from_edid(edid) {
+                Some(edid_modeline) => edid_modeline,
+                _ => DVIModeline::default()
+            }
+            _ => DVIModeline::default()
+        }
+    } else {
+        DVIModeline::default().maybe_override_fixed(FIXED_MODELINE, CLOCK_DVI_HZ)
+    }
+}
+
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -426,7 +569,7 @@ fn main() -> ! {
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
-    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
+    let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
 
     crate::handlers::logger_init(serial);
 
@@ -446,14 +589,21 @@ fn main() -> ! {
         }
     }
 
-    // Setup external PLL
+    // Fetch initial modeline (may be used for external PLL setup)
+
+    timer.delay_ms(10);
+    let mut i2cdev_edid = I2c0::new(unsafe { pac::I2C0::steal() } );
+    let mut modeline = modeline_or_fallback(&mut i2cdev_edid);
+
+    // Setup audio clocks on external PLL
 
     let maybe_external_pll = if HW_REV_MAJOR >= 4 {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         configure_external_pll(&ExternalPLLConfig{
             clk0_hz: CLOCK_AUDIO_HZ,
-            clk1_hz: Some(CLOCK_DVI_HZ),
+            clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
+            clk1_inherit: false,
             spread_spectrum: Some(0.01),
         }, &mut si5351drv).unwrap();
         Some(si5351drv)
@@ -497,53 +647,124 @@ fn main() -> ! {
     opts.boot.slot6.value = names[6].clone();
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
-    let app = Mutex::new(RefCell::new(App::new(opts, manifests.clone(), maybe_external_pll)));
 
+    let app = Mutex::new(RefCell::new(
+            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone())));
+
+    let mut display = DMAFramebuffer0::new(
+        peripherals.FRAMEBUFFER_PERIPH,
+        peripherals.PALETTE_PERIPH,
+        PSRAM_FB_BASE,
+        modeline.clone(),
+    );
 
     handler!(timer0 = || timer0_handler(&app));
 
     irq::scope(|s| {
 
-        s.register(handlers::Interrupt::TIMER0, timer0);
-
-        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
-                              pac::Interrupt::TIMER0);
-
         let mut logo_coord_ix = 0u32;
         let mut rng = fastrand::Rng::with_seed(0);
-        let mut display = DMADisplay {
-            framebuffer_base: PSRAM_FB_BASE as *mut u32,
-        };
-        video.set_persist(256);
+
+        persist.set_persist(256);
 
         let stroke = PrimitiveStyleBuilder::new()
             .stroke_color(Gray8::new(0xB0))
             .stroke_width(1)
             .build();
 
-        palette::ColorPalette::default().write_to_hardware(&mut video);
+        palette::ColorPalette::default().write_to_hardware(&mut display);
 
         log::info!("{}", startup_report);
 
+        s.register(handlers::Interrupt::TIMER0, timer0);
+        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
+                              pac::Interrupt::TIMER0);
+
+
+        let mut last_hpd = display.get_hpd();
+
         loop {
+
+            let h_active = display.size().width;
+            let v_active = display.size().height;
 
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
 
-            let (opts, reboot_n, error_n) = critical_section::with(|cs| {
-                (app.borrow_ref(cs).ui.opts.clone(),
-                 app.borrow_ref(cs).reboot_n.clone(),
-                 app.borrow_ref(cs).error_n.clone())
+            let (opts, reboot_n, error_n, final_modeline) = critical_section::with(|cs| {
+
+                let mut app = app.borrow_ref_mut(cs);
+
+                //
+                // Dynamic modeline switching.
+                // Rising edge hotplug checks EDID, reprograms PLL and reinitializes display.
+                //
+
+                if display.get_hpd() && !last_hpd {
+                    // Rising edge of DVI HPD
+                    info!("video/hpd: display reconnected!");
+                    let new_modeline = modeline_or_fallback(&mut i2cdev_edid);
+                    info!("video/hpd: modeline was {:?}", modeline);
+                    info!("video/hpd: modeline infer {:?}", new_modeline);
+                    let mut reprogrammed_pll = false;
+                    if new_modeline != modeline {
+                        info!("video/hpd: display inferred different modeline to previous. switching timings...");
+                        if let Some(ref mut external_pll) = app.pll {
+                            // Hold DVI PHY in reset before touching the video PLL
+                            unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
+                                w.enable().bit(false)
+                            );
+                            // Configure new pixel clock. Technically we don't need to touch
+                            // the audio clock. This might be important to separate if we decide
+                            // to support dynamic hotplug timings in user bitstreams where
+                            // we want the audio streams to not be interrupted.
+                            configure_external_pll(&ExternalPLLConfig{
+                                clk0_hz: CLOCK_AUDIO_HZ,
+                                clk1_hz: Some((new_modeline.pixel_clk_mhz*1e6) as u32),
+                                clk1_inherit: false,
+                                spread_spectrum: Some(0.01),
+                            }, external_pll).unwrap();
+                            reprogrammed_pll = true;
+                        }
+                    } else {
+                        info!("video/hpd: display inferred same modeline as previous. do nothing");
+                    }
+
+                    if reprogrammed_pll {
+                        // Finally, reinitialize the display.
+                        let peripherals = unsafe { pac::Peripherals::steal() };
+                        display = DMAFramebuffer0::new(
+                            peripherals.FRAMEBUFFER_PERIPH,
+                            peripherals.PALETTE_PERIPH,
+                            PSRAM_FB_BASE,
+                            new_modeline.clone()
+                        );
+                        app.modeline = new_modeline;
+                    }
+                }
+
+                last_hpd = display.get_hpd();
+
+                //
+                // Copy out mutable application state
+                //
+
+                (app.ui.opts.clone(),
+                 app.reboot_n.clone(),
+                 app.error_n.clone(),
+                 app.modeline.clone())
             });
 
-            draw::draw_options(&mut display, &opts, 100, V_ACTIVE/2-50, 0).ok();
-            draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE-50, 0, UI_NAME, UI_SHA).ok();
+            modeline = final_modeline;
+
+            draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
+            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA, &modeline).ok();
 
             if let Some(n) = opts.tracker.selected {
                 draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
                 if manifests[n].is_some() {
-                    Line::new(Point::new(255, (V_ACTIVE/2 - 55 + (n as u32)*18) as i32),
-                              Point::new((H_ACTIVE/2-90) as i32, (V_ACTIVE/2+8) as i32))
+                    Line::new(Point::new(255, (v_active/2 - 55 + (n as u32)*18) as i32),
+                              Point::new((h_active/2-90) as i32, (v_active/2+8) as i32))
                               .into_styled(stroke)
                               .draw(&mut display).ok();
                 }
@@ -551,7 +772,7 @@ fn main() -> ! {
 
             for _ in 0..5 {
                 let _ = draw::draw_boot_logo(&mut display,
-                                             (H_ACTIVE/2) as i32,
+                                             (h_active/2) as i32,
                                              150 as i32,
                                              logo_coord_ix);
                 logo_coord_ix += 1;

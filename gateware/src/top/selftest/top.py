@@ -12,9 +12,12 @@ import os
 from tiliqua.tiliqua_soc         import TiliquaSoc
 from tiliqua.cli                 import top_level_cli
 
+class SelftestSoc(TiliquaSoc):
+    brief = "Test & calibration utilities"
+
 if __name__ == "__main__":
     this_path = os.path.dirname(os.path.realpath(__file__))
-    top_level_cli(TiliquaSoc, path=this_path,
+    top_level_cli(SelftestSoc, path=this_path,
                   argparse_fragment=lambda _: {
                       # direct codec output registers
                       "poke_outputs": True,

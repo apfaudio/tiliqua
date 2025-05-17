@@ -14,6 +14,11 @@ from tiliqua.dvi_modeline import DVIModeline, DVIPLL
 from dataclasses          import dataclass
 from typing               import List, Optional
 
+# Maximum allowed pixel clock that may be set by external PLL when `dynamic_modeline`
+# is used. Synthesis is performed using this frequency as a constraint, even if
+# the true frequency determined at runtime may be lower.
+PCLK_FMAX_DYNAMIC = 74250000
+
 @dataclass
 class ClockFrequencies:
     sync:  int # CPU, SoC, USB, most synchronous logic
@@ -24,32 +29,45 @@ class ClockFrequencies:
 
 @dataclass
 class ClockSettings:
+
     audio_clock: AudioClock
-    default_modeline: Optional[DVIModeline]
+    dynamic_modeline: bool
+    modeline: Optional[DVIModeline]
     frequencies: ClockFrequencies
 
-def clock_settings(audio_clock: AudioClock, default_modeline: DVIModeline) -> ClockSettings:
-    """
-    Calculate frequency of all clocks used by Tiliqua gateware given an intended PLL configuration.
-    It should match what the PLLs end up generating, as these constants are used in downstream logic.
-    """
-    frequencies = ClockFrequencies(
-        sync=60_000_000,
-        fast=120_000_000,
-        audio=None,
-        dvi=None,
-        dvi5x=None
-    )
-    frequencies.audio = audio_clock.mclk()
-    if default_modeline is not None:
-        frequencies.dvi = int(default_modeline.pixel_clk_mhz*1_000_000)
-        frequencies.dvi5x = 5*int(default_modeline.pixel_clk_mhz*1_000_000)
-    settings = ClockSettings(
-        audio_clock=audio_clock,
-        default_modeline=default_modeline,
-        frequencies=frequencies
-    )
-    return settings
+    def __init__(self, audio_clock: AudioClock, dynamic_modeline: bool,
+                       modeline: Optional[DVIModeline]):
+
+        """
+        Calculate frequency of all clocks used by Tiliqua gateware given an intended PLL configuration.
+        It should match what the PLLs end up generating, as these constants are used in downstream logic.
+        """
+
+        frequencies = ClockFrequencies(
+            sync=60_000_000,
+            fast=120_000_000,
+            audio=None,
+            dvi=None,
+            dvi5x=None
+        )
+        frequencies.audio = audio_clock.mclk()
+
+        if dynamic_modeline and modeline is not None:
+            raise ValueError(
+                "Both `dynamic_modeline` and fixed `modeline` are set. Only one may be set.")
+
+        if modeline is not None:
+            frequencies.dvi = int(modeline.pixel_clk_mhz*1_000_000)
+            frequencies.dvi5x = 5*int(modeline.pixel_clk_mhz*1_000_000)
+
+        if dynamic_modeline:
+            frequencies.dvi = int(PCLK_FMAX_DYNAMIC)
+            frequencies.dvi5x = 5*int(PCLK_FMAX_DYNAMIC)
+
+        self.audio_clock = audio_clock
+        self.dynamic_modeline = dynamic_modeline
+        self.modeline = modeline
+        self.frequencies = frequencies
 
 def create_dvi_pll(pll_settings: DVIPLL, clk48, reset, feedback, locked):
     """
@@ -114,6 +132,14 @@ def create_dynamic_dvi_pll(reset, locked):
     """
     Create dynamic PLL to generate DVI clocks (locks to pixel frequency of external PLL).
     1x pixel clock and 5x (half DVI TDMS clock, output is DDR).
+
+    WARN: It's easy to drive this out of spec. To stay inside the VCO frequency of
+    400-800MHz (spec from Trellis), clk1 (pixel clock) should be between 40MHz and
+    80MHz. However, it seems experimentaly reliable to lock at lower frequencies,
+    at least according to the notes from [1]. Even though 25Mhz for 640x480 is
+    way out of spec for this PLL configuration, it seems to work fine.
+
+    [1] https://github.com/YosysHQ/prjtrellis/pull/117
     """
     return Instance("EHXPLLL",
             # Clock in.
@@ -220,7 +246,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
     sync, usb: 60 MHz (Main clock)
     fast:      120 MHz (PSRAM DDR clock)
     audio:     external PLL: 12.288 MHz or 49.152 MHz (audio CODEC master clock, divide by 256 for CODEC sample rate)
-    dvi/dvi5x: video clocks, depend on resolution passed with `--resolution` flag.
+    dvi/dvi5x: video clocks, depend on selected resolution.
 
     """
 
@@ -235,8 +261,8 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
 
     clock_tree_video = """
     │                            └>[clk1]───>[ECP5 PLL]─┐                         │
-    │                                      ┊            ├─>[dvi]  {dvi:11.4f} MHz │
-    │                                      ┊            └─>[dvi5x]{dvi5x:11.4f} MHz │
+    │                                      ┊            ├─>[dvi]  {dvi:11.4f} MHz │ {dyn1}
+    │                                      ┊            └─>[dvi5x]{dvi5x:11.4f} MHz │ {dyn2}
     └─────────────────────────────────────────────────────────────────────────────┘"""
     clock_tree_no_video = """
     │                            └>[clk1]─────────────────>[disable]              │
@@ -256,9 +282,16 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             print(textwrap.dedent(self.clock_tree_video[1:]).format(
                 dvi=self.settings.frequencies.dvi/1e6,
                 dvi5x=self.settings.frequencies.dvi5x/1e6,
+                dyn1='(dynamic)' if self.settings.dynamic_modeline else '',
+                dyn2='(dynamic)' if self.settings.dynamic_modeline else '',
                 ))
+            if self.settings.dynamic_modeline:
+                print("PLL configured for DYNAMIC video mode (maximum pixel clock shown).")
+            else:
+                print(f"PLL configured for STATIC video mode: {self.settings.modeline}.")
         else:
             print(textwrap.dedent(self.clock_tree_no_video[1:]))
+            print("Video clocks disabled (no video out).")
 
     def elaborate(self, platform):
         m = Module()
@@ -272,7 +305,8 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
         m.domains.audio      = ClockDomain()
         m.domains.raw48      = ClockDomain()
         m.domains.expll_clk0 = ClockDomain()
-        m.domains.expll_clk1 = ClockDomain()
+        if self.settings.modeline or self.settings.dynamic_modeline:
+            m.domains.expll_clk1 = ClockDomain()
 
         clk48 = platform.request(platform.default_clk, dir='i').i
         reset  = Signal(init=0)
@@ -280,11 +314,15 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
         m.d.comb += [
             ClockSignal("raw48")     .eq(clk48),
             # external PLL clock domain with no synchronous reset.
-            ClockSignal("expll_clk0").eq(platform.request("expll_clk0").i),
+            ClockSignal("expll_clk0").eq(platform.request("clkex", 0).i),
             ResetSignal("expll_clk0").eq(0),
-            ClockSignal("expll_clk1").eq(platform.request("expll_clk1").i),
-            ResetSignal("expll_clk1").eq(0),
         ]
+
+        if self.settings.modeline or self.settings.dynamic_modeline:
+            m.d.comb += [
+                ClockSignal("expll_clk1").eq(platform.request("clkex", 1).i),
+                ResetSignal("expll_clk1").eq(0),
+            ]
 
         # Generate synchronous reset for audio domain (there is no internal
         # PLL between the external PLL clock and the audio domain).
@@ -361,22 +399,17 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
         )
 
         # Video PLL and derived signals
-        if self.settings.default_modeline is not None:
+        if self.settings.modeline or self.settings.dynamic_modeline:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
 
-            locked_dvi   = Signal()
+            locked_dvi = Signal()
             m.submodules.pll_dvi = create_dynamic_dvi_pll(reset, locked_dvi)
 
             m.d.comb += [
                 ResetSignal("dvi")  .eq(~locked_dvi),
                 ResetSignal("dvi5x").eq(~locked_dvi),
-            ]
-
-            m.d.comb += [
-                platform.request("led_a").o.eq(locked60),
-                platform.request("led_b").o.eq(locked_dvi),
             ]
 
         # Derived clocks and resets
@@ -409,6 +442,9 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
+
+        if self.settings.frequencies.dvi is not None:
+            print(f"PLL configured for STATIC video mode: {self.settings.modeline}.")
 
         # Create our domains.
         m.domains.sync   = ClockDomain()
@@ -499,7 +535,8 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
         )
 
         # Video PLL and derived signals
-        if self.settings.default_modeline is not None:
+
+        if self.settings.modeline is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
@@ -507,7 +544,7 @@ class TiliquaDomainGenerator2PLLs(Elaboratable):
             feedback_dvi = Signal()
             locked_dvi   = Signal()
 
-            pll_settings = DVIPLL.get(self.settings.default_modeline.pixel_clk_mhz)
+            pll_settings = DVIPLL.get(self.settings.modeline.pixel_clk_mhz)
             m.submodules.pll_dvi = create_dvi_pll(pll_settings, clk48,
                                                   reset, feedback_dvi, locked_dvi)
 
@@ -546,6 +583,9 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
+
+        if self.settings.frequencies.dvi is not None:
+            print(f"PLL configured for STATIC video mode: {self.settings.modeline}.")
 
         # Create our domains.
         m.domains.sync   = ClockDomain()
@@ -620,15 +660,14 @@ class TiliquaDomainGenerator4PLLs(Elaboratable):
                 a_LPF_RESISTOR="8"
         )
 
-        # Video PLL and derived signals
-        if self.settings.default_modeline is not None:
+        if self.settings.modeline is not None:
 
             m.domains.dvi   = ClockDomain()
             m.domains.dvi5x = ClockDomain()
 
             feedback_dvi = Signal()
             locked_dvi   = Signal()
-            pll_settings = DVIPLL.get(self.settings.default_modeline.pixel_clk_mhz)
+            pll_settings = DVIPLL.get(self.settings.modeline.pixel_clk_mhz)
             m.submodules.pll_dvi = create_dvi_pll(pll_settings, clk48,
                                                   reset, feedback_dvi, locked_dvi)
 

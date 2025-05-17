@@ -195,7 +195,8 @@ where
     Ok(())
 }
 
-pub fn draw_name<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, name: &str, sha: &str) -> Result<(), D::Error>
+use tiliqua_hal::dma_framebuffer::DVIModeline;
+pub fn draw_name<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, name: &str, sha: &str, modeline: &DVIModeline) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = Gray8>,
 {
@@ -209,8 +210,21 @@ where
         Alignment::Center
     ).draw(d)?;
 
+    let mut modeline_text: String<32> = String::new();
+    if modeline.fixed() {
+        // Fixed modeline doesn't have all the info needed to calculate refresh rate.
+        write!(modeline_text, "{}/{}x{}(fxd)\r\n",
+               sha, modeline.h_active, modeline.v_active
+               ).ok();
+    } else {
+        write!(modeline_text, "{}/{}x{}@{:.1}Hz\r\n",
+               sha,
+               modeline.h_active, modeline.v_active, modeline.refresh_rate()
+               ).ok();
+    }
+
     Text::with_alignment(
-        sha,
+        &modeline_text,
         Point::new(pos_x as i32, (pos_y + 18) as i32),
         font_small_grey,
         Alignment::Center
@@ -722,7 +736,7 @@ mod tests {
         opts.tick_up();
         opts.toggle_modify();
 
-        draw_name(&mut disp, H_ACTIVE/2, 30, 0, "MACRO-OSC", "b2d3aa").ok();
+        draw_name(&mut disp, H_ACTIVE/2, 30, 0, "MACRO-OSC", "b2d3aa", &DVIModeline::default()).ok();
         draw_options(&mut disp, &opts, H_ACTIVE/2-30, 70, 0).ok();
         disp.img.save("draw_options.png").unwrap();
     }

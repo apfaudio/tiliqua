@@ -7,7 +7,7 @@
 extern crate std;
 
 // modules
-pub mod dma_display;
+pub mod dma_framebuffer;
 pub mod encoder;
 pub mod i2c;
 pub mod pca9635;
@@ -16,7 +16,7 @@ pub mod polysynth;
 pub mod serial;
 pub mod si5351;
 pub mod timer;
-pub mod video;
+pub mod persist;
 pub mod cy8cmbr3xxx;
 
 pub use embedded_hal as hal;
@@ -55,8 +55,13 @@ macro_rules! impl_tiliqua_soc_pac {
             EurorackPmod0: tiliqua_pac::PMOD0_PERIPH,
         }
 
-        tiliqua_hal::impl_video! {
-            Video0: tiliqua_pac::VIDEO_PERIPH,
+        tiliqua_hal::impl_persist! {
+            Persist0: tiliqua_pac::PERSIST_PERIPH,
+        }
+
+        tiliqua_hal::impl_dma_framebuffer! {
+            DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
+            Palette0: tiliqua_pac::PALETTE_PERIPH,
         }
     };
 }

@@ -9,3 +9,5 @@ pub mod ui;
 pub mod dsp;
 pub mod midi;
 pub mod calibration;
+pub mod edid;
+pub mod bootinfo;

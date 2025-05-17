@@ -16,11 +16,10 @@ from amaranth.lib.cdc      import FFSynchronizer
 from amaranth.utils        import exact_log2
 from amaranth.lib.memory   import Memory
 
-from amaranth_soc          import wishbone
+from amaranth_soc          import wishbone, csr
 
 from tiliqua               import sim, dvi, palette
 from tiliqua.dvi_modeline  import DVIModeline
-
 
 class DMAFramebuffer(wiring.Component):
 
@@ -46,17 +45,16 @@ class DMAFramebuffer(wiring.Component):
                 "b": Out(8),
             })
 
-    def __init__(self, *, fb_base_default=0, addr_width=22,
+    def __init__(self, *, palette, fb_base_default=0, addr_width=22,
                  fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128,
-                 fixed_modeline: DVIModeline = None):
+                 fixed_modeline=None):
 
-        self.fixed_modeline = fixed_modeline
         self.fifo_depth = fifo_depth
         self.bytes_per_pixel = bytes_per_pixel
         self.burst_threshold_words = burst_threshold_words
+        self.fixed_modeline = fixed_modeline
 
-        # Color palette tweaking interface is presented by this
-        self.palette = palette.ColorPalette()
+        self.palette = palette
 
         super().__init__({
             # Start of framebuffer
@@ -79,10 +77,11 @@ class DMAFramebuffer(wiring.Component):
             for member in self.timings.signature.members:
                 m.d.comb += getattr(self.timings, member).eq(getattr(self.fixed_modeline, member))
 
-        m.submodules.palette = self.palette
         m.submodules.fifo = fifo = AsyncFIFOBuffered(
                 width=32, depth=self.fifo_depth, r_domain='dvi', w_domain='sync')
+
         m.submodules.dvi_tgen = dvi_tgen = dvi.DVITimingGen()
+
         # TODO: FFSync needed? (sync -> dvi crossing, but should always be in reset when changed).
         wiring.connect(m, wiring.flipped(self.timings), dvi_tgen.timings)
 
@@ -103,11 +102,9 @@ class DMAFramebuffer(wiring.Component):
 
         fb_size_words = (self.timings.active_pixels * self.bytes_per_pixel) // 4
 
+
         # Read to FIFO in sync domain
         with m.FSM() as fsm:
-            with m.State('OFF'):
-                with m.If(self.enable):
-                    m.next = 'WAIT-VSYNC'
             with m.State('WAIT-VSYNC'):
                 with m.If(phy_vsync_sync):
                     m.d.sync += dma_addr.eq(0)
@@ -193,3 +190,102 @@ class DMAFramebuffer(wiring.Component):
             ]
 
         return m
+
+
+class Peripheral(wiring.Component):
+
+    """
+    CSR peripheral for tweaking framebuffer timing/palette parameters from an SoC.
+    Timing values follow the same format as DVIModeline in dvi_modeline.py.
+    """
+
+    class HTimingReg(csr.Register, access="w"):
+        h_active:     csr.Field(csr.action.W, unsigned(16))
+        h_sync_start: csr.Field(csr.action.W, unsigned(16))
+
+    class HTimingReg2(csr.Register, access="w"):
+        h_sync_end:   csr.Field(csr.action.W, unsigned(16))
+        h_total:      csr.Field(csr.action.W, unsigned(16))
+
+    class VTimingReg(csr.Register, access="w"):
+        v_active:     csr.Field(csr.action.W, unsigned(16))
+        v_sync_start: csr.Field(csr.action.W, unsigned(16))
+
+    class VTimingReg2(csr.Register, access="w"):
+        v_sync_end:   csr.Field(csr.action.W, unsigned(16))
+        v_total:      csr.Field(csr.action.W, unsigned(16))
+
+    class HVTimingReg(csr.Register, access="w"):
+        h_sync_invert: csr.Field(csr.action.W, unsigned(1))
+        v_sync_invert: csr.Field(csr.action.W, unsigned(1))
+        active_pixels: csr.Field(csr.action.W, unsigned(30))
+
+    class FlagsReg(csr.Register, access="w"):
+        enable:        csr.Field(csr.action.W, unsigned(1))
+
+    class FBBaseReg(csr.Register, access="w"):
+        fb_base: csr.Field(csr.action.W, unsigned(32))
+
+    class HpdReg(csr.Register, access="r"):
+        # DVI hot plug detect
+        hpd: csr.Field(csr.action.R, unsigned(1))
+
+    def __init__(self, fb):
+        self.fb = fb
+
+        regs = csr.Builder(addr_width=6, data_width=8)
+
+        self._h_timing     = regs.add("h_timing",     self.HTimingReg(),     offset=0x00)
+        self._h_timing2    = regs.add("h_timing2",    self.HTimingReg2(),    offset=0x04)
+        self._v_timing     = regs.add("v_timing",     self.VTimingReg(),     offset=0x08)
+        self._v_timing2    = regs.add("v_timing2",    self.VTimingReg2(),    offset=0x0C)
+        self._hv_timing    = regs.add("hv_timing",    self.HVTimingReg(),    offset=0x10)
+        self._flags        = regs.add("flags",        self.FlagsReg(),       offset=0x14)
+        self._fb_base      = regs.add("fb_base",      self.FBBaseReg(),      offset=0x18)
+        self._hpd          = regs.add("hpd",          self.HpdReg(),         offset=0x1C)
+
+        self._bridge = csr.Bridge(regs.as_memory_map())
+
+        super().__init__({
+            "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+        })
+
+        self.bus.memory_map = self._bridge.bus.memory_map
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.bridge = self._bridge
+
+        wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
+
+        if not self.fb.fixed_modeline:
+            with m.If(self._h_timing.element.w_stb):
+                m.d.sync += self.fb.timings.h_active.eq(self._h_timing.f.h_active.w_data)
+                m.d.sync += self.fb.timings.h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
+            with m.If(self._h_timing2.element.w_stb):
+                m.d.sync += self.fb.timings.h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
+                m.d.sync += self.fb.timings.h_total.eq(self._h_timing2.f.h_total.w_data)
+            with m.If(self._v_timing.element.w_stb):
+                m.d.sync += self.fb.timings.v_active.eq(self._v_timing.f.v_active.w_data)
+                m.d.sync += self.fb.timings.v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
+            with m.If(self._v_timing2.element.w_stb):
+                m.d.sync += self.fb.timings.v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
+                m.d.sync += self.fb.timings.v_total.eq(self._v_timing2.f.v_total.w_data)
+            with m.If(self._hv_timing.element.w_stb):
+                m.d.sync += self.fb.timings.h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
+                m.d.sync += self.fb.timings.v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
+                m.d.sync += self.fb.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
+        with m.If(self._flags.f.enable.w_stb):
+            m.d.sync += self.fb.enable.eq(self._flags.f.enable.w_data)
+        with m.If(self._fb_base.f.fb_base.w_stb):
+            m.d.sync += self.fb.fb_base.eq(self._fb_base.f.fb_base.w_data)
+
+        if sim.is_hw(platform):
+            m.d.comb += self._hpd.f.hpd.r_data.eq(platform.request("dvi_hpd").i)
+        else:
+            # Fake connected screen in simulation
+            m.d.comb += self._hpd.f.hpd.r_data.eq(1)
+
+        return m
+

@@ -20,150 +20,7 @@ from tiliqua                 import dsp
 from tiliqua.dma_framebuffer import DMAFramebuffer
 from tiliqua.eurorack_pmod   import ASQ
 
-from amaranth_soc            import wishbone
-
-class Persistance(wiring.Component):
-
-    """
-    Read pixels from a framebuffer in PSRAM and apply gradual intensity reduction to simulate oscilloscope glow.
-    Pixels are DMA'd from PSRAM as a wishbone master in bursts of 'fifo_depth // 2' in the 'sync' clock domain.
-    The block of pixels has its intensity reduced and is then DMA'd back to the bus.
-
-    'holdoff' is used to keep this core from saturating the bus between bursts.
-    """
-
-    def __init__(self, *, fb: DMAFramebuffer,
-                 fifo_depth=32, holdoff_default=256):
-
-        self.fb = fb
-        self.fifo_depth = fifo_depth
-
-        # FIFO to cache pixels from PSRAM.
-        self.fifo = SyncFIFOBuffered(width=32, depth=fifo_depth)
-
-        # Current addresses in the framebuffer (read and write sides)
-        self.dma_addr_in = Signal(32, init=0)
-        self.dma_addr_out = Signal(32)
-
-        super().__init__({
-            # Tweakables
-            "holdoff": In(16, init=holdoff_default),
-            "decay": In(4, init=1),
-            # We are a DMA master
-            "bus":  Out(fb.bus.signature),
-            # Kick this to start the core
-            "enable": In(1),
-        })
-
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        # Length of framebuffer in 32-bit words
-        fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
-
-        holdoff_count = Signal(32)
-        pnext = Signal(32)
-        wr_source = Signal(32)
-
-        m.submodules.fifo = self.fifo
-        bus = self.bus
-        dma_addr_in = self.dma_addr_in
-        dma_addr_out = self.dma_addr_out
-
-        decay_latch = Signal(4)
-
-        # Persistance state machine in 'sync' domain.
-        with m.FSM() as fsm:
-            with m.State('OFF'):
-                with m.If(self.enable):
-                    m.next = 'BURST-IN'
-
-            with m.State('BURST-IN'):
-                m.d.sync += holdoff_count.eq(0)
-                m.d.sync += decay_latch.eq(self.decay)
-                m.d.comb += [
-                    bus.stb.eq(1),
-                    bus.cyc.eq(1),
-                    bus.we.eq(0),
-                    bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.adr.eq(self.fb.fb_base + dma_addr_in),
-                    self.fifo.w_en.eq(bus.ack),
-                    self.fifo.w_data.eq(bus.dat_r),
-                    bus.cti.eq(
-                        wishbone.CycleType.INCR_BURST),
-                ]
-                with m.If(self.fifo.w_level >= (self.fifo_depth-1)):
-                    m.d.comb += bus.cti.eq(
-                            wishbone.CycleType.END_OF_BURST)
-                with m.If(bus.stb & bus.ack & self.fifo.w_rdy): # WARN: drops last word
-                    with m.If(dma_addr_in < (fb_len_words-1)):
-                        m.d.sync += dma_addr_in.eq(dma_addr_in + 1)
-                    with m.Else():
-                        m.d.sync += dma_addr_in.eq(0)
-                with m.Elif(~self.fifo.w_rdy):
-                    m.next = 'WAIT1'
-
-            with m.State('WAIT1'):
-                m.d.sync += holdoff_count.eq(holdoff_count + 1)
-                with m.If(holdoff_count > self.holdoff):
-                    m.d.sync += pnext.eq(self.fifo.r_data)
-                    m.d.comb += self.fifo.r_en.eq(1)
-                    m.next = 'BURST-OUT'
-
-            with m.State('BURST-OUT'):
-                m.d.sync += holdoff_count.eq(0)
-
-                # Incoming pixel array (read from FIFO)
-                pixa = Signal(data.ArrayLayout(unsigned(8), 4))
-                # Outgoing pixel array (write to bus)
-                pixb = Signal(data.ArrayLayout(unsigned(8), 4))
-
-                m.d.sync += [
-                    pixa.eq(wr_source),
-                ]
-
-                # The actual persistance calculation. 4 pixels at a time.
-                for n in range(4):
-                    # color
-                    m.d.comb += pixb[n][0:4].eq(pixa[n][0:4])
-                    # intensity
-                    with m.If(pixa[n][4:8] >= decay_latch):
-                        m.d.comb += pixb[n][4:8].eq(pixa[n][4:8] - decay_latch)
-                    with m.Else():
-                        m.d.comb += pixb[n][4:8].eq(0)
-
-
-                m.d.comb += [
-                    bus.stb.eq(1),
-                    bus.cyc.eq(1),
-                    bus.we.eq(1),
-                    bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.adr.eq(self.fb.fb_base + dma_addr_out),
-                    wr_source.eq(pnext),
-                    bus.dat_w.eq(pixb),
-                    bus.cti.eq(
-                        wishbone.CycleType.INCR_BURST)
-                ]
-                with m.If(bus.stb & bus.ack):
-                    m.d.comb += self.fifo.r_en.eq(1)
-                    m.d.comb += wr_source.eq(self.fifo.r_data),
-                    with m.If(dma_addr_out < (fb_len_words-1)):
-                        m.d.sync += dma_addr_out.eq(dma_addr_out + 1)
-                        m.d.comb += bus.adr.eq(self.fb.fb_base + dma_addr_out + 1),
-                    with m.Else():
-                        m.d.sync += dma_addr_out.eq(0)
-                        m.d.comb += bus.adr.eq(self.fb.fb_base + 0),
-                with m.If(~self.fifo.r_rdy):
-                    m.d.comb += bus.cti.eq(
-                            wishbone.CycleType.END_OF_BURST)
-                    m.next = 'WAIT2'
-
-            with m.State('WAIT2'):
-                m.d.sync += holdoff_count.eq(holdoff_count + 1)
-                with m.If(holdoff_count > self.holdoff):
-                    m.next = 'BURST-IN'
-
-        return m
+from amaranth_soc            import wishbone, csr
 
 class Stroke(wiring.Component):
 
@@ -188,18 +45,11 @@ class Stroke(wiring.Component):
 
 
     def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=4,
-                 default_hue=10, default_x=0, default_y=0, video_rotate_90=False):
-
-        self.rotate_90 = video_rotate_90
+                 default_hue=10, default_x=0, default_y=0):
 
         self.fb = fb
         self.fs = fs
         self.n_upsample = n_upsample
-
-        self.sample_x = Signal(signed(16))
-        self.sample_y = Signal(signed(16))
-        self.sample_p = Signal(signed(16)) # intensity modulation TODO
-        self.sample_c = Signal(signed(16)) # color modulation DONE
 
         self.hue       = Signal(4, init=default_hue);
         self.intensity = Signal(4, init=8);
@@ -215,6 +65,8 @@ class Stroke(wiring.Component):
             # Point stream to render
             # 4 channels: x, y, intensity, color
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            # Rotate all draws 90 degrees to the left (screen_rotation)
+            "rotate_left": In(1),
             # We are a DMA master (no burst support)
             "bus":  Out(wishbone.Signature(addr_width=fb.bus.addr_width, data_width=32, granularity=8)),
             # Kick this to start the core
@@ -229,11 +81,6 @@ class Stroke(wiring.Component):
 
         fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
         fb_hwords = ((self.fb.timings.h_active*self.fb.bytes_per_pixel)//4)
-
-        sample_x = self.sample_x
-        sample_y = self.sample_y
-        sample_p = self.sample_p
-        sample_c = self.sample_c
 
         point_stream = None
         if self.n_upsample is not None and self.n_upsample != 1:
@@ -273,15 +120,21 @@ class Stroke(wiring.Component):
         subpix_shift = Signal(unsigned(6))
         pixel_offs = Signal(unsigned(32))
 
+        # last sample
+        sample_x = Signal(signed(16))
+        sample_y = Signal(signed(16))
+        sample_p = Signal(signed(16)) # intensity modulation TODO
+        sample_c = Signal(signed(16)) # color modulation DONE
+
         m.d.comb += pixel_offs.eq(y_offs*fb_hwords + x_offs),
-        if self.rotate_90:
+        with m.If(self.rotate_left):
             # remap pixel offset for 90deg rotation
             m.d.comb += [
                 subpix_shift.eq((-sample_y)[0:2]*8),
                 x_offs.eq((fb_hwords//2) + ((-sample_y)>>2)),
                 y_offs.eq(sample_x + (self.fb.timings.v_active>>1)),
             ]
-        else:
+        with m.Else():
             m.d.comb += [
                 subpix_shift.eq(sample_x[0:2]*8),
                 x_offs.eq((fb_hwords//2) + (sample_x>>2)),

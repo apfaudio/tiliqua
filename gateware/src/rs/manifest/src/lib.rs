@@ -36,6 +36,7 @@ pub struct MemoryRegion {
 pub struct ExternalPLLConfig {
     pub clk0_hz: u32,
     pub clk1_hz: Option<u32>,
+    pub clk1_inherit: bool,
     pub spread_spectrum: Option<f32>,
 }
 
@@ -65,6 +66,7 @@ impl BitstreamManifest {
             info!("\texternal_pll_config = {{");
             info!("\t\tclk0_hz: {}", clocks.clk0_hz);
             info!("\t\tclk1_hz: {:?}", clocks.clk1_hz);
+            info!("\t\tclk1_inherit: {:?}", clocks.clk1_inherit);
             info!("\t\tspread_spectrum: {:?}", clocks.spread_spectrum);
             info!("\t}}");
         }
@@ -87,12 +89,9 @@ impl BitstreamManifest {
         match manifest_de {
             Ok((contents, _rest)) => {
                 info!("BitstreamManifest: parse OK");
-                contents.print();
                 Some(contents)
             }
-            Err(err) => {
-                info!("BitstreamManifest: parse failed with {:?}", err);
-                info!("BitstreamManifest: bad or nonexisting manifest");
+            Err(_err) => {
                 None
             }
         }

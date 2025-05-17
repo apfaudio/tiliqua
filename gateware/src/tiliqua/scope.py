@@ -12,12 +12,13 @@ from amaranth.lib.wiring                         import In, Out, flipped, connec
 from amaranth_soc                                import csr
 
 from tiliqua                                     import dsp
-from tiliqua.raster                              import Stroke
+from tiliqua.raster_stroke                       import Stroke
 
 class VectorTracePeripheral(wiring.Component):
 
-    class EnableReg(csr.Register, access="w"):
+    class Flags(csr.Register, access="w"):
         enable: csr.Field(csr.action.W, unsigned(1))
+        rotate_left: csr.Field(csr.action.W, unsigned(1))
 
     class HueReg(csr.Register, access="w"):
         hue: csr.Field(csr.action.W, unsigned(8))
@@ -37,10 +38,11 @@ class VectorTracePeripheral(wiring.Component):
         self.i = self.stroke.i
         self.en = Signal()
         self.soc_en = Signal()
+        self.rotate_left = Signal()
 
         regs = csr.Builder(addr_width=5, data_width=8)
 
-        self._en        = regs.add("en",        self.EnableReg(),    offset=0x0)
+        self._flags     = regs.add("flags",     self.Flags(),        offset=0x0)
         self._hue       = regs.add("hue",       self.HueReg(),       offset=0x4)
         self._intensity = regs.add("intensity", self.IntensityReg(), offset=0x8)
         self._xscale    = regs.add("xscale",    self.XScaleReg(),    offset=0xC)
@@ -61,6 +63,7 @@ class VectorTracePeripheral(wiring.Component):
         connect(m, flipped(self.bus), self._bridge.bus)
 
         m.d.comb += self.stroke.enable.eq(self.en & self.soc_en)
+        m.d.comb += self.stroke.rotate_left.eq(self.rotate_left)
 
         with m.If(self._hue.f.hue.w_stb):
             m.d.sync += self.stroke.hue.eq(self._hue.f.hue.w_data)
@@ -74,15 +77,20 @@ class VectorTracePeripheral(wiring.Component):
         with m.If(self._yscale.f.yscale.w_stb):
             m.d.sync += self.stroke.scale_y.eq(self._yscale.f.yscale.w_data)
 
-        with m.If(self._en.f.enable.w_stb):
-            m.d.sync += self.soc_en.eq(self._en.f.enable.w_data)
+        with m.If(self._flags.f.enable.w_stb):
+            m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
+
+        with m.If(self._flags.f.rotate_left.w_stb):
+            m.d.sync += self.rotate_left.eq(self._flags.f.rotate_left.w_data)
 
         return m
 
 class ScopeTracePeripheral(wiring.Component):
 
-    class Enable(csr.Register, access="w"):
+    class Flags(csr.Register, access="w"):
         enable: csr.Field(csr.action.W, unsigned(1))
+        rotate_left: csr.Field(csr.action.W, unsigned(1))
+        trigger_always: csr.Field(csr.action.W, unsigned(1))
 
     class Hue(csr.Register, access="w"):
         hue: csr.Field(csr.action.W, unsigned(8))
@@ -98,9 +106,6 @@ class ScopeTracePeripheral(wiring.Component):
 
     class YScale(csr.Register, access="w"):
         yscale: csr.Field(csr.action.W, unsigned(8))
-
-    class TriggerAlways(csr.Register, access="w"):
-        trigger_always: csr.Field(csr.action.W, unsigned(1))
 
     class TriggerLevel(csr.Register, access="w"):
         trigger_level: csr.Field(csr.action.W, unsigned(16))
@@ -123,22 +128,22 @@ class ScopeTracePeripheral(wiring.Component):
 
         self.en = Signal()
         self.soc_en = Signal()
+        self.rotate_left = Signal()
 
         self.timebase = Signal(shape=dsp.ASQ)
         self.trigger_lvl = Signal(shape=dsp.ASQ)
         self.trigger_always = Signal()
 
         regs = csr.Builder(addr_width=6, data_width=8)
-        self._en             = regs.add("en",             self.Enable(),        offset=0x0)
+        self._flags          = regs.add("flags",          self.Flags(),         offset=0x0)
         self._hue            = regs.add("hue",            self.Hue(),           offset=0x4)
         self._intensity      = regs.add("intensity",      self.Intensity(),     offset=0x8)
         self._timebase       = regs.add("timebase",       self.Timebase(),      offset=0xC)
         self._xscale         = regs.add("xscale",         self.XScale(),        offset=0x10)
         self._yscale         = regs.add("yscale",         self.YScale(),        offset=0x14)
-        self._trigger_always = regs.add("trigger_always", self.TriggerAlways(), offset=0x18)
-        self._trigger_lvl    = regs.add("trigger_lvl",    self.TriggerLevel(),  offset=0x1C)
-        self._xpos           = regs.add("xpos",           self.XPosition(),     offset=0x20)
-        self._ypos           = [regs.add(f"ypos{i}",      self.YPosition(),     offset=(0x24+i*4)) for i in range(4)]
+        self._trigger_lvl    = regs.add("trigger_lvl",    self.TriggerLevel(),  offset=0x18)
+        self._xpos           = regs.add("xpos",           self.XPosition(),     offset=0x1C)
+        self._ypos           = [regs.add(f"ypos{i}",      self.YPosition(),     offset=(0x20+i*4)) for i in range(4)]
 
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
@@ -156,6 +161,7 @@ class ScopeTracePeripheral(wiring.Component):
 
         for s in self.strokes:
             m.d.comb += s.enable.eq(self.en & self.soc_en)
+            m.d.comb += s.rotate_left.eq(self.rotate_left)
 
         # Scope and trigger
         # Ch0 is routed through trigger, the rest are not.
@@ -197,6 +203,15 @@ class ScopeTracePeripheral(wiring.Component):
 
         # Wishbone tweakables
 
+        with m.If(self._flags.f.enable.w_stb):
+            m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
+
+        with m.If(self._flags.f.trigger_always.w_stb):
+            m.d.sync += self.trigger_always.eq(self._flags.f.trigger_always.w_data)
+
+        with m.If(self._flags.f.rotate_left.w_stb):
+            m.d.sync += self.rotate_left.eq(self._flags.f.rotate_left.w_data)
+
         with m.If(self._hue.f.hue.w_stb):
             for ch, s in enumerate(self.strokes):
                 m.d.sync += s.hue.eq(self._hue.f.hue.w_data + ch*3)
@@ -226,12 +241,6 @@ class ScopeTracePeripheral(wiring.Component):
         for i, ypos_reg in enumerate(self._ypos):
             with m.If(ypos_reg.f.ypos.w_stb):
                 m.d.sync += self.strokes[i].y_offset.eq(ypos_reg.f.ypos.w_data)
-
-        with m.If(self._en.f.enable.w_stb):
-            m.d.sync += self.soc_en.eq(self._en.f.enable.w_data)
-
-        with m.If(self._trigger_always.f.trigger_always.w_stb):
-            m.d.sync += self.trigger_always.eq(self._trigger_always.f.trigger_always.w_data)
 
         return m
 

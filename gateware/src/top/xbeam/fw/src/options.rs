@@ -5,9 +5,9 @@ use tiliqua_lib::palette::ColorPalette;
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
-    #[default]
     Vector,
     Beam,
+    #[default]
     Scope,
 }
 

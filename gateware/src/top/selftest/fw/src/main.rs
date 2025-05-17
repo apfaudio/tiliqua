@@ -7,16 +7,12 @@ use log::{info, error};
 
 use critical_section::Mutex;
 use core::cell::RefCell;
-use core::convert::TryInto;
 use core::fmt::Write;
 
 use embedded_hal::i2c::Operation;
 use embedded_hal::i2c::I2c;
 use embedded_hal::delay::DelayNs;
-use embedded_graphics::{
-    pixelcolor::{Gray8, GrayColor},
-    prelude::*,
-};
+use embedded_graphics::prelude::*;
 
 use heapless::String;
 
@@ -27,15 +23,14 @@ use pac::constants::*;
 use tiliqua_lib::draw;
 use tiliqua_lib::calibration::*;
 use tiliqua_fw::options::*;
-use tiliqua_hal::video::Video;
 use tiliqua_hal::pmod::EurorackPmod;
+use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pca9635::Pca9635Driver;
+use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 
 const TUSB322I_ADDR:  u8 = 0x47;
 
 pub type ReportString = String<512>;
-
-tiliqua_hal::impl_dma_display!(DMADisplay, H_ACTIVE, V_ACTIVE, VIDEO_ROTATE_90);
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
@@ -224,6 +219,40 @@ fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
     ok
 }
 
+fn edid_test(s: &mut ReportString, i2cdev: &mut I2c0) {
+    const EDID_ADDR: u8 = 0x50;
+    write!(s, "EDID: ").ok();
+    let mut edid: [u8; 128] = [0; 128];
+    for i in 0..16 {
+        i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
+                                            Operation::Read(&mut edid[i*8..i*8+8])]).ok();
+    }
+    let edid_parsed = edid::Edid::parse(&edid);
+    match edid_parsed {
+        Ok(edid::Edid { header, descriptors, .. }) => {
+            write!(s, "mfg_id={:?} product={:?} serial={:?}\r\n",
+                   header.manufacturer_id,
+                   header.product_code,
+                   header.serial_number,
+                   ).ok();
+            info!("EDID header: {:?}", header);
+            for descriptor in descriptors.iter() {
+                info!("EDID descriptor: {:?}", descriptor);
+                if let edid::Descriptor::DetailedTiming(desc) = descriptor {
+                    write!(s, "      detailed [sz_x={} sz_y={} clk={}kHz]\r\n",
+                           desc.horizontal_active,
+                           desc.vertical_active,
+                           desc.pixel_clock_khz,
+                           ).ok();
+                }
+            }
+        }
+        _ => {
+            write!(s, "{:?}\r\n", edid_parsed).ok();
+        }
+    }
+}
+
 fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
 {
     if pmod.touch_err() != 0 {
@@ -359,9 +388,13 @@ fn main() -> ! {
 
     let sysclk = pac::clock::sysclk();
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
-    let mut video = Video0::new(peripherals.VIDEO_PERIPH);
+    let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
 
     info!("Hello from Tiliqua selftest!");
+
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
+    let modeline = bootinfo.modeline.maybe_override_fixed(
+        FIXED_MODELINE, CLOCK_DVI_HZ);
 
     let mut i2cdev = I2c0::new(peripherals.I2C0);
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
@@ -374,16 +407,10 @@ fn main() -> ! {
     tusb322i_id_test(&mut startup_report, &mut i2cdev);
     print_touch_err(&mut startup_report, &pmod);
     eeprom_id_test(&mut startup_report, &mut i2cdev1);
+    edid_test(&mut startup_report, &mut i2cdev);
 
     timer.disable();
     timer.delay_ns(0);
-
-    let mut display = DMADisplay {
-        framebuffer_base: PSRAM_FB_BASE as *mut u32,
-    };
-
-    palette::ColorPalette::default().write_to_hardware(&mut video);
-    video.set_persist(128);
 
     let mut opts = Opts::default();
 
@@ -399,18 +426,39 @@ fn main() -> ! {
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 10;
 
+    let mut display = DMAFramebuffer0::new(
+        peripherals.FRAMEBUFFER_PERIPH,
+        peripherals.PALETTE_PERIPH,
+        PSRAM_FB_BASE,
+        modeline.clone(),
+    );
+
     handler!(timer0 = || timer0_handler(&app));
 
     let psram = peripherals.PSRAM_CSR;
 
+    let mut last_hpd = display.get_hpd();
+
     irq::scope(|s| {
+
+        palette::ColorPalette::default().write_to_hardware(&mut display);
+        persist.set_persist(128);
 
         s.register(handlers::Interrupt::TIMER0, timer0);
 
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
                               pac::Interrupt::TIMER0);
 
+        let h_active = display.size().width;
+        let v_active = display.size().height;
+
         loop {
+            let dvi_hpd = display.get_hpd();
+            if last_hpd != dvi_hpd {
+                info!("dvi_hpd: display hotplug! new state: {}", dvi_hpd);
+                last_hpd = dvi_hpd;
+            }
+
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
                 // Single-shot commit: when 'write' is selected and the encoder
@@ -425,9 +473,10 @@ fn main() -> ! {
 
             let stimulus_raw = 4000 * opts.autocal.volts.value as i16;
 
-            draw::draw_options(&mut display, &opts, H_ACTIVE/2-30, 70,
+            draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                hue).ok();
-            draw::draw_name(&mut display, H_ACTIVE/2, 30, hue, UI_NAME, UI_SHA).ok();
+            draw::draw_name(&mut display, h_active/2, 30, hue,
+                            &bootinfo.manifest.name, &bootinfo.manifest.sha, &modeline).ok();
 
             if opts.tracker.page.value == Page::Report {
                 let mut status_report = ReportString::new();
@@ -438,10 +487,11 @@ fn main() -> ! {
                         print_usb_state(&mut status_report, &mut i2cdev);
                         print_die_temperature(&mut status_report, &dtr);
                         print_psram_stats(&mut status_report, &psram);
+                        write!(&mut status_report, "dvi_hpd [active={}]\r\n", dvi_hpd).ok();
                         ("[status report]", &status_report)
                     }
                 };
-                draw::draw_tiliqua(&mut display, H_ACTIVE/2-80, V_ACTIVE/2-200, hue,
+                draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-200, hue,
                     [
                     //  "touch  jack "
                         "-      adc0 ",
@@ -507,16 +557,16 @@ fn main() -> ! {
             constants.write_to_pmod(&mut pmod);
 
             if opts.tracker.page.value != Page::Report {
-                draw::draw_cal(&mut display, H_ACTIVE/2-128, V_ACTIVE/2-128, hue,
+                draw::draw_cal(&mut display, h_active/2-128, v_active/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
                                &pmod.sample_i()).ok();
                 draw::draw_cal_constants(
-                    &mut display, H_ACTIVE/2-128, V_ACTIVE/2+64, hue,
+                    &mut display, h_active/2-128, v_active/2+64, hue,
                     &constants.adc_scale, &constants.adc_zero, &constants.dac_scale, &constants.dac_zero).ok();
 
                 if commit_to_eeprom {
                     constants.write_to_eeprom(&mut i2cdev1);
-                    draw::draw_name(&mut display, H_ACTIVE/2, V_ACTIVE/2+64, hue, &"SAVED", &"").ok();
+                    //draw::draw_name(&mut display, h_active/2, v_active/2+64, hue, &"SAVED", &"").ok();
                 }
             }
 

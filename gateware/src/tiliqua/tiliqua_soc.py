@@ -42,7 +42,7 @@ import os
 from amaranth                                    import *
 from amaranth.build                              import Attrs, Pins, PinsN, Platform, Resource, Subsignal
 from amaranth.hdl.rec                            import Record
-from amaranth.lib                                import wiring, data
+from amaranth.lib                                import wiring, data, cdc
 from amaranth.lib.wiring                         import Component, In, Out, flipped, connect
 
 from amaranth_soc                                import csr, gpio, wishbone
@@ -51,96 +51,22 @@ from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
 from luna_soc.gateware.core                      import blockram, timer, uart, spiflash
 from luna_soc.gateware.cpu                       import InterruptController
 from luna_soc.gateware.provider.cynthion         import UARTProvider
+from amaranth_soc          import wishbone, csr
 from luna_soc.util                               import readbin
 from luna_soc.generate                           import rust, introspect, svd
 
 from vendor.vexiiriscv                           import VexiiRiscv
 
 from tiliqua.tiliqua_platform                    import *
-from tiliqua.raster                              import Persistance
 from tiliqua.types                               import FirmwareLocation
 
-from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer
+from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster_persist, palette
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
-class VideoPeripheral(wiring.Component):
-
-    class PersistReg(csr.Register, access="w"):
-        persist: csr.Field(csr.action.W, unsigned(16))
-
-    class DecayReg(csr.Register, access="w"):
-        decay: csr.Field(csr.action.W, unsigned(8))
-
-    class PaletteReg(csr.Register, access="w"):
-        position: csr.Field(csr.action.W, unsigned(8))
-        red:      csr.Field(csr.action.W, unsigned(8))
-        green:    csr.Field(csr.action.W, unsigned(8))
-        blue:     csr.Field(csr.action.W, unsigned(8))
-
-    class PaletteBusyReg(csr.Register, access="r"):
-        busy: csr.Field(csr.action.R, unsigned(1))
-
-    def __init__(self, fb, bus_dma):
-        self.en = Signal()
-        self.fb = fb
-        self.persist = Persistance(fb=self.fb)
-        bus_dma.add_master(self.persist.bus)
-
-        regs = csr.Builder(addr_width=5, data_width=8)
-
-        self._persist      = regs.add("persist",      self.PersistReg(),     offset=0x0)
-        self._decay        = regs.add("decay",        self.DecayReg(),       offset=0x4)
-        self._palette      = regs.add("palette",      self.PaletteReg(),     offset=0x8)
-        self._palette_busy = regs.add("palette_busy", self.PaletteBusyReg(), offset=0xC)
-
-        self._bridge = csr.Bridge(regs.as_memory_map())
-
-        super().__init__({
-            "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-        })
-        self.bus.memory_map = self._bridge.bus.memory_map
-
-    def elaborate(self, platform):
-        m = Module()
-        m.submodules.bridge = self._bridge
-        m.submodules.persist = self.persist
-        connect(m, flipped(self.bus), self._bridge.bus)
-
-        m.d.comb += self.persist.enable.eq(self.en)
-
-        with m.If(self._persist.f.persist.w_stb):
-            m.d.sync += self.persist.holdoff.eq(self._persist.f.persist.w_data)
-
-        with m.If(self._decay.f.decay.w_stb):
-            m.d.sync += self.persist.decay.eq(self._decay.f.decay.w_data)
-
-        # palette update logic
-        palette_busy = Signal()
-        m.d.comb += self._palette_busy.f.busy.r_data.eq(palette_busy)
-
-        with m.If(self._palette.element.w_stb & ~palette_busy):
-            m.d.sync += [
-                palette_busy                            .eq(1),
-                self.fb.palette.update.valid            .eq(1),
-                self.fb.palette.update.payload.position .eq(self._palette.f.position.w_data),
-                self.fb.palette.update.payload.red      .eq(self._palette.f.red.w_data),
-                self.fb.palette.update.payload.green    .eq(self._palette.f.green.w_data),
-                self.fb.palette.update.payload.blue     .eq(self._palette.f.blue.w_data),
-            ]
-
-        with m.If(palette_busy & self.fb.palette.update.ready):
-            # coefficient has been written
-            m.d.sync += [
-                palette_busy.eq(0),
-                self.fb.palette.update.valid.eq(0),
-            ]
-
-        return m
-
 class TiliquaSoc(Component):
-    def __init__(self, *, firmware_bin_path, default_modeline, ui_name, ui_sha, platform_class, clock_settings,
-                 touch=False, finalize_csr_bridge=True, video_rotate_90=False, poke_outputs=False,
-                 mainram_size=0x2000, fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
+    def __init__(self, *, firmware_bin_path, ui_name, ui_sha, platform_class, clock_settings,
+                 touch=False, finalize_csr_bridge=True, poke_outputs=False, mainram_size=0x2000,
+                 fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
                  extra_cpu_regions=[]):
 
         super().__init__({})
@@ -153,8 +79,6 @@ class TiliquaSoc(Component):
         self.firmware_bin_path = firmware_bin_path
         self.touch = touch
         self.clock_settings = clock_settings
-        self.default_modeline = default_modeline
-        self.video_rotate_90 = video_rotate_90
 
         self.platform_class = platform_class
 
@@ -175,8 +99,10 @@ class TiliquaSoc(Component):
         self.encoder0_base        = 0x00000600
         self.pmod0_periph_base    = 0x00000700
         self.dtr0_base            = 0x00000800
-        self.video_periph_base    = 0x00000900
-        self.psram_csr_base       = 0x00000A00
+        self.persist_periph_base  = 0x00000900
+        self.palette_periph_base  = 0x00000A00
+        self.fb_periph_base       = 0x00000B00
+        self.psram_csr_base       = 0x00000C00
 
         # Some settings depend on whether code is in block RAM or SPI flash
         self.fw_location = fw_location
@@ -255,11 +181,6 @@ class TiliquaSoc(Component):
         self.psram_periph = psram_peripheral.Peripheral(size=self.psram_size)
         self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base,
                             name="psram")
-
-        # video PHY (DMAs from PSRAM starting at self.psram_base)
-        self.fb = dma_framebuffer.DMAFramebuffer(
-                fb_base_default=self.psram_base, fixed_modeline=default_modeline)
-        self.psram_periph.add_master(self.fb.bus)
         self.csr_decoder.add(self.psram_periph.csr_bus, addr=self.psram_csr_base, name="psram_csr")
 
         # mobo i2c
@@ -288,13 +209,28 @@ class TiliquaSoc(Component):
         self.dtr0 = dtr.Peripheral()
         self.csr_decoder.add(self.dtr0.bus, addr=self.dtr0_base, name="dtr0")
 
-        # video persistance effect (all writes gradually fade) -
-        # this is an interesting alternative to double-buffering that looks
-        # kind of like an old CRT with slow-scanning.
-        self.video_periph = VideoPeripheral(
+        # framebuffer palette interface
+        self.palette_periph = palette.Peripheral()
+        self.csr_decoder.add(
+                self.palette_periph.bus, addr=self.palette_periph_base, name="palette_periph")
+
+        # video PHY (DMAs from PSRAM starting at self.psram_base)
+        self.fb = dma_framebuffer.DMAFramebuffer(
+                palette=self.palette_periph.palette,
+                fb_base_default=self.psram_base,
+                fixed_modeline=self.clock_settings.modeline)
+        self.psram_periph.add_master(self.fb.bus)
+
+        # Timing CSRs for video PHY
+        self.framebuffer_periph = dma_framebuffer.Peripheral(fb=self.fb)
+        self.csr_decoder.add(
+                self.framebuffer_periph.bus, addr=self.fb_periph_base, name="framebuffer_periph")
+
+        # Video persistance DMA effect
+        self.persist_periph = raster_persist.Peripheral(
             fb=self.fb,
             bus_dma=self.psram_periph)
-        self.csr_decoder.add(self.video_periph.bus, addr=self.video_periph_base, name="video_periph")
+        self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
 
         self.permit_bus_traffic = Signal()
 
@@ -384,10 +320,16 @@ class TiliquaSoc(Component):
         m.submodules.spiflash_periph = self.spiflash_periph
 
         # video PHY
-        m.submodules.fb = self.fb
+        m.submodules.palette_periph = self.palette_periph
+        # Bring fb.enable into dvi clock domain for graceful PHY shutdown.
+        reset_dvi = Signal()
+        m.submodules.en_ff = cdc.FFSynchronizer(
+                i=~self.fb.enable, o=reset_dvi, o_domain="dvi", reset=1)
+        m.submodules.fb = ResetInserter({'sync': ~self.fb.enable, 'dvi': reset_dvi, 'dvi5x': reset_dvi})(self.fb)
+        m.submodules.framebuffer_periph = self.framebuffer_periph
 
         # video periph / persist
-        m.submodules.video_periph = self.video_periph
+        m.submodules.persist_periph = self.persist_periph
 
         # audio interface
         m.submodules.pmod0 = self.pmod0
@@ -427,8 +369,6 @@ class TiliquaSoc(Component):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
             m.d.sync += self.permit_bus_traffic.eq(1)
-            m.d.sync += self.fb.enable.eq(1)
-            m.d.sync += self.video_periph.en.eq(1)
 
         return m
 
@@ -459,22 +399,25 @@ class TiliquaSoc(Component):
             f.write(f"pub const UI_NAME: &str            = \"{self.ui_name}\";\n")
             f.write(f"pub const UI_SHA: &str             = \"{self.ui_sha}\";\n")
             f.write(f"pub const HW_REV_MAJOR: u32        = {self.platform_class.version_major};\n")
+            use_external_pll = self.platform_class.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal
+            f.write(f"pub const USE_EXTERNAL_PLL: bool   = {str(use_external_pll).lower()};\n")
             f.write(f"pub const CLOCK_SYNC_HZ: u32       = {self.clock_settings.frequencies.sync};\n")
-            f.write(f"pub const CLOCK_FAST_HZ: u32       = {self.clock_settings.frequencies.fast};\n")
-            f.write(f"pub const CLOCK_DVI_HZ: u32        = {self.clock_settings.frequencies.dvi};\n")
             f.write(f"pub const CLOCK_AUDIO_HZ: u32      = {self.clock_settings.frequencies.audio};\n")
+            f.write(f"pub const CLOCK_DVI_HZ: u32        = {self.clock_settings.frequencies.dvi};\n")
+            if self.clock_settings.dynamic_modeline:
+                f.write(f"pub const FIXED_MODELINE: Option<(u16, u16)> = None;\n")
+            else:
+                f.write("pub const FIXED_MODELINE: Option<(u16, u16)> = Some(("
+                        f"{self.fb.fixed_modeline.h_active}, {self.fb.fixed_modeline.v_active}));")
             f.write(f"pub const PSRAM_BASE: usize        = 0x{self.psram_base:x};\n")
             f.write(f"pub const PSRAM_SZ_BYTES: usize    = 0x{self.psram_size:x};\n")
             f.write(f"pub const PSRAM_SZ_WORDS: usize    = PSRAM_SZ_BYTES / 4;\n")
             f.write(f"pub const SPIFLASH_BASE: usize     = 0x{self.spiflash_base:x};\n")
             f.write(f"pub const SPIFLASH_SZ_BYTES: usize = 0x{self.spiflash_size:x};\n")
-            f.write(f"pub const H_ACTIVE: u32            = {self.fb.fixed_modeline.h_active};\n")
-            f.write(f"pub const V_ACTIVE: u32            = {self.fb.fixed_modeline.v_active};\n")
-            f.write(f"pub const VIDEO_ROTATE_90: bool    = {'true' if self.video_rotate_90 else 'false'};\n")
             f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base.init:x};\n")
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")
-            f.write(f"pub const MANIFEST_BASE: usize     = SPIFLASH_BASE + SPIFLASH_SZ_BYTES - 4096;\n")
-            f.write(f"pub const MANIFEST_SZ_BYTES: usize = 4096;\n")
+            f.write(f"pub const BOOTINFO_SZ_BYTES: usize = 4096;\n")
+            f.write(f"pub const BOOTINFO_BASE: usize     = PSRAM_BASE + PSRAM_SZ_BYTES - BOOTINFO_SZ_BYTES;\n")
             f.write("// Extra constants specified by an SoC subclass:\n")
             for l in self.extra_rust_constants:
                 f.write(l)

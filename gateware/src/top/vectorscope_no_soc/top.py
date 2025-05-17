@@ -42,7 +42,8 @@ from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
 from tiliqua.sim              import FakeTiliquaDomainGenerator
-from tiliqua.raster           import Persistance, Stroke
+from tiliqua.raster_persist   import Persistance
+from tiliqua.raster_stroke    import Stroke
 
 from vendor.ila               import AsyncSerialILA
 
@@ -52,7 +53,7 @@ class VectorScopeTop(Elaboratable):
     Top-level Vectorscope design.
     """
 
-    def __init__(self, *, default_modeline, wishbone_l2_cache, clock_settings):
+    def __init__(self, *, wishbone_l2_cache, clock_settings):
 
         self.wishbone_l2_cache = wishbone_l2_cache
         self.clock_settings = clock_settings
@@ -63,8 +64,13 @@ class VectorScopeTop(Elaboratable):
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
+        if not clock_settings.modeline:
+            raise ValueError("This design requires a fixed modeline, use `--modeline`.")
+
         # All of our DMA masters
-        self.fb = dma_framebuffer.DMAFramebuffer(fixed_modeline=default_modeline)
+        self.palette = palette.ColorPalette()
+        self.fb = dma_framebuffer.DMAFramebuffer(fixed_modeline=clock_settings.modeline,
+                                                 palette=self.palette)
         self.psram_periph.add_master(self.fb.bus)
 
         self.persist = Persistance(fb=self.fb)
@@ -99,6 +105,7 @@ class VectorScopeTop(Elaboratable):
 
         self.stroke.pmod0 = pmod0
 
+        m.submodules.palette = self.palette
         m.submodules.fb = self.fb
         m.submodules.persist = self.persist
         m.submodules.stroke = self.stroke

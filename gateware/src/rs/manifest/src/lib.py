@@ -39,6 +39,7 @@ class MemoryRegion:
 class ExternalPLLConfig:
     clk0_hz: int
     clk1_hz: Optional[int]
+    clk1_inherit: bool
     spread_spectrum: Optional[float]
 
 @dataclass_json

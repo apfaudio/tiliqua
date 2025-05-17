@@ -12,6 +12,7 @@ private:
     uint32_t frames = 0;
     uint32_t x = 0;
     uint32_t y = 0;
+    bool vsync_seen=false;
 
 public:
     explicit DVIDriver(DutT* dut) : dut(dut) {
@@ -20,13 +21,11 @@ public:
     }
 
     void post_edge() {
+        if (dut -> dvi_vsync) {
+            vsync_seen = true;
+        }
         if (dut->clk_dvi) {
-            // TODO: handle vsync inversion for different timings
-            if (dut->dvi_vsync) {
-                x = 0;
-                y = 0;
-            }
-            if (dut->dvi_de) {
+            if (dut->dvi_de && vsync_seen) {
                 ++x;
                 if (x >= DVI_H_ACTIVE) {
                     x = 0;
@@ -38,6 +37,7 @@ public:
                     printf("DVIDriver: %s\n", name);
                     stbi_write_bmp(name, DVI_H_ACTIVE, DVI_V_ACTIVE, 3, image_data);
                     ++frames;
+                    y = 0;
                 }
                 image_data[y*DVI_H_ACTIVE*3 + x*3 + 0] = dut->dvi_r;
                 image_data[y*DVI_H_ACTIVE*3 + x*3 + 1] = dut->dvi_g;

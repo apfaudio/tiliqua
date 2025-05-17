@@ -15,7 +15,7 @@ import subprocess
 import sys
 import time
 
-from tiliqua                     import sim, dvi_modeline
+from tiliqua                     import sim, dvi_modeline, tiliqua_pll
 from tiliqua.types               import *
 from tiliqua.tiliqua_platform    import *
 from tiliqua.tiliqua_soc         import TiliquaSoc
@@ -57,10 +57,11 @@ def top_level_cli(
                         help="Force usage of maximum CODEC sample rate (192kHz, default is 48kHz).")
 
     if video_core:
-        parser.add_argument('--resolution', type=str, default="1280x720p60",
-                            help="DVI resolution - (default: 1280x720p60)")
-        parser.add_argument('--rotate-90', action='store_true',
-                            help="Rotate DVI out by 90 degrees")
+        parser.add_argument('--modeline', type=str, default=None,
+                            help=("Set static video mode. For some bitstreams, this is the only option. "
+                                  "For SoC bitstreams, on HW R4+ it is not required, as the video mode "
+                                  "is dynamically inferred by the bootloader and passed to bitstreams.")
+                            )
 
     if sim_ports or issubclass(fragment, TiliquaSoc):
         simulation_supported = True
@@ -93,7 +94,6 @@ def top_level_cli(
                             )
         parser.add_argument('--fw-offset', type=str, default=None,
                             help="SoC designs: See `--fw-location`.")
-
 
     # TODO: is this ok on windows?
     name_default = os.path.normpath(sys.argv[0]).split(os.sep)[2].replace("_", "-").upper()
@@ -138,19 +138,33 @@ def top_level_cli(
     else:
         kwargs = {}
 
-    if video_core:
-        modelines = dvi_modeline.DVIModeline.all_timings()
-        assert args.resolution in modelines, f"error: video resolution must be one of {modelines.keys()}"
-        kwargs["default_modeline"] = default_modeline = modelines[args.resolution]
-        if args.rotate_90:
-            kwargs["video_rotate_90"] = True
-
     platform_class = args.hw.platform_class()
 
     audio_clock = platform_class.default_audio_clock
-    kwargs["clock_settings"] = tiliqua_pll.clock_settings(
-        audio_clock.to_192khz() if args.fs_192khz else audio_clock,
-        default_modeline=default_modeline if video_core else None)
+    if video_core:
+        if (args.modeline is None and issubclass(fragment, TiliquaSoc) and
+            platform_class.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal):
+            # If this configuration supports dynamic modelines and no modeline was set, use dynamic video mode.
+            kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
+                audio_clock.to_192khz() if args.fs_192khz else audio_clock,
+                dynamic_modeline=True,
+                modeline=None)
+        else:
+            # Use static video mode
+            if args.modeline is None:
+                # Default modeline (if no static modeline was set and dynamic modelines unsupported)
+                args.modeline = "1280x720p60"
+            modelines = dvi_modeline.DVIModeline.all_timings()
+            assert args.modeline in modelines, f"error: fixed `--modeline` must be one of {modelines.keys()}"
+            kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
+                audio_clock.to_192khz() if args.fs_192khz else audio_clock,
+                dynamic_modeline=False,
+                modeline=modelines[args.modeline])
+    else:
+        kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
+            audio_clock.to_192khz() if args.fs_192khz else audio_clock,
+            dynamic_modeline=False,
+            modeline=None)
 
     build_path = os.path.abspath(os.path.join(
         "build", f"{args.name.lower()}-{args.hw.value}"))
@@ -198,14 +212,21 @@ def top_level_cli(
         sha=repo_sha,
         hw_rev=args.hw,
         brief=args.brief if args.brief is not None else getattr(fragment, "brief", ""),
-        video=args.resolution if hasattr(args, 'resolution') else None
+        video="<none>"
     )
+
+    if video_core:
+        archiver.video ="<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
 
     if hw_platform.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal:
         archiver.external_pll_config = ExternalPLLConfig(
             clk0_hz=kwargs["clock_settings"].frequencies.audio,
             clk1_hz=kwargs["clock_settings"].frequencies.dvi,
+            clk1_inherit=kwargs["clock_settings"].dynamic_modeline,
             spread_spectrum=0.01)
+        # Ensure PnR/LPF constraints match the external PLL settings above
+        hw_platform.resources[('clkex', 0)].clock.frequency = archiver.external_pll_config.clk0_hz
+        hw_platform.resources[('clkex', 1)].clock.frequency = archiver.external_pll_config.clk1_hz
 
     def maybe_flash_firmware(args, kwargs, force_flash=False):
         """Handle `--flash` option where it is supported (at the moment, only XiP)."""

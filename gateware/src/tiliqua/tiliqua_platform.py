@@ -160,7 +160,7 @@ class _TiliquaR2Mobo:
         Resource("mobo_leds_oe", 0, PinsN("11", dir="o", conn=("m2", 0))),
 
         # DVI: Hotplug Detect
-        Resource("dvi_hpd", 0, Pins("8", dir="i", conn=("m2", 0)),
+        Resource("dvi_hpd", 0, Pins("37", dir="i", conn=("m2", 0)),
                  Attrs(IO_TYPE="LVCMOS33")),
 
         # TRS MIDI RX
@@ -290,10 +290,11 @@ class _TiliquaR3Mobo:
 
 class _TiliquaR4Mobo:
     resources   = [
-        # External PLL (SI5351A) clock inputs.
-        # Clock frequencies are dynamic, so set them to the maximum expected settings in each domain.
-        Resource("expll_clk0", 0, Pins("44", dir="i", conn=("m2", 0)), Clock(49.152e6), Attrs(IO_TYPE="LVCMOS33")),
-        Resource("expll_clk1", 0, Pins("40", dir="i", conn=("m2", 0)), Clock(74.250e6), Attrs(IO_TYPE="LVCMOS33")),
+        # External PLL (SI5351A) clock inputs. Clock frequencies are dynamic. The constraints
+        # are overwritten in `cli.py` based on the project configuration.
+        Resource("clkex", 0, Pins("44", dir="i", conn=("m2", 0)), Clock(0), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("clkex", 1, Pins("40", dir="i", conn=("m2", 0)),
+                 Clock(0), Attrs(IO_TYPE="LVCMOS33")),
 
         # Quadrature rotary encoder and switch. These are already debounced by an RC filter.
         Resource("encoder", 0,
@@ -466,7 +467,7 @@ class TiliquaRevision(str, enum.Enum):
     R4    = "r4"
 
     def default():
-        return TiliquaRevision.R2
+        return TiliquaRevision.R4
 
     def all():
         return [
