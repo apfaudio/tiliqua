@@ -9,7 +9,7 @@ import unittest
 from amaranth              import *
 from amaranth.sim          import *
 from amaranth.lib          import wiring
-from tiliqua               import raster, test_util, eurorack_pmod, dma_framebuffer, dvi_modeline
+from tiliqua               import raster_persist, raster_stroke, test_util, eurorack_pmod, dma_framebuffer, dvi_modeline, palette
 
 from amaranth_soc          import csr
 from amaranth_soc.csr      import wishbone
@@ -24,14 +24,15 @@ class RasterTests(unittest.TestCase):
 
         m = Module()
         fb = dma_framebuffer.DMAFramebuffer(
-            fixed_modeline=self.MODELINE)
-        dut = raster.Persistance(fb=fb)
-        m.submodules += [dut, fb]
+            fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
+        dut = raster_persist.Persistance(fb=fb)
+        m.submodules += [dut, fb, fb.palette]
 
         # No actual FB backing store, just simulating WB transactions
 
         async def testbench(ctx):
             ctx.set(dut.enable, 1)
+            ctx.set(fb.enable, 1)
             # Simulate N burst accesses
             for _ in range(4):
                 while not ctx.get(dut.bus.stb):
@@ -60,9 +61,9 @@ class RasterTests(unittest.TestCase):
 
         m = Module()
         fb = dma_framebuffer.DMAFramebuffer(
-            fixed_modeline=self.MODELINE)
-        dut = raster.Stroke(fb=fb)
-        m.submodules += [dut, fb]
+            fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
+        dut = raster_stroke.Stroke(fb=fb)
+        m.submodules += [dut, fb, fb.palette]
 
         async def stimulus(ctx):
             for n in range(0, sys.maxsize):
@@ -74,6 +75,7 @@ class RasterTests(unittest.TestCase):
 
         async def testbench(ctx):
             ctx.set(dut.enable, 1)
+            ctx.set(fb.enable, 1)
             # Simulate some acks delayed from stb
             for _ in range(16):
                 while not ctx.get(dut.bus.stb):
