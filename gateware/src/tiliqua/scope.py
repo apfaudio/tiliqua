@@ -6,13 +6,14 @@ Multi-channel oscilloscope and vectorscope SoC peripherals.
 """
 
 from amaranth                                    import *
-from amaranth.lib                                import wiring, data, stream
+from amaranth.lib                                import wiring, data, stream, fifo
 from amaranth.lib.wiring                         import In, Out, flipped, connect
 
 from amaranth_soc                                import csr
 
 from tiliqua                                     import dsp
 from tiliqua.raster_stroke                       import Stroke
+from tiliqua.eurorack_pmod                       import ASQ
 
 class VectorTracePeripheral(wiring.Component):
 
@@ -120,8 +121,10 @@ class ScopeTracePeripheral(wiring.Component):
         self.strokes = [Stroke(fb=fb, n_upsample=None, **kwargs)
                         for _ in range(4)]
 
+        self.plot_fifo = fifo.SyncFIFOBuffered(
+            width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
+        self.i = self.plot_fifo.w_stream
         self.isplit4 = dsp.Split(4)
-        self.i = self.isplit4.i
 
         for s in self.strokes:
             bus_dma.add_master(s.bus)
@@ -153,6 +156,9 @@ class ScopeTracePeripheral(wiring.Component):
 
     def elaborate(self, platform):
         m = Module()
+
+        m.submodules.plot_fifo = self.plot_fifo
+        wiring.connect(m, self.plot_fifo.r_stream, self.isplit4.i)
 
         m.submodules.bridge = self._bridge
         connect(m, flipped(self.bus), self._bridge.bus)

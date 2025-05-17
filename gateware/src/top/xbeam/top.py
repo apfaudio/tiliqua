@@ -68,15 +68,18 @@ class XbeamSoc(TiliquaSoc):
 
         self.scope_periph.source = pmod0.o_cal
 
-        with m.If(self.scope_periph.soc_en):
-            wiring.connect(m, pmod0.o_cal, self.scope_periph.i)
-        with m.Else():
-            wiring.connect(m, pmod0.o_cal, self.vector_periph.i)
+        wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
 
-        m.d.comb += [
-            pmod0.i_cal.valid.eq(pmod0.o_cal.valid & pmod0.o_cal.ready),
-            pmod0.i_cal.payload.eq(pmod0.o_cal.payload),
-        ]
+        with m.If(self.scope_periph.soc_en):
+            m.d.comb += [
+                self.scope_periph.i.valid.eq(pmod0.o_cal.valid & pmod0.o_cal.ready),
+                self.scope_periph.i.payload.eq(pmod0.o_cal.payload),
+            ]
+        with m.Else():
+            m.d.comb += [
+                self.vector_periph.i.valid.eq(pmod0.o_cal.valid & pmod0.o_cal.ready),
+                self.vector_periph.i.payload.eq(pmod0.o_cal.payload),
+            ]
 
         # Memory controller hangs if we start making requests to it straight away.
         with m.If(self.permit_bus_traffic):
