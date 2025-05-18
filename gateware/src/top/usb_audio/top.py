@@ -18,6 +18,7 @@ import os
 from amaranth              import *
 from amaranth.build        import *
 from amaranth.lib          import wiring, data, stream
+from amaranth.lib.wiring   import In, Out
 from amaranth.lib.cdc      import FFSynchronizer
 from amaranth.lib.fifo     import SyncFIFO, AsyncFIFO, SyncFIFOBuffered
 
@@ -53,18 +54,18 @@ from channels_to_usb_stream import ChannelsToUSBStream
 from audio_to_channels      import AudioToChannels
 
 
-class USB2AudioInterface(Elaboratable):
+class USB2AudioInterface(wiring.Component):
     """ USB Audio Class v2 interface """
-
-    brief = "USB soundcard, 4in + 4out."
 
     NR_CHANNELS = 4
     MAX_PACKET_SIZE = int(224 // 8 * NR_CHANNELS)
     MAX_PACKET_SIZE_MIDI = 64
 
-    def __init__(self, clock_settings):
+    i:    In(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, 4)))
+    o:   Out(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, 4)))
+
+    def __init__(self):
         super().__init__()
-        self.clock_settings = clock_settings
 
     def create_descriptors(self):
         """ Creates the descriptors that describe our audio topology. """
@@ -81,7 +82,7 @@ class USB2AudioInterface(Elaboratable):
 
             d.iManufacturer      = "apf.audio"
             d.iProduct           = "Tiliqua"
-            d.iSerialNumber      = "r2-beta-0000"
+            d.iSerialNumber      = "beta-0000"
             d.bcdDevice          = 0.01
 
             d.bNumConfigurations = 1
@@ -273,11 +274,6 @@ class USB2AudioInterface(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
-        m.submodules.reboot = reboot = RebootProvider(car.settings.frequencies.sync)
-        m.submodules.btn = FFSynchronizer(
-                platform.request("encoder").s.i, reboot.button)
-
         ulpi = platform.request(platform.default_usb_connection)
         m.submodules.usb = usb = USBDevice(bus=ulpi)
 
@@ -422,64 +418,11 @@ class USB2AudioInterface(Elaboratable):
             usb_to_channel_stream.no_channels_in.eq(self.NR_CHANNELS),
         ]
 
-        m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
-        m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
-        wiring.connect(m, pmod0.pins, pmod0_provider.pins)
-        m.d.comb += pmod0.codec_mute.eq(reboot.mute)
-
         m.submodules.audio_to_channels = audio_to_channels = AudioToChannels(
                 to_usb_stream=channels_to_usb_stream.channel_stream_in,
                 from_usb_stream=usb_to_channel_stream.channel_stream_out)
-        wiring.connect(m, pmod0.o_cal, audio_to_channels.i)
-        wiring.connect(m, audio_to_channels.o, pmod0.i_cal)
-
-        if platform.ila:
-
-            test_signal = Signal(16, reset=0xFEED)
-            pmod_sample_o0 = Signal(16)
-
-            m.d.comb += pmod_sample_o0.eq(pmod0.sample_o[0])
-
-            ila_signals = [
-                test_signal,
-                pmod_sample_o0,
-                pmod0.fs_strobe,
-                m.submodules.audio_to_channels.dac_fifo_level,
-
-                # channel stream
-                #usb_to_channel_stream.channel_stream_out.channel_nr,
-                #usb_to_channel_stream.channel_stream_out.payload,
-                #usb_to_channel_stream.channel_stream_out.valid,
-                #usb_to_channel_stream.garbage_seen_out,
-
-                # interface from IsochronousStreamOutEndpoint
-                #usb_to_channel_stream.usb_stream_in.first,
-                #usb_to_channel_stream.usb_stream_in.valid,
-                #usb_to_channel_stream.usb_stream_in.payload,
-                #usb_to_channel_stream.usb_stream_in.last,
-                #usb_to_channel_stream.usb_stream_in.ready,
-
-                # interface to IsochronousStreamOutEndpoint
-                #ep1_out.interface.rx.next,
-                #ep1_out.interface.rx.valid,
-                #ep1_out.interface.rx.payload,
-
-                usb.sof_detected,
-                sof_counter,
-                feedbackValue,
-                bitPos,
-            ]
-
-            self.ila = AsyncSerialILA(signals=ila_signals,
-                                      sample_depth=8192, divisor=521,
-                                      domain='usb', sample_rate=60e6) # ~115200 baud on USB clock
-            m.submodules += self.ila
-
-            m.d.comb += [
-                self.ila.trigger.eq(pmod0.sample_o[0] > Const(1000)),
-                #self.ila.trigger.eq(usb_audio_in_active),
-                platform.request("uart").tx.o.eq(self.ila.tx), # needs FFSync?
-            ]
+        wiring.connect(m, wiring.flipped(self.i), audio_to_channels.i)
+        wiring.connect(m, audio_to_channels.o, wiring.flipped(self.o))
 
         return m
 
@@ -583,5 +526,87 @@ class UAC2RequestHandlers(USBRequestHandler):
 
                 return m
 
+
+class USBAudioTop(Elaboratable):
+    """ USB Audio Class v2 interface """
+
+    brief = "USB soundcard, 4in + 4out."
+
+    def __init__(self, clock_settings):
+        super().__init__()
+        self.clock_settings = clock_settings
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
+        m.submodules.reboot = reboot = RebootProvider(car.settings.frequencies.sync)
+        m.submodules.btn = FFSynchronizer(
+                platform.request("encoder").s.i, reboot.button)
+
+        m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()
+        m.submodules.pmod0 = pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
+        wiring.connect(m, pmod0.pins, pmod0_provider.pins)
+        m.d.comb += pmod0.codec_mute.eq(reboot.mute)
+
+        m.submodules.usb_audio = usb_audio = USB2AudioInterface()
+
+        wiring.connect(m, pmod0.o_cal, usb_audio.i)
+        wiring.connect(m, usb_audio.o, pmod0.i_cal)
+
+        if platform.ila:
+
+            # TODO: unbitrot ILA flag
+            # https://github.com/apfaudio/tiliqua/issues/113
+
+            test_signal = Signal(16, reset=0xFEED)
+            pmod_sample_o0 = Signal(16)
+
+            m.d.comb += pmod_sample_o0.eq(pmod0.sample_o[0])
+
+            ila_signals = [
+                test_signal,
+                pmod_sample_o0,
+                pmod0.fs_strobe,
+                m.submodules.audio_to_channels.dac_fifo_level,
+
+                # channel stream
+                #usb_to_channel_stream.channel_stream_out.channel_nr,
+                #usb_to_channel_stream.channel_stream_out.payload,
+                #usb_to_channel_stream.channel_stream_out.valid,
+                #usb_to_channel_stream.garbage_seen_out,
+
+                # interface from IsochronousStreamOutEndpoint
+                #usb_to_channel_stream.usb_stream_in.first,
+                #usb_to_channel_stream.usb_stream_in.valid,
+                #usb_to_channel_stream.usb_stream_in.payload,
+                #usb_to_channel_stream.usb_stream_in.last,
+                #usb_to_channel_stream.usb_stream_in.ready,
+
+                # interface to IsochronousStreamOutEndpoint
+                #ep1_out.interface.rx.next,
+                #ep1_out.interface.rx.valid,
+                #ep1_out.interface.rx.payload,
+
+                usb.sof_detected,
+                sof_counter,
+                feedbackValue,
+                bitPos,
+            ]
+
+            self.ila = AsyncSerialILA(signals=ila_signals,
+                                      sample_depth=8192, divisor=521,
+                                      domain='usb', sample_rate=60e6) # ~115200 baud on USB clock
+            m.submodules += self.ila
+
+            m.d.comb += [
+                self.ila.trigger.eq(pmod0.sample_o[0] > Const(1000)),
+                #self.ila.trigger.eq(usb_audio_in_active),
+                platform.request("uart").tx.o.eq(self.ila.tx), # needs FFSync?
+            ]
+
+
+        return m
+
 if __name__ == "__main__":
-    top_level_cli(USB2AudioInterface, video_core=False, ila_supported=True)
+    top_level_cli(USBAudioTop, video_core=False, ila_supported=True)
