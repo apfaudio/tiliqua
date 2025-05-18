@@ -19,6 +19,22 @@ pub enum TriggerMode {
     Rising,
 }
 
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
+pub enum USBMode {
+    #[default]
+    Bypass,
+    Enable,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
+pub enum Show {
+    #[default]
+    Inputs,
+    Outputs,
+}
+
 int_params!(XScaleParams<u8>      { step: 1, min: 0, max: 15 });
 int_params!(YScaleParams<u8>      { step: 1, min: 0, max: 15 });
 int_params!(PersistParams<u16>    { step: 64, min: 64, max: 4096 });

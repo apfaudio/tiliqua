@@ -24,7 +24,7 @@ from amaranth_soc                                import csr
 
 from amaranth_future                             import fixed
 
-from tiliqua                                     import eurorack_pmod, dsp, scope
+from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
@@ -68,17 +68,20 @@ class XbeamSoc(TiliquaSoc):
 
         self.scope_periph.source = pmod0.o_cal
 
-        wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
+        #wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
+        m.submodules.usbif = usbif = usb_audio.USB2AudioInterface()
+        wiring.connect(m, pmod0.o_cal, usbif.i)
+        wiring.connect(m, usbif.o, pmod0.i_cal)
 
         with m.If(self.scope_periph.soc_en):
             m.d.comb += [
-                self.scope_periph.i.valid.eq(pmod0.o_cal.valid & pmod0.o_cal.ready),
-                self.scope_periph.i.payload.eq(pmod0.o_cal.payload),
+                self.scope_periph.i.valid.eq(pmod0.i_cal.valid & pmod0.i_cal.ready),
+                self.scope_periph.i.payload.eq(pmod0.i_cal.payload),
             ]
         with m.Else():
             m.d.comb += [
-                self.vector_periph.i.valid.eq(pmod0.o_cal.valid & pmod0.o_cal.ready),
-                self.vector_periph.i.payload.eq(pmod0.o_cal.payload),
+                self.vector_periph.i.valid.eq(pmod0.i_cal.valid & pmod0.i_cal.ready),
+                self.vector_periph.i.payload.eq(pmod0.i_cal.payload),
             ]
 
         # Memory controller hangs if we start making requests to it straight away.
