@@ -7,6 +7,7 @@ use tiliqua_lib::palette::ColorPalette;
 pub enum Page {
     Vector,
     Beam,
+    Usb,
     #[default]
     Scope,
 }
@@ -68,6 +69,14 @@ pub struct BeamOpts {
 }
 
 #[derive(OptionPage, Clone)]
+pub struct UsbOpts {
+    #[option]
+    pub mode: EnumOption<USBMode>,
+    #[option]
+    pub show: EnumOption<Show>,
+}
+
+#[derive(OptionPage, Clone)]
 pub struct ScopeOpts {
     #[option(32)]
     pub timebase: IntOption<TimebaseParams>,
@@ -96,6 +105,8 @@ pub struct Opts {
     pub vector: VectorOpts,
     #[page(Page::Beam)]
     pub beam: BeamOpts,
+    #[page(Page::Usb)]
+    pub usb: UsbOpts,
     #[page(Page::Scope)]
     pub scope: ScopeOpts,
 }

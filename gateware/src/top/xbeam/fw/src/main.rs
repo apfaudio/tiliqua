@@ -49,7 +49,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
-
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
@@ -86,8 +85,9 @@ fn main() -> ! {
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
                               pac::Interrupt::TIMER0);
 
-        let vscope  = peripherals.VECTOR_PERIPH;
-        let scope  = peripherals.SCOPE_PERIPH;
+        let vscope    = peripherals.VECTOR_PERIPH;
+        let scope     = peripherals.SCOPE_PERIPH;
+        let xbeam_mux = peripherals.XBEAM_PERIPH;
         let mut first = true;
 
         let h_active = display.size().width;
@@ -131,6 +131,11 @@ fn main() -> ! {
             scope.ypos1().write(|w| unsafe { w.ypos().bits(opts.scope.ypos1.value as u16) } );
             scope.ypos2().write(|w| unsafe { w.ypos().bits(opts.scope.ypos2.value as u16) } );
             scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope.ypos3.value as u16) } );
+
+            xbeam_mux.flags().write(
+                |w| { w.usb_bypass().bit(opts.usb.mode.value == USBMode::Bypass);
+                      w.show_outputs().bit(opts.usb.show.value == Show::Outputs)
+                } );
 
             if opts.tracker.page.value == Page::Vector {
                 scope.flags().write(
