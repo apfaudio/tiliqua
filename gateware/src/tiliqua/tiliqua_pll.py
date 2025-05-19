@@ -336,7 +336,6 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             ResetSignal("audio").eq(clock_monitor.reset_out),
         ]
 
-        m.d.comb += platform.request("led_b").o.eq(ResetSignal("audio")),
 
         # ecppll -i 48 --clkout0 60 --clkout1 120 --clkout2 50 --reset -f pll60.v
         # 60MHz for USB (currently also sync domain. fast is for DQS)
@@ -415,7 +414,6 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             ]
 
             # LED off when DVI PLL locked
-            m.d.comb += platform.request("led_a").o.eq(ResetSignal("dvi"))
 
 
         # Derived clocks and resets

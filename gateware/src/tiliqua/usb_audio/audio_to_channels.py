@@ -115,4 +115,9 @@ class AudioToChannels(wiring.Component):
             self.from_usb.ready.eq(dac_fifo.w_rdy),
         ]
 
+        m.d.comb += [
+            platform.request("led_a").o.eq(~dac_fifo.r_rdy),
+            platform.request("led_b").o.eq(~dac_fifo.w_rdy),
+        ]
+
         return m
