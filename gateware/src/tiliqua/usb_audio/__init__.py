@@ -49,7 +49,7 @@ class USB2AudioInterface(wiring.Component):
     """ USB Audio Class v2 interface """
 
     NR_CHANNELS = 4
-    MAX_PACKET_SIZE = int(224 // 8 * NR_CHANNELS)
+    MAX_PACKET_SIZE = int(4 * 224 // 8 * NR_CHANNELS)
     MAX_PACKET_SIZE_MIDI = 64
 
     i:    In(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, 4)))
@@ -339,7 +339,9 @@ class USB2AudioInterface(wiring.Component):
         sof_counter         = Signal(8)
 
         audio_clock_usb = Signal()
-        m.submodules.audio_clock_usb_sync = FFSynchronizer(ClockSignal("audio"), audio_clock_usb, o_domain="usb")
+        audio_clkdiv = Signal(2)
+        m.d.audio += audio_clkdiv.eq(audio_clkdiv+1)
+        m.submodules.audio_clock_usb_sync = FFSynchronizer(audio_clkdiv[-1], audio_clock_usb, o_domain="usb")
         m.submodules.audio_clock_usb_pulse = audio_clock_usb_pulse = DomainRenamer("usb")(EdgeToPulse())
         audio_clock_tick = Signal()
         m.d.usb += [
@@ -348,7 +350,7 @@ class USB2AudioInterface(wiring.Component):
         ]
 
         with m.If(audio_clock_tick):
-            m.d.usb += audio_clock_counter.eq(audio_clock_counter + 1)
+            m.d.usb += audio_clock_counter.eq(audio_clock_counter + 2)
 
 
         m.d.comb += [
@@ -483,8 +485,8 @@ class UAC2RequestHandlers(USBRequestHandler):
                         m.d.comb += [
                             Cat(transmitter.data).eq(
                                 Cat(Const(0x1, 16), # no triples
-                                    Const(48000, 32), # MIN
-                                    Const(48000, 32), # MAX
+                                    Const(192000, 32), # MIN
+                                    Const(192000, 32), # MAX
                                     Const(0, 32))),   # RES
                             transmitter.max_length.eq(setup.length)
                         ]
@@ -504,7 +506,7 @@ class UAC2RequestHandlers(USBRequestHandler):
                     m.d.comb += transmitter.stream.attach(self.interface.tx)
                     with m.If(request_clock_freq & (setup.length == 4)):
                         m.d.comb += [
-                            Cat(transmitter.data[0:4]).eq(Const(48000, 32)),
+                            Cat(transmitter.data[0:4]).eq(Const(192000, 32)),
                             transmitter.max_length.eq(4)
                         ]
                     with m.Else():
