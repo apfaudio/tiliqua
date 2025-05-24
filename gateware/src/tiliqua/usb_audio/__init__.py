@@ -336,7 +336,7 @@ class USB2AudioInterface(wiring.Component):
         # required by the USB standard, so and that is 0xc000, so we
         # need 16 bits here
         audio_clock_counter = Signal(24)
-        sof_counter         = Signal(5)
+        sof_counter         = Signal(8)
 
         audio_clock_usb = Signal()
         m.submodules.audio_clock_usb_sync = FFSynchronizer(ClockSignal("audio"), audio_clock_usb, o_domain="usb")
@@ -350,22 +350,6 @@ class USB2AudioInterface(wiring.Component):
         with m.If(audio_clock_tick):
             m.d.usb += audio_clock_counter.eq(audio_clock_counter + 1)
 
-        with m.If(usb.sof_detected):
-            m.d.usb += sof_counter.eq(sof_counter + 1)
-
-            # according to USB2 standard chapter 5.12.4.2
-            # we need 2**13 / 2**8 = 2**5 = 32 SOF-frames of
-            # sample master frequency counter to get enough
-            # precision for the sample frequency estimate
-            # / 2**8 because the ADAT-clock = 256 times = 2**8
-            # the sample frequency and sof_counter is 5 bits
-            # so it wraps automatically every 32 SOFs
-            with m.If(sof_counter == 0):
-                m.d.usb += [
-                    # FIFO feedback?
-                    feedbackValue.eq(audio_clock_counter << 3),
-                    audio_clock_counter.eq(0),
-                ]
 
         m.d.comb += [
             bitPos.eq(ep1_in.address << 3),
@@ -414,6 +398,25 @@ class USB2AudioInterface(wiring.Component):
                 from_usb_stream=usb_to_channel_stream.channel_stream_out)
         wiring.connect(m, wiring.flipped(self.i), audio_to_channels.i)
         wiring.connect(m, audio_to_channels.o, wiring.flipped(self.o))
+
+        with m.If(usb.sof_detected):
+            m.d.usb += sof_counter.eq(sof_counter + 1)
+
+            # according to USB2 standard chapter 5.12.4.2
+            # we need 2**13 / 2**8 = 2**5 = 32 SOF-frames of
+            # sample master frequency counter to get enough
+            # precision for the sample frequency estimate
+            # / 2**8 because the ADAT-clock = 256 times = 2**8
+            # the sample frequency and sof_counter is 5 bits
+            # so it wraps automatically every 32 SOFs
+            with m.If(sof_counter == 0):
+                m.d.usb += [
+                    # FIFO feedback?
+                    feedbackValue.eq((audio_clock_counter + 1) -
+                                     (audio_to_channels.dac_fifo_level >> 3)),
+                    audio_clock_counter.eq(0),
+                ]
+
 
         return m
 
