@@ -350,7 +350,7 @@ class USB2AudioInterface(wiring.Component):
         ]
 
         with m.If(audio_clock_tick):
-            m.d.usb += audio_clock_counter.eq(audio_clock_counter + 2)
+            m.d.usb += audio_clock_counter.eq(audio_clock_counter + 4)
 
 
         m.d.comb += [
