@@ -56,11 +56,11 @@ pub struct VectorOpts {
 
 #[derive(OptionPage, Clone)]
 pub struct BeamOpts {
-    #[option(128)]
+    #[option(64)]
     pub persist: IntOption<PersistParams>,
-    #[option(1)]
+    #[option(2)]
     pub decay: IntOption<DecayParams>,
-    #[option(8)]
+    #[option(4)]
     pub intensity: IntOption<IntensityParams>,
     #[option(10)]
     pub hue: IntOption<HueParams>,
