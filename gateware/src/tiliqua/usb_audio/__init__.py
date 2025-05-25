@@ -260,7 +260,7 @@ class USB2AudioInterface(wiring.Component):
         c.add_subordinate_descriptor(quietAudioStreamingInterface)
 
         # Windows wants a stereo pair as default setting, so let's have it
-        self.create_input_streaming_interface(c, nr_channels=self.NR_CHANNELS, alt_setting_nr=1, channel_config=0x3)
+        #self.create_input_streaming_interface(c, nr_channels=self.NR_CHANNELS, alt_setting_nr=1, channel_config=0x3)
 
     def elaborate(self, platform):
         m = Module()
