@@ -260,7 +260,7 @@ class USB2AudioInterface(wiring.Component):
         c.add_subordinate_descriptor(quietAudioStreamingInterface)
 
         # Windows wants a stereo pair as default setting, so let's have it
-        #self.create_input_streaming_interface(c, nr_channels=self.NR_CHANNELS, alt_setting_nr=1, channel_config=0x3)
+        self.create_input_streaming_interface(c, nr_channels=self.NR_CHANNELS, alt_setting_nr=1, channel_config=0x3)
 
     def elaborate(self, platform):
         m = Module()
@@ -362,7 +362,7 @@ class USB2AudioInterface(wiring.Component):
             DomainRenamer("usb")(USBStreamToChannels(self.NR_CHANNELS))
 
         m.submodules.channels_to_usb_stream = channels_to_usb_stream = \
-            DomainRenamer("usb")(ChannelsToUSBStream(self.NR_CHANNELS))
+            DomainRenamer("usb")(ChannelsToUSBStream(self.NR_CHANNELS, max_packet_size=self.MAX_PACKET_SIZE))
 
         def detect_active_audio_in(m, name: str, usb, ep2_in):
             audio_in_seen   = Signal(name=f"{name}_audio_in_seen")
