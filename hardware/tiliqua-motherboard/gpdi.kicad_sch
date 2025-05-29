@@ -3408,9 +3408,9 @@
 		(at 181.61 111.76 180)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom no)
+		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "004cf1eb-75ec-4bd0-bb79-b54e8a3214ec")
 		(property "Reference" "R9"
 			(at 182.88 115.57 0)
@@ -5418,9 +5418,9 @@
 		(at 184.15 111.76 180)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom no)
+		(in_bom yes)
 		(on_board yes)
-		(dnp yes)
+		(dnp no)
 		(uuid "a8ce5f9d-c006-41f4-8a51-68f4743b1c2d")
 		(property "Reference" "R25"
 			(at 185.42 115.57 0)
