@@ -1597,7 +1597,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C25503345"
+		(property "LCSC" "C965790"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -6579,7 +6579,7 @@
 				)
 			)
 		)
-		(property "LCSC" ""
+		(property "LCSC" "C76934"
 			(at 0 0 225)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -7320,7 +7320,7 @@
 				)
 			)
 		)
-		(property "LCSC" ""
+		(property "LCSC" "C76934"
 			(at 0 0 135)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -10971,7 +10971,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C25503345"
+		(property "LCSC" "C965790"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -13808,7 +13808,7 @@
 		(path "/fab2810c-846b-4fd3-91f6-29ac3e93c045/e99ff966-6784-4fb1-94e5-eb9576a3ae2a")
 		(sheetname "/gpdi/")
 		(sheetfile "gpdi.kicad_sch")
-		(attr smd exclude_from_bom dnp)
+		(attr smd exclude_from_pos_files exclude_from_bom dnp)
 		(fp_line
 			(start -0.153641 0.38)
 			(end 0.153641 0.38)
@@ -14541,7 +14541,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C861679"
+		(property "LCSC" "C99856"
 			(at 0 0 270)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -16709,7 +16709,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C25503345"
+		(property "LCSC" "C965790"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -24725,7 +24725,7 @@
 				)
 			)
 		)
-		(property "LCSC" ""
+		(property "LCSC" "C76934"
 			(at 0 0 225)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -28364,7 +28364,7 @@
 		(path "/d2a2a9e8-d4aa-4c38-99cd-33ac9e017277/45f4ad2d-014e-4e03-a1f2-986fa8973140")
 		(sheetname "/usbc/")
 		(sheetfile "usbc.kicad_sch")
-		(attr smd exclude_from_bom dnp)
+		(attr smd exclude_from_pos_files exclude_from_bom dnp)
 		(fp_line
 			(start -0.153641 0.38)
 			(end 0.153641 0.38)
@@ -29479,7 +29479,7 @@
 		(path "/fab2810c-846b-4fd3-91f6-29ac3e93c045/3a9d5b51-5bdb-4a45-837f-8389ef51c68d")
 		(sheetname "/gpdi/")
 		(sheetfile "gpdi.kicad_sch")
-		(attr smd exclude_from_bom dnp)
+		(attr smd exclude_from_pos_files exclude_from_bom dnp)
 		(fp_line
 			(start -0.153641 0.38)
 			(end 0.153641 0.38)
@@ -29981,7 +29981,7 @@
 				)
 			)
 		)
-		(property "LCSC" ""
+		(property "LCSC" "C76934"
 			(at 0 0 225)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -34432,7 +34432,7 @@
 				)
 			)
 		)
-		(property "LCSC" ""
+		(property "LCSC" "C76934"
 			(at 0 0 135)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -34959,7 +34959,7 @@
 				)
 			)
 		)
-		(property "LCSC" ""
+		(property "LCSC" "C76934"
 			(at 0 0 135)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -38861,7 +38861,7 @@
 				)
 			)
 		)
-		(property "LCSC" ""
+		(property "LCSC" "C76934"
 			(at 0 0 135)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -41564,7 +41564,7 @@
 				)
 			)
 		)
-		(property "LCSC" ""
+		(property "LCSC" "C76934"
 			(at 0 0 225)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -43613,6 +43613,18 @@
 					(thickness 0.15)
 				)
 				(justify mirror)
+			)
+		)
+		(property "LCSC" "C111212"
+			(at 0 0 0)
+			(layer "B.SilkS")
+			(hide yes)
+			(uuid "1b23309b-4449-406e-a6bb-35a93e2a6b71")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
 			)
 		)
 		(property ki_fp_filters "SOT?23*")
@@ -45788,7 +45800,7 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC" "C25503345"
+		(property "LCSC" "C965790"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "B.Fab")
@@ -47003,6 +47015,18 @@
 					(thickness 0.15)
 				)
 				(justify mirror)
+			)
+		)
+		(property "LCSC" "C15999"
+			(at 0 0 0)
+			(layer "B.SilkS")
+			(hide yes)
+			(uuid "76b76519-243a-43c9-9626-64ee5ae1feee")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
 			)
 		)
 		(property ki_fp_filters "SOT?666*")
@@ -48521,7 +48545,7 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC" "C25503345"
+		(property "LCSC" "C965790"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "B.Fab")
@@ -50384,7 +50408,7 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC" "C25503345"
+		(property "LCSC" "C965790"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "B.Fab")
@@ -51214,7 +51238,7 @@
 				(justify mirror)
 			)
 		)
-		(property "LCSC" "C25503345"
+		(property "LCSC" "C965790"
 			(at 0 0 0)
 			(unlocked yes)
 			(layer "B.Fab")
@@ -51508,7 +51532,7 @@
 		(path "/815700a1-f390-4cc3-bfb7-f344ae8bce18")
 		(sheetname "/")
 		(sheetfile "tiliqua-motherboard.kicad_sch")
-		(attr smd exclude_from_bom dnp)
+		(attr smd exclude_from_pos_files exclude_from_bom dnp)
 		(fp_line
 			(start 0.153641 -0.38)
 			(end -0.153641 -0.38)
