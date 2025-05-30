@@ -13294,7 +13294,7 @@
 		(path "/fab2810c-846b-4fd3-91f6-29ac3e93c045/25191896-45b0-41c5-9a56-9f577c3785a4")
 		(sheetname "/gpdi/")
 		(sheetfile "gpdi.kicad_sch")
-		(attr smd exclude_from_pos_files exclude_from_bom)
+		(attr smd)
 		(fp_line
 			(start 1.5 1.5)
 			(end -1.5 1.5)
