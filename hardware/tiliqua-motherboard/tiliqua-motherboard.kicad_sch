@@ -4082,6 +4082,10 @@
 		(uuid "9ddd84b2-3d8d-4769-a50e-3346e138b32c")
 	)
 	(no_connect
+		(at 238.76 71.12)
+		(uuid "c96142f2-4e0c-4290-b681-3650fddb49ac")
+	)
+	(no_connect
 		(at 119.38 63.5)
 		(uuid "f1be68ea-c147-47d6-b658-2981921cdceb")
 	)
@@ -4527,6 +4531,16 @@
 	)
 	(wire
 		(pts
+			(xy 227.33 44.45) (xy 238.76 44.45)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8bbfafcc-c32b-4f31-8845-55b7e3f90dac")
+	)
+	(wire
+		(pts
 			(xy 236.22 66.04) (xy 236.22 53.34)
 		)
 		(stroke
@@ -4845,16 +4859,6 @@
 		)
 		(uuid "d8520567-5a8e-43c5-9455-dd2637cf2a43")
 	)
-	(wire
-		(pts
-			(xy 227.33 71.12) (xy 238.76 71.12)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "daaddb85-69ef-441f-8090-57f5e4673cf6")
-	)
 	(polyline
 		(pts
 			(xy 220.98 16.51) (xy 219.71 16.51)
@@ -5111,6 +5115,28 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "GPDI_DDC_EN"
+		(shape bidirectional)
+		(at 227.33 44.45 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "1a0d7122-143b-4020-9db1-7758fc42cafb")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 210.594 44.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 				(hide yes)
 			)
 		)
@@ -5797,28 +5823,6 @@
 			)
 		)
 	)
-	(global_label "MOBO_LED_OE"
-		(shape bidirectional)
-		(at 227.33 71.12 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "6d6e5025-8006-4431-a644-faa47c0dff04")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 209.9893 71.12 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "USB_VBUS_EN"
 		(shape bidirectional)
 		(at 238.76 97.79 180)
@@ -6479,7 +6483,7 @@
 			)
 		)
 	)
-	(global_label "MOBO_LED_OE"
+	(global_label "GPDI_DDC_EN"
 		(shape bidirectional)
 		(at 119.38 58.42 180)
 		(fields_autoplaced yes)
@@ -6491,7 +6495,7 @@
 		)
 		(uuid "b31001c8-faa0-4056-825e-5a6b32f5a547")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 102.0393 58.42 0)
+			(at 102.644 58.42 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -16101,6 +16105,16 @@
 		(pin "GPDI_HPD" input
 			(at 238.76 48.26 180)
 			(uuid "1919c200-960c-49af-9ada-8ff93e15c89f")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "GPDI_DDC_EN" bidirectional
+			(at 238.76 44.45 180)
+			(uuid "6c173f25-fd7b-42b1-b9da-3164b6367be7")
 			(effects
 				(font
 					(size 1.27 1.27)

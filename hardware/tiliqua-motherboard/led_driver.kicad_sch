@@ -1490,9 +1490,9 @@
 			(embedded_fonts no)
 		)
 	)
-	(text "off by default"
+	(text "on by default"
 		(exclude_from_sim no)
-		(at 94.996 86.106 0)
+		(at 93.472 81.28 0)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -1580,6 +1580,12 @@
 		(uuid "b48b49db-e52f-4d65-a58d-cf98c0712e50")
 	)
 	(junction
+		(at 101.6 82.55)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "bdfe8fd4-db6e-4d3b-a9a5-5d2e6a75fbd7")
+	)
+	(junction
 		(at 187.96 85.09)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -1596,12 +1602,6 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "f9a97c8d-5ca1-43f6-aecb-c7c3b0235d89")
-	)
-	(junction
-		(at 101.6 82.55)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "fbd6c5c3-91d3-43db-9c57-23130e3e1b0d")
 	)
 	(junction
 		(at 73.66 87.63)
@@ -2007,7 +2007,7 @@
 	)
 	(wire
 		(pts
-			(xy 101.6 73.66) (xy 101.6 74.93)
+			(xy 101.6 82.55) (xy 101.6 83.82)
 		)
 		(stroke
 			(width 0)
@@ -2548,7 +2548,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 101.6 78.74 180)
+		(at 101.6 87.63 180)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -2556,7 +2556,7 @@
 		(dnp no)
 		(uuid "0b752da8-36a1-40b7-b184-ec77dcfa4e11")
 		(property "Reference" "R32"
-			(at 104.14 76.962 90)
+			(at 104.14 85.852 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2565,7 +2565,7 @@
 			)
 		)
 		(property "Value" "4K7"
-			(at 101.6 76.708 90)
+			(at 101.6 85.598 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2574,7 +2574,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0402_1005Metric"
-			(at 103.378 78.74 90)
+			(at 103.378 87.63 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2583,7 +2583,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 101.6 78.74 0)
+			(at 101.6 87.63 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2592,7 +2592,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 101.6 78.74 0)
+			(at 101.6 87.63 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2601,7 +2601,7 @@
 			)
 		)
 		(property "Mfg" "Yageo"
-			(at 101.6 78.74 0)
+			(at 101.6 87.63 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2610,7 +2610,7 @@
 			)
 		)
 		(property "PN" ""
-			(at 101.6 78.74 0)
+			(at 101.6 87.63 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2619,7 +2619,7 @@
 			)
 		)
 		(property "lcsc#" "C25900"
-			(at 101.6 78.74 0)
+			(at 101.6 87.63 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2628,7 +2628,7 @@
 			)
 		)
 		(property "Tol" ""
-			(at 101.6 78.74 0)
+			(at 101.6 87.63 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2637,7 +2637,7 @@
 			)
 		)
 		(property "LCSC" "C25900"
-			(at 104.14 76.962 0)
+			(at 104.14 85.852 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5139,72 +5139,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+3V3")
-		(at 101.6 73.66 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "94f89034-1570-45cb-b502-caf6488d7b63")
-		(property "Reference" "#PWR084"
-			(at 101.6 77.47 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "+3V3"
-			(at 101.6 68.58 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 101.6 73.66 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 101.6 73.66 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 101.6 73.66 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "9632e8ea-50a6-4dc9-ac0e-b38857702c83")
-		)
-		(instances
-			(project "tiliqua-motherboard"
-				(path "/df6062c3-a570-4505-924c-c7fe32df3670/cdf6c5cd-4778-4bd4-bc0a-19e7e0b15b0b"
-					(reference "#PWR084")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R_Pack04_Split")
 		(at 181.61 77.47 90)
 		(unit 1)
@@ -5568,6 +5502,73 @@
 			(project "tiliqua-motherboard"
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/cdf6c5cd-4778-4bd4-bc0a-19e7e0b15b0b"
 					(reference "C43")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 101.6 91.44 0)
+		(mirror y)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c37b9190-3a6d-4153-9f7f-60825473ce6b")
+		(property "Reference" "#PWR084"
+			(at 101.6 97.79 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 101.6 96.52 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 101.6 91.44 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 101.6 91.44 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 101.6 91.44 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "259f55ae-9432-4ab1-ae29-6d772a4f37e0")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/cdf6c5cd-4778-4bd4-bc0a-19e7e0b15b0b"
+					(reference "#PWR084")
 					(unit 1)
 				)
 			)
