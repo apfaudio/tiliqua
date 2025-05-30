@@ -460,7 +460,7 @@ class I2CMaster(wiring.Component):
 
     N_JACKS   = 8
     N_LEDS    = N_JACKS * 2
-    N_SENSORS = 8
+    N_SENSORS = 16
 
     AK4619VN_CFG_48KHZ = [
         0x00, # Register address to start at.
@@ -739,14 +739,23 @@ class I2CMaster(wiring.Component):
                     with m.If(self.touch_err > 0):
                         m.d.sync += self.touch_err.eq(self.touch_err - 1)
                     with m.Switch(touch_nsensor):
-                        for n in range(8):
-                            if n > 3:
-                                # R3.3 hw swaps last four vs R3.2 to improve PCB routing
-                                with m.Case(n):
-                                    m.d.sync += self.touch[4+(7-n)].eq(i2c.o.payload)
-                            else:
-                                with m.Case(n):
-                                    m.d.sync += self.touch[n].eq(i2c.o.payload)
+                        for n in range(self.N_SENSORS):
+                            with m.Case(5):
+                                m.d.sync += self.touch[0].eq(i2c.o.payload)
+                            with m.Case(7):
+                                m.d.sync += self.touch[1].eq(i2c.o.payload)
+                            with m.Case(8):
+                                m.d.sync += self.touch[2].eq(i2c.o.payload)
+                            with m.Case(9):
+                                m.d.sync += self.touch[3].eq(i2c.o.payload)
+                            with m.Case(10):
+                                m.d.sync += self.touch[4].eq(i2c.o.payload)
+                            with m.Case(11):
+                                m.d.sync += self.touch[5].eq(i2c.o.payload)
+                            with m.Case(12):
+                                m.d.sync += self.touch[6].eq(i2c.o.payload)
+                            with m.Case(13):
+                                m.d.sync += self.touch[7].eq(i2c.o.payload)
                     m.d.comb += i2c.o.ready.eq(1)
                 with m.Else():
                     with m.If(self.touch_err != 0xff):
