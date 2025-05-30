@@ -294,7 +294,7 @@ class _TiliquaR3Mobo:
         Connector("pmod", 1, "59 63 14 20 - - 61 15 13 22 - -", conn=("m2", 0)),
     ]
 
-class _TiliquaR4Mobo:
+class _TiliquaR4R5Mobo:
     resources   = [
         # External PLL (SI5351A) clock inputs. Clock frequencies are dynamic. The constraints
         # are overwritten in `cli.py` based on the project configuration.
@@ -316,9 +316,6 @@ class _TiliquaR4Mobo:
         # USB: Interrupt line from TUSB322I
         Resource("usb_int", 0, PinsN("47", dir="i", conn=("m2", 0)),
                  Attrs(IO_TYPE="LVCMOS33")),
-
-        # Output enable for LEDs driven by PCA9635 on motherboard PCBA
-        Resource("mobo_leds_oe", 0, PinsN("11", dir="o", conn=("m2", 0))),
 
         # DVI: Hotplug Detect
         Resource("dvi_hpd", 0, Pins("37", dir="i", conn=("m2", 0)),
@@ -380,10 +377,15 @@ class _TiliquaR4Mobo:
             Subsignal("i2c_scl", Pins("69", dir="io", conn=("m2", 0))),
             Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
         ),
+    ]
 
-        # DVI
-        # Note: technically DVI outputs are supposed to be open-drain, but
-        # compatibility with cheap AliExpress screens seems better with push/pull outputs.
+
+class _TiliquaR4Mobo:
+    resources  = _TiliquaR4R5Mobo.resources + [
+        # Output enable for LEDs driven by PCA9635 on motherboard PCBA
+        Resource("mobo_leds_oe", 0, PinsN("11", dir="o", conn=("m2", 0))),
+
+        # Diffpairs routed directly to video output through termination resistors.
         Resource("dvi", 0,
             Subsignal("d0", Pins("60", dir="o", conn=("m2", 0))),
             Subsignal("d1", Pins("62", dir="o", conn=("m2", 0))),
@@ -396,6 +398,28 @@ class _TiliquaR4Mobo:
     # Expansion connectors ex0 and ex1
     connectors  = [
         Connector("pmod", 0, "55 38 66 41 - - 57 35 34 73 - -", conn=("m2", 0)),
+        Connector("pmod", 1, "59 63 14 20 - - 61 15 13 22 - -", conn=("m2", 0)),
+    ]
+
+class _TiliquaR5Mobo:
+    resources  = _TiliquaR4R5Mobo.resources + [
+        # TODO I2C switch to bridge DVI DDC bus and mobo_i2c bus through level translators.
+        # Resource("gpdi_ddc_en", 0, Pins("11", dir="o", conn=("m2", 0))),
+        Resource("mobo_leds_oe", 0, PinsN("11", dir="o", conn=("m2", 0))),
+
+        # Diffpairs routed to video output, AC-coupled through a DVI redriver IC.
+        Resource("dvi", 0,
+            Subsignal("d0", Pins("68", dir="o", conn=("m2", 0))),
+            Subsignal("d1", Pins("52", dir="o", conn=("m2", 0))),
+            Subsignal("d2", Pins("60", dir="o", conn=("m2", 0))),
+            Subsignal("ck", Pins("62", dir="o", conn=("m2", 0))),
+            Attrs(IO_TYPE="LVCMOS33D", DRIVE="8", SLEWRATE="FAST")
+         ),
+    ]
+
+    # TODO update for rev5 pinswaps vs rev4 (!!)
+    connectors  = [
+        Connector("pmod", 0, "55 38 66 41 - - 57 35 34 70 - -", conn=("m2", 0)),
         Connector("pmod", 1, "59 63 14 20 - - 61 15 13 22 - -", conn=("m2", 0)),
     ]
 
@@ -471,14 +495,33 @@ class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
         *_TiliquaR4Mobo.connectors
     ]
 
+class TiliquaR5SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
+    name                   = ("Tiliqua R5 / SoldierCrab R3 "
+                              f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
+    version_major          = 5
+    clock_domain_generator = tiliqua_pll.TiliquaDomainGeneratorPLLExternal
+    default_audio_clock    = AudioClock.FINE_48KHZ
+    default_usb_connection = "ulpi"
+
+    resources = [
+        *SoldierCrabR3Platform.resources,
+        *_TiliquaR5Mobo.resources
+    ]
+
+    connectors = [
+        *SoldierCrabR3Platform.connectors,
+        *_TiliquaR5Mobo.connectors
+    ]
+
 class TiliquaRevision(str, enum.Enum):
     R2    = "r2"
     R2SC3 = "r2sc3"
     R3    = "r3"
     R4    = "r4"
+    R5    = "r5"
 
     def default():
-        return TiliquaRevision.R4
+        return TiliquaRevision.R5
 
     def all():
         return [
@@ -486,6 +529,7 @@ class TiliquaRevision(str, enum.Enum):
             TiliquaRevision.R2SC3,
             TiliquaRevision.R3,
             TiliquaRevision.R4,
+            TiliquaRevision.R5,
         ]
 
     def platform_class(self):
@@ -494,6 +538,7 @@ class TiliquaRevision(str, enum.Enum):
             TiliquaRevision.R2SC3: TiliquaR2SC3Platform,
             TiliquaRevision.R3:    TiliquaR3SC3Platform,
             TiliquaRevision.R4:    TiliquaR4SC3Platform,
+            TiliquaRevision.R5:    TiliquaR5SC3Platform,
         }[self]
 
 class RebootProvider(wiring.Component):
