@@ -21,9 +21,9 @@ const CMD_WRITE_RESET: u8       = 0xFF;
 
 /// Default configuration for the CY8CMBR3108
 /// Hand-picked after a lot of fiddling, for Tiliqua.
-pub const DEFAULT_CONFIG: [u8; CY8CMBR3XXX_CONFIG_DATA_LENGTH] = [
+pub const DEFAULT_CONFIG_R5: [u8; CY8CMBR3XXX_CONFIG_DATA_LENGTH] = [
     0xff, // SENSOR_EN
-    0x00,
+    0xff,
     0x00, // FSS_EN
     0x00,
     0x00, // TOGGLE_EN
@@ -42,14 +42,14 @@ pub const DEFAULT_CONFIG: [u8; CY8CMBR3XXX_CONFIG_DATA_LENGTH] = [
     0x80, // FINGER_THRESHOLD5
     0x80, // FINGER_THRESHOLD6
     0x80, // FINGER_THRESHOLD7
-    0x00, // FINGER_THRESHOLD8
-    0x00, // FINGER_THRESHOLD9
-    0x00, // FINGER_THRESHOLD10
-    0x00, // FINGER_THRESHOLD11
-    0x00, // FINGER_THRESHOLD12
-    0x00, // FINGER_THRESHOLD13
-    0x00, // FINGER_THRESHOLD14
-    0x00, // FINGER_THRESHOLD15
+    0x80, // FINGER_THRESHOLD8
+    0x80, // FINGER_THRESHOLD9
+    0x80, // FINGER_THRESHOLD10
+    0x80, // FINGER_THRESHOLD11
+    0x80, // FINGER_THRESHOLD12
+    0x80, // FINGER_THRESHOLD13
+    0x80, // FINGER_THRESHOLD14
+    0x80, // FINGER_THRESHOLD15
     0x04, // SENSOR_DEBOUNCE
     0x9f, // BUTTON_HYS
     0x00,
@@ -158,7 +158,8 @@ pub struct Cy8cmbr3108Driver<I2C> {
 impl<I2C: I2c> Cy8cmbr3108Driver<I2C> {
 
     pub fn new(i2c: I2C) -> Self {
-        Self { i2c, config: DEFAULT_CONFIG.clone() }
+        // TODO HACK
+        Self { i2c, config: DEFAULT_CONFIG_R5.clone() }
     }
 
     pub fn calculate_crc(&self) -> u16 {
