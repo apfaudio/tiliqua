@@ -55,6 +55,8 @@ class Stroke(wiring.Component):
         self.intensity = Signal(4, init=8);
         self.scale_x   = Signal(4, init=6);
         self.scale_y   = Signal(4, init=6);
+        self.scale_p   = Signal(4, init=10);
+        self.scale_c   = Signal(4, init=10);
         self.x_offset  = Signal(signed(16), init=default_x)
         self.y_offset  = Signal(signed(16), init=default_y)
 
@@ -116,8 +118,6 @@ class Stroke(wiring.Component):
         px_read = self.px_read
         px_sum = self.px_sum
 
-        sample_intensity = Signal(4)
-
         # pixel position
         x_offs = Signal(unsigned(16))
         y_offs = Signal(unsigned(16))
@@ -159,9 +159,8 @@ class Stroke(wiring.Component):
                     m.d.sync += [
                         sample_x.eq((point_stream.payload[0].as_value()>>self.scale_x) + self.x_offset),
                         sample_y.eq((point_stream.payload[1].as_value()>>self.scale_y) + self.y_offset),
-                        sample_p.eq(point_stream.payload[2].as_value()),
-                        sample_c.eq(point_stream.payload[3].as_value()),
-                        sample_intensity.eq(self.intensity),
+                        sample_p.eq(point_stream.payload[2].as_value()>>self.scale_p),
+                        sample_c.eq(point_stream.payload[3].as_value()>>self.scale_c),
                     ]
                     m.next = 'LATCH1'
 
@@ -214,9 +213,15 @@ class Stroke(wiring.Component):
                 # TODO: color is always overridden, perhaps we should mix it?
 
                 new_color = Signal(unsigned(4))
+                sample_intensity = Signal(unsigned(4))
                 white = Signal(unsigned(4))
                 m.d.comb += white.eq(0xf)
-                m.d.comb += new_color.eq((sample_c>>10) + self.hue)
+                m.d.comb += new_color.eq(sample_c + self.hue)
+
+                with m.If((sample_p + self.intensity > 0) & (sample_p + self.intensity <= 0xf)):
+                    m.d.comb += sample_intensity.eq(sample_p + self.intensity)
+                with m.Else():
+                    m.d.comb += sample_intensity.eq(0)
 
                 with m.If(px_sum[4:8] + sample_intensity >= 0xF):
                     m.d.comb += bus.dat_w.eq(
@@ -233,4 +238,3 @@ class Stroke(wiring.Component):
                     m.next = 'LATCH0'
 
         return ResetInserter({'sync': ~self.fb.enable})(m)
-

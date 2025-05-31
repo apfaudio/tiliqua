@@ -36,8 +36,7 @@ pub enum Show {
     Outputs,
 }
 
-int_params!(XScaleParams<u8>      { step: 1, min: 0, max: 15 });
-int_params!(YScaleParams<u8>      { step: 1, min: 0, max: 15 });
+int_params!(ScaleParams<u8>      { step: 1, min: 0, max: 15 });
 int_params!(PersistParams<u16>    { step: 16, min: 16, max: 4096 });
 int_params!(DecayParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
@@ -49,9 +48,13 @@ int_params!(YPosParams<i16>       { step: 25, min: -500, max: 500 });
 #[derive(OptionPage, Clone)]
 pub struct VectorOpts {
     #[option(6)]
-    pub xscale: IntOption<XScaleParams>,
+    pub xscale: IntOption<ScaleParams>,
     #[option(6)]
-    pub yscale: IntOption<YScaleParams>,
+    pub yscale: IntOption<ScaleParams>,
+    #[option(10)]
+    pub pscale: IntOption<ScaleParams>,
+    #[option(10)]
+    pub cscale: IntOption<ScaleParams>,
 }
 
 #[derive(OptionPage, Clone)]
@@ -93,9 +96,9 @@ pub struct ScopeOpts {
     #[option(250)]
     pub ypos3: IntOption<YPosParams>,
     #[option(8)]
-    pub yscale: IntOption<YScaleParams>,
+    pub yscale: IntOption<ScaleParams>,
     #[option(6)]
-    pub xscale: IntOption<XScaleParams>,
+    pub xscale: IntOption<ScaleParams>,
 }
 
 #[derive(Options, Clone, Default)]

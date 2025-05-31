@@ -27,11 +27,8 @@ class VectorTracePeripheral(wiring.Component):
     class IntensityReg(csr.Register, access="w"):
         intensity: csr.Field(csr.action.W, unsigned(8))
 
-    class XScaleReg(csr.Register, access="w"):
-        xscale: csr.Field(csr.action.W, unsigned(8))
-
-    class YScaleReg(csr.Register, access="w"):
-        yscale: csr.Field(csr.action.W, unsigned(8))
+    class ScaleReg(csr.Register, access="w"):
+        scale: csr.Field(csr.action.W, unsigned(8))
 
     def __init__(self, fb, bus_dma, **kwargs):
 
@@ -43,8 +40,10 @@ class VectorTracePeripheral(wiring.Component):
         self._flags     = regs.add("flags",     self.Flags(),        offset=0x0)
         self._hue       = regs.add("hue",       self.HueReg(),       offset=0x4)
         self._intensity = regs.add("intensity", self.IntensityReg(), offset=0x8)
-        self._xscale    = regs.add("xscale",    self.XScaleReg(),    offset=0xC)
-        self._yscale    = regs.add("yscale",    self.YScaleReg(),    offset=0x10)
+        self._xscale    = regs.add("xscale",    self.ScaleReg(),    offset=0xC)
+        self._yscale    = regs.add("yscale",    self.ScaleReg(),    offset=0x10)
+        self._pscale    = regs.add("pscale",    self.ScaleReg(),    offset=0x14)
+        self._cscale    = regs.add("cscale",    self.ScaleReg(),    offset=0x18)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
@@ -74,11 +73,17 @@ class VectorTracePeripheral(wiring.Component):
         with m.If(self._intensity.f.intensity.w_stb):
             m.d.sync += self.stroke.intensity.eq(self._intensity.f.intensity.w_data)
 
-        with m.If(self._xscale.f.xscale.w_stb):
-            m.d.sync += self.stroke.scale_x.eq(self._xscale.f.xscale.w_data)
+        with m.If(self._xscale.f.scale.w_stb):
+            m.d.sync += self.stroke.scale_x.eq(self._xscale.f.scale.w_data)
 
-        with m.If(self._yscale.f.yscale.w_stb):
-            m.d.sync += self.stroke.scale_y.eq(self._yscale.f.yscale.w_data)
+        with m.If(self._yscale.f.scale.w_stb):
+            m.d.sync += self.stroke.scale_y.eq(self._yscale.f.scale.w_data)
+
+        with m.If(self._pscale.f.scale.w_stb):
+            m.d.sync += self.stroke.scale_p.eq(self._pscale.f.scale.w_data)
+
+        with m.If(self._cscale.f.scale.w_stb):
+            m.d.sync += self.stroke.scale_c.eq(self._cscale.f.scale.w_data)
 
         with m.If(self._flags.f.enable.w_stb):
             m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
@@ -121,7 +126,7 @@ class ScopeTracePeripheral(wiring.Component):
 
     def __init__(self, fb, bus_dma, **kwargs):
 
-        self.strokes = [Stroke(fb=fb, n_upsample=2, **kwargs)
+        self.strokes = [Stroke(fb=fb, n_upsample=None, **kwargs)
                         for _ in range(4)]
 
         for s in self.strokes:

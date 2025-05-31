@@ -137,8 +137,10 @@ fn main() -> ! {
 
             vscope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
             vscope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
-            vscope.xscale().write(|w| unsafe { w.xscale().bits(opts.vector.xscale.value) } );
-            vscope.yscale().write(|w| unsafe { w.yscale().bits(opts.vector.yscale.value) } );
+            vscope.xscale().write(|w| unsafe { w.scale().bits(opts.vector.xscale.value) } );
+            vscope.yscale().write(|w| unsafe { w.scale().bits(opts.vector.yscale.value) } );
+            vscope.pscale().write(|w| unsafe { w.scale().bits(opts.vector.pscale.value) } );
+            vscope.cscale().write(|w| unsafe { w.scale().bits(opts.vector.cscale.value) } );
 
             scope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
             scope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
