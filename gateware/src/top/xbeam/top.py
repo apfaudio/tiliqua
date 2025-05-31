@@ -20,11 +20,11 @@ from amaranth                                    import *
 from amaranth.lib                                import wiring, data, stream
 from amaranth.lib.wiring                         import In, Out, flipped, connect
 
-from amaranth_soc                                import csr
+from amaranth_soc                                import csr, wishbone
 
 from amaranth_future                             import fixed
 
-from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio
+from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio, cache
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
@@ -73,14 +73,25 @@ class XbeamSoc(TiliquaSoc):
         self.scope_periph_base  = 0x00001100
         self.xbeam_periph_base  = 0x00001200
 
+        self.cache = cache.WishboneL2Cache(
+                addr_width=self.psram_periph.bus.addr_width,
+                cachesize_words=256)
+
+        self.arbiter = wishbone.Arbiter(
+            addr_width=self.psram_periph.bus.addr_width,
+            data_width=32,
+            granularity=8,
+        )
+        self.psram_periph.add_master(self.cache.slave)
+
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.psram_periph)
+            bus_dma=self.arbiter)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
         self.scope_periph = scope.ScopeTracePeripheral(
             fb=self.fb,
-            bus_dma=self.psram_periph)
+            bus_dma=self.arbiter)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
 
         self.xbeam_periph = XbeamPeripheral()
@@ -92,6 +103,12 @@ class XbeamSoc(TiliquaSoc):
     def elaborate(self, platform):
 
         m = Module()
+
+        wiring.connect(m, self.arbiter.bus, self.cache.master)
+
+        m.submodules += self.cache
+
+        m.submodules += self.arbiter
 
         m.submodules += self.vector_periph
 

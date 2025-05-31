@@ -38,7 +38,7 @@ pub enum Show {
 
 int_params!(XScaleParams<u8>      { step: 1, min: 0, max: 15 });
 int_params!(YScaleParams<u8>      { step: 1, min: 0, max: 15 });
-int_params!(PersistParams<u16>    { step: 64, min: 64, max: 4096 });
+int_params!(PersistParams<u16>    { step: 16, min: 16, max: 4096 });
 int_params!(DecayParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
 int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
