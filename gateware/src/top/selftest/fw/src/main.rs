@@ -439,6 +439,12 @@ fn main() -> ! {
 
     let mut last_hpd = display.get_hpd();
 
+    use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
+    let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
+    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8);
+
+    let mut last_jack = pmod.jack();
+
     irq::scope(|s| {
 
         palette::ColorPalette::default().write_to_hardware(&mut display);
@@ -458,6 +464,11 @@ fn main() -> ! {
                 info!("dvi_hpd: display hotplug! new state: {}", dvi_hpd);
                 last_hpd = dvi_hpd;
             }
+
+            if pmod.jack() != last_jack {
+                cy8.reset();
+            }
+            last_jack = pmod.jack();
 
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
