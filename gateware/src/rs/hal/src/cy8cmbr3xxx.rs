@@ -253,7 +253,7 @@ impl<I2C: I2c> Cy8cmbr3108Driver<I2C> {
         Ok(())
     }
 
-    fn reset(&mut self) -> Result<(), I2C::Error> {
+    pub fn reset(&mut self) -> Result<(), I2C::Error> {
         self.write_register(REG_COMMAND, CMD_WRITE_RESET)
     }
 }
