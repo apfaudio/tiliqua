@@ -21,6 +21,7 @@ dependencies = [
     "dataclasses-json>=0.6.7",
     "fastcrc>=0.3.2",
     "portalocker>=3.1.1",
+    "apollo-fpga>=1.1.1",
 ]
 
 [tool.pdm.dev-dependencies]
