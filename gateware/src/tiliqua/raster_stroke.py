@@ -44,7 +44,7 @@ class Stroke(wiring.Component):
     """
 
 
-    def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=16,
+    def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=4,
                  default_hue=10, default_x=0, default_y=0):
 
         self.fb = fb

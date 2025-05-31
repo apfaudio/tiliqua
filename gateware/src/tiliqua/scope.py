@@ -35,7 +35,7 @@ class VectorTracePeripheral(wiring.Component):
 
     def __init__(self, fb, bus_dma, **kwargs):
 
-        self.stroke = Stroke(fb=fb, **kwargs)
+        self.stroke = Stroke(fb=fb, n_upsample=8, **kwargs)
         bus_dma.add(self.stroke.bus)
 
         regs = csr.Builder(addr_width=5, data_width=8)
@@ -121,7 +121,7 @@ class ScopeTracePeripheral(wiring.Component):
 
     def __init__(self, fb, bus_dma, **kwargs):
 
-        self.strokes = [Stroke(fb=fb, n_upsample=None, **kwargs)
+        self.strokes = [Stroke(fb=fb, n_upsample=2, **kwargs)
                         for _ in range(4)]
 
         for s in self.strokes:
