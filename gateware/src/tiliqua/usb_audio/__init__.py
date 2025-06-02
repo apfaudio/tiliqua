@@ -47,6 +47,14 @@ from tiliqua                                  import eurorack_pmod, types
 
 class USB2AudioInterface(wiring.Component):
 
+    class DebugInterface(wiring.Signature):
+        def __init__(self):
+            super().__init__({
+                "sof_detected": Out(1),
+                "dac_fifo_level": Out(8),
+                "adc_fifo_level": Out(8),
+            })
+
     """ USB Audio Class v2 interface """
 
     def __init__(self, *, audio_clock: types.AudioClock, nr_channels):
@@ -55,7 +63,9 @@ class USB2AudioInterface(wiring.Component):
         self.max_packet_size = int(32 * (self.fs // 48000) * self.nr_channels)
         super().__init__({
             "i":  In(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, self.nr_channels))),
-            "o": Out(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, self.nr_channels)))
+            "o": Out(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, self.nr_channels))),
+
+            "dbg": Out(self.DebugInterface())
         })
 
     def create_descriptors(self):
@@ -406,7 +416,8 @@ class USB2AudioInterface(wiring.Component):
         m.submodules.audio_to_channels = audio_to_channels = AudioToChannels(
                 nr_channels=self.nr_channels,
                 to_usb_stream=channels_to_usb_stream.channel_stream_in,
-                from_usb_stream=usb_to_channel_stream.channel_stream_out)
+                from_usb_stream=usb_to_channel_stream.channel_stream_out,
+                fifo_depth=16 * (self.fs // 48000))
         wiring.connect(m, wiring.flipped(self.i), audio_to_channels.i)
         wiring.connect(m, audio_to_channels.o, wiring.flipped(self.o))
 
@@ -428,6 +439,12 @@ class USB2AudioInterface(wiring.Component):
                     audio_clock_counter.eq(0),
                 ]
 
+        # Debug interface for introspection / ILA usage
+        m.d.comb += [
+            self.dbg.dac_fifo_level.eq(audio_to_channels.dac_fifo_level),
+            self.dbg.adc_fifo_level.eq(audio_to_channels.adc_fifo_level),
+            self.dbg.sof_detected.eq(usb.sof_detected),
+        ]
 
         return m
 

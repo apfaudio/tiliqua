@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: BSD--3-Clause
 
 from amaranth              import *
-from amaranth.lib.fifo     import AsyncFIFO
+from amaranth.lib.fifo     import AsyncFIFOBuffered
 from amaranth.lib          import wiring, data, stream
 from amaranth.lib.wiring   import In, Out
 from tiliqua.eurorack_pmod import I2STDM, ASQ
@@ -17,11 +17,13 @@ class AudioToChannels(wiring.Component):
 
     # TODO: legacy: internal USB streams should be exposed as an ordinary wiring.Component.
 
-    def __init__(self, nr_channels, to_usb_stream, from_usb_stream):
+    def __init__(self, nr_channels, to_usb_stream, from_usb_stream, fifo_depth):
         self.nr_channels = nr_channels
         self.to_usb = to_usb_stream
         self.from_usb = from_usb_stream
-        self.dac_fifo_level = Signal(16)
+        self.fifo_depth = fifo_depth
+        self.dac_fifo_level = Signal(range(fifo_depth+1))
+        self.adc_fifo_level = Signal(range(fifo_depth+1))
         super().__init__({
             # streams for hooking up to audio source / sink, sent / recieved over USB.
             "i":  In(stream.Signature(data.ArrayLayout(ASQ, self.nr_channels))),
@@ -44,7 +46,7 @@ class AudioToChannels(wiring.Component):
         # eurorack-pmod calibrated INPUT samples -> USB Channel stream -> HOST
         #
 
-        m.submodules.adc_fifo = adc_fifo = AsyncFIFO(width=SW*self.nr_channels, depth=16, w_domain="sync", r_domain="usb")
+        m.submodules.adc_fifo = adc_fifo = AsyncFIFOBuffered(width=SW*self.nr_channels, depth=self.fifo_depth, w_domain="sync", r_domain="usb")
 
         # (sync domain) on every sample strobe, latch and write all channels concatenated into one entry
         # of adc_fifo.
@@ -58,13 +60,26 @@ class AudioToChannels(wiring.Component):
         # Storage for samples in the USB domain as we send them to the channel stream.
         adc_latched = Signal(SW*self.nr_channels)
 
+        # ADC underrun/overrun handling
+        adc_underrun = Signal()
+        adc_overrun = Signal()
+        with m.If(adc_fifo.r_level == 0):
+            m.d.usb += adc_underrun.eq(1)
+        with m.If(adc_fifo.r_level == self.fifo_depth+1):
+            m.d.usb += adc_overrun.eq(1)
+        with m.If(adc_underrun | adc_overrun):
+            with m.If(adc_fifo.r_level == (self.fifo_depth//2)):
+                m.d.usb += adc_underrun.eq(0)
+                m.d.usb += adc_overrun.eq(0)
+
         with m.FSM(domain="usb") as fsm:
 
             with m.State('WAIT'):
                 m.d.usb += self.to_usb.valid.eq(0),
                 with m.If(adc_fifo.r_rdy):
-                    m.d.usb += adc_fifo.r_en.eq(1)
-                    m.next = 'LATCH'
+                    m.d.usb += adc_fifo.r_en.eq(~adc_underrun)
+                    with m.If(~adc_overrun):
+                        m.next = 'LATCH'
 
             with m.State('LATCH'):
                 m.d.usb += [
@@ -98,9 +113,9 @@ class AudioToChannels(wiring.Component):
         # HOST -> USB Channel stream -> eurorack-pmod calibrated OUTPUT samples.
         #
 
-        m.submodules.dac_fifo = dac_fifo = AsyncFIFO(width=SW*self.nr_channels, depth=16, w_domain="usb", r_domain="sync")
-        wiring.connect(m, dac_fifo.r_stream, wiring.flipped(self.o));
+        m.submodules.dac_fifo = dac_fifo = AsyncFIFOBuffered(width=SW*self.nr_channels, depth=self.fifo_depth, w_domain="usb", r_domain="sync")
 
+        dac_overrun = Signal()
         m.d.usb += dac_fifo.w_en.eq(0)
         for n in range(self.nr_channels):
             with m.If((self.from_usb.channel_nr == n) & self.from_usb.valid):
@@ -108,11 +123,25 @@ class AudioToChannels(wiring.Component):
                 # Write all channels on every incoming zero'th channel
                 # This should work even if < 4 channels are used.
                 if n == 0:
-                    m.d.usb += dac_fifo.w_en.eq(1)
+                    m.d.usb += dac_fifo.w_en.eq(~dac_overrun)
+
+        # DAC underrun/overrun handling
+        dac_underrun = Signal()
+        with m.If(dac_fifo.w_level == 0):
+            m.d.usb += dac_underrun.eq(1)
+        with m.If(dac_fifo.w_level == self.fifo_depth+1):
+            m.d.usb += dac_overrun.eq(1)
+        with m.If(~dac_underrun):
+            wiring.connect(m, dac_fifo.r_stream, wiring.flipped(self.o));
+        with m.If(dac_underrun | dac_overrun):
+            with m.If(dac_fifo.w_level == (self.fifo_depth//2)):
+                m.d.usb += dac_underrun.eq(0)
+                m.d.usb += dac_overrun.eq(0)
 
         dbg = platform.request('debug')
         m.d.comb += [
-            self.dac_fifo_level.eq(m.submodules.dac_fifo.w_level),
+            self.dac_fifo_level.eq(dac_fifo.w_level),
+            self.adc_fifo_level.eq(adc_fifo.r_level),
             self.from_usb.ready.eq(dac_fifo.w_rdy),
             dbg.debug0.o.eq(dac_fifo.w_rdy),
             dbg.debug1.o.eq(dac_fifo.r_rdy),

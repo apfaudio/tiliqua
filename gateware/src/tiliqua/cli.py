@@ -51,8 +51,6 @@ def top_level_cli(
 
     parser.add_argument('--skip-build', action='store_true',
                         help="Perform design elaboration but do not actually build the bitstream.")
-    parser.add_argument('--flash', action='store_true',
-                        help="Flash bitstream (and firmware if needed) after building it.")
     parser.add_argument('--fs-192khz', action='store_true',
                         help="Force usage of maximum CODEC sample rate (192kHz, default is 48kHz).")
 
@@ -129,9 +127,6 @@ def top_level_cli(
 
     # Print help if no arguments are passed.
     args = parser.parse_args(args=None if sys.argv[1:] else ["--help"])
-
-    if args.action != CliAction.Build:
-        assert args.flash == False, "--flash requires 'build' action"
 
     if argparse_fragment:
         kwargs = argparse_fragment(args)
@@ -228,30 +223,6 @@ def top_level_cli(
         hw_platform.resources[('clkex', 0)].clock.frequency = archiver.external_pll_config.clk0_hz
         hw_platform.resources[('clkex', 1)].clock.frequency = archiver.external_pll_config.clk1_hz
 
-    def maybe_flash_firmware(args, kwargs, force_flash=False):
-        """Handle `--flash` option where it is supported (at the moment, only XiP)."""
-        print()
-        match args.fw_location:
-            case FirmwareLocation.BRAM:
-                print("Note: Firmware is stored in BRAM, it is not possible to flash firmware "
-                      "and bitstream separately. The bitstream contains the firmware.")
-            case FirmwareLocation.SPIFlash:
-                args_flash_firmware = [
-                    "sudo", "openFPGALoader", "-c", "dirtyJtag", "-f", "-o", f"{hex(kwargs['fw_offset'])}",
-                    "--file-type", "raw", kwargs["firmware_bin_path"]
-                ]
-                print("SoC is configured for XIP, firmware may be flashed directly to SPI flash by passing "
-                      "the bitstream archive to `pdm flash`, or passing `--flash` to build command.")
-                if args.flash or force_flash:
-                    subprocess.check_call(args_flash_firmware, env=os.environ)
-            case FirmwareLocation.PSRAM:
-                print("Note: This bitstream expects firmware already copied from SPI flash to PSRAM "
-                      "by a bootloader.\nPass the bitstream archive to `pdm flash` to flash it.")
-                if args.flash:
-                    print("ERROR: direct --flash is only supported for --fw-location=spiflash (XIP). "
-                          "Pass the bitstream archive to `pdm flash` instead.")
-                    sys.exit(-1)
-
     if isinstance(fragment, TiliquaSoc):
         # Generate SVD
         svd_path = os.path.join(build_path, "soc.svd")
@@ -284,7 +255,6 @@ def top_level_cli(
                 sys.exit(1)
             archiver.write_manifest()
             archiver.create_archive()
-            maybe_flash_firmware(args, kwargs)
             sys.exit(0)
 
         # Simulation configuration
@@ -333,19 +303,10 @@ def top_level_cli(
 
         archiver.create_archive()
 
-        if isinstance(fragment, TiliquaSoc):
-            maybe_flash_firmware(args, kwargs, force_flash=hw_platform.ila)
-
-        if args.flash or hw_platform.ila:
-            bitstream_path = "build/top.bit"
-            args_flash_bitstream = ["sudo", "openFPGALoader", "-c", "dirtyJtag",
-                                    "-f", bitstream_path]
-            # ILA situation always requires flashing, as we want to make sure
-            # we aren't getting data from an old bitstream before starting the
-            # ILA frontend.
-            subprocess.check_call(args_flash_bitstream, env=os.environ)
-
         if hw_platform.ila:
+            args_flash_bitstream = ["sudo", "openFPGALoader", "-c", "dirtyJtag",
+                                    archiver.bitstream_path]
+            subprocess.check_call(args_flash_bitstream, env=os.environ)
             vcd_dst = "out.vcd"
             print(f"{AsyncSerialILAFrontend.__name__} listen on {args.ila_port} - destination {vcd_dst} ...")
             frontend = AsyncSerialILAFrontend(args.ila_port, baudrate=115200, ila=fragment.ila)
