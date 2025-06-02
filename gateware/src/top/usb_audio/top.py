@@ -58,6 +58,11 @@ class USBAudioTop(Elaboratable):
                 usbif.dbg.dac_fifo_level,
                 usbif.dbg.adc_fifo_level,
                 usbif.dbg.sof_detected,
+                usbif.dbg.channel_stream_out_valid,
+                usbif.dbg.channel_stream_out_first,
+                usbif.dbg.usb_stream_in_valid,
+                usbif.dbg.usb_stream_in_payload,
+                usbif.dbg.usb_stream_in_ready,
             ]
 
             self.ila = AsyncSerialILA(signals=ila_signals,

@@ -53,6 +53,12 @@ class USB2AudioInterface(wiring.Component):
                 "sof_detected": Out(1),
                 "dac_fifo_level": Out(8),
                 "adc_fifo_level": Out(8),
+                "garbage_seen_out": Out(1),
+                "channel_stream_out_valid": Out(1),
+                "channel_stream_out_first": Out(1),
+                "usb_stream_in_valid": Out(1),
+                "usb_stream_in_ready": Out(1),
+                "usb_stream_in_payload": Out(8),
             })
 
     """ USB Audio Class v2 interface """
@@ -444,6 +450,11 @@ class USB2AudioInterface(wiring.Component):
             self.dbg.dac_fifo_level.eq(audio_to_channels.dac_fifo_level),
             self.dbg.adc_fifo_level.eq(audio_to_channels.adc_fifo_level),
             self.dbg.sof_detected.eq(usb.sof_detected),
+            self.dbg.channel_stream_out_valid.eq(usb_to_channel_stream.channel_stream_out.valid),
+            self.dbg.channel_stream_out_first.eq(usb_to_channel_stream.channel_stream_out.first),
+            self.dbg.usb_stream_in_valid.eq(usb_to_channel_stream.usb_stream_in.valid),
+            self.dbg.usb_stream_in_payload.eq(usb_to_channel_stream.usb_stream_in.payload),
+            self.dbg.usb_stream_in_ready.eq(usb_to_channel_stream.usb_stream_in.ready),
         ]
 
         return m
