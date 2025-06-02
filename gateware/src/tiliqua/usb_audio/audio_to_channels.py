@@ -15,17 +15,18 @@ class AudioToChannels(wiring.Component):
     to `channels_to_usb_stream` and `usb_stream_to_channels` logic in the USB domain.
     """
 
-    # streams for hooking up to audio source / sink, sent / recieved over USB.
-    i:    In(stream.Signature(data.ArrayLayout(ASQ, 4)))
-    o:   Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
-
     # TODO: legacy: internal USB streams should be exposed as an ordinary wiring.Component.
 
-    def __init__(self, to_usb_stream, from_usb_stream):
+    def __init__(self, nr_channels, to_usb_stream, from_usb_stream):
+        self.nr_channels = nr_channels
         self.to_usb = to_usb_stream
         self.from_usb = from_usb_stream
         self.dac_fifo_level = Signal(16)
-        super().__init__()
+        super().__init__({
+            # streams for hooking up to audio source / sink, sent / recieved over USB.
+            "i":  In(stream.Signature(data.ArrayLayout(ASQ, self.nr_channels))),
+            "o": Out(stream.Signature(data.ArrayLayout(ASQ, self.nr_channels)))
+        })
 
     def elaborate(self, platform) -> Module:
 
@@ -43,7 +44,7 @@ class AudioToChannels(wiring.Component):
         # eurorack-pmod calibrated INPUT samples -> USB Channel stream -> HOST
         #
 
-        m.submodules.adc_fifo = adc_fifo = AsyncFIFO(width=SW*4, depth=16, w_domain="sync", r_domain="usb")
+        m.submodules.adc_fifo = adc_fifo = AsyncFIFO(width=SW*self.nr_channels, depth=16, w_domain="sync", r_domain="usb")
 
         # (sync domain) on every sample strobe, latch and write all channels concatenated into one entry
         # of adc_fifo.
@@ -55,7 +56,7 @@ class AudioToChannels(wiring.Component):
         # per sample strobe in the audio domain.
 
         # Storage for samples in the USB domain as we send them to the channel stream.
-        adc_latched = Signal(SW*4)
+        adc_latched = Signal(SW*self.nr_channels)
 
         with m.FSM(domain="usb") as fsm:
 
@@ -88,21 +89,20 @@ class AudioToChannels(wiring.Component):
                         m.d.usb += self.to_usb.valid.eq(0)
                         m.next = next_state_name
 
-            generate_channel_states(0, 'CH1')
-            generate_channel_states(1, 'CH2')
-            generate_channel_states(2, 'CH3')
-            generate_channel_states(3, 'WAIT')
+            for n in range(self.nr_channels-1):
+                generate_channel_states(n, f'CH{n+1}')
+            generate_channel_states(self.nr_channels-1, 'WAIT')
 
         #
         # OUTPUT SIDE
         # HOST -> USB Channel stream -> eurorack-pmod calibrated OUTPUT samples.
         #
 
-        m.submodules.dac_fifo = dac_fifo = AsyncFIFO(width=SW*4, depth=16, w_domain="usb", r_domain="sync")
+        m.submodules.dac_fifo = dac_fifo = AsyncFIFO(width=SW*self.nr_channels, depth=16, w_domain="usb", r_domain="sync")
         wiring.connect(m, dac_fifo.r_stream, wiring.flipped(self.o));
 
         m.d.usb += dac_fifo.w_en.eq(0)
-        for n in range(4):
+        for n in range(self.nr_channels):
             with m.If((self.from_usb.channel_nr == n) & self.from_usb.valid):
                 m.d.usb += dac_fifo.w_data[n*SW:(n+1)*SW].eq(self.from_usb.payload[N_ZFILL:])
                 # Write all channels on every incoming zero'th channel

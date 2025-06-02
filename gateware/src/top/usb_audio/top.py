@@ -35,7 +35,8 @@ class USBAudioTop(Elaboratable):
         wiring.connect(m, pmod0.pins, pmod0_provider.pins)
         m.d.comb += pmod0.codec_mute.eq(reboot.mute)
 
-        m.submodules.usbif = usbif = usb_audio.USB2AudioInterface()
+        m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
+                audio_clock=self.clock_settings.audio_clock, nr_channels=4)
 
         wiring.connect(m, pmod0.o_cal, usbif.i)
         wiring.connect(m, usbif.o, pmod0.i_cal)
