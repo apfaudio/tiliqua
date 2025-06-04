@@ -120,8 +120,6 @@ class XbeamSoc(TiliquaSoc):
 
         pmod0 = self.pmod0_periph.pmod
 
-        self.scope_periph.source = pmod0.o_cal
-
         m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
                 audio_clock=self.clock_settings.audio_clock, nr_channels=4)
 

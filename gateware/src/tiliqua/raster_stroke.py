@@ -73,6 +73,8 @@ class Stroke(wiring.Component):
             "bus":  Out(wishbone.Signature(addr_width=fb.bus.addr_width, data_width=32, granularity=8)),
             # Kick this to start the core
             "enable": In(1),
+            # Internal point stream, upsampled from self.i (TODO no need to expose this)
+            "point_stream": In(stream.Signature(data.ArrayLayout(ASQ, 4)))
         })
 
 
@@ -84,7 +86,10 @@ class Stroke(wiring.Component):
         fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
         fb_hwords = ((self.fb.timings.h_active*self.fb.bytes_per_pixel)//4)
 
-        point_stream = None
+        m.submodules.plot_fifo = plot_fifo = SyncFIFOBuffered(
+            width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
+        wiring.connect(m, wiring.flipped(self.i), plot_fifo.w_stream)
+
         if self.n_upsample is not None and self.n_upsample != 1:
             # If interpolation is enabled, insert an FIR upsampling stage.
             m.submodules.split = split = dsp.Split(n_channels=4)
@@ -95,10 +100,6 @@ class Stroke(wiring.Component):
             m.submodules.resample2 = resample2 = dsp.Resample(fs_in=self.fs, n_up=self.n_upsample, m_down=1)
             m.submodules.resample3 = resample3 = dsp.Resample(fs_in=self.fs, n_up=self.n_upsample, m_down=1)
 
-            from amaranth.lib.fifo import SyncFIFO
-            m.submodules.plot_fifo = plot_fifo = SyncFIFOBuffered(
-                width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
-            wiring.connect(m, wiring.flipped(self.i), plot_fifo.w_stream)
             wiring.connect(m, plot_fifo.r_stream, split.i)
 
             wiring.connect(m, split.o[0], resample0.i)
@@ -111,9 +112,13 @@ class Stroke(wiring.Component):
             wiring.connect(m, resample2.o, merge.i[2])
             wiring.connect(m, resample3.o, merge.i[3])
 
-            point_stream=merge.o
+            wiring.connect(m, merge.o, self.point_stream)
         else:
-            point_stream=self.i
+            # Don't block progress of gateware feeding this core if memory is blocking read/writes.
+            # TODO this is a hack for stable scope triggering.
+            m.d.comb += self.i.ready.eq(1)
+            # No upsampling. Just buffering to tolerate cache misses.
+            wiring.connect(m, plot_fifo.r_stream, self.point_stream)
 
         px_read = self.px_read
         px_sum = self.px_sum
@@ -153,14 +158,15 @@ class Stroke(wiring.Component):
 
             with m.State('LATCH0'):
 
-                m.d.comb += point_stream.ready.eq(1)
+                m.d.comb += self.point_stream.ready.eq(1)
                 # Fired on every audio sample fs_strobe
-                with m.If(point_stream.valid):
+                with m.If(self.point_stream.valid):
                     m.d.sync += [
-                        sample_x.eq((point_stream.payload[0].as_value()>>self.scale_x) + self.x_offset),
-                        sample_y.eq((point_stream.payload[1].as_value()>>self.scale_y) + self.y_offset),
-                        sample_p.eq(point_stream.payload[2].as_value()>>self.scale_p),
-                        sample_c.eq(point_stream.payload[3].as_value()>>self.scale_c),
+                        sample_x.eq((self.point_stream.payload[0].as_value()>>self.scale_x) + self.x_offset),
+                        # invert sample_y for positive scope -> up
+                        sample_y.eq((-self.point_stream.payload[1].as_value()>>self.scale_y) + self.y_offset),
+                        sample_p.eq(self.point_stream.payload[2].as_value()>>self.scale_p),
+                        sample_c.eq(self.point_stream.payload[3].as_value()>>self.scale_c),
                     ]
                     m.next = 'LATCH1'
 
