@@ -223,3 +223,58 @@ class WishboneL2Cache(wiring.Component):
                         m.next = "TEST_HIT"
 
         return m
+
+
+class CacheFlusher(wiring.Component):
+
+    """
+    Periodically flush stale cache lines.
+    """
+
+    def __init__(self, *, base, addr_width, burst_len, flush_backoff_bits=10):
+        self.base = base
+        self.burst_len = burst_len
+        self.flush_backoff_bits = flush_backoff_bits
+        super().__init__({
+            # Kick this to start the core
+            "enable": In(1),
+            # We are a DMA master (no burst support)
+            "bus":  Out(wishbone.Signature(addr_width=addr_width, data_width=32, granularity=8)),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        bus = self.bus
+
+        flush_wait = Signal(self.flush_backoff_bits, init=1)
+        flush_adr  = Signal(16)
+
+        m.d.comb += [
+            bus.we.eq(0),
+            bus.sel.eq(0xf),
+            bus.adr.eq(self.base + flush_adr),
+        ]
+
+        with m.FSM() as fsm:
+
+            with m.State('OFF'):
+                with m.If(self.enable):
+                    m.next = 'WAIT'
+
+            with m.State('WAIT'):
+                m.d.sync += flush_wait.eq(flush_wait+1)
+                with m.If(flush_wait == 0):
+                    m.next = 'READ'
+
+            with m.State('READ'):
+                m.d.comb += [
+                    bus.stb.eq(1),
+                    bus.cyc.eq(1),
+                ]
+                with m.If(bus.stb & bus.ack):
+                    m.next = 'WAIT'
+                    m.d.sync += flush_adr.eq(flush_adr + self.burst_len)
+
+        return m
+
