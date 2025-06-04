@@ -31,7 +31,7 @@ from tiliqua.cli                                 import top_level_cli
 class XbeamPeripheral(wiring.Component):
 
     class Flags(csr.Register, access="w"):
-        usb_bypass:   csr.Field(csr.action.W, unsigned(1))
+        usb_en:   csr.Field(csr.action.W, unsigned(1))
         show_outputs: csr.Field(csr.action.W, unsigned(1))
 
     def __init__(self):
@@ -39,7 +39,7 @@ class XbeamPeripheral(wiring.Component):
         self._flags = regs.add("flags", self.Flags(), offset=0x0)
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
-            "usb_bypass": Out(1, init=1),
+            "usb_en": Out(1),
             "show_outputs": Out(1),
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
         })
@@ -51,8 +51,8 @@ class XbeamPeripheral(wiring.Component):
         m.submodules.bridge  = self._bridge
         connect(m, flipped(self.bus), self._bridge.bus)
 
-        with m.If(self._flags.f.usb_bypass.w_stb):
-            m.d.sync += self.usb_bypass.eq(self._flags.f.usb_bypass.w_data)
+        with m.If(self._flags.f.usb_en.w_stb):
+            m.d.sync += self.usb_en.eq(self._flags.f.usb_en.w_data)
 
         with m.If(self._flags.f.show_outputs.w_stb):
             m.d.sync += self.show_outputs.eq(self._flags.f.show_outputs.w_data)
@@ -123,11 +123,11 @@ class XbeamSoc(TiliquaSoc):
         m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
                 audio_clock=self.clock_settings.audio_clock, nr_channels=4)
 
-        with m.If(self.xbeam_periph.usb_bypass):
-            wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
-        with m.Else():
+        with m.If(self.xbeam_periph.usb_en):
             wiring.connect(m, pmod0.o_cal, usbif.i)
             wiring.connect(m, usbif.o, pmod0.i_cal)
+        with m.Else():
+            wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
 
         with m.If(self.scope_periph.soc_en):
             with m.If(self.xbeam_periph.show_outputs):
