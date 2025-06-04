@@ -148,7 +148,19 @@ fn main() -> ! {
             scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trig_lvl.value as u16) } );
             scope.xscale().write(|w| unsafe { w.xscale().bits(opts.scope.xscale.value) } );
             scope.yscale().write(|w| unsafe { w.yscale().bits(opts.scope.yscale.value) } );
-            scope.timebase().write(|w| unsafe { w.timebase().bits(opts.scope.timebase.value) } );
+            let timebase_value = match opts.scope.timebase.value {
+                Timebase::Timebase1s    => 3,
+                Timebase::Timebase500ms => 6,
+                Timebase::Timebase250ms => 13,
+                Timebase::Timebase100ms => 32,
+                Timebase::Timebase50ms  => 64,
+                Timebase::Timebase25ms  => 128,
+                Timebase::Timebase10ms  => 320,
+                Timebase::Timebase5ms   => 640,
+                Timebase::Timebase2p5ms => 1280,
+                Timebase::Timebase1ms   => 3200,
+            };
+            scope.timebase().write(|w| unsafe { w.timebase().bits(timebase_value) } );
 
             scope.ypos0().write(|w| unsafe { w.ypos().bits(opts.scope.ypos0.value as u16) } );
             scope.ypos1().write(|w| unsafe { w.ypos().bits(opts.scope.ypos1.value as u16) } );

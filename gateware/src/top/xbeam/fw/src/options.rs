@@ -36,12 +36,37 @@ pub enum Show {
     Outputs,
 }
 
-int_params!(ScaleParams<u8>      { step: 1, min: 0, max: 15 });
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
+pub enum Timebase {
+    #[strum(serialize = "1s")]
+    Timebase1s,
+    #[strum(serialize = "500ms")]
+    Timebase500ms,
+    #[strum(serialize = "250ms")]
+    Timebase250ms,
+    #[default]
+    #[strum(serialize = "100ms")]
+    Timebase100ms,
+    #[strum(serialize = "50ms")]
+    Timebase50ms,
+    #[strum(serialize = "25ms")]
+    Timebase25ms,
+    #[strum(serialize = "10ms")]
+    Timebase10ms,
+    #[strum(serialize = "5ms")]
+    Timebase5ms,
+    #[strum(serialize = "2.5ms")]
+    Timebase2p5ms,
+    #[strum(serialize = "1ms")]
+    Timebase1ms,
+}
+
+int_params!(ScaleParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(PersistParams<u16>    { step: 16, min: 16, max: 4096 });
 int_params!(DecayParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
 int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
-int_params!(TimebaseParams<u16>   { step: 128, min: 32, max: 3872 });
 int_params!(TriggerLvlParams<i16> { step: 512, min: -16384, max: 16384 });
 int_params!(YPosParams<i16>       { step: 25, min: -500, max: 500 });
 
@@ -81,8 +106,8 @@ pub struct UsbOpts {
 
 #[derive(OptionPage, Clone)]
 pub struct ScopeOpts {
-    #[option(32)]
-    pub timebase: IntOption<TimebaseParams>,
+    #[option]
+    pub timebase: EnumOption<Timebase>,
     #[option]
     pub trig_mode: EnumOption<TriggerMode>,
     #[option]
