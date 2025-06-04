@@ -39,7 +39,7 @@ class XbeamPeripheral(wiring.Component):
         self._flags = regs.add("flags", self.Flags(), offset=0x0)
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
-            "usb_bypass": Out(1),
+            "usb_bypass": Out(1, init=1),
             "show_outputs": Out(1),
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
         })
