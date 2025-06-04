@@ -137,10 +137,12 @@ fn main() -> ! {
 
             vscope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
             vscope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
-            vscope.xscale().write(|w| unsafe { w.scale().bits(opts.vector.xscale.value) } );
-            vscope.yscale().write(|w| unsafe { w.scale().bits(opts.vector.yscale.value) } );
-            vscope.pscale().write(|w| unsafe { w.scale().bits(opts.vector.pscale.value) } );
-            vscope.cscale().write(|w| unsafe { w.scale().bits(opts.vector.cscale.value) } );
+            vscope.xoffset().write(|w| unsafe { w.value().bits(opts.vector.x_offset.value as u16) } );
+            vscope.yoffset().write(|w| unsafe { w.value().bits(opts.vector.y_offset.value as u16) } );
+            vscope.xscale().write(|w| unsafe { w.scale().bits(opts.vector.x_scale.value) } );
+            vscope.yscale().write(|w| unsafe { w.scale().bits(opts.vector.y_scale.value) } );
+            vscope.pscale().write(|w| unsafe { w.scale().bits(0xf-opts.vector.i_mod.value) } );
+            vscope.cscale().write(|w| unsafe { w.scale().bits(0xf-opts.vector.c_mod.value) } );
 
             scope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
             scope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
@@ -168,7 +170,7 @@ fn main() -> ! {
             scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope.ypos3.value as u16) } );
 
             xbeam_mux.flags().write(
-                |w| { w.usb_bypass().bit(opts.usb.mode.value == USBMode::Bypass);
+                |w| { w.usb_en().bit(opts.usb.mode.value == USBMode::Enable);
                       w.show_outputs().bit(opts.usb.show.value == Show::Outputs)
                 } );
 

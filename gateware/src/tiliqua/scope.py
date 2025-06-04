@@ -30,20 +30,25 @@ class VectorTracePeripheral(wiring.Component):
     class ScaleReg(csr.Register, access="w"):
         scale: csr.Field(csr.action.W, unsigned(8))
 
+    class Position(csr.Register, access="w"):
+        value: csr.Field(csr.action.W, unsigned(16))
+
     def __init__(self, fb, bus_dma, **kwargs):
 
         self.stroke = Stroke(fb=fb, n_upsample=8, **kwargs)
         bus_dma.add(self.stroke.bus)
 
-        regs = csr.Builder(addr_width=5, data_width=8)
+        regs = csr.Builder(addr_width=6, data_width=8)
 
         self._flags     = regs.add("flags",     self.Flags(),        offset=0x0)
         self._hue       = regs.add("hue",       self.HueReg(),       offset=0x4)
         self._intensity = regs.add("intensity", self.IntensityReg(), offset=0x8)
-        self._xscale    = regs.add("xscale",    self.ScaleReg(),    offset=0xC)
-        self._yscale    = regs.add("yscale",    self.ScaleReg(),    offset=0x10)
-        self._pscale    = regs.add("pscale",    self.ScaleReg(),    offset=0x14)
-        self._cscale    = regs.add("cscale",    self.ScaleReg(),    offset=0x18)
+        self._xoffset   = regs.add("xoffset",   self.Position(),     offset=0xC)
+        self._yoffset   = regs.add("yoffset",   self.Position(),     offset=0x10)
+        self._xscale    = regs.add("xscale",    self.ScaleReg(),     offset=0x14)
+        self._yscale    = regs.add("yscale",    self.ScaleReg(),     offset=0x18)
+        self._pscale    = regs.add("pscale",    self.ScaleReg(),     offset=0x1C)
+        self._cscale    = regs.add("cscale",    self.ScaleReg(),     offset=0x20)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
@@ -78,6 +83,12 @@ class VectorTracePeripheral(wiring.Component):
 
         with m.If(self._yscale.f.scale.w_stb):
             m.d.sync += self.stroke.scale_y.eq(self._yscale.f.scale.w_data)
+
+        with m.If(self._xoffset.f.value.w_stb):
+            m.d.sync += self.stroke.x_offset.eq(self._xoffset.f.value.w_data)
+
+        with m.If(self._yoffset.f.value.w_stb):
+            m.d.sync += self.stroke.y_offset.eq(self._yoffset.f.value.w_data)
 
         with m.If(self._pscale.f.scale.w_stb):
             m.d.sync += self.stroke.scale_p.eq(self._pscale.f.scale.w_data)

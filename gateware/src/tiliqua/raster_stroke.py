@@ -165,8 +165,8 @@ class Stroke(wiring.Component):
                         sample_x.eq((self.point_stream.payload[0].as_value()>>self.scale_x) + self.x_offset),
                         # invert sample_y for positive scope -> up
                         sample_y.eq((-self.point_stream.payload[1].as_value()>>self.scale_y) + self.y_offset),
-                        sample_p.eq(self.point_stream.payload[2].as_value()>>self.scale_p),
-                        sample_c.eq(self.point_stream.payload[3].as_value()>>self.scale_c),
+                        sample_p.eq(Mux(self.scale_p != 0xf, self.point_stream.payload[2].as_value()>>self.scale_p, 0)),
+                        sample_c.eq(Mux(self.scale_c != 0xf, self.point_stream.payload[3].as_value()>>self.scale_c, 0)),
                     ]
                     m.next = 'LATCH1'
 

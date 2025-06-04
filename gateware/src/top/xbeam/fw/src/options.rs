@@ -63,23 +63,28 @@ pub enum Timebase {
 }
 
 int_params!(ScaleParams<u8>       { step: 1, min: 0, max: 15 });
+int_params!(PCScaleParams<u8>     { step: 1, min: 0, max: 15 });
 int_params!(PersistParams<u16>    { step: 16, min: 16, max: 4096 });
 int_params!(DecayParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
 int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
 int_params!(TriggerLvlParams<i16> { step: 512, min: -16384, max: 16384 });
-int_params!(YPosParams<i16>       { step: 25, min: -500, max: 500 });
+int_params!(PosParams<i16>       { step: 25, min: -500, max: 500 });
 
 #[derive(OptionPage, Clone)]
 pub struct VectorOpts {
+    #[option(0)]
+    pub x_offset: IntOption<PosParams>,
+    #[option(0)]
+    pub y_offset: IntOption<PosParams>,
     #[option(6)]
-    pub xscale: IntOption<ScaleParams>,
+    pub x_scale: IntOption<ScaleParams>,
     #[option(6)]
-    pub yscale: IntOption<ScaleParams>,
-    #[option(10)]
-    pub pscale: IntOption<ScaleParams>,
-    #[option(10)]
-    pub cscale: IntOption<ScaleParams>,
+    pub y_scale: IntOption<ScaleParams>,
+    #[option(0)]
+    pub i_mod: IntOption<PCScaleParams>,
+    #[option(0)]
+    pub c_mod: IntOption<PCScaleParams>,
 }
 
 #[derive(OptionPage, Clone)]
@@ -113,13 +118,13 @@ pub struct ScopeOpts {
     #[option]
     pub trig_lvl: IntOption<TriggerLvlParams>,
     #[option(-250)]
-    pub ypos0: IntOption<YPosParams>,
+    pub ypos0: IntOption<PosParams>,
     #[option(-75)]
-    pub ypos1: IntOption<YPosParams>,
+    pub ypos1: IntOption<PosParams>,
     #[option(75)]
-    pub ypos2: IntOption<YPosParams>,
+    pub ypos2: IntOption<PosParams>,
     #[option(250)]
-    pub ypos3: IntOption<YPosParams>,
+    pub ypos3: IntOption<PosParams>,
     #[option(8)]
     pub yscale: IntOption<ScaleParams>,
     #[option(6)]
