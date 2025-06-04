@@ -24,7 +24,7 @@ from amaranth_soc                                import csr, wishbone
 
 from amaranth_future                             import fixed
 
-from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio, cache
+from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio, cache, sim
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
@@ -75,7 +75,8 @@ class XbeamSoc(TiliquaSoc):
 
         self.cache = cache.WishboneL2Cache(
                 addr_width=self.psram_periph.bus.addr_width,
-                cachesize_words=32)
+                cachesize_words=64)
+
 
         self.arbiter = wishbone.Arbiter(
             addr_width=self.psram_periph.bus.addr_width,
@@ -83,6 +84,15 @@ class XbeamSoc(TiliquaSoc):
             granularity=8,
         )
         self.psram_periph.add_master(self.cache.slave)
+
+        # Periodically flush stale cache lines, so we still get a dead beam 'dot'
+        # even if the beam is not being deflected despite the write-back cache.
+
+        self.flusher = cache.CacheFlusher(
+                base=self.fb.fb_base,
+                addr_width=self.psram_periph.bus.addr_width,
+                burst_len=self.cache.burst_len<<5)
+        self.arbiter.add(self.flusher.bus)
 
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
@@ -108,6 +118,8 @@ class XbeamSoc(TiliquaSoc):
 
         m.submodules += self.cache
 
+        m.submodules += self.flusher
+
         m.submodules += self.arbiter
 
         m.submodules += self.vector_periph
@@ -120,12 +132,16 @@ class XbeamSoc(TiliquaSoc):
 
         pmod0 = self.pmod0_periph.pmod
 
-        m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
-                audio_clock=self.clock_settings.audio_clock, nr_channels=4)
+        if sim.is_hw(platform):
+            m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
+                    audio_clock=self.clock_settings.audio_clock, nr_channels=4)
 
         with m.If(self.xbeam_periph.usb_en):
-            wiring.connect(m, pmod0.o_cal, usbif.i)
-            wiring.connect(m, usbif.o, pmod0.i_cal)
+            if sim.is_hw(platform):
+                wiring.connect(m, pmod0.o_cal, usbif.i)
+                wiring.connect(m, usbif.o, pmod0.i_cal)
+            else:
+                pass
         with m.Else():
             wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
 
@@ -156,6 +172,7 @@ class XbeamSoc(TiliquaSoc):
         with m.If(self.permit_bus_traffic):
             m.d.sync += self.vector_periph.en.eq(1)
             m.d.sync += self.scope_periph.en.eq(1)
+            m.d.sync += self.flusher.enable.eq(1)
 
         return m
 
