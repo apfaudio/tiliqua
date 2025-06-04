@@ -99,8 +99,8 @@ class AudioToChannels(wiring.Component):
         # OUTPUT SIDE
         # HOST -> USB Channel stream -> eurorack-pmod calibrated OUTPUT samples.
         #
-
         m.submodules.dac_fifo = dac_fifo = AsyncFIFOBuffered(width=SW*self.nr_channels, depth=self.fifo_depth, w_domain="usb", r_domain="sync")
+        wiring.connect(m, dac_fifo.r_stream, wiring.flipped(self.o));
 
         m.d.usb += dac_fifo.w_en.eq(0)
         for n in range(self.nr_channels):
