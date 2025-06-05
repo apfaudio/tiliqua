@@ -227,7 +227,7 @@ class WishboneL2Cache(wiring.Component):
 class CacheFlusher(wiring.Component):
 
     """
-    Periodically flush stale cache lines.
+    Periodically flush stale cache lines by making them all dirty at a slow interval.
     """
 
     def __init__(self, *, base, addr_width, burst_len, flush_backoff_bits=10):
@@ -247,13 +247,14 @@ class CacheFlusher(wiring.Component):
         bus = self.bus
 
         flush_wait = Signal(self.flush_backoff_bits, init=1)
-        flush_adr  = Signal(16)
+        flush_adr  = Signal(8)
 
         m.d.comb += [
-            bus.we.eq(0),
             bus.sel.eq(0xf),
             bus.adr.eq(self.base + flush_adr),
         ]
+
+        data = Signal(32)
 
         with m.FSM() as fsm:
 
@@ -270,6 +271,21 @@ class CacheFlusher(wiring.Component):
                 m.d.comb += [
                     bus.stb.eq(1),
                     bus.cyc.eq(1),
+                    bus.we.eq(0),
+                ]
+                with m.If(bus.stb & bus.ack):
+                    m.d.sync += data.eq(bus.dat_r)
+                    m.next = 'WAIT2'
+
+            with m.State('WAIT2'):
+                m.next = 'WRITE'
+
+            with m.State('WRITE'):
+                m.d.comb += [
+                    bus.stb.eq(1),
+                    bus.cyc.eq(1),
+                    bus.we.eq(1),
+                    bus.dat_w.eq(data),
                 ]
                 with m.If(bus.stb & bus.ack):
                     m.next = 'WAIT'
