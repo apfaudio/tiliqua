@@ -91,7 +91,7 @@ class XbeamSoc(TiliquaSoc):
         self.flusher = cache.CacheFlusher(
                 base=self.fb.fb_base,
                 addr_width=self.psram_periph.bus.addr_width,
-                burst_len=self.cache.burst_len<<5)
+                burst_len=self.cache.burst_len)
         self.arbiter.add(self.flusher.bus)
 
         self.vector_periph = scope.VectorTracePeripheral(
