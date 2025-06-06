@@ -75,8 +75,7 @@ class XbeamSoc(TiliquaSoc):
 
         self.cache = cache.WishboneL2Cache(
                 addr_width=self.psram_periph.bus.addr_width,
-                cachesize_words=64)
-
+                cachesize_words=32)
 
         self.arbiter = wishbone.Arbiter(
             addr_width=self.psram_periph.bus.addr_width,
