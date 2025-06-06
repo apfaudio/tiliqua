@@ -96,8 +96,7 @@ class WishboneL2Cache(wiring.Component):
         m.submodules.data_mem = data_mem = Memory(
             shape=unsigned(self.data_width), depth=2**linebits*self.burst_len, init=[])
         wr_port = data_mem.write_port(granularity=self.granularity)
-
-        rd_port = data_mem.read_port(domain='comb')
+        rd_port = data_mem.read_port()
 
 
         write_from_slave = Signal()
@@ -108,9 +107,8 @@ class WishboneL2Cache(wiring.Component):
             rd_port.addr.eq(Cat(adr_offset, adr_line)),
             slave.sel.eq(word_select),
             master.dat_r.eq(rd_port.data),
+            slave.dat_w.eq(rd_port.data),
         ]
-
-        m.d.sync += slave.dat_w.eq(rd_port.data)
 
         with m.If(write_from_slave):
             m.d.comb += [
@@ -150,22 +148,27 @@ class WishboneL2Cache(wiring.Component):
 
         m.d.comb += slave.adr.eq(Cat(Const(0).replicate(offsetbits), adr_line, tag_do.tag))
 
+        m.d.sync += master.ack.eq(0)
+
         with m.FSM() as fsm:
 
             with m.State("IDLE"):
                 with m.If(master.cyc & master.stb):
                     m.next = "TEST_HIT"
 
+            with m.State("WAIT"):
+                m.next = "IDLE"
+
             with m.State("TEST_HIT"):
                 with m.If((tag_do.tag == adr_tag) & tag_do.valid):
-                    m.d.comb += master.ack.eq(1)
+                    m.d.sync += master.ack.eq(1)
                     with m.If(master.we):
                         m.d.comb += [
                             tag_di.valid.eq(1),
                             tag_di.dirty.eq(1),
                             tag_wr_port.en.eq(1)
                         ]
-                    m.next = "IDLE"
+                    m.next = "WAIT"
                 with m.Else():
                     with m.If(tag_do.dirty):
                         m.next = "EVICT"
@@ -188,9 +191,7 @@ class WishboneL2Cache(wiring.Component):
                 ]
 
                 with m.If(slave.ack):
-
                     m.d.comb += burst_offset_lookahead.eq(burst_offset+1)
-
                     m.d.sync += burst_offset.eq(burst_offset + 1)
                     with m.If(burst_offset == (self.burst_len - 1)):
                         m.d.comb += slave.cti.eq(wishbone.CycleType.END_OF_BURST)
