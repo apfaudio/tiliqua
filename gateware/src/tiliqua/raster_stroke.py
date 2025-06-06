@@ -97,8 +97,8 @@ class Stroke(wiring.Component):
 
             m.submodules.resample0 = resample0 = dsp.Resample(fs_in=self.fs, n_up=self.n_upsample, m_down=1)
             m.submodules.resample1 = resample1 = dsp.Resample(fs_in=self.fs, n_up=self.n_upsample, m_down=1)
-            m.submodules.resample2 = resample2 = dsp.Resample(fs_in=self.fs, n_up=self.n_upsample, m_down=1)
-            m.submodules.resample3 = resample3 = dsp.Resample(fs_in=self.fs, n_up=self.n_upsample, m_down=1)
+            m.submodules.resample2 = resample2 = dsp.Duplicate(n=self.n_upsample)
+            m.submodules.resample3 = resample3 = dsp.Duplicate(n=self.n_upsample)
 
             wiring.connect(m, plot_fifo.r_stream, split.i)
 
