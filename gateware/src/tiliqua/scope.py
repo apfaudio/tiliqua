@@ -35,7 +35,7 @@ class VectorTracePeripheral(wiring.Component):
 
     def __init__(self, fb, bus_dma, **kwargs):
 
-        self.stroke = Stroke(fb=fb, n_upsample=8, **kwargs)
+        self.stroke = Stroke(fb=fb, **kwargs)
         bus_dma.add(self.stroke.bus)
 
         regs = csr.Builder(addr_width=6, data_width=8)
