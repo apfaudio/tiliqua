@@ -111,13 +111,10 @@ class AudioToChannels(wiring.Component):
                 if n == 0:
                     m.d.usb += dac_fifo.w_en.eq(1)
 
-        dbg = platform.request('debug')
         m.d.comb += [
             self.dac_fifo_level.eq(dac_fifo.w_level),
             self.adc_fifo_level.eq(adc_fifo.r_level),
             self.from_usb.ready.eq(dac_fifo.w_rdy),
-            dbg.debug0.o.eq(dac_fifo.w_rdy),
-            dbg.debug1.o.eq(dac_fifo.r_rdy),
         ]
 
         return m

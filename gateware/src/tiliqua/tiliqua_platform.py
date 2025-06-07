@@ -380,16 +380,11 @@ class _TiliquaR4Mobo:
             Subsignal("ck", Pins("52", dir="o", conn=("m2", 0))),
             Attrs(IO_TYPE="LVCMOS33D", DRIVE="8", SLEWRATE="FAST")
          ),
-
-        Resource("debug", 0,
-            Subsignal("debug0",  Pins("41", dir="o",  conn=("m2", 0))),
-            Subsignal("debug1",  Pins("73", dir="o",  conn=("m2", 0))),
-         )
     ]
 
     # Expansion connectors ex0 and ex1
     connectors  = [
-        #Connector("pmod", 0, "55 38 66 41 - - 57 35 34 70 - -", conn=("m2", 0)),
+        Connector("pmod", 0, "55 38 66 41 - - 57 35 34 70 - -", conn=("m2", 0)),
         Connector("pmod", 1, "59 63 14 20 - - 61 15 13 22 - -", conn=("m2", 0)),
     ]
 
