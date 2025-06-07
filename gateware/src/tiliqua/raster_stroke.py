@@ -45,11 +45,12 @@ class Stroke(wiring.Component):
 
 
     def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=4,
-                 default_hue=10, default_x=0, default_y=0):
+                 default_hue=10, default_x=0, default_y=0, plot_fifo=True):
 
         self.fb = fb
         self.fs = fs
         self.n_upsample = n_upsample
+        self.plot_fifo = plot_fifo
 
         self.hue       = Signal(4, init=default_hue);
         self.intensity = Signal(4, init=8);
@@ -86,9 +87,15 @@ class Stroke(wiring.Component):
         fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
         fb_hwords = ((self.fb.timings.h_active*self.fb.bytes_per_pixel)//4)
 
-        m.submodules.plot_fifo = plot_fifo = SyncFIFOBuffered(
-            width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
-        wiring.connect(m, wiring.flipped(self.i), plot_fifo.w_stream)
+        if self.plot_fifo:
+            # Optional FIFO between incoming and plotted points, helps keep
+            # more points from being dropped if memory contention is high.
+            m.submodules.plot_fifo = plot_fifo = SyncFIFOBuffered(
+                width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
+            wiring.connect(m, wiring.flipped(self.i), plot_fifo.w_stream)
+            r_stream = plot_fifo.r_stream
+        else:
+            r_stream = wiring.flipped(self.i)
 
         if self.n_upsample is not None and self.n_upsample != 1:
             # If interpolation is enabled, insert an FIR upsampling stage.
@@ -100,7 +107,7 @@ class Stroke(wiring.Component):
             m.submodules.resample2 = resample2 = dsp.Duplicate(n=self.n_upsample)
             m.submodules.resample3 = resample3 = dsp.Duplicate(n=self.n_upsample)
 
-            wiring.connect(m, plot_fifo.r_stream, split.i)
+            wiring.connect(m, r_stream, split.i)
 
             wiring.connect(m, split.o[0], resample0.i)
             wiring.connect(m, split.o[1], resample1.i)
@@ -118,7 +125,7 @@ class Stroke(wiring.Component):
             # TODO this is a hack for stable scope triggering.
             m.d.comb += self.i.ready.eq(1)
             # No upsampling. Just buffering to tolerate cache misses.
-            wiring.connect(m, plot_fifo.r_stream, self.point_stream)
+            wiring.connect(m, r_stream, self.point_stream)
 
         px_read = self.px_read
         px_sum = self.px_sum

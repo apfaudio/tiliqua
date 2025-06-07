@@ -57,7 +57,7 @@ from amaranth_soc.memory  import MemoryMap
 
 from amaranth_future                             import fixed
 
-from tiliqua                                     import eurorack_pmod, dsp, scope
+from tiliqua                                     import eurorack_pmod, dsp, scope, cache
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
@@ -171,16 +171,33 @@ class MacroOscSoc(TiliquaSoc):
         super().__init__(finalize_csr_bridge=False, mainram_size=0x10000,
                          cpu_variant="tiliqua_rv32imafc", extra_cpu_regions=extra_cpu_regions, **kwargs)
 
+        self.cache = cache.WishboneL2Cache(
+                addr_width=self.psram_periph.bus.addr_width,
+                cachesize_words=32)
+        self.arbiter = wishbone.Arbiter(
+            addr_width=self.psram_periph.bus.addr_width,
+            data_width=32,
+            granularity=8,
+        )
+        self.psram_periph.add_master(self.cache.slave)
+        self.flusher = cache.CacheFlusher(
+                base=self.fb.fb_base,
+                addr_width=self.psram_periph.bus.addr_width,
+                burst_len=self.cache.burst_len)
+        self.arbiter.add(self.flusher.bus)
+
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.psram_periph,
-            n_upsample=8,
-            fs=48000)
+            bus_dma=self.arbiter,
+            n_upsample=16,
+            fs=48000,
+            plot_fifo=False)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
         self.scope_periph = scope.ScopeTracePeripheral(
             fb=self.fb,
-            bus_dma=self.psram_periph)
+            bus_dma=self.arbiter,
+            plot_fifo=False)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
 
         self.audio_fifo = AudioFIFOPeripheral()
@@ -200,6 +217,14 @@ class MacroOscSoc(TiliquaSoc):
 
         m = Module()
 
+        wiring.connect(m, self.arbiter.bus, self.cache.master)
+
+        m.submodules += self.cache
+
+        m.submodules += self.flusher
+
+        m.submodules += self.arbiter
+
         m.submodules += self.vector_periph
 
         m.submodules += self.scope_periph
@@ -218,7 +243,7 @@ class MacroOscSoc(TiliquaSoc):
         # This FIFO does not block the audio stream.
 
         m.submodules.plot_fifo = plot_fifo = fifo.SyncFIFOBuffered(
-            width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=16)
+            width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=32)
 
         # Route audio outputs 2/3 to plotting stream (scope / vector)
         m.d.comb += [
@@ -237,6 +262,7 @@ class MacroOscSoc(TiliquaSoc):
         with m.If(self.permit_bus_traffic):
             m.d.sync += self.vector_periph.en.eq(1)
             m.d.sync += self.scope_periph.en.eq(1)
+            m.d.sync += self.flusher.enable.eq(1)
 
         return m
 
