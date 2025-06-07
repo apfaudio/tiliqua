@@ -173,7 +173,9 @@ class MacroOscSoc(TiliquaSoc):
 
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.psram_periph)
+            bus_dma=self.psram_periph,
+            n_upsample=8,
+            fs=48000)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
         self.scope_periph = scope.ScopeTracePeripheral(

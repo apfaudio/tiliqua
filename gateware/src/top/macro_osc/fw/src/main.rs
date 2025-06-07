@@ -294,8 +294,8 @@ fn main() -> ! {
             unsafe {
                 vscope.hue().write(|w| w.hue().bits(opts.beam.hue.value+4));
                 vscope.intensity().write(|w| w.intensity().bits(opts.beam.intensity.value));
-                vscope.xscale().write(|w| w.xscale().bits(opts.vector.xscale.value));
-                vscope.yscale().write(|w| w.yscale().bits(opts.vector.yscale.value));
+                vscope.xscale().write(|w| w.scale().bits(opts.vector.xscale.value));
+                vscope.yscale().write(|w| w.scale().bits(opts.vector.yscale.value));
 
                 scope.hue().write(|w| w.hue().bits(opts.beam.hue.value+6));
                 scope.intensity().write(|w| w.intensity().bits(opts.beam.intensity.value));
