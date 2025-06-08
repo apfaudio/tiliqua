@@ -278,3 +278,61 @@ class CacheFlusher(wiring.Component):
 
         return m
 
+
+class PlotterCache(wiring.Component):
+
+    """
+    Cache optimized for use in stroke-raster conversion.
+
+    Main difference is an extra arbiter to support multiple plotting cores, as well
+    as a periodic cache flusher to avoid cache lines staying dirty (without hitting
+    the persistance emulation) for too long.
+    """
+
+    def __init__(self, *, fb_base, addr_width):
+
+        # Instantiate a small cache and connect it to the backing store as a DMA master
+        self.cache = WishboneL2Cache(
+                addr_width=addr_width,
+                cachesize_words=64)
+
+        # Create an arbiter for different plotting cores to share
+        self.arbiter = wishbone.Arbiter(
+            addr_width=self.cache.master.addr_width,
+            data_width=self.cache.master.data_width,
+            granularity=self.cache.master.granularity,
+        )
+
+        # Periodically flush stale cache lines, so we still get a dead beam 'dot'
+        # even if the beam is not being deflected despite the write-back cache.
+        self.flusher = CacheFlusher(
+            base=fb_base,
+            addr_width=self.cache.master.addr_width,
+            burst_len=self.cache.burst_len)
+        self.arbiter.add(self.flusher.bus)
+
+        super().__init__({
+            # Transactions to backing store
+            "bus": Out(wishbone.Signature(addr_width=self.cache.slave.addr_width,
+                                          data_width=self.cache.slave.data_width,
+                                          granularity=self.cache.slave.granularity,
+                                          features={"cti", "bte"})),
+        })
+
+    def add(self, bus):
+        self.arbiter.add(bus)
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        wiring.connect(m, self.arbiter.bus, self.cache.master)
+        wiring.connect(m, self.cache.slave, wiring.flipped(self.bus))
+
+        m.submodules += self.cache
+        m.submodules += self.flusher
+        m.submodules += self.arbiter
+
+        with m.If(self.cache.slave.ack):
+            m.d.sync += self.flusher.enable.eq(1)
+
+        return m

@@ -168,6 +168,7 @@ class ScopeTracePeripheral(wiring.Component):
             "en": In(1),
             "soc_en": In(1),
             "rotate_left": In(1),
+            # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
         })
         self.bus.memory_map = self._bridge.bus.memory_map

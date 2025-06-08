@@ -73,35 +73,19 @@ class XbeamSoc(TiliquaSoc):
         self.scope_periph_base  = 0x00001100
         self.xbeam_periph_base  = 0x00001200
 
-        self.cache = cache.WishboneL2Cache(
-                addr_width=self.psram_periph.bus.addr_width,
-                cachesize_words=64)
-
-        self.arbiter = wishbone.Arbiter(
-            addr_width=self.psram_periph.bus.addr_width,
-            data_width=32,
-            granularity=8,
-        )
-        self.psram_periph.add_master(self.cache.slave)
-
-        # Periodically flush stale cache lines, so we still get a dead beam 'dot'
-        # even if the beam is not being deflected despite the write-back cache.
-
-        self.flusher = cache.CacheFlusher(
-                base=self.fb.fb_base,
-                addr_width=self.psram_periph.bus.addr_width,
-                burst_len=self.cache.burst_len)
-        self.arbiter.add(self.flusher.bus)
+        self.plotter_cache = cache.PlotterCache(
+            fb_base=self.fb.fb_base, addr_width=self.psram_periph.bus.addr_width)
+        self.psram_periph.add_master(self.plotter_cache.bus)
 
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.arbiter,
+            bus_dma=self.plotter_cache,
             n_upsample=8)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
         self.scope_periph = scope.ScopeTracePeripheral(
             fb=self.fb,
-            bus_dma=self.arbiter)
+            bus_dma=self.plotter_cache)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
 
         self.xbeam_periph = XbeamPeripheral()
@@ -114,13 +98,7 @@ class XbeamSoc(TiliquaSoc):
 
         m = Module()
 
-        wiring.connect(m, self.arbiter.bus, self.cache.master)
-
-        m.submodules += self.cache
-
-        m.submodules += self.flusher
-
-        m.submodules += self.arbiter
+        m.submodules += self.plotter_cache
 
         m.submodules += self.vector_periph
 
@@ -162,7 +140,6 @@ class XbeamSoc(TiliquaSoc):
         with m.If(self.permit_bus_traffic):
             m.d.sync += self.vector_periph.en.eq(1)
             m.d.sync += self.scope_periph.en.eq(1)
-            m.d.sync += self.flusher.enable.eq(1)
 
         return m
 
