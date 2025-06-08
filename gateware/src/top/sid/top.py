@@ -15,7 +15,7 @@ from amaranth_soc          import csr
 
 from amaranth_future       import fixed
 
-from tiliqua               import eurorack_pmod, dsp, scope
+from tiliqua               import eurorack_pmod, dsp, scope, cache
 from tiliqua.tiliqua_soc   import TiliquaSoc
 from tiliqua.cli           import top_level_cli
 from tiliqua.scope         import ScopeTracePeripheral
@@ -217,11 +217,15 @@ class SIDSoc(TiliquaSoc):
         self.sid_periph = SIDPeripheral()
         self.csr_decoder.add(self.sid_periph.bus, addr=0x1000, name="sid_periph")
 
+        self.plotter_cache = cache.PlotterCache(fb=self.fb)
+        self.psram_periph.add_master(self.plotter_cache.bus)
+
         # Add scope peripheral 
         self.scope_periph = scope.ScopeTracePeripheral(
-            fb=self.fb,
-            bus_dma=self.psram_periph)
+            fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=0x1100, name="scope_periph")
+        for bus in self.scope_periph.bus_dma:
+            self.plotter_cache.add(bus)
 
         # Now finalize the CSR bridge
         self.finalize_csr_bridge()
@@ -229,6 +233,8 @@ class SIDSoc(TiliquaSoc):
     def elaborate(self, platform):
 
         m = Module()
+
+        m.submodules += self.plotter_cache
 
         m.submodules.sid = sid = SID()
         m.submodules += self.sid_periph
