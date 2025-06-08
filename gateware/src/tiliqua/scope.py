@@ -179,12 +179,9 @@ class ScopeTracePeripheral(wiring.Component):
         trigger_lvl = Signal(shape=dsp.ASQ)
         trigger_always = Signal()
 
-        m.submodules.plot_fifo = plot_fifo = fifo.SyncFIFOBuffered(
-            width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
         self.isplit4 = dsp.Split(4)
 
-        wiring.connect(m, wiring.flipped(self.i), plot_fifo.w_stream)
-        wiring.connect(m, plot_fifo.r_stream, self.isplit4.i)
+        wiring.connect(m, wiring.flipped(self.i), self.isplit4.i)
 
         m.submodules.bridge = self._bridge
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
@@ -220,14 +217,18 @@ class ScopeTracePeripheral(wiring.Component):
         m.submodules.rampsplit4 = rampsplit4 = dsp.Split(4, replicate=True, source=ramp.o)
 
         # Rasterize ch0: Ramp => X, Audio => Y
-        m.submodules.ch0_merge4 = ch0_merge4 = dsp.Merge(4, sink=self.strokes[0].i)
+        m.submodules.ch0_merge4 = ch0_merge4 = dsp.Merge(4)
+        # HACK for stable trigger despite periodic cache misses
+        # TODO: modify ramp generation instead?
+        dsp.connect_peek(m, ch0_merge4.o, self.strokes[0].i, always_ready=True)
         ch0_merge4.wire_valid(m, [2, 3])
         wiring.connect(m, rampsplit4.o[0], ch0_merge4.i[0])
         wiring.connect(m, irep2.o[1], ch0_merge4.i[1])
 
         # Rasterize ch1-ch3: Ramp => X, Audio => Y
         for ch in range(1, 4):
-            ch_merge4 = dsp.Merge(4, sink=self.strokes[ch].i)
+            ch_merge4 = dsp.Merge(4)
+            dsp.connect_peek(m, ch_merge4.o, self.strokes[ch].i, always_ready=True)
             m.submodules += ch_merge4
             ch_merge4.wire_valid(m, [2, 3])
             wiring.connect(m, rampsplit4.o[ch], ch_merge4.i[0])

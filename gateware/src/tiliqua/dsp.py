@@ -1282,6 +1282,18 @@ def named_submodules(m_submodules, elaboratables, override_name=None):
     else:
         [setattr(m_submodules, f"{override_name}{i}", e) for i, e in enumerate(elaboratables)]
 
+
+def connect_peek(m, stream_peek, stream_dst, always_ready=False):
+    """
+    Nonblocking 'peek', used to tap off an EXISTING stream connection, without
+    influencing it, for inspection / plotting purposes.
+    """
+    m.d.comb += [
+        stream_dst.valid.eq(stream_peek.valid & stream_peek.ready),
+        stream_dst.payload.eq(stream_peek.payload),
+        stream_peek.ready.eq(1) if always_ready else []
+    ]
+
 class Duplicate(wiring.Component):
     """
     Simple 'upsampler' that duplicates each input sample N times.
