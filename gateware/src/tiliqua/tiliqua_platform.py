@@ -182,13 +182,16 @@ class _TiliquaR2Mobo:
             attrs=Attrs(IO_TYPE="LVCMOS33", PULLMODE="UP")
         ),
 
-        # FFC connector to eurorack-pmod on the back.
-        Resource("audio_ffc", 0,
+        Resource("audio_ffc_i2s", 0,
             Subsignal("sdin1",   Pins("44", dir="o",  conn=("m2", 0))),
             Subsignal("sdout1",  Pins("46", dir="i",  conn=("m2", 0))),
             Subsignal("lrck",    Pins("48", dir="o",  conn=("m2", 0))),
             Subsignal("bick",    Pins("50", dir="o",  conn=("m2", 0))),
             Subsignal("mclk",    Pins("52", dir="o",  conn=("m2", 0))),
+            Attrs(IO_TYPE="LVCMOS33")
+        ),
+
+        Resource("audio_ffc_aux", 0,
             Subsignal("pdn_d",   Pins("54", dir="o",  conn=("m2", 0))),
             Subsignal("i2c_sda", Pins("56", dir="io", conn=("m2", 0))),
             Subsignal("i2c_scl", Pins("58", dir="io", conn=("m2", 0))),
@@ -256,13 +259,16 @@ class _TiliquaR3Mobo:
             attrs=Attrs(IO_TYPE="LVCMOS33", PULLMODE="UP")
         ),
 
-        # FFC connector to eurorack-pmod on the back.
-        Resource("audio_ffc", 0,
+        Resource("audio_ffc_i2s", 0,
             Subsignal("sdin1",   Pins("44", dir="o",  conn=("m2", 0))),
             Subsignal("sdout1",  Pins("46", dir="i",  conn=("m2", 0))),
             Subsignal("lrck",    Pins("48", dir="o",  conn=("m2", 0))),
             Subsignal("bick",    Pins("50", dir="o",  conn=("m2", 0))),
             Subsignal("mclk",    Pins("67", dir="o",  conn=("m2", 0))),
+            Attrs(IO_TYPE="LVCMOS33")
+        ),
+
+        Resource("audio_ffc_aux", 0,
             Subsignal("pdn_d",   Pins("65", dir="o",  conn=("m2", 0))),
             Subsignal("pdn_clk", Pins("56", dir="o",  conn=("m2", 0))),
             Subsignal("i2c_sda", Pins("71", dir="io", conn=("m2", 0))),
