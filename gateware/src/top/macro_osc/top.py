@@ -171,34 +171,21 @@ class MacroOscSoc(TiliquaSoc):
         super().__init__(finalize_csr_bridge=False, mainram_size=0x10000,
                          cpu_variant="tiliqua_rv32imafc", extra_cpu_regions=extra_cpu_regions, **kwargs)
 
-        self.cache = cache.WishboneL2Cache(
-                addr_width=self.psram_periph.bus.addr_width,
-                cachesize_words=32)
-        self.arbiter = wishbone.Arbiter(
-            addr_width=self.psram_periph.bus.addr_width,
-            data_width=32,
-            granularity=8,
-        )
-        self.psram_periph.add_master(self.cache.slave)
-        self.flusher = cache.CacheFlusher(
-                base=self.fb.fb_base,
-                addr_width=self.psram_periph.bus.addr_width,
-                burst_len=self.cache.burst_len)
-        self.arbiter.add(self.flusher.bus)
+        self.plotter_cache = cache.PlotterCache(fb=self.fb)
+        self.psram_periph.add_master(self.plotter_cache.bus)
 
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.arbiter,
             n_upsample=16,
-            fs=48000,
-            plot_fifo=False)
+            fs=48000)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
+        self.plotter_cache.add(self.vector_periph.bus_dma)
 
         self.scope_periph = scope.ScopeTracePeripheral(
-            fb=self.fb,
-            bus_dma=self.arbiter,
-            plot_fifo=False)
+            fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
+        for bus in self.scope_periph.bus_dma:
+            self.plotter_cache.add(bus)
 
         self.audio_fifo = AudioFIFOPeripheral()
         self.csr_decoder.add(self.audio_fifo.csr_bus, addr=self.audio_fifo_csr_base, name="audio_fifo")
@@ -217,13 +204,7 @@ class MacroOscSoc(TiliquaSoc):
 
         m = Module()
 
-        wiring.connect(m, self.arbiter.bus, self.cache.master)
-
-        m.submodules += self.cache
-
-        m.submodules += self.flusher
-
-        m.submodules += self.arbiter
+        m.submodules += self.plotter_cache
 
         m.submodules += self.vector_periph
 
@@ -262,7 +243,6 @@ class MacroOscSoc(TiliquaSoc):
         with m.If(self.permit_bus_traffic):
             m.d.sync += self.vector_periph.en.eq(1)
             m.d.sync += self.scope_periph.en.eq(1)
-            m.d.sync += self.flusher.enable.eq(1)
 
         return m
 
