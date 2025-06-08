@@ -371,28 +371,15 @@ class PolySoc(TiliquaSoc):
         self.vector_periph_base = 0x00001000
         self.synth_periph_base  = 0x00001100
 
-        self.cache = cache.WishboneL2Cache(
-                addr_width=self.psram_periph.bus.addr_width,
-                cachesize_words=32)
-        self.arbiter = wishbone.Arbiter(
-            addr_width=self.psram_periph.bus.addr_width,
-            data_width=32,
-            granularity=8,
-        )
-        self.psram_periph.add_master(self.cache.slave)
-
-        self.flusher = cache.CacheFlusher(
-                base=self.fb.fb_base,
-                addr_width=self.psram_periph.bus.addr_width,
-                burst_len=self.cache.burst_len)
-        self.arbiter.add(self.flusher.bus)
+        self.plotter_cache = cache.PlotterCache(fb=self.fb)
+        self.psram_periph.add_master(self.plotter_cache.bus)
 
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.arbiter,
             fs=48000,
             n_upsample=32)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
+        self.plotter_cache.add(self.vector_periph.bus_dma)
 
         # synth controls
         self.synth_periph = SynthPeripheral()
@@ -408,13 +395,7 @@ class PolySoc(TiliquaSoc):
 
         m = Module()
 
-        wiring.connect(m, self.arbiter.bus, self.cache.master)
-
-        m.submodules += self.cache
-
-        m.submodules += self.flusher
-
-        m.submodules += self.arbiter
+        m.submodules += self.plotter_cache
 
         m.submodules.vector_periph = self.vector_periph
 
@@ -475,7 +456,6 @@ class PolySoc(TiliquaSoc):
         # Memory controller hangs if we start making requests to it straight away.
         with m.If(self.permit_bus_traffic):
             m.d.sync += self.vector_periph.en.eq(1)
-            m.d.sync += self.flusher.enable.eq(1)
 
         return m
 

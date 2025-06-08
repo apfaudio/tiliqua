@@ -71,19 +71,19 @@ pub struct PolyOpts {
 
 #[derive(OptionPage, Clone)]
 pub struct VectorOpts {
-    #[option(7)]
+    #[option(6)]
     pub xscale: IntOption<XScaleParams>,
-    #[option(7)]
+    #[option(6)]
     pub yscale: IntOption<YScaleParams>,
 }
 
 #[derive(OptionPage, Clone)]
 pub struct BeamOpts {
-    #[option(32)]
+    #[option(64)]
     pub persist: IntOption<PersistParams>,
-    #[option(1)]
-    pub decay: IntOption<DecayParams>,
     #[option(2)]
+    pub decay: IntOption<DecayParams>,
+    #[option(8)]
     pub intensity: IntOption<IntensityParams>,
     #[option(10)]
     pub hue: IntOption<HueParams>,
