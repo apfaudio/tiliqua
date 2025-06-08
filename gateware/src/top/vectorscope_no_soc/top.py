@@ -53,9 +53,8 @@ class VectorScopeTop(Elaboratable):
     Top-level Vectorscope design.
     """
 
-    def __init__(self, *, wishbone_l2_cache, clock_settings):
+    def __init__(self, *, clock_settings):
 
-        self.wishbone_l2_cache = wishbone_l2_cache
         self.clock_settings = clock_settings
 
         # One PSRAM with an internal arbiter to support multiple DMA masters.
@@ -76,14 +75,10 @@ class VectorScopeTop(Elaboratable):
         self.persist = Persistance(fb=self.fb)
         self.psram_periph.add_master(self.persist.bus)
 
-        self.stroke = Stroke(fb=self.fb)
-        if self.wishbone_l2_cache:
-            self.cache = cache.WishboneL2Cache(
-                    addr_width=self.psram_periph.bus.addr_width,
-                    cachesize_words=128)
-            self.psram_periph.add_master(self.cache.slave)
-        else:
-            self.psram_periph.add_master(self.stroke.bus)
+        self.stroke = Stroke(fb=self.fb, n_upsample=8, fs=clock_settings.audio_clock.fs())
+        self.plotter_cache = cache.PlotterCache(fb=self.fb)
+        self.psram_periph.add_master(self.plotter_cache.bus)
+        self.plotter_cache.add(self.stroke.bus)
 
         super().__init__()
 
@@ -91,6 +86,8 @@ class VectorScopeTop(Elaboratable):
         m = Module()
 
         m.submodules.pmod0 = pmod0 = self.pmod0
+
+        m.submodules.plotter_cache = self.plotter_cache
 
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
@@ -109,10 +106,6 @@ class VectorScopeTop(Elaboratable):
         m.submodules.fb = self.fb
         m.submodules.persist = self.persist
         m.submodules.stroke = self.stroke
-
-        if self.wishbone_l2_cache:
-            m.submodules.cache = self.cache
-            wiring.connect(m, self.stroke.bus, self.cache.master)
 
         wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
 
@@ -215,15 +208,6 @@ def simulation_ports(fragment):
         "dvi_b":          (fragment.fb.simif.b,                     None),
     }
 
-def argparse_callback(parser):
-    parser.add_argument('--cache', action='store_true',
-                        help="Add L2 wishbone cache to stroke-raster converter.")
-
-def argparse_fragment(args):
-    return {
-        "wishbone_l2_cache": args.cache
-    }
-
 if __name__ == "__main__":
     this_path = os.path.dirname(os.path.realpath(__file__))
     top_level_cli(
@@ -231,6 +215,4 @@ if __name__ == "__main__":
         ila_supported=True,
         sim_ports=simulation_ports,
         sim_harness="../../src/top/vectorscope_no_soc/sim/sim.cpp",
-        argparse_callback=argparse_callback,
-        argparse_fragment=argparse_fragment,
     )
