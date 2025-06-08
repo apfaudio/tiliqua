@@ -174,6 +174,11 @@ fn main() -> ! {
                       w.show_outputs().bit(opts.usb.show.value == Show::Outputs)
                 } );
 
+            xbeam_mux.delay0().write(|w| unsafe { w.value().bits(opts.delay.delay_x.value) });
+            xbeam_mux.delay1().write(|w| unsafe { w.value().bits(opts.delay.delay_y.value) });
+            xbeam_mux.delay2().write(|w| unsafe { w.value().bits(opts.delay.delay_i.value) });
+            xbeam_mux.delay3().write(|w| unsafe { w.value().bits(opts.delay.delay_c.value) });
+
             if opts.tracker.page.value == Page::Vector {
                 scope.flags().write(
                     |w| w.enable().bit(false) );

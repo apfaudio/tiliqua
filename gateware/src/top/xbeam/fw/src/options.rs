@@ -6,6 +6,7 @@ use tiliqua_lib::palette::ColorPalette;
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     Vector,
+    Delay,
     Beam,
     Usb,
     #[default]
@@ -62,6 +63,7 @@ pub enum Timebase {
     Timebase1ms,
 }
 
+int_params!(DelayParams<u16>      { step: 128, min: 0, max: 4096 });
 int_params!(ScaleParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(PCScaleParams<u8>     { step: 1, min: 0, max: 15 });
 int_params!(PersistParams<u16>    { step: 32, min: 32, max: 4096 });
@@ -85,6 +87,18 @@ pub struct VectorOpts {
     pub i_mod: IntOption<PCScaleParams>,
     #[option(0)]
     pub c_mod: IntOption<PCScaleParams>,
+}
+
+#[derive(OptionPage, Clone)]
+pub struct DelayOpts {
+    #[option(0)]
+    pub delay_x: IntOption<DelayParams>,
+    #[option(0)]
+    pub delay_y: IntOption<DelayParams>,
+    #[option(0)]
+    pub delay_i: IntOption<DelayParams>,
+    #[option(0)]
+    pub delay_c: IntOption<DelayParams>,
 }
 
 #[derive(OptionPage, Clone)]
@@ -136,6 +150,8 @@ pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Vector)]
     pub vector: VectorOpts,
+    #[page(Page::Delay)]
+    pub delay: DelayOpts,
     #[page(Page::Beam)]
     pub beam: BeamOpts,
     #[page(Page::Usb)]

@@ -35,7 +35,7 @@ class XbeamPeripheral(wiring.Component):
         show_outputs: csr.Field(csr.action.W, unsigned(1))
 
     class Delay(csr.Register, access="w"):
-        amount:   csr.Field(csr.action.W, unsigned(16))
+        value:   csr.Field(csr.action.W, unsigned(16))
 
     def __init__(self):
         regs = csr.Builder(addr_width=5, data_width=8)
@@ -69,14 +69,24 @@ class XbeamPeripheral(wiring.Component):
         m.submodules.split4 = split4 = dsp.Split(n_channels=4, source=wiring.flipped(self.delay_i))
         m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4, sink=wiring.flipped(self.delay_o))
 
-        m.submodules.delayln1 = self.delayln1 = delay_line.DelayLine(max_delay=0x1000)
-        tap = self.delayln1.add_tap(fixed_delay=0x1000-1)
-        assert self.delayln1.write_triggers_read
-        wiring.connect(m, split4.o[3], self.delayln1.i)
-        wiring.connect(m, tap.o, merge4.i[3])
-        wiring.connect(m, split4.o[0], merge4.i[0])
-        wiring.connect(m, split4.o[1], merge4.i[1])
-        wiring.connect(m, split4.o[2], merge4.i[2])
+        delay = [Signal(16) for _ in range(4)]
+
+        for ch in range(4):
+            delayln = delay_line.DelayLine(max_delay=0x1000, write_triggers_read=False)
+            split2 = dsp.Split(n_channels=2, source=split4.o[ch], replicate=True)
+            m.submodules += [delayln, split2]
+            tap = delayln.add_tap()
+            wiring.connect(m, split2.o[0], delayln.i)
+            m.d.comb += [
+                tap.i.valid.eq(split2.o[1].valid),
+                split2.o[1].ready.eq(tap.i.ready),
+                tap.i.payload.eq(delay[ch])
+            ]
+            wiring.connect(m, tap.o, merge4.i[ch])
+
+            field = getattr(self, f'_delay{ch}')
+            with m.If(field.f.value.w_stb):
+                m.d.sync += delay[ch].eq(field.f.value.w_data)
 
         return m
 
