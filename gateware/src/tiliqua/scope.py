@@ -141,7 +141,7 @@ class ScopeTracePeripheral(wiring.Component):
 
     def __init__(self, fb, bus_dma, **kwargs):
 
-        self.strokes = [Stroke(fb=fb, n_upsample=None, **kwargs)
+        self.strokes = [Stroke(fb=fb, **kwargs)
                         for _ in range(4)]
 
         if hasattr(bus_dma, 'add'):

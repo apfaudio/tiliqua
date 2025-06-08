@@ -44,7 +44,7 @@ class Stroke(wiring.Component):
     """
 
 
-    def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=4,
+    def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=None,
                  default_hue=10, default_x=0, default_y=0):
 
         self.fb = fb
@@ -83,6 +83,14 @@ class Stroke(wiring.Component):
         fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
         fb_hwords = ((self.fb.timings.h_active*self.fb.bytes_per_pixel)//4)
 
+        # Define pixel structure: 4-bit color + 4-bit intensity
+        pixel_layout = data.StructLayout({
+            "color": unsigned(4),
+            "intensity": unsigned(4),
+        })
+        pixels_per_word = self.bus.data_width // pixel_layout.as_shape().width
+        pixel_array_layout = data.ArrayLayout(pixel_layout, pixels_per_word)
+
         if self.n_upsample is not None and self.n_upsample != 1:
             # If interpolation is enabled, insert an FIR upsampling stage.
             m.submodules.split = split = dsp.Split(n_channels=4)
@@ -110,14 +118,14 @@ class Stroke(wiring.Component):
             # No upsampling.
             wiring.connect(m, wiring.flipped(self.i), self.point_stream)
 
-        # pixel readback and calculation
-        px_read = Signal(32)
-        px_sum = Signal(16)
+        # Structured pixel data
+        pixels_read = Signal(pixel_array_layout)
+        pixels_write = Signal(pixel_array_layout)
 
         # pixel position
         x_offs = Signal(unsigned(16))
         y_offs = Signal(unsigned(16))
-        subpix_shift = Signal(unsigned(6))
+        pixel_index = Signal(unsigned(2))  # Which of the 4 pixels in the word
         pixel_offs = Signal(unsigned(32))
 
         # last sample
@@ -130,13 +138,13 @@ class Stroke(wiring.Component):
         with m.If(self.rotate_left):
             # remap pixel offset for 90deg rotation
             m.d.comb += [
-                subpix_shift.eq((-sample_y)[0:2]*8),
+                pixel_index.eq((-sample_y)[0:2]),
                 x_offs.eq((fb_hwords//2) + ((-sample_y)>>2)),
                 y_offs.eq(sample_x + (self.fb.timings.v_active>>1)),
             ]
         with m.Else():
             m.d.comb += [
-                subpix_shift.eq(sample_x[0:2]*8),
+                pixel_index.eq(sample_x[0:2]),
                 x_offs.eq((fb_hwords//2) + (sample_x>>2)),
                 y_offs.eq(sample_y + (self.fb.timings.v_active>>1)),
             ]
@@ -182,8 +190,7 @@ class Stroke(wiring.Component):
                 ]
 
                 with m.If(bus.stb & bus.ack):
-                    m.d.sync += px_read.eq(bus.dat_r)
-                    m.d.sync += px_sum.eq(((bus.dat_r >> subpix_shift) & 0xff))
+                    m.d.sync += pixels_read.as_value().eq(bus.dat_r)
                     m.next = 'WAIT'
 
             with m.State('WAIT'):
@@ -203,33 +210,46 @@ class Stroke(wiring.Component):
                     bus.we.eq(1),
                 ]
 
-                # The actual drawing logic
-                # Basically we just increment the intensity and clamp it to a maximum
-                # for the correct bits of the native bus word for this pixel.
-                #
-                # TODO: color is always overridden, perhaps we should mix it?
-
+                # Calculate new pixel values
                 new_color = Signal(unsigned(4))
                 sample_intensity = Signal(unsigned(4))
-                white = Signal(unsigned(4))
-                m.d.comb += white.eq(0xf)
+                current_intensity = Signal(unsigned(4))
+                new_intensity = Signal(unsigned(4))
+
+                # Extract current pixel data
+                m.d.comb += current_intensity.eq(pixels_read[pixel_index].intensity)
+
+                # Calculate new color (sample color + base hue)
                 m.d.comb += new_color.eq(sample_c + self.hue)
 
+                # Calculate sample intensity with bounds checking
                 with m.If((sample_p + self.intensity > 0) & (sample_p + self.intensity <= 0xf)):
                     m.d.comb += sample_intensity.eq(sample_p + self.intensity)
                 with m.Else():
                     m.d.comb += sample_intensity.eq(0)
 
-                with m.If(px_sum[4:8] + sample_intensity >= 0xF):
-                    m.d.comb += bus.dat_w.eq(
-                        (px_read & ~(Const(0xFF, unsigned(32)) << subpix_shift)) |
-                        (Cat(new_color, white) << (subpix_shift))
-                         )
+                # Calculate new intensity (add with saturation)
+                with m.If(current_intensity + sample_intensity >= 0xF):
+                    m.d.comb += new_intensity.eq(0xF)
                 with m.Else():
-                    m.d.comb += bus.dat_w.eq(
-                        (px_read & ~(Const(0xFF, unsigned(32)) << subpix_shift)) |
-                        (Cat(new_color, (px_sum[4:8] + sample_intensity)) << subpix_shift)
-                         )
+                    m.d.comb += new_intensity.eq(current_intensity + sample_intensity)
+
+                # Copy new pixel from read data to write data
+                for i in range(pixels_per_word):
+                    with m.If(pixel_index == i):
+                        m.d.comb += [
+                            pixels_write[i].color.eq(new_color),
+                            pixels_write[i].intensity.eq(new_intensity),
+                        ]
+                    # Preserve other pixels unchanged
+                    with m.Else():
+                        m.d.comb += [
+                            pixels_write[i].color.eq(pixels_read[i].color),
+                            pixels_write[i].intensity.eq(pixels_read[i].intensity),
+                        ]
+
+                # Write pixel data back to bus
+                m.d.comb += bus.dat_w.eq(pixels_write.as_value())
 
                 with m.If(bus.stb & bus.ack):
                     m.next = 'LATCH0'

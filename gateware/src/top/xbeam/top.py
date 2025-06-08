@@ -75,7 +75,7 @@ class XbeamSoc(TiliquaSoc):
 
         self.cache = cache.WishboneL2Cache(
                 addr_width=self.psram_periph.bus.addr_width,
-                cachesize_words=256)
+                cachesize_words=64)
 
         self.arbiter = wishbone.Arbiter(
             addr_width=self.psram_periph.bus.addr_width,
@@ -95,7 +95,8 @@ class XbeamSoc(TiliquaSoc):
 
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.arbiter)
+            bus_dma=self.arbiter,
+            n_upsample=8)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
         self.scope_periph = scope.ScopeTracePeripheral(

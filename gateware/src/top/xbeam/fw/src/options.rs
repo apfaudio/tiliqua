@@ -91,9 +91,9 @@ pub struct VectorOpts {
 pub struct BeamOpts {
     #[option(32)]
     pub persist: IntOption<PersistParams>,
-    #[option(1)]
-    pub decay: IntOption<DecayParams>,
     #[option(2)]
+    pub decay: IntOption<DecayParams>,
+    #[option(4)]
     pub intensity: IntOption<IntensityParams>,
     #[option(10)]
     pub hue: IntOption<HueParams>,
