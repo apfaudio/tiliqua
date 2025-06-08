@@ -24,7 +24,7 @@ from amaranth_soc                                import csr, wishbone
 
 from amaranth_future                             import fixed
 
-from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio, cache, sim
+from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio, cache, sim, delay_line
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
@@ -34,14 +34,23 @@ class XbeamPeripheral(wiring.Component):
         usb_en:   csr.Field(csr.action.W, unsigned(1))
         show_outputs: csr.Field(csr.action.W, unsigned(1))
 
+    class Delay(csr.Register, access="w"):
+        amount:   csr.Field(csr.action.W, unsigned(16))
+
     def __init__(self):
         regs = csr.Builder(addr_width=5, data_width=8)
         self._flags = regs.add("flags", self.Flags(), offset=0x0)
+        self._delay0 = regs.add("delay0", self.Delay(), offset=0x4)
+        self._delay1 = regs.add("delay1", self.Delay(), offset=0x8)
+        self._delay2 = regs.add("delay2", self.Delay(), offset=0xC)
+        self._delay3 = regs.add("delay3", self.Delay(), offset=0x10)
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
             "usb_en": Out(1),
             "show_outputs": Out(1),
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            "delay_i": In(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, 4))),
+            "delay_o": Out(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, 4))),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -56,6 +65,18 @@ class XbeamPeripheral(wiring.Component):
 
         with m.If(self._flags.f.show_outputs.w_stb):
             m.d.sync += self.show_outputs.eq(self._flags.f.show_outputs.w_data)
+
+        m.submodules.split4 = split4 = dsp.Split(n_channels=4, source=wiring.flipped(self.delay_i))
+        m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4, sink=wiring.flipped(self.delay_o))
+
+        m.submodules.delayln1 = self.delayln1 = delay_line.DelayLine(max_delay=0x1000)
+        tap = self.delayln1.add_tap(fixed_delay=0x1000-1)
+        assert self.delayln1.write_triggers_read
+        wiring.connect(m, split4.o[3], self.delayln1.i)
+        wiring.connect(m, tap.o, merge4.i[3])
+        wiring.connect(m, split4.o[0], merge4.i[0])
+        wiring.connect(m, split4.o[1], merge4.i[1])
+        wiring.connect(m, split4.o[2], merge4.i[2])
 
         return m
 
@@ -135,10 +156,12 @@ class XbeamSoc(TiliquaSoc):
         with m.Else():
             dsp.connect_peek(m, pmod0.o_cal, plot_fifo.w_stream)
 
+        wiring.connect(m, plot_fifo.r_stream, self.xbeam_periph.delay_i)
+
         with m.If(self.scope_periph.soc_en):
-            wiring.connect(m, plot_fifo.r_stream, self.scope_periph.i)
+            wiring.connect(m, self.xbeam_periph.delay_o, self.scope_periph.i)
         with m.Else():
-            wiring.connect(m, plot_fifo.r_stream, self.vector_periph.i)
+            wiring.connect(m, self.xbeam_periph.delay_o, self.vector_periph.i)
 
         # Memory controller hangs if we start making requests to it straight away.
         with m.If(self.permit_bus_traffic):
