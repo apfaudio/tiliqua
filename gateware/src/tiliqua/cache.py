@@ -289,11 +289,11 @@ class PlotterCache(wiring.Component):
     the persistance emulation) for too long.
     """
 
-    def __init__(self, *, fb_base, addr_width):
+    def __init__(self, *, fb):
 
         # Instantiate a small cache and connect it to the backing store as a DMA master
         self.cache = WishboneL2Cache(
-                addr_width=addr_width,
+                addr_width=fb.bus.addr_width,
                 cachesize_words=64)
 
         # Create an arbiter for different plotting cores to share
@@ -306,7 +306,7 @@ class PlotterCache(wiring.Component):
         # Periodically flush stale cache lines, so we still get a dead beam 'dot'
         # even if the beam is not being deflected despite the write-back cache.
         self.flusher = CacheFlusher(
-            base=fb_base,
+            base=fb.fb_base,
             addr_width=self.cache.master.addr_width,
             burst_len=self.cache.burst_len)
         self.arbiter.add(self.flusher.bus)

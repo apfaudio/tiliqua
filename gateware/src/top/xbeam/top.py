@@ -73,21 +73,25 @@ class XbeamSoc(TiliquaSoc):
         self.scope_periph_base  = 0x00001100
         self.xbeam_periph_base  = 0x00001200
 
-        self.plotter_cache = cache.PlotterCache(
-            fb_base=self.fb.fb_base, addr_width=self.psram_periph.bus.addr_width)
+        # Small localized write-back cache for plotting operations.
+        self.plotter_cache = cache.PlotterCache(fb=self.fb)
         self.psram_periph.add_master(self.plotter_cache.bus)
 
+        # Vectorscope with upsampling and CSR registers
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.plotter_cache,
             n_upsample=8)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
+        self.plotter_cache.add(self.vector_periph.bus_dma)
 
+        # 4-ch oscilloscope with CSR registers
         self.scope_periph = scope.ScopeTracePeripheral(
-            fb=self.fb,
-            bus_dma=self.plotter_cache)
+            fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
+        for bus in self.scope_periph.bus_dma:
+            self.plotter_cache.add(bus)
 
+        # Extra peripheral for some global control flags.
         self.xbeam_periph = XbeamPeripheral()
         self.csr_decoder.add(self.xbeam_periph.bus, addr=self.xbeam_periph_base, name="xbeam_periph")
 

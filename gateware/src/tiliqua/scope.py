@@ -33,14 +33,9 @@ class VectorTracePeripheral(wiring.Component):
     class Position(csr.Register, access="w"):
         value: csr.Field(csr.action.W, unsigned(16))
 
-    def __init__(self, fb, bus_dma, **kwargs):
+    def __init__(self, fb, **kwargs):
 
         self.stroke = Stroke(fb=fb, **kwargs)
-
-        if hasattr(bus_dma, 'add'):
-            bus_dma.add(self.stroke.bus)
-        else:
-            bus_dma.add_master(self.stroke.bus)
 
         regs = csr.Builder(addr_width=6, data_width=8)
 
@@ -61,7 +56,10 @@ class VectorTracePeripheral(wiring.Component):
             "en": In(1),
             "soc_en": In(1),
             "rotate_left": In(1),
+            # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            # DMA bus (plotting)
+            "bus_dma": Out(self.stroke.bus.signature),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -71,6 +69,7 @@ class VectorTracePeripheral(wiring.Component):
         m.submodules += self.stroke
 
         wiring.connect(m, wiring.flipped(self.i), self.stroke.i)
+        wiring.connect(m, self.stroke.bus, wiring.flipped(self.bus_dma))
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         m.d.comb += self.stroke.enable.eq(self.en & self.soc_en)
@@ -139,17 +138,11 @@ class ScopeTracePeripheral(wiring.Component):
     class YPosition(csr.Register, access="w"):
         ypos: csr.Field(csr.action.W, unsigned(16))
 
-    def __init__(self, fb, bus_dma, **kwargs):
+    def __init__(self, fb, n_channels=4, **kwargs):
 
+        self.n_channels = n_channels
         self.strokes = [Stroke(fb=fb, **kwargs)
-                        for _ in range(4)]
-
-        if hasattr(bus_dma, 'add'):
-            for s in self.strokes:
-                bus_dma.add(s.bus)
-        else:
-            for s in self.strokes:
-                bus_dma.add_master(s.bus)
+                        for _ in range(self.n_channels)]
 
         regs = csr.Builder(addr_width=6, data_width=8)
         self._flags          = regs.add("flags",          self.Flags(),         offset=0x0)
@@ -160,16 +153,19 @@ class ScopeTracePeripheral(wiring.Component):
         self._yscale         = regs.add("yscale",         self.YScale(),        offset=0x14)
         self._trigger_lvl    = regs.add("trigger_lvl",    self.TriggerLevel(),  offset=0x18)
         self._xpos           = regs.add("xpos",           self.XPosition(),     offset=0x1C)
-        self._ypos           = [regs.add(f"ypos{i}",      self.YPosition(),     offset=(0x20+i*4)) for i in range(4)]
+        self._ypos           = [regs.add(f"ypos{i}",      self.YPosition(),
+                                offset=(0x20+i*4)) for i in range(self.n_channels)]
 
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
-            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, self.n_channels))),
             "en": In(1),
             "soc_en": In(1),
             "rotate_left": In(1),
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            # DMA buses, one for plotting each channel
+            "bus_dma": Out(self.strokes[0].bus.signature).array(self.n_channels),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -180,7 +176,7 @@ class ScopeTracePeripheral(wiring.Component):
         trigger_lvl = Signal(shape=dsp.ASQ)
         trigger_always = Signal()
 
-        self.isplit4 = dsp.Split(4)
+        self.isplit4 = dsp.Split(self.n_channels)
 
         wiring.connect(m, wiring.flipped(self.i), self.isplit4.i)
 
@@ -189,9 +185,10 @@ class ScopeTracePeripheral(wiring.Component):
 
         m.submodules += self.strokes
 
-        for s in self.strokes:
+        for i, s in enumerate(self.strokes):
             m.d.comb += s.enable.eq(self.en & self.soc_en)
             m.d.comb += s.rotate_left.eq(self.rotate_left)
+            wiring.connect(m, s.bus, wiring.flipped(self.bus_dma[i]))
 
         # Scope and trigger
         # Ch0 is routed through trigger, the rest are not.
@@ -215,7 +212,7 @@ class ScopeTracePeripheral(wiring.Component):
         ])
 
         # Split ramp into 4 streams, one for each channel
-        m.submodules.rampsplit4 = rampsplit4 = dsp.Split(4, replicate=True, source=ramp.o)
+        m.submodules.rampsplit4 = rampsplit4 = dsp.Split(self.n_channels, replicate=True, source=ramp.o)
 
         # Rasterize ch0: Ramp => X, Audio => Y
         m.submodules.ch0_merge4 = ch0_merge4 = dsp.Merge(4)
@@ -227,7 +224,7 @@ class ScopeTracePeripheral(wiring.Component):
         wiring.connect(m, irep2.o[1], ch0_merge4.i[1])
 
         # Rasterize ch1-ch3: Ramp => X, Audio => Y
-        for ch in range(1, 4):
+        for ch in range(1, self.n_channels):
             ch_merge4 = dsp.Merge(4)
             dsp.connect_peek(m, ch_merge4.o, self.strokes[ch].i, always_ready=True)
             m.submodules += ch_merge4
