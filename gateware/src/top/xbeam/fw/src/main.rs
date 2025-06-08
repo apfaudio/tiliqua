@@ -127,30 +127,30 @@ fn main() -> ! {
             }
 
             if draw_options {
-                draw::draw_options(&mut display, &opts, h_active-200, v_active/2, opts.beam.hue.value).ok();
-                draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.hue.value, UI_NAME, UI_SHA,
+                draw::draw_options(&mut display, &opts, h_active-200, v_active/2, opts.beam.ui_hue.value).ok();
+                draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.ui_hue.value, UI_NAME, UI_SHA,
                                 &modeline).ok();
             }
 
             persist.set_persist(opts.beam.persist.value);
             persist.set_decay(opts.beam.decay.value);
 
-            vscope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
-            vscope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
             vscope.xoffset().write(|w| unsafe { w.value().bits(opts.vector.x_offset.value as u16) } );
             vscope.yoffset().write(|w| unsafe { w.value().bits(opts.vector.y_offset.value as u16) } );
-            vscope.xscale().write(|w| unsafe { w.scale().bits(opts.vector.x_scale.value) } );
-            vscope.yscale().write(|w| unsafe { w.scale().bits(opts.vector.y_scale.value) } );
-            vscope.pscale().write(|w| unsafe { w.scale().bits(0xf-opts.vector.i_mod.value) } );
-            vscope.cscale().write(|w| unsafe { w.scale().bits(0xf-opts.vector.c_mod.value) } );
+            vscope.xscale().write(|w| unsafe { w.scale().bits(0xf-opts.vector.x_scale.value) } );
+            vscope.yscale().write(|w| unsafe { w.scale().bits(0xf-opts.vector.y_scale.value) } );
+            vscope.pscale().write(|w| unsafe { w.scale().bits(0xf-opts.vector.i_scale.value) } );
+            vscope.intensity().write(|w| unsafe { w.intensity().bits(opts.vector.i_offset.value) } );
+            vscope.cscale().write(|w| unsafe { w.scale().bits(0xf-opts.vector.c_scale.value) } );
+            vscope.hue().write(|w| unsafe { w.hue().bits(opts.vector.c_offset.value) } );
 
-            scope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
-            scope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
+            scope.hue().write(|w| unsafe { w.hue().bits(opts.scope1.hue.value) } );
+            scope.intensity().write(|w| unsafe { w.intensity().bits(opts.scope1.intensity.value) } );
 
-            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope.trig_lvl.value as u16) } );
-            scope.xscale().write(|w| unsafe { w.xscale().bits(opts.scope.xscale.value) } );
-            scope.yscale().write(|w| unsafe { w.yscale().bits(opts.scope.yscale.value) } );
-            let timebase_value = match opts.scope.timebase.value {
+            scope.trigger_lvl().write(|w| unsafe { w.trigger_level().bits(opts.scope1.trig_lvl.value as u16) } );
+            scope.xscale().write(|w| unsafe { w.xscale().bits(0xf-opts.scope1.xscale.value) } );
+            scope.yscale().write(|w| unsafe { w.yscale().bits(0xf-opts.scope1.yscale.value) } );
+            let timebase_value = match opts.scope1.timebase.value {
                 Timebase::Timebase1s    => 3,
                 Timebase::Timebase500ms => 6,
                 Timebase::Timebase250ms => 13,
@@ -164,10 +164,10 @@ fn main() -> ! {
             };
             scope.timebase().write(|w| unsafe { w.timebase().bits(timebase_value) } );
 
-            scope.ypos0().write(|w| unsafe { w.ypos().bits(opts.scope.ypos0.value as u16) } );
-            scope.ypos1().write(|w| unsafe { w.ypos().bits(opts.scope.ypos1.value as u16) } );
-            scope.ypos2().write(|w| unsafe { w.ypos().bits(opts.scope.ypos2.value as u16) } );
-            scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope.ypos3.value as u16) } );
+            scope.ypos0().write(|w| unsafe { w.ypos().bits(opts.scope2.ypos0.value as u16) } );
+            scope.ypos1().write(|w| unsafe { w.ypos().bits(opts.scope2.ypos1.value as u16) } );
+            scope.ypos2().write(|w| unsafe { w.ypos().bits(opts.scope2.ypos2.value as u16) } );
+            scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope2.ypos3.value as u16) } );
 
             xbeam_mux.flags().write(
                 |w| { w.usb_en().bit(opts.usb.mode.value == USBMode::Enable);
@@ -188,11 +188,13 @@ fn main() -> ! {
                     } );
             }
 
-            if opts.tracker.page.value == Page::Scope || first {
+            if opts.tracker.page.value == Page::Scope1 ||
+               opts.tracker.page.value == Page::Scope2 ||
+               first {
                 scope.flags().write(
                     |w| { w.enable().bit(true);
                           w.rotate_left().bit(modeline.rotate == Rotate::Left);
-                          w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always)
+                          w.trigger_always().bit(opts.scope1.trig_mode.value == TriggerMode::Always)
                     } );
                 vscope.flags().write(
                     |w| w.enable().bit(false) );

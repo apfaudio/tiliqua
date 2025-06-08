@@ -10,7 +10,8 @@ pub enum Page {
     Beam,
     Usb,
     #[default]
-    Scope,
+    Scope1,
+    Scope2,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
@@ -77,16 +78,20 @@ int_params!(PosParams<i16>       { step: 25, min: -500, max: 500 });
 pub struct VectorOpts {
     #[option(0)]
     pub x_offset: IntOption<PosParams>,
+    #[option(9)]
+    pub x_scale: IntOption<ScaleParams>,
     #[option(0)]
     pub y_offset: IntOption<PosParams>,
-    #[option(6)]
-    pub x_scale: IntOption<ScaleParams>,
-    #[option(6)]
+    #[option(9)]
     pub y_scale: IntOption<ScaleParams>,
+    #[option(4)]
+    pub i_offset: IntOption<IntensityParams>,
     #[option(0)]
-    pub i_mod: IntOption<PCScaleParams>,
+    pub i_scale: IntOption<PCScaleParams>,
+    #[option(10)]
+    pub c_offset: IntOption<HueParams>,
     #[option(0)]
-    pub c_mod: IntOption<PCScaleParams>,
+    pub c_scale: IntOption<PCScaleParams>,
 }
 
 #[derive(OptionPage, Clone)]
@@ -107,10 +112,8 @@ pub struct BeamOpts {
     pub persist: IntOption<PersistParams>,
     #[option(2)]
     pub decay: IntOption<DecayParams>,
-    #[option(4)]
-    pub intensity: IntOption<IntensityParams>,
     #[option(10)]
-    pub hue: IntOption<HueParams>,
+    pub ui_hue: IntOption<HueParams>,
     #[option]
     pub palette: EnumOption<ColorPalette>,
 }
@@ -124,13 +127,25 @@ pub struct UsbOpts {
 }
 
 #[derive(OptionPage, Clone)]
-pub struct ScopeOpts {
+pub struct ScopeOpts1 {
     #[option]
     pub timebase: EnumOption<Timebase>,
     #[option]
     pub trig_mode: EnumOption<TriggerMode>,
     #[option]
     pub trig_lvl: IntOption<TriggerLvlParams>,
+    #[option(6)]
+    pub yscale: IntOption<ScaleParams>,
+    #[option(9)]
+    pub xscale: IntOption<ScaleParams>,
+    #[option(8)]
+    pub intensity: IntOption<IntensityParams>,
+    #[option(10)]
+    pub hue: IntOption<HueParams>,
+}
+
+#[derive(OptionPage, Clone)]
+pub struct ScopeOpts2 {
     #[option(-250)]
     pub ypos0: IntOption<PosParams>,
     #[option(-75)]
@@ -139,10 +154,6 @@ pub struct ScopeOpts {
     pub ypos2: IntOption<PosParams>,
     #[option(250)]
     pub ypos3: IntOption<PosParams>,
-    #[option(8)]
-    pub yscale: IntOption<ScaleParams>,
-    #[option(6)]
-    pub xscale: IntOption<ScaleParams>,
 }
 
 #[derive(Options, Clone, Default)]
@@ -156,6 +167,8 @@ pub struct Opts {
     pub beam: BeamOpts,
     #[page(Page::Usb)]
     pub usb: UsbOpts,
-    #[page(Page::Scope)]
-    pub scope: ScopeOpts,
+    #[page(Page::Scope1)]
+    pub scope1: ScopeOpts1,
+    #[page(Page::Scope2)]
+    pub scope2: ScopeOpts2,
 }
