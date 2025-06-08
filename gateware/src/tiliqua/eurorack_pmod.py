@@ -9,7 +9,7 @@ import os
 
 from amaranth                   import *
 from amaranth.build             import *
-from amaranth.lib               import wiring, data, stream
+from amaranth.lib               import wiring, data, stream, io
 from amaranth.lib.wiring        import In, Out
 from amaranth.lib.fifo          import AsyncFIFO
 from amaranth.lib.cdc           import FFSynchronizer
@@ -59,14 +59,29 @@ class FFCProvider(wiring.Component):
 
     def elaborate(self, platform):
         m = Module()
-        ffc = platform.request("audio_ffc")
+        ffc_i2s = platform.request("audio_ffc_i2s", dir={
+            "sdin1": "-", "sdout1": "-", "lrck": "-", "bick": "-", "mclk": "-",
+        })
+        m.submodules.ff_sdout1 = ff_sdout1 = io.FFBuffer(
+                "i", ffc_i2s.sdout1, i_domain="audio")
+        m.submodules.ff_sdin1 = ff_sdin1 = io.FFBuffer(
+                "o", ffc_i2s.sdin1, o_domain="audio")
+        m.submodules.ff_lrck = ff_lrck = io.FFBuffer(
+                "o", ffc_i2s.lrck, o_domain="audio")
+        m.submodules.ff_bick = ff_bick = io.FFBuffer(
+                "o", ffc_i2s.bick, o_domain="audio")
+        m.submodules.ff_mclk = ff_mclk = io.FFBuffer(
+                "o", ffc_i2s.mclk, o_domain="audio")
         m.d.comb += [
             # I2S bus
-            ffc.sdin1.o.eq(self.pins.i2s.sdin1),
-            self.pins.i2s.sdout1.eq(ffc.sdout1.i),
-            ffc.lrck.o.eq(self.pins.i2s.lrck),
-            ffc.bick.o.eq(self.pins.i2s.bick),
-            ffc.mclk.o.eq(self.pins.i2s.mclk),
+            ff_sdin1.o.eq(self.pins.i2s.sdin1),
+            self.pins.i2s.sdout1.eq(ff_sdout1.i),
+            ff_lrck.o.eq(self.pins.i2s.lrck),
+            ff_bick.o.eq(self.pins.i2s.bick),
+            ff_mclk.o.eq(self.pins.i2s.mclk),
+        ],
+        ffc = platform.request("audio_ffc_aux")
+        m.d.comb += [
             # Power clocking (Note: only R3+ has a flip-flop on PDN with pdn_clk).
             ffc.pdn_clk.o.eq(self.pins.pdn_clk) if hasattr(ffc, "pdn_clk") else [],
             ffc.pdn_d.o.eq(self.pins.pdn_d),
@@ -144,7 +159,7 @@ class I2STDM(wiring.Component):
             # BICK transition HI -> LO: Clock in W bits
             # On HI -> LO both SDIN and SDOUT do not transition.
             # (determined by AK4619 transition polarity register BCKP)
-            with m.If(bit_counter < self.S_WIDTH):
+            with m.If((bit_counter > 0) & (bit_counter <= self.S_WIDTH)):
                 m.d.audio += self.o.eq((self.o << 1) | self.i2s.sdout1)
         with m.Else():
             # BICK transition LO -> HI: Clock out W bits
