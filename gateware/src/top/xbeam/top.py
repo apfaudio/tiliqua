@@ -49,6 +49,8 @@ class XbeamPeripheral(wiring.Component):
             "usb_en": Out(1),
             "show_outputs": Out(1),
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+
+            # Streams in/out of plotting delay lines
             "delay_i": In(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, 4))),
             "delay_o": Out(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, 4))),
         })
@@ -66,13 +68,12 @@ class XbeamPeripheral(wiring.Component):
         with m.If(self._flags.f.show_outputs.w_stb):
             m.d.sync += self.show_outputs.eq(self._flags.f.show_outputs.w_data)
 
+        # Tweakable plotting delay lines.
         m.submodules.split4 = split4 = dsp.Split(n_channels=4, source=wiring.flipped(self.delay_i))
         m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4, sink=wiring.flipped(self.delay_o))
-
         delay = [Signal(16) for _ in range(4)]
-
         for ch in range(4):
-            delayln = delay_line.DelayLine(max_delay=0x1000, write_triggers_read=False)
+            delayln = delay_line.DelayLine(max_delay=1024, write_triggers_read=False)
             split2 = dsp.Split(n_channels=2, source=split4.o[ch], replicate=True)
             m.submodules += [delayln, split2]
             tap = delayln.add_tap()
@@ -83,7 +84,6 @@ class XbeamPeripheral(wiring.Component):
                 tap.i.payload.eq(delay[ch])
             ]
             wiring.connect(m, tap.o, merge4.i[ch])
-
             field = getattr(self, f'_delay{ch}')
             with m.If(field.f.value.w_stb):
                 m.d.sync += delay[ch].eq(field.f.value.w_data)

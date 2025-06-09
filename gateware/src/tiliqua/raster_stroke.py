@@ -224,9 +224,9 @@ class Stroke(wiring.Component):
 
                 # Calculate sample intensity with bounds checking
                 with m.If((sample_p + self.intensity > 0) & (sample_p + self.intensity <= 0xf)):
-                    m.d.comb += sample_intensity.eq(sample_p + self.intensity)
+                    m.d.sync += sample_intensity.eq(sample_p + self.intensity)
                 with m.Else():
-                    m.d.comb += sample_intensity.eq(0)
+                    m.d.sync += sample_intensity.eq(0)
 
                 # Calculate new intensity (add with saturation)
                 with m.If(current_intensity + sample_intensity >= 0xF):

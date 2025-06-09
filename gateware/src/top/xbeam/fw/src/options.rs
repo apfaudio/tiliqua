@@ -64,7 +64,7 @@ pub enum Timebase {
     Timebase1ms,
 }
 
-int_params!(DelayParams<u16>      { step: 128, min: 0, max: 4096 });
+int_params!(DelayParams<u16>      { step: 32, min: 0, max: 1024 });
 int_params!(ScaleParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(PCScaleParams<u8>     { step: 1, min: 0, max: 15 });
 int_params!(PersistParams<u16>    { step: 32, min: 32, max: 4096 });
@@ -110,7 +110,7 @@ pub struct DelayOpts {
 pub struct BeamOpts {
     #[option(32)]
     pub persist: IntOption<PersistParams>,
-    #[option(2)]
+    #[option(1)]
     pub decay: IntOption<DecayParams>,
     #[option(10)]
     pub ui_hue: IntOption<HueParams>,
