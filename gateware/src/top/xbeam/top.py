@@ -73,7 +73,7 @@ class XbeamPeripheral(wiring.Component):
         m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4, sink=wiring.flipped(self.delay_o))
         delay = [Signal(16) for _ in range(4)]
         for ch in range(4):
-            delayln = delay_line.DelayLine(max_delay=1024, write_triggers_read=False)
+            delayln = delay_line.DelayLine(max_delay=512, write_triggers_read=False)
             split2 = dsp.Split(n_channels=2, source=split4.o[ch], replicate=True)
             m.submodules += [delayln, split2]
             tap = delayln.add_tap()
@@ -152,11 +152,13 @@ class XbeamSoc(TiliquaSoc):
         with m.If(self.xbeam_periph.usb_en):
             if sim.is_hw(platform):
                 wiring.connect(m, pmod0.o_cal, usbif.i)
-                wiring.connect(m, usbif.o, pmod0.i_cal)
+                wiring.connect(m, usbif.o, self.xbeam_periph.delay_i)
             else:
                 pass
         with m.Else():
-            wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
+            wiring.connect(m, pmod0.o_cal, self.xbeam_periph.delay_i)
+
+        wiring.connect(m, self.xbeam_periph.delay_o, pmod0.i_cal)
 
         m.submodules.plot_fifo = plot_fifo = fifo.SyncFIFOBuffered(
             width=data.ArrayLayout(eurorack_pmod.ASQ, 4).as_shape().width, depth=256)
@@ -166,12 +168,10 @@ class XbeamSoc(TiliquaSoc):
         with m.Else():
             dsp.connect_peek(m, pmod0.o_cal, plot_fifo.w_stream)
 
-        wiring.connect(m, plot_fifo.r_stream, self.xbeam_periph.delay_i)
-
         with m.If(self.scope_periph.soc_en):
-            wiring.connect(m, self.xbeam_periph.delay_o, self.scope_periph.i)
+            wiring.connect(m, plot_fifo.r_stream, self.scope_periph.i)
         with m.Else():
-            wiring.connect(m, self.xbeam_periph.delay_o, self.vector_periph.i)
+            wiring.connect(m, plot_fifo.r_stream, self.vector_periph.i)
 
         # Memory controller hangs if we start making requests to it straight away.
         with m.If(self.permit_bus_traffic):

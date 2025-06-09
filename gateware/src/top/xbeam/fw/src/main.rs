@@ -9,6 +9,7 @@ use core::cell::RefCell;
 
 use tiliqua_fw::*;
 use tiliqua_lib::*;
+use tiliqua_lib::dsp::OnePoleSmoother;
 use pac::constants::*;
 use tiliqua_lib::calibration::*;
 
@@ -81,6 +82,8 @@ fn main() -> ! {
     handler!(timer0 = || timer0_handler(&app));
 
     let mut md = 0;
+
+    let mut delay_smoothers = [OnePoleSmoother::new(0.05f32); 4];
 
     irq::scope(|s| {
 
@@ -174,10 +177,14 @@ fn main() -> ! {
                       w.show_outputs().bit(opts.usb.show.value == Show::Outputs)
                 } );
 
-            xbeam_mux.delay0().write(|w| unsafe { w.value().bits(opts.delay.delay_x.value) });
-            xbeam_mux.delay1().write(|w| unsafe { w.value().bits(opts.delay.delay_y.value) });
-            xbeam_mux.delay2().write(|w| unsafe { w.value().bits(opts.delay.delay_i.value) });
-            xbeam_mux.delay3().write(|w| unsafe { w.value().bits(opts.delay.delay_c.value) });
+            xbeam_mux.delay0().write(|w| unsafe { w.value().bits(
+                    delay_smoothers[0].proc_u16(opts.delay.delay_x.value)) });
+            xbeam_mux.delay1().write(|w| unsafe { w.value().bits(
+                    delay_smoothers[1].proc_u16(opts.delay.delay_y.value)) });
+            xbeam_mux.delay2().write(|w| unsafe { w.value().bits(
+                    delay_smoothers[2].proc_u16(opts.delay.delay_i.value)) });
+            xbeam_mux.delay3().write(|w| unsafe { w.value().bits(
+                    delay_smoothers[3].proc_u16(opts.delay.delay_c.value)) });
 
             if opts.tracker.page.value == Page::Vector {
                 scope.flags().write(

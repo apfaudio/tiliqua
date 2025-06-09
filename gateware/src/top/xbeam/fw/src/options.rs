@@ -33,8 +33,8 @@ pub enum USBMode {
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Show {
-    #[default]
     Inputs,
+    #[default]
     Outputs,
 }
 
@@ -64,7 +64,7 @@ pub enum Timebase {
     Timebase1ms,
 }
 
-int_params!(DelayParams<u16>      { step: 32, min: 0, max: 1024 });
+int_params!(DelayParams<u16>      { step: 8, min: 0, max: 512 });
 int_params!(ScaleParams<u8>       { step: 1, min: 0, max: 15 });
 int_params!(PCScaleParams<u8>     { step: 1, min: 0, max: 15 });
 int_params!(PersistParams<u16>    { step: 32, min: 32, max: 4096 });
