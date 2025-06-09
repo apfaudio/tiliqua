@@ -69,8 +69,6 @@ fn main() -> ! {
         modeline.clone(),
     );
 
-    let psram = peripherals.PSRAM_CSR;
-
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
@@ -80,8 +78,6 @@ fn main() -> ! {
     let app = Mutex::new(RefCell::new(App::new(opts)));
 
     handler!(timer0 = || timer0_handler(&app));
-
-    let mut md = 0;
 
     let mut delay_smoothers = [OnePoleSmoother::new(0.05f32); 4];
 
@@ -101,23 +97,6 @@ fn main() -> ! {
         let v_active = display.size().height;
 
         loop {
-
-            if md % 10 == 0 {
-                psram.ctrl().write(|w| w.collect().bit(false));
-                let cycles_elapsed: u32 = psram.stats0().read().cycles_elapsed().bits();
-                let cycles_idle: u32 = psram.stats1().read().cycles_idle().bits();
-                let cycles_ack_r: u32 = psram.stats2().read().cycles_ack_r().bits();
-                let cycles_ack_w: u32 = psram.stats3().read().cycles_ack_w().bits();
-                psram.ctrl().write(|w| w.collect().bit(true));
-                let sysclk = pac::clock::sysclk();
-                info!("psram [busy={}%, wasted={}%, read={}%, write={}%, refresh={}Hz]",
-                      (100.0f32 * (1.0f32 - (cycles_idle as f32 / cycles_elapsed as f32))) as u32,
-                      (100.0f32 * (cycles_elapsed - cycles_idle - cycles_ack_r - cycles_ack_w) as f32 / cycles_elapsed as f32) as u32,
-                      (100.0f32 * cycles_ack_r as f32 / cycles_elapsed as f32) as u32,
-                      (100.0f32 * cycles_ack_w as f32 / cycles_elapsed as f32) as u32,
-                      sysclk / (cycles_elapsed+1));
-            }
-            md = md + 1;
 
             let (opts, draw_options) = critical_section::with(|cs| {
                 let ui = &app.borrow_ref(cs).ui;
