@@ -42,21 +42,37 @@ from .usb_stream_to_channels                  import USBStreamToChannels
 from .channels_to_usb_stream                  import ChannelsToUSBStream
 from .audio_to_channels                       import AudioToChannels
 
-from tiliqua                                  import eurorack_pmod
+from tiliqua                                  import eurorack_pmod, types
 
 
 class USB2AudioInterface(wiring.Component):
+
+    class DebugInterface(wiring.Signature):
+        def __init__(self):
+            super().__init__({
+                "sof_detected": Out(1),
+                "dac_fifo_level": Out(8),
+                "adc_fifo_level": Out(8),
+                "garbage_seen_out": Out(1),
+                "channel_stream_out_valid": Out(1),
+                "channel_stream_out_first": Out(1),
+                "usb_stream_in_valid": Out(1),
+                "usb_stream_in_ready": Out(1),
+                "usb_stream_in_payload": Out(8),
+            })
+
     """ USB Audio Class v2 interface """
 
-    NR_CHANNELS = 4
-    MAX_PACKET_SIZE = int(224 // 8 * NR_CHANNELS)
-    MAX_PACKET_SIZE_MIDI = 64
+    def __init__(self, *, audio_clock: types.AudioClock, nr_channels):
+        self.fs = 192000 if audio_clock.is_192khz() else 48000
+        self.nr_channels = nr_channels
+        self.max_packet_size = int(32 * (self.fs // 48000) * self.nr_channels)
+        super().__init__({
+            "i":  In(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, self.nr_channels))),
+            "o": Out(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, self.nr_channels))),
 
-    i:    In(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, 4)))
-    o:   Out(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, 4)))
-
-    def __init__(self):
-        super().__init__()
+            "dbg": Out(self.DebugInterface())
+        })
 
     def create_descriptors(self):
         """ Creates the descriptors that describe our audio topology. """
@@ -119,7 +135,7 @@ class USB2AudioInterface(wiring.Component):
         # default audio out device by Windows. We provide an alternate
         # setting with the full channel count, which also references
         # this terminal ID
-        inputTerminal.bNrChannels   = self.NR_CHANNELS
+        inputTerminal.bNrChannels   = self.nr_channels
         inputTerminal.bCSourceID    = 1
         audioControlInterface.add_subordinate_descriptor(inputTerminal)
 
@@ -135,7 +151,7 @@ class USB2AudioInterface(wiring.Component):
         inputTerminal               = uac2.InputTerminalDescriptorEmitter()
         inputTerminal.bTerminalID   = 4
         inputTerminal.wTerminalType = uac2.InputTerminalTypes.MICROPHONE
-        inputTerminal.bNrChannels   = self.NR_CHANNELS
+        inputTerminal.bNrChannels   = self.nr_channels
         inputTerminal.bCSourceID    = 1
         audioControlInterface.add_subordinate_descriptor(inputTerminal)
 
@@ -178,7 +194,7 @@ class USB2AudioInterface(wiring.Component):
         audioOutEndpoint.bmAttributes         = USBTransferType.ISOCHRONOUS  | \
                                                 (USBSynchronizationType.ASYNC << 2) | \
                                                 (USBUsageType.DATA << 4)
-        audioOutEndpoint.wMaxPacketSize = self.MAX_PACKET_SIZE
+        audioOutEndpoint.wMaxPacketSize = self.max_packet_size
         audioOutEndpoint.bInterval       = 1
         c.add_subordinate_descriptor(audioOutEndpoint)
 
@@ -209,7 +225,7 @@ class USB2AudioInterface(wiring.Component):
         # we need the default alternate setting to be stereo
         # out for windows to automatically recognize
         # and use this audio interface
-        self.create_output_streaming_interface(c, nr_channels=self.NR_CHANNELS, alt_setting_nr=1)
+        self.create_output_streaming_interface(c, nr_channels=self.nr_channels, alt_setting_nr=1)
 
 
     def create_input_streaming_interface(self, c, *, nr_channels, alt_setting_nr, channel_config=0):
@@ -241,7 +257,7 @@ class USB2AudioInterface(wiring.Component):
         audioOutEndpoint.bmAttributes         = USBTransferType.ISOCHRONOUS  | \
                                                 (USBSynchronizationType.ASYNC << 2) | \
                                                 (USBUsageType.DATA << 4)
-        audioOutEndpoint.wMaxPacketSize = self.MAX_PACKET_SIZE
+        audioOutEndpoint.wMaxPacketSize = self.max_packet_size
         audioOutEndpoint.bInterval      = 1
         c.add_subordinate_descriptor(audioOutEndpoint)
 
@@ -260,7 +276,7 @@ class USB2AudioInterface(wiring.Component):
         c.add_subordinate_descriptor(quietAudioStreamingInterface)
 
         # Windows wants a stereo pair as default setting, so let's have it
-        self.create_input_streaming_interface(c, nr_channels=self.NR_CHANNELS, alt_setting_nr=1, channel_config=0x3)
+        self.create_input_streaming_interface(c, nr_channels=self.nr_channels, alt_setting_nr=1, channel_config=0x3)
 
     def elaborate(self, platform):
         m = Module()
@@ -277,7 +293,7 @@ class USB2AudioInterface(wiring.Component):
         ])
 
         # Attach our class request handlers.
-        class_request_handler = UAC2RequestHandlers()
+        class_request_handler = UAC2RequestHandlers(fs=self.fs)
         control_ep.add_request_handler(class_request_handler)
 
         # Attach class-request handlers that stall any vendor or reserved requests,
@@ -289,7 +305,7 @@ class USB2AudioInterface(wiring.Component):
 
         ep1_out = USBIsochronousStreamOutEndpoint(
             endpoint_number=1, # EP 1 OUT
-            max_packet_size=self.MAX_PACKET_SIZE)
+            max_packet_size=self.max_packet_size)
         usb.add_endpoint(ep1_out)
 
         ep1_in = USBIsochronousInEndpoint(
@@ -299,11 +315,11 @@ class USB2AudioInterface(wiring.Component):
 
         ep2_in = USBIsochronousStreamInEndpoint(
             endpoint_number=2, # EP 2 IN
-            max_packet_size=self.MAX_PACKET_SIZE)
+            max_packet_size=self.max_packet_size)
         usb.add_endpoint(ep2_in)
 
         # calculate bytes in frame for audio in
-        audio_in_frame_bytes = Signal(range(self.MAX_PACKET_SIZE), reset=24 * self.NR_CHANNELS)
+        audio_in_frame_bytes = Signal(range(self.max_packet_size), reset=24 * self.nr_channels)
         audio_in_frame_bytes_counting = Signal()
 
         with m.If(ep1_out.stream.valid & ep1_out.stream.ready):
@@ -336,10 +352,8 @@ class USB2AudioInterface(wiring.Component):
         # required by the USB standard, so and that is 0xc000, so we
         # need 16 bits here
         audio_clock_counter = Signal(24)
-        sof_counter         = Signal(5)
-
+        sof_counter         = Signal(8)
         audio_clock_usb = Signal()
-        m.submodules.audio_clock_usb_sync = FFSynchronizer(ClockSignal("audio"), audio_clock_usb, o_domain="usb")
         m.submodules.audio_clock_usb_pulse = audio_clock_usb_pulse = DomainRenamer("usb")(EdgeToPulse())
         audio_clock_tick = Signal()
         m.d.usb += [
@@ -347,25 +361,21 @@ class USB2AudioInterface(wiring.Component):
             audio_clock_tick.eq(audio_clock_usb_pulse.pulse_out),
         ]
 
-        with m.If(audio_clock_tick):
-            m.d.usb += audio_clock_counter.eq(audio_clock_counter + 1)
-
-        with m.If(usb.sof_detected):
-            m.d.usb += sof_counter.eq(sof_counter + 1)
-
-            # according to USB2 standard chapter 5.12.4.2
-            # we need 2**13 / 2**8 = 2**5 = 32 SOF-frames of
-            # sample master frequency counter to get enough
-            # precision for the sample frequency estimate
-            # / 2**8 because the ADAT-clock = 256 times = 2**8
-            # the sample frequency and sof_counter is 5 bits
-            # so it wraps automatically every 32 SOFs
-            with m.If(sof_counter == 0):
-                m.d.usb += [
-                    # FIFO feedback?
-                    feedbackValue.eq(audio_clock_counter << 3),
-                    audio_clock_counter.eq(0),
-                ]
+        match self.fs:
+            case 192000:
+                # Audio clock dangerously close to USB clock, divide it down before synchronizing into USB domain
+                audio_clkdiv = Signal(2)
+                m.d.audio += audio_clkdiv.eq(audio_clkdiv+1)
+                m.submodules.audio_clock_usb_sync = FFSynchronizer(audio_clkdiv[-1], audio_clock_usb, o_domain="usb")
+                with m.If(audio_clock_tick):
+                    m.d.usb += audio_clock_counter.eq(audio_clock_counter + 4)
+            case 48000:
+                # Audio clock not close to USB clock, no need for divider.
+                m.submodules.audio_clock_usb_sync = FFSynchronizer(ClockSignal("audio"), audio_clock_usb, o_domain="usb")
+                with m.If(audio_clock_tick):
+                    m.d.usb += audio_clock_counter.eq(audio_clock_counter + 1)
+            case _:
+                raise ValueError("audio clock tracking only tested for 48khz/192khz")
 
         m.d.comb += [
             bitPos.eq(ep1_in.address << 3),
@@ -373,10 +383,10 @@ class USB2AudioInterface(wiring.Component):
         ]
 
         m.submodules.usb_to_channel_stream = usb_to_channel_stream = \
-            DomainRenamer("usb")(USBStreamToChannels(self.NR_CHANNELS))
+            DomainRenamer("usb")(USBStreamToChannels(self.nr_channels))
 
         m.submodules.channels_to_usb_stream = channels_to_usb_stream = \
-            DomainRenamer("usb")(ChannelsToUSBStream(self.NR_CHANNELS))
+            DomainRenamer("usb")(ChannelsToUSBStream(self.nr_channels, max_packet_size=self.max_packet_size))
 
         def detect_active_audio_in(m, name: str, usb, ep2_in):
             audio_in_seen   = Signal(name=f"{name}_audio_in_seen")
@@ -402,26 +412,59 @@ class USB2AudioInterface(wiring.Component):
         wiring.connect(m,  wiring.flipped(ep2_in.stream), channels_to_usb_stream.usb_stream_out)
 
         m.d.comb += [
-            channels_to_usb_stream.no_channels_in.eq(self.NR_CHANNELS),
+            channels_to_usb_stream.no_channels_in.eq(self.nr_channels),
             channels_to_usb_stream.data_requested_in.eq(ep2_in.data_requested),
             channels_to_usb_stream.frame_finished_in.eq(ep2_in.frame_finished),
             channels_to_usb_stream.audio_in_active.eq(usb_audio_in_active),
-            usb_to_channel_stream.no_channels_in.eq(self.NR_CHANNELS),
+            usb_to_channel_stream.no_channels_in.eq(self.nr_channels),
         ]
 
         m.submodules.audio_to_channels = audio_to_channels = AudioToChannels(
+                nr_channels=self.nr_channels,
                 to_usb_stream=channels_to_usb_stream.channel_stream_in,
-                from_usb_stream=usb_to_channel_stream.channel_stream_out)
+                from_usb_stream=usb_to_channel_stream.channel_stream_out,
+                fifo_depth=16 * (self.fs // 48000))
         wiring.connect(m, wiring.flipped(self.i), audio_to_channels.i)
         wiring.connect(m, audio_to_channels.o, wiring.flipped(self.o))
+
+        with m.If(usb.sof_detected):
+            m.d.usb += sof_counter.eq(sof_counter + 1)
+
+            # according to USB2 standard chapter 5.12.4.2
+            # we need 2**13 / 2**8 = 2**5 = 32 SOF-frames of
+            # sample master frequency counter to get enough
+            # precision for the sample frequency estimate
+            # / 2**8 because the ADAT-clock = 256 times = 2**8
+            # the sample frequency and sof_counter is 5 bits
+            # so it wraps automatically every 32 SOFs
+            with m.If(sof_counter == 0):
+                m.d.usb += [
+                    # FIFO feedback?
+                    feedbackValue.eq((audio_clock_counter + 1) -
+                                     (audio_to_channels.dac_fifo_level >> 3)),
+                    audio_clock_counter.eq(0),
+                ]
+
+        # Debug interface for introspection / ILA usage
+        m.d.comb += [
+            self.dbg.dac_fifo_level.eq(audio_to_channels.dac_fifo_level),
+            self.dbg.adc_fifo_level.eq(audio_to_channels.adc_fifo_level),
+            self.dbg.sof_detected.eq(usb.sof_detected),
+            self.dbg.channel_stream_out_valid.eq(usb_to_channel_stream.channel_stream_out.valid),
+            self.dbg.channel_stream_out_first.eq(usb_to_channel_stream.channel_stream_out.first),
+            self.dbg.usb_stream_in_valid.eq(usb_to_channel_stream.usb_stream_in.valid),
+            self.dbg.usb_stream_in_payload.eq(usb_to_channel_stream.usb_stream_in.payload),
+            self.dbg.usb_stream_in_ready.eq(usb_to_channel_stream.usb_stream_in.ready),
+        ]
 
         return m
 
 class UAC2RequestHandlers(USBRequestHandler):
     """ request handlers to implement UAC2 functionality. """
-    def __init__(self):
+    def __init__(self, fs):
         super().__init__()
 
+        self.fs = fs
         self.output_interface_altsetting_nr = Signal(3)
         self.input_interface_altsetting_nr  = Signal(3)
         self.interface_settings_changed     = Signal()
@@ -480,8 +523,8 @@ class UAC2RequestHandlers(USBRequestHandler):
                         m.d.comb += [
                             Cat(transmitter.data).eq(
                                 Cat(Const(0x1, 16), # no triples
-                                    Const(48000, 32), # MIN
-                                    Const(48000, 32), # MAX
+                                    Const(self.fs, 32), # MIN
+                                    Const(self.fs, 32), # MAX
                                     Const(0, 32))),   # RES
                             transmitter.max_length.eq(setup.length)
                         ]
@@ -501,7 +544,7 @@ class UAC2RequestHandlers(USBRequestHandler):
                     m.d.comb += transmitter.stream.attach(self.interface.tx)
                     with m.If(request_clock_freq & (setup.length == 4)):
                         m.d.comb += [
-                            Cat(transmitter.data[0:4]).eq(Const(48000, 32)),
+                            Cat(transmitter.data[0:4]).eq(Const(self.fs, 32)),
                             transmitter.max_length.eq(4)
                         ]
                     with m.Else():

@@ -35,11 +35,11 @@ from amaranth.lib              import wiring, data, stream
 from amaranth.lib.wiring       import In, Out, connect, flipped
 from amaranth.lib.fifo         import SyncFIFOBuffered
 
-from amaranth_soc              import csr
+from amaranth_soc              import csr, wishbone
 
 from amaranth_future           import fixed
 
-from tiliqua                   import eurorack_pmod, dsp, mac, midi, scope, sim, delay
+from tiliqua                   import eurorack_pmod, dsp, mac, midi, scope, sim, delay, cache
 from tiliqua.delay_line        import DelayLine
 from tiliqua.eurorack_pmod     import ASQ
 from tiliqua.tiliqua_soc       import TiliquaSoc
@@ -371,12 +371,15 @@ class PolySoc(TiliquaSoc):
         self.vector_periph_base = 0x00001000
         self.synth_periph_base  = 0x00001100
 
+        self.plotter_cache = cache.PlotterCache(fb=self.fb)
+        self.psram_periph.add_master(self.plotter_cache.bus)
+
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
-            bus_dma=self.psram_periph,
             fs=48000,
-            n_upsample=8)
+            n_upsample=32)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
+        self.plotter_cache.add(self.vector_periph.bus_dma)
 
         # synth controls
         self.synth_periph = SynthPeripheral()
@@ -391,6 +394,8 @@ class PolySoc(TiliquaSoc):
     def elaborate(self, platform):
 
         m = Module()
+
+        m.submodules += self.plotter_cache
 
         m.submodules.vector_periph = self.vector_periph
 

@@ -1282,3 +1282,62 @@ def named_submodules(m_submodules, elaboratables, override_name=None):
     else:
         [setattr(m_submodules, f"{override_name}{i}", e) for i, e in enumerate(elaboratables)]
 
+
+def connect_peek(m, stream_peek, stream_dst, always_ready=False):
+    """
+    Nonblocking 'peek', used to tap off an EXISTING stream connection, without
+    influencing it, for inspection / plotting purposes.
+    """
+    m.d.comb += [
+        stream_dst.valid.eq(stream_peek.valid & stream_peek.ready),
+        stream_dst.payload.eq(stream_peek.payload),
+        stream_peek.ready.eq(1) if always_ready else []
+    ]
+
+class Duplicate(wiring.Component):
+    """
+    Simple 'upsampler' that duplicates each input sample N times.
+
+    No filtering is performed - each input sample is simply repeated N times
+    in the output stream.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(ASQ))`
+        Input stream for samples to be upsampled.
+    o : :py:`Out(stream.Signature(ASQ))`
+        Output stream producing each input sample N times.
+    """
+
+    i: In(stream.Signature(ASQ))
+    o: Out(stream.Signature(ASQ))
+
+    def __init__(self, n: int):
+        self.n = n
+        super().__init__()
+
+    def elaborate(self, platform):
+        m = Module()
+        if self.n == 1:
+            wiring.connect(m, wiring.flipped(self.i), self.o)
+        else:
+            dup_counter = Signal(range(self.n))
+            current_sample = Signal(ASQ)
+            sample_valid = Signal()
+            m.d.comb += self.i.ready.eq(dup_counter == 0)
+            with m.If(self.i.valid & self.i.ready):
+                m.d.sync += [
+                    current_sample.eq(self.i.payload),
+                    sample_valid.eq(1),
+                    dup_counter.eq(self.n - 1),
+                ]
+            with m.If(self.o.ready & sample_valid):
+                with m.If(dup_counter > 0):
+                    m.d.sync += dup_counter.eq(dup_counter - 1)
+                with m.Else():
+                    m.d.sync += sample_valid.eq(0)
+            m.d.comb += [
+                self.o.valid.eq(sample_valid),
+                self.o.payload.eq(current_sample),
+            ]
+        return m

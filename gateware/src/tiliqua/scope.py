@@ -27,24 +27,27 @@ class VectorTracePeripheral(wiring.Component):
     class IntensityReg(csr.Register, access="w"):
         intensity: csr.Field(csr.action.W, unsigned(8))
 
-    class XScaleReg(csr.Register, access="w"):
-        xscale: csr.Field(csr.action.W, unsigned(8))
+    class ScaleReg(csr.Register, access="w"):
+        scale: csr.Field(csr.action.W, unsigned(8))
 
-    class YScaleReg(csr.Register, access="w"):
-        yscale: csr.Field(csr.action.W, unsigned(8))
+    class Position(csr.Register, access="w"):
+        value: csr.Field(csr.action.W, unsigned(16))
 
-    def __init__(self, fb, bus_dma, **kwargs):
+    def __init__(self, fb, **kwargs):
 
         self.stroke = Stroke(fb=fb, **kwargs)
-        bus_dma.add_master(self.stroke.bus)
 
-        regs = csr.Builder(addr_width=5, data_width=8)
+        regs = csr.Builder(addr_width=6, data_width=8)
 
         self._flags     = regs.add("flags",     self.Flags(),        offset=0x0)
         self._hue       = regs.add("hue",       self.HueReg(),       offset=0x4)
         self._intensity = regs.add("intensity", self.IntensityReg(), offset=0x8)
-        self._xscale    = regs.add("xscale",    self.XScaleReg(),    offset=0xC)
-        self._yscale    = regs.add("yscale",    self.YScaleReg(),    offset=0x10)
+        self._xoffset   = regs.add("xoffset",   self.Position(),     offset=0xC)
+        self._yoffset   = regs.add("yoffset",   self.Position(),     offset=0x10)
+        self._xscale    = regs.add("xscale",    self.ScaleReg(),     offset=0x14)
+        self._yscale    = regs.add("yscale",    self.ScaleReg(),     offset=0x18)
+        self._pscale    = regs.add("pscale",    self.ScaleReg(),     offset=0x1C)
+        self._cscale    = regs.add("cscale",    self.ScaleReg(),     offset=0x20)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
@@ -53,7 +56,10 @@ class VectorTracePeripheral(wiring.Component):
             "en": In(1),
             "soc_en": In(1),
             "rotate_left": In(1),
+            # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            # DMA bus (plotting)
+            "bus_dma": Out(self.stroke.bus.signature),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -63,6 +69,7 @@ class VectorTracePeripheral(wiring.Component):
         m.submodules += self.stroke
 
         wiring.connect(m, wiring.flipped(self.i), self.stroke.i)
+        wiring.connect(m, self.stroke.bus, wiring.flipped(self.bus_dma))
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         m.d.comb += self.stroke.enable.eq(self.en & self.soc_en)
@@ -74,11 +81,23 @@ class VectorTracePeripheral(wiring.Component):
         with m.If(self._intensity.f.intensity.w_stb):
             m.d.sync += self.stroke.intensity.eq(self._intensity.f.intensity.w_data)
 
-        with m.If(self._xscale.f.xscale.w_stb):
-            m.d.sync += self.stroke.scale_x.eq(self._xscale.f.xscale.w_data)
+        with m.If(self._xscale.f.scale.w_stb):
+            m.d.sync += self.stroke.scale_x.eq(self._xscale.f.scale.w_data)
 
-        with m.If(self._yscale.f.yscale.w_stb):
-            m.d.sync += self.stroke.scale_y.eq(self._yscale.f.yscale.w_data)
+        with m.If(self._yscale.f.scale.w_stb):
+            m.d.sync += self.stroke.scale_y.eq(self._yscale.f.scale.w_data)
+
+        with m.If(self._xoffset.f.value.w_stb):
+            m.d.sync += self.stroke.x_offset.eq(self._xoffset.f.value.w_data)
+
+        with m.If(self._yoffset.f.value.w_stb):
+            m.d.sync += self.stroke.y_offset.eq(self._yoffset.f.value.w_data)
+
+        with m.If(self._pscale.f.scale.w_stb):
+            m.d.sync += self.stroke.scale_p.eq(self._pscale.f.scale.w_data)
+
+        with m.If(self._cscale.f.scale.w_stb):
+            m.d.sync += self.stroke.scale_c.eq(self._cscale.f.scale.w_data)
 
         with m.If(self._flags.f.enable.w_stb):
             m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
@@ -119,13 +138,11 @@ class ScopeTracePeripheral(wiring.Component):
     class YPosition(csr.Register, access="w"):
         ypos: csr.Field(csr.action.W, unsigned(16))
 
-    def __init__(self, fb, bus_dma, **kwargs):
+    def __init__(self, fb, n_channels=4, **kwargs):
 
-        self.strokes = [Stroke(fb=fb, n_upsample=None, **kwargs)
-                        for _ in range(4)]
-
-        for s in self.strokes:
-            bus_dma.add_master(s.bus)
+        self.n_channels = n_channels
+        self.strokes = [Stroke(fb=fb, **kwargs)
+                        for _ in range(self.n_channels)]
 
         regs = csr.Builder(addr_width=6, data_width=8)
         self._flags          = regs.add("flags",          self.Flags(),         offset=0x0)
@@ -136,15 +153,19 @@ class ScopeTracePeripheral(wiring.Component):
         self._yscale         = regs.add("yscale",         self.YScale(),        offset=0x14)
         self._trigger_lvl    = regs.add("trigger_lvl",    self.TriggerLevel(),  offset=0x18)
         self._xpos           = regs.add("xpos",           self.XPosition(),     offset=0x1C)
-        self._ypos           = [regs.add(f"ypos{i}",      self.YPosition(),     offset=(0x20+i*4)) for i in range(4)]
+        self._ypos           = [regs.add(f"ypos{i}",      self.YPosition(),
+                                offset=(0x20+i*4)) for i in range(self.n_channels)]
 
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
-            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, self.n_channels))),
             "en": In(1),
             "soc_en": In(1),
             "rotate_left": In(1),
+            # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            # DMA buses, one for plotting each channel
+            "bus_dma": Out(self.strokes[0].bus.signature).array(self.n_channels),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -155,21 +176,19 @@ class ScopeTracePeripheral(wiring.Component):
         trigger_lvl = Signal(shape=dsp.ASQ)
         trigger_always = Signal()
 
-        m.submodules.plot_fifo = plot_fifo = fifo.SyncFIFOBuffered(
-            width=data.ArrayLayout(ASQ, 4).as_shape().width, depth=64)
-        self.isplit4 = dsp.Split(4)
+        self.isplit4 = dsp.Split(self.n_channels)
 
-        wiring.connect(m, wiring.flipped(self.i), plot_fifo.w_stream)
-        wiring.connect(m, plot_fifo.r_stream, self.isplit4.i)
+        wiring.connect(m, wiring.flipped(self.i), self.isplit4.i)
 
         m.submodules.bridge = self._bridge
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         m.submodules += self.strokes
 
-        for s in self.strokes:
+        for i, s in enumerate(self.strokes):
             m.d.comb += s.enable.eq(self.en & self.soc_en)
             m.d.comb += s.rotate_left.eq(self.rotate_left)
+            wiring.connect(m, s.bus, wiring.flipped(self.bus_dma[i]))
 
         # Scope and trigger
         # Ch0 is routed through trigger, the rest are not.
@@ -193,17 +212,21 @@ class ScopeTracePeripheral(wiring.Component):
         ])
 
         # Split ramp into 4 streams, one for each channel
-        m.submodules.rampsplit4 = rampsplit4 = dsp.Split(4, replicate=True, source=ramp.o)
+        m.submodules.rampsplit4 = rampsplit4 = dsp.Split(self.n_channels, replicate=True, source=ramp.o)
 
         # Rasterize ch0: Ramp => X, Audio => Y
-        m.submodules.ch0_merge4 = ch0_merge4 = dsp.Merge(4, sink=self.strokes[0].i)
+        m.submodules.ch0_merge4 = ch0_merge4 = dsp.Merge(4)
+        # HACK for stable trigger despite periodic cache misses
+        # TODO: modify ramp generation instead?
+        dsp.connect_peek(m, ch0_merge4.o, self.strokes[0].i, always_ready=True)
         ch0_merge4.wire_valid(m, [2, 3])
         wiring.connect(m, rampsplit4.o[0], ch0_merge4.i[0])
         wiring.connect(m, irep2.o[1], ch0_merge4.i[1])
 
         # Rasterize ch1-ch3: Ramp => X, Audio => Y
-        for ch in range(1, 4):
-            ch_merge4 = dsp.Merge(4, sink=self.strokes[ch].i)
+        for ch in range(1, self.n_channels):
+            ch_merge4 = dsp.Merge(4)
+            dsp.connect_peek(m, ch_merge4.o, self.strokes[ch].i, always_ready=True)
             m.submodules += ch_merge4
             ch_merge4.wire_valid(m, [2, 3])
             wiring.connect(m, rampsplit4.o[ch], ch_merge4.i[0])

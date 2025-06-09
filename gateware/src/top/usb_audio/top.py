@@ -35,7 +35,8 @@ class USBAudioTop(Elaboratable):
         wiring.connect(m, pmod0.pins, pmod0_provider.pins)
         m.d.comb += pmod0.codec_mute.eq(reboot.mute)
 
-        m.submodules.usbif = usbif = usb_audio.USB2AudioInterface()
+        m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
+                audio_clock=self.clock_settings.audio_clock, nr_channels=4)
 
         wiring.connect(m, pmod0.o_cal, usbif.i)
         wiring.connect(m, usbif.o, pmod0.i_cal)
@@ -46,38 +47,22 @@ class USBAudioTop(Elaboratable):
             # https://github.com/apfaudio/tiliqua/issues/113
 
             test_signal = Signal(16, reset=0xFEED)
-            pmod_sample_o0 = Signal(16)
 
-            m.d.comb += pmod_sample_o0.eq(pmod0.sample_o[0])
+            pmod_sample_o0 = Signal(16)
+            m.d.comb += pmod_sample_o0.eq(pmod0.i_cal.payload[0])
 
             ila_signals = [
                 test_signal,
                 pmod_sample_o0,
-                pmod0.fs_strobe,
-                m.submodules.audio_to_channels.dac_fifo_level,
-
-                # channel stream
-                #usb_to_channel_stream.channel_stream_out.channel_nr,
-                #usb_to_channel_stream.channel_stream_out.payload,
-                #usb_to_channel_stream.channel_stream_out.valid,
-                #usb_to_channel_stream.garbage_seen_out,
-
-                # interface from IsochronousStreamOutEndpoint
-                #usb_to_channel_stream.usb_stream_in.first,
-                #usb_to_channel_stream.usb_stream_in.valid,
-                #usb_to_channel_stream.usb_stream_in.payload,
-                #usb_to_channel_stream.usb_stream_in.last,
-                #usb_to_channel_stream.usb_stream_in.ready,
-
-                # interface to IsochronousStreamOutEndpoint
-                #ep1_out.interface.rx.next,
-                #ep1_out.interface.rx.valid,
-                #ep1_out.interface.rx.payload,
-
-                usb.sof_detected,
-                sof_counter,
-                feedbackValue,
-                bitPos,
+                pmod0.i_cal.valid,
+                usbif.dbg.dac_fifo_level,
+                usbif.dbg.adc_fifo_level,
+                usbif.dbg.sof_detected,
+                usbif.dbg.channel_stream_out_valid,
+                usbif.dbg.channel_stream_out_first,
+                usbif.dbg.usb_stream_in_valid,
+                usbif.dbg.usb_stream_in_payload,
+                usbif.dbg.usb_stream_in_ready,
             ]
 
             self.ila = AsyncSerialILA(signals=ila_signals,
@@ -86,8 +71,7 @@ class USBAudioTop(Elaboratable):
             m.submodules += self.ila
 
             m.d.comb += [
-                self.ila.trigger.eq(pmod0.sample_o[0] > Const(1000)),
-                #self.ila.trigger.eq(usb_audio_in_active),
+                self.ila.trigger.eq((pmod_sample_o0 > Const(1000)) & pmod0.i_cal.valid),
                 platform.request("uart").tx.o.eq(self.ila.tx), # needs FFSync?
             ]
 

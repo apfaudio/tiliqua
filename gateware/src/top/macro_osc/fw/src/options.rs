@@ -89,7 +89,7 @@ pub struct BeamOpts {
     pub persist: IntOption<PersistParams>,
     #[option(1)]
     pub decay: IntOption<DecayParams>,
-    #[option(15)]
+    #[option(8)]
     pub intensity: IntOption<IntensityParams>,
     #[option(10)]
     pub hue: IntOption<HueParams>,

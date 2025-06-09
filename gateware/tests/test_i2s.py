@@ -22,9 +22,18 @@ class I2STests(unittest.TestCase):
         m = Module()
         i2stdm = eurorack_pmod.I2STDM(audio_192=False) # 48kHz logic
         dut = eurorack_pmod.I2SCalibrator()
-        m.d.comb += i2stdm.i2s.sdout1.eq(i2stdm.i2s.sdin1) # I2S hardware loopback
+
+        # I2S hardware loopback with 2-cycle FFBuffer pipeline delay
+        sdin1_reg0 = Signal()
+        sdin1_reg1 = Signal()
+        m.d.audio += [
+            sdin1_reg0.eq(i2stdm.i2s.sdin1),
+            sdin1_reg1.eq(sdin1_reg0),
+        ]
+        m.d.comb += i2stdm.i2s.sdout1.eq(sdin1_reg1)
+
+        # I2S <-> calibrator
         m.d.comb += [
-            # I2S <-> calibrator
             dut.channel.eq(i2stdm.channel),
             dut.strobe.eq(i2stdm.strobe),
             dut.i_uncal.eq(i2stdm.o),
