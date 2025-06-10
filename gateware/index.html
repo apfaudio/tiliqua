@@ -5,6 +5,10 @@
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             background-color: #0a0a0a;
             color: #ffffff;
@@ -12,141 +16,306 @@
             margin: 0;
             padding: 0;
             min-height: 100vh;
-        }
-
-        .slot-grid {
             display: flex;
-            flex-direction: column;
-            gap: 20px;
-            width: 100%;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
         }
 
-        .slot {
+        .main-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .header {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 10;
+        }
+
+        h1 {
+            color: #fff;
+            font-weight: 500;
+            margin: 0;
+            font-size: 28px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .scan-button {
+            background-color: #2196F3;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            box-shadow: 0 4px 20px rgba(33, 150, 243, 0.3);
+        }
+
+        .scan-button:hover {
+            background-color: #1976D2;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(33, 150, 243, 0.4);
+        }
+
+        .device-info {
+            background: rgba(26, 26, 26, 0.8);
             border: 2px solid #333;
-            padding: 20px;
-            border-radius: 8px;
-            background-color: #1a1a1a;
-            display: flex;
-            gap: 20px;
+            border-radius: 20px;
+            padding: 10px 20px;
+            margin-top: 15px;
+            font-family: monospace;
+            font-size: 0.9em;
+            display: inline-block;
+            backdrop-filter: blur(10px);
         }
 
-        .bootloader-slot {
-            background-color: #1a2634;
+        .device-info.connected {
+            border-color: #4CAF50;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+        }
+
+        .device-info.error {
+            border-color: #ff6b6b;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .circle-container {
+            position: relative;
+            width: 600px;
+            height: 600px;
+        }
+
+        .circle {
+            width: 100%;
+            height: 100%;
+            border: 3px solid #333;
+            border-radius: 50%;
+            background: radial-gradient(circle at center, rgba(26, 38, 52, 0.4) 0%, rgba(10, 10, 10, 0.8) 100%);
+            position: relative;
+            transition: all 0.5s ease;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5), inset 0 0 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .circle.connected {
+            border-color: #4CAF50;
+            box-shadow: 0 0 80px rgba(76, 175, 80, 0.3), inset 0 0 50px rgba(76, 175, 80, 0.1);
+        }
+
+        /* Tab buttons around the circle */
+        .tab-button {
+            position: absolute;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            color: #666;
+            padding: 12px 20px;
+            cursor: not-allowed;
+            border-radius: 25px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            transform-origin: center;
+            white-space: nowrap;
+            opacity: 0.5;
+        }
+
+        .tab-button.enabled {
+            cursor: pointer;
+            color: #aaa;
+            opacity: 1;
+        }
+
+        .tab-button.enabled:hover {
+            background: #222;
+            border-color: #444;
+            color: #fff;
+            transform: scale(1.05);
+        }
+
+        .tab-button.active {
+            background: #2196F3;
+            border-color: #2196F3;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(33, 150, 243, 0.5);
+            opacity: 1;
+        }
+
+        .tab-button.bootloader {
+            background: #1a2634;
             border-color: #234;
         }
 
-        .slot h3 {
-            margin-top: 0;
+        .tab-button.bootloader.active {
+            background: #2196F3;
+            border-color: #2196F3;
+        }
+
+        /* Position tabs around left side of circle */
+        .tab-button:nth-child(1) { left: -120px; top: 50%; transform: translateY(-50%); }
+        .tab-button:nth-child(2) { left: -110px; top: 30%; transform: translateY(-50%) rotate(-15deg); }
+        .tab-button:nth-child(3) { left: -110px; top: 70%; transform: translateY(-50%) rotate(15deg); }
+        .tab-button:nth-child(4) { left: -90px; top: 10%; transform: translateY(-50%) rotate(-30deg); }
+        .tab-button:nth-child(5) { left: -90px; top: 90%; transform: translateY(-50%) rotate(30deg); }
+        .tab-button:nth-child(6) { left: -60px; top: -5%; transform: translateY(-50%) rotate(-45deg); }
+        .tab-button:nth-child(7) { left: -60px; top: 105%; transform: translateY(-50%) rotate(45deg); }
+        .tab-button:nth-child(8) { left: -20px; top: -15%; transform: translateY(-50%) rotate(-60deg); }
+        .tab-button:nth-child(9) { left: -20px; top: 115%; transform: translateY(-50%) rotate(60deg); }
+
+        /* Content inside circle */
+        .circle-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .circle-content.active {
+            opacity: 1;
+        }
+
+        .slot-info {
+            font-size: 24px;
+            margin-bottom: 30px;
+            font-weight: 500;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .file-input-wrapper {
+            display: inline-block;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #333;
             color: #fff;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
             font-weight: 500;
         }
 
-        .slot-content {
-            margin: 15px 0;
+        .file-input-label:hover {
+            background: #444;
+            transform: translateY(-2px);
+        }
+
+        input[type="file"] {
+            position: absolute;
+            left: -9999px;
         }
 
         .flash-button {
             background-color: #4CAF50;
             color: white;
-            padding: 10px 20px;
+            padding: 15px 40px;
             border: none;
-            border-radius: 4px;
+            border-radius: 30px;
             cursor: pointer;
             font-family: 'Space Grotesk', sans-serif;
             font-weight: 500;
-            transition: background-color 0.2s;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(76, 175, 80, 0.3);
+            margin-top: 20px;
         }
 
         .flash-button:hover:not(:disabled) {
             background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(76, 175, 80, 0.4);
         }
 
         .flash-button:disabled {
             background-color: #333;
             cursor: not-allowed;
+            opacity: 0.5;
+            box-shadow: none;
         }
 
-        .error {
-            color: #ff6b6b;
-            margin-top: 10px;
+        .manifest-view {
+            background: rgba(15, 15, 15, 0.8);
+            padding: 15px;
+            border-radius: 15px;
+            margin-top: 30px;
             max-height: 200px;
             overflow-y: auto;
             font-family: monospace;
-            white-space: pre-wrap;
-            background: #1a1a1a;
-            padding: 10px;
-            border-radius: 4px;
+            font-size: 0.85em;
+            text-align: left;
+            backdrop-filter: blur(10px);
+            border: 1px solid #222;
         }
 
-        .message-line {
-            padding: 2px 0;
+        .manifest-table {
+            width: 100%;
+            border-collapse: collapse;
         }
 
-        .regions-list {
-            font-family: 'Space Grotesk', monospace;
-            margin: 10px 0;
-            font-size: 0.9em;
+        .manifest-table td {
+            padding: 3px 8px;
+            vertical-align: top;
+        }
+
+        .manifest-table td:first-child {
+            color: #4a9eff;
+            white-space: nowrap;
+            padding-right: 15px;
+        }
+
+        .manifest-table td:last-child {
             color: #aaa;
+            word-break: break-word;
         }
 
-        input[type="file"] {
-            background: #222;
-            color: #fff;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #333;
-            margin-right: 10px;
-            font-family: 'Space Grotesk', sans-serif;
-        }
-
-        input[type="file"]::-webkit-file-upload-button {
-            background: #333;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            font-family: 'Space Grotesk', sans-serif;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-
-        input[type="file"]::-webkit-file-upload-button:hover {
-            background: #444;
-        }
-
-        /* Add new styles for the layout and log panel */
-        .container {
-            display: flex;
-            gap: 20px;
-            padding: 20px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .slot-container {
-            flex: 0 1 800px;
-            min-width: 0;
-        }
-
+        /* Log panel */
         .log-panel {
-            flex: 0 0 400px;
-            background: #1a1a1a;
-            border: 2px solid #333;
-            border-radius: 8px;
-            padding: 20px;
-            position: sticky;
-            top: calc(20px + 24px + 20px);
-            max-height: calc(100vh - (20px + 24px + 20px + 20px));
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 400px;
+            height: 100vh;
+            background: rgba(26, 26, 26, 0.95);
+            border-left: 2px solid #333;
+            padding: 30px 20px;
+            backdrop-filter: blur(10px);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .log-panel.show {
+            transform: translateX(0);
         }
 
         .log-panel h3 {
             margin-top: 0;
             color: #fff;
             font-weight: 500;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .log-content {
@@ -154,14 +323,16 @@
             overflow-y: auto;
             font-family: monospace;
             white-space: pre-wrap;
-            background: #0a0a0a;
-            padding: 10px;
-            border-radius: 4px;
-            font-size: 0.9em;
+            background: rgba(10, 10, 10, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 0.85em;
+            border: 1px solid #222;
         }
 
         .log-line {
-            padding: 2px 0;
+            padding: 3px 0;
+            line-height: 1.4;
         }
 
         .log-line.error {
@@ -186,161 +357,244 @@
             margin-right: 8px;
         }
 
-        /* Add responsive breakpoint */
-        @media (max-width: 1200px) {
-            .container {
-                flex-direction: column;
-            }
+        /* Log toggle button */
+        .log-toggle {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #333;
+            border: 2px solid #444;
+            color: #fff;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 100;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-            .slot-container {
-                flex: 1;
-                width: 100%;
+        .log-toggle:hover {
+            background: #444;
+            border-color: #555;
+        }
+
+        .log-toggle.active {
+            right: 420px;
+        }
+
+        /* Disconnected overlay */
+        .disconnected-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        .disconnected-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .disconnected-text {
+            font-size: 18px;
+            color: #666;
+            text-align: center;
+        }
+
+        @media (max-width: 1200px) {
+            .circle-container {
+                width: 500px;
+                height: 500px;
             }
 
             .log-panel {
-                flex: 0 0 300px;
+                width: 350px;
+            }
+
+            .log-toggle.active {
+                right: 370px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .circle-container {
+                width: 400px;
+                height: 400px;
+            }
+
+            .tab-button {
+                font-size: 12px;
+                padding: 8px 15px;
+            }
+
+            .log-panel {
                 width: 100%;
-                position: static;
-                height: 300px;
-            }
-        }
-
-        .slot-main {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .manifest-view {
-            flex: 0 0 300px;
-            font-size: 0.8em;
-            font-family: monospace;
-            background: #0f0f0f;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .manifest-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .manifest-table td {
-            padding: 2px 4px;
-            vertical-align: top;
-        }
-
-        .manifest-table td:first-child {
-            color: #4a9eff;
-            white-space: nowrap;
-            padding-right: 10px;
-        }
-
-        .manifest-table td:last-child {
-            color: #aaa;
-            word-break: break-word;
-        }
-
-        @media (max-width: 800px) {
-            .slot {
-                flex-direction: column;
+                height: 40vh;
+                top: auto;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                border-left: none;
+                border-top: 2px solid #333;
+                transform: translateY(100%);
             }
 
-            .manifest-view {
-                flex: 0 0 200px;
+            .log-panel.show {
+                transform: translateY(0);
             }
-        }
 
-        h1 {
-            color: #fff;
-            font-weight: 500;
-            margin: 0;
-            padding: 0 0 20px 0;
-            font-size: 24px;
-        }
+            .log-toggle {
+                top: auto;
+                bottom: 20px;
+                right: 50%;
+                transform: translateX(50%);
+            }
 
-        .scan-button {
-            background-color: #2196F3;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: 'Space Grotesk', sans-serif;
-            font-weight: 500;
-            transition: background-color 0.2s;
-            margin-bottom: 20px;
-        }
-
-        .scan-button:hover {
-            background-color: #1976D2;
-        }
-
-        .device-info {
-            background: #1a1a1a;
-            border: 2px solid #333;
-            border-radius: 4px;
-            padding: 10px;
-            margin-bottom: 20px;
-            font-family: monospace;
-            font-size: 0.9em;
-        }
-
-        .device-info.connected {
-            border-color: #4CAF50;
-        }
-
-        .device-info.error {
-            border-color: #ff6b6b;
+            .log-toggle.active {
+                right: 50%;
+                bottom: 41vh;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="slot-container">
+    <div class="main-container">
+        <div class="header">
             <h1>Tiliqua Flasher</h1>
-            
             <button class="scan-button" id="scan-button">Scan for Tiliqua</button>
             <div class="device-info" id="device-info">
                 No device connected. Click "Scan for Tiliqua" to connect.
             </div>
-            
-            <div class="slot-grid">
-                <!-- Generate 8 user slots -->
-                <script>
-                    for (let i = 0; i < 8; i++) {
-                        document.write(`
-                            <div class="slot" id="slot-${i}">
-                                <div class="slot-main">
-                                    <h3>Slot ${i} (0x${(0x100000 + i * 0x100000).toString(16)})</h3>
-                                    <div class="slot-content">
-                                        <input type="file" accept=".tar.gz" id="file-${i}">
-                                        <button class="flash-button" disabled>Flash</button>
-                                    </div>
-                                    <div class="error" id="error-${i}"></div>
-                                </div>
-                                <div class="manifest-view" id="regions-${i}"></div>
-                            </div>
-                        `);
-                    }
-                </script>
+        </div>
 
-                <div class="slot bootloader-slot" id="bootloader">
-                    <div class="slot-main">
-                        <h3>Bootloader (0x000000)</h3>
-                        <div class="slot-content">
-                            <input type="file" accept=".tar.gz" id="file-bootloader">
-                            <button class="flash-button" disabled>Flash</button>
-                        </div>
-                        <div class="error" id="error-bootloader"></div>
+        <div class="circle-container">
+            <div class="circle" id="main-circle">
+                <!-- Tab buttons -->
+                <button class="tab-button" data-slot="0">Slot 0</button>
+                <button class="tab-button" data-slot="1">Slot 1</button>
+                <button class="tab-button" data-slot="2">Slot 2</button>
+                <button class="tab-button" data-slot="3">Slot 3</button>
+                <button class="tab-button" data-slot="4">Slot 4</button>
+                <button class="tab-button" data-slot="5">Slot 5</button>
+                <button class="tab-button" data-slot="6">Slot 6</button>
+                <button class="tab-button" data-slot="7">Slot 7</button>
+                <button class="tab-button bootloader" data-slot="bootloader">Bootloader</button>
+
+                <!-- Content for each slot -->
+                <div class="circle-content" data-content="0">
+                    <div class="slot-info">Slot 0 (0x100000)</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label" for="file-0">Choose Bitstream</label>
+                        <input type="file" accept=".tar.gz" id="file-0">
                     </div>
+                    <button class="flash-button" disabled>Flash</button>
+                    <div class="manifest-view" id="regions-0"></div>
+                </div>
+
+                <div class="circle-content" data-content="1">
+                    <div class="slot-info">Slot 1 (0x200000)</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label" for="file-1">Choose Bitstream</label>
+                        <input type="file" accept=".tar.gz" id="file-1">
+                    </div>
+                    <button class="flash-button" disabled>Flash</button>
+                    <div class="manifest-view" id="regions-1"></div>
+                </div>
+
+                <div class="circle-content" data-content="2">
+                    <div class="slot-info">Slot 2 (0x300000)</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label" for="file-2">Choose Bitstream</label>
+                        <input type="file" accept=".tar.gz" id="file-2">
+                    </div>
+                    <button class="flash-button" disabled>Flash</button>
+                    <div class="manifest-view" id="regions-2"></div>
+                </div>
+
+                <div class="circle-content" data-content="3">
+                    <div class="slot-info">Slot 3 (0x400000)</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label" for="file-3">Choose Bitstream</label>
+                        <input type="file" accept=".tar.gz" id="file-3">
+                    </div>
+                    <button class="flash-button" disabled>Flash</button>
+                    <div class="manifest-view" id="regions-3"></div>
+                </div>
+
+                <div class="circle-content" data-content="4">
+                    <div class="slot-info">Slot 4 (0x500000)</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label" for="file-4">Choose Bitstream</label>
+                        <input type="file" accept=".tar.gz" id="file-4">
+                    </div>
+                    <button class="flash-button" disabled>Flash</button>
+                    <div class="manifest-view" id="regions-4"></div>
+                </div>
+
+                <div class="circle-content" data-content="5">
+                    <div class="slot-info">Slot 5 (0x600000)</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label" for="file-5">Choose Bitstream</label>
+                        <input type="file" accept=".tar.gz" id="file-5">
+                    </div>
+                    <button class="flash-button" disabled>Flash</button>
+                    <div class="manifest-view" id="regions-5"></div>
+                </div>
+
+                <div class="circle-content" data-content="6">
+                    <div class="slot-info">Slot 6 (0x700000)</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label" for="file-6">Choose Bitstream</label>
+                        <input type="file" accept=".tar.gz" id="file-6">
+                    </div>
+                    <button class="flash-button" disabled>Flash</button>
+                    <div class="manifest-view" id="regions-6"></div>
+                </div>
+
+                <div class="circle-content" data-content="7">
+                    <div class="slot-info">Slot 7 (0x800000)</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label" for="file-7">Choose Bitstream</label>
+                        <input type="file" accept=".tar.gz" id="file-7">
+                    </div>
+                    <button class="flash-button" disabled>Flash</button>
+                    <div class="manifest-view" id="regions-7"></div>
+                </div>
+
+                <div class="circle-content" data-content="bootloader">
+                    <div class="slot-info">Bootloader (0x000000)</div>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-label" for="file-bootloader">Choose Bitstream</label>
+                        <input type="file" accept=".tar.gz" id="file-bootloader">
+                    </div>
+                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-bootloader"></div>
+                </div>
+
+                <div class="disconnected-overlay" id="disconnected-overlay">
+                    <div class="disconnected-text">
+                        Connect a Tiliqua device to continue
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="log-panel">
+
+        <button class="log-toggle" id="log-toggle">📋</button>
+        
+        <div class="log-panel" id="log-panel">
             <h3>Log</h3>
             <div class="log-content" id="global-log"></div>
         </div>
@@ -355,21 +609,69 @@ const BOOTLOADER_BITSTREAM_ADDR = 0x000000;
 const SLOT_BITSTREAM_BASE = 0x100000;
 const SLOT_SIZE = 0x100000;
 const MANIFEST_SIZE = 1024;
-const FIRMWARE_BASE_SLOT0 = 0x1B0000;  // Updated to match Python (was 0x1C0000)
+const FIRMWARE_BASE_SLOT0 = 0x1B0000;
 const FLASH_PAGE_SIZE = 1024;
 const MAX_ERROR_LINES = 100;
 const globalLogHistory = [];
-const N_MANIFESTS = 8;  // Added this constant
+const N_MANIFESTS = 8;
 
 // Store loaded archives
 const loadedArchives = new Map();
 
-// Add this to store message history for each slot
+// Store message history for each slot
 const messageHistory = new Map();
 
 // Add at the top of the file
 let usbDevice = null;
 let tiliquaHwVersion = null;
+let currentSlot = null;
+
+// UI functions
+function showTab(slotId) {
+    // Hide all content
+    document.querySelectorAll('.circle-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Remove active from all tabs
+    document.querySelectorAll('.tab-button').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Show selected content
+    const content = document.querySelector(`[data-content="${slotId}"]`);
+    if (content) {
+        content.classList.add('active');
+    }
+    
+    // Activate selected tab
+    const tab = document.querySelector(`[data-slot="${slotId}"]`);
+    if (tab) {
+        tab.classList.add('active');
+    }
+    
+    currentSlot = slotId;
+}
+
+function enableTabs() {
+    document.querySelectorAll('.tab-button').forEach(tab => {
+        tab.classList.add('enabled');
+    });
+    document.getElementById('main-circle').classList.add('connected');
+    document.getElementById('disconnected-overlay').classList.add('hidden');
+}
+
+function disableTabs() {
+    document.querySelectorAll('.tab-button').forEach(tab => {
+        tab.classList.remove('enabled');
+        tab.classList.remove('active');
+    });
+    document.getElementById('main-circle').classList.remove('connected');
+    document.getElementById('disconnected-overlay').classList.remove('hidden');
+    document.querySelectorAll('.circle-content').forEach(content => {
+        content.classList.remove('active');
+    });
+}
 
 async function scanForTiliqua() {
     try {
@@ -420,11 +722,16 @@ async function scanForTiliqua() {
             // Store the device
             usbDevice = tiliquaDevice;
             
-            // Enable all flash buttons since we have a device
-            document.querySelectorAll('.flash-button').forEach(button => {
-                const slot = button.closest('.slot');
-                const slotId = slot.id === 'bootloader' ? 'bootloader' : slot.id.replace('slot-', '');
-                if (loadedArchives.has(slotId)) {
+            // Enable tabs
+            enableTabs();
+            
+            // Show first tab by default
+            showTab('0');
+            
+            // Enable flash buttons for loaded archives
+            loadedArchives.forEach((data, slotId) => {
+                const button = document.querySelector(`[data-content="${slotId}"] .flash-button`);
+                if (button) {
                     button.disabled = false;
                 }
             });
@@ -567,6 +874,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // Scan button handler
     document.getElementById('scan-button').addEventListener('click', scanForTiliqua);
     
+    // Tab button handlers
+    document.querySelectorAll('.tab-button').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            if (e.target.classList.contains('enabled')) {
+                showTab(e.target.dataset.slot);
+            }
+        });
+    });
+    
+    // Log toggle handler
+    const logToggle = document.getElementById('log-toggle');
+    const logPanel = document.getElementById('log-panel');
+    
+    logToggle.addEventListener('click', () => {
+        logPanel.classList.toggle('show');
+        logToggle.classList.toggle('active');
+    });
+    
     // File input handlers
     document.querySelectorAll('input[type="file"]').forEach(input => {
         input.addEventListener('change', async (e) => {
@@ -575,12 +900,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (file) {
                 try {
                     await loadArchive(file, slotId);
-                    // Fix bootloader button selection
-                    const button = slotId === 'bootloader' 
-                        ? document.querySelector('#bootloader button')
-                        : document.querySelector(`#slot-${slotId} button`);
-                    if (button && tiliquaHwVersion) {
-                        button.disabled = false;
+                    // Update file label
+                    const label = document.querySelector(`label[for="${e.target.id}"]`);
+                    if (label) {
+                        label.textContent = file.name;
+                    }
+                    // Enable flash button if connected
+                    if (tiliquaHwVersion) {
+                        const button = document.querySelector(`[data-content="${slotId}"] .flash-button`);
+                        if (button) {
+                            button.disabled = false;
+                        }
                     }
                 } catch (error) {
                     showError(slotId, error.message);
@@ -592,9 +922,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Flash button handlers
     document.querySelectorAll('.flash-button').forEach(button => {
         button.addEventListener('click', () => {
-            // Fix bootloader slot ID handling
-            const slot = button.closest('.slot');
-            const slotId = slot.id === 'bootloader' ? 'bootloader' : slot.id.replace('slot-', '');
+            const content = button.closest('.circle-content');
+            const slotId = content.dataset.content;
             handleFlash(slotId);
         });
     });
