@@ -533,7 +533,7 @@ class I2CMaster(wiring.Component):
             # should be close to 0 if touch sense is OK.
             "touch_err":      Out(unsigned(8)),
             # assert for at least 100msec for complete muting sequence.
-            "codec_mute":     In(1),
+            "codec_mute":     In(1, init=1),
             # I2C override from SoC, not used unless written to.
             "i2c_override":  In(i2c.I2CStreamerControl()),
         })
@@ -652,20 +652,11 @@ class I2CMaster(wiring.Component):
 
         # CODEC DAC soft mute sequencing
         codec_reg14 = Signal(8)
-        with m.If(self.codec_mute):
-            # DA1MUTE / DA2MUTE soft mute ON
-            m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] | 0b00110000)
-        with m.Else():
-            # DA1MUTE / DA2MUTE soft mute OFF
-            m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] & 0b11001111)
+        m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] & 0b11001111)
 
         # CODEC RSTN sequencing
-        # Only assert if we know soft mute has been asserted for a while.
         codec_reg00 = Signal(8)
-        with m.If(mute_count == 0xff):
-            m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] & 0b11111110)
-        with m.Else():
-            m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
+        m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
 
         startup_delay = Signal(32)
 
@@ -948,15 +939,13 @@ class EurorackPmod(wiring.Component):
 
         # soft reset by default
         pdn_cnt = Signal(unsigned(32), init=(1<<20))
+        m.d.sync += pdn_cnt.eq(pdn_cnt+1)
         m.d.comb += [
-            self.pins.pdn_clk.eq(pdn_cnt[19]),
-            self.pins.pdn_d  .eq(pdn_cnt[20]), # 2b11 @ ~35msec
+            self.pins.pdn_clk.eq(pdn_cnt[5]),
         ]
-        with m.If(~(self.pins.pdn_d & self.pins.pdn_clk)):
-            m.d.sync += pdn_cnt.eq(pdn_cnt+1)
-        with m.Elif(self.hard_reset):
-            # hard reset only if requested
-            m.d.sync += pdn_cnt.eq(0)
-            m.d.comb += reset_i2c_master.eq(1)
+        with m.If(self.codec_mute):
+            m.d.comb += self.pins.pdn_d.eq(0)
+        with m.Else():
+            m.d.comb += self.pins.pdn_d.eq(1)
 
         return m
