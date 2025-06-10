@@ -83,7 +83,7 @@ class Peripheral(wiring.Component):
 
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            "mute": In(1),
+            "mute": In(1, init=1),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -98,7 +98,7 @@ class Peripheral(wiring.Component):
             self._jack.f.jack.r_data.eq(self.pmod.jack),
         ]
 
-        mute_reg = Signal(init=0)
+        mute_reg = Signal(init=1)
         m.d.comb += self.pmod.codec_mute.eq(mute_reg | self.mute)
         with m.If(self._flags.f.mute.w_stb):
             m.d.sync += mute_reg.eq(self._flags.f.mute.w_data)

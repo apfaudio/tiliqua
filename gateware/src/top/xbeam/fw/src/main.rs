@@ -96,6 +96,9 @@ fn main() -> ! {
         let h_active = display.size().width;
         let v_active = display.size().height;
 
+        use tiliqua_hal::pmod::EurorackPmod;
+        pmod.mute(false);
+
         loop {
 
             let (opts, draw_options) = critical_section::with(|cs| {
