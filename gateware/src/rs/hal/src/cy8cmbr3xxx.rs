@@ -22,8 +22,8 @@ const CMD_WRITE_RESET: u8       = 0xFF;
 /// Default configuration for the CY8CMBR3108
 /// Hand-picked after a lot of fiddling, for Tiliqua.
 pub const DEFAULT_CONFIG_R5: [u8; CY8CMBR3XXX_CONFIG_DATA_LENGTH] = [
-    0xff, // SENSOR_EN
-    0xff,
+    0xa0,
+    0x3f, // SENSOR_EN
     0x00, // FSS_EN
     0x00,
     0x00, // TOGGLE_EN
