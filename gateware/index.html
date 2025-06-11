@@ -755,7 +755,7 @@ function showGlobalMessage(message, type = 'info') {
     const logContent = document.getElementById('global-log');
     const logLine = document.createElement('div');
     logLine.className = `log-line ${type}`;
-    logLine.innerHTML = `<span class="timestamp">${timestamp}</span>${message}`;
+    logLine.innerHTML = `${message}`;
     logContent.appendChild(logLine);
     logContent.scrollTop = logContent.scrollHeight;
 }
@@ -763,13 +763,12 @@ function showGlobalMessage(message, type = 'info') {
 function addToGlobalLog(slotId, message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
     const lines = message.split('\n');
-    
     lines.forEach(line => {
         if (line.trim()) {
             const logContent = document.getElementById('global-log');
             const logLine = document.createElement('div');
             logLine.className = `log-line ${type}`;
-            logLine.innerHTML = `<span class="timestamp">${timestamp}</span><span class="slot-id">[${slotId}]</span>${line}`;
+            logLine.innerHTML = `${line}`;
             logContent.appendChild(logLine);
             logContent.scrollTop = logContent.scrollHeight;
         }
