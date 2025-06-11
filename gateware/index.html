@@ -1237,29 +1237,11 @@ function displayRegions(slotId, manifest) {
 
     // Preserve existing status element
     const existingStatus = regionsDiv.querySelector('.manifest-status');
-    
-    function createTableFromObject(obj) {
-        const rows = [];
-        function addRow(key, value, indent = 0) {
-            if (key === 'regions') return;
-            
-            if (typeof value === 'object' && value !== null) {
-                Object.entries(value).forEach(([k, v]) => {
-                    addRow(k, v, indent + 2);
-                });
-            } else {
-                rows.push(`<tr><td>${'&nbsp;'.repeat(indent)}${key}</td><td>${value}</td></tr>`);
-            }
-        }
-        
-        Object.entries(manifest).forEach(([key, value]) => {
-            addRow(key, value);
-        });
-        
-        return `<table class="manifest-table">${rows.join('')}</table>`;
-    }
-    
-    regionsDiv.innerHTML = createTableFromObject(manifest);
+
+    // Display raw JSON with proper escaping
+    const jsonString = JSON.stringify(manifest, null, 2);
+    const escapedJson = jsonString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    regionsDiv.innerHTML = `<pre style="font-family: monospace; white-space: pre-wrap; margin: 0;">${escapedJson}</pre>`;
 
     // Re-add the status element if it existed
     if (existingStatus) {
