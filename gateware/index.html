@@ -278,6 +278,7 @@
             transform: translateX(100%);
             transform: translateX(0);
             transition: transform 0.3s ease;
+            z-index: 9999;
         }
 
         .log-panel h3 {
@@ -371,7 +372,8 @@
             display: none;
         }
 
-        .loading-indicator .spinner {
+        .loading-indicator .spinner,
+        .flash-loading .spinner {
             width: 60px;
             height: 60px;
             border: 3px solid rgba(255, 255, 255, 0.1);
@@ -401,6 +403,25 @@
         .loading-indicator.show {
             display: flex;
         }
+
+       .flash-loading {
+           position: fixed;
+           top: 0;
+           left: 0;
+           width: 100%;
+           height: 100%;
+           background: rgba(10, 10, 10, 0.95);
+           display: flex;
+           flex-direction: column;
+           align-items: center;
+           justify-content: center;
+           z-index: 8888;
+           display: none;
+       }
+
+       .flash-loading.show {
+           display: flex;
+       }
 
         @media (max-width: 1200px) {
             .circle-container {
@@ -506,11 +527,19 @@
 <body>
     <div class="loading-indicator" id="loading-indicator">
         <div class="loading-text">
-            Loading Flashing Environment...<br>
+            Loading...<br>
             <span style="font-size: 16px; opacity: 0.7;">(fetching pyodide)</span>
         </div>
         <div class="spinner"></div>
     </div>
+
+   <div class="flash-loading" id="flash-loading">
+       <div class="loading-text">
+           Flash operation in progress...<br>
+           <span style="font-size: 16px; opacity: 0.7;">See log panel →</span>
+       </div>
+       <div class="spinner"></div>
+   </div>
 
     <div class="main-container">
         <div class="header">
@@ -685,6 +714,7 @@ initPyodide().catch(err => {
 async function readFlashManifests() {
     if (!pyodide || !tiliquaHwVersion) return;
     
+    document.getElementById('flash-loading').classList.add('show');
     showGlobalMessage("Reading current flash contents...");
     
     try {
@@ -779,6 +809,8 @@ json.dumps(info.to_dict())
         
     } catch (error) {
         showGlobalMessage(`Failed to read flash manifests: ${error.message}`, 'error');
+    } finally {
+       document.getElementById('flash-loading').classList.remove('show');
     }
 }
 
@@ -972,7 +1004,9 @@ window.handleFlash = async function(slotId) {
     
     const slotData = loadedArchives.get(slotId.toString());
     if (!slotData) return;
-    
+
+    document.getElementById('flash-loading').classList.add('show');
+
     try {
         if (!tiliquaHwVersion) {
             addToGlobalLog(slotId, "No Tiliqua device connected. Please click 'Scan for Tiliqua' first.", 'error');
@@ -1133,7 +1167,9 @@ json.dumps(result)
         addToGlobalLog(slotId, "\nFlashing completed successfully", 'success');
     } catch (error) {
         addToGlobalLog(slotId, `Flash failed: ${error.message}`, 'error');
-    }
+   } finally {
+       document.getElementById('flash-loading').classList.remove('show');
+   }
 };
 
 // Tar archive reader
