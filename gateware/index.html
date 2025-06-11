@@ -189,13 +189,6 @@
             pointer-events: auto;
         }
 
-        .slot-info {
-            font-size: 24px;
-            margin-bottom: 30px;
-            font-weight: 500;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-        }
-
         .file-input-wrapper {
             display: inline-block;
             position: relative;
@@ -246,20 +239,6 @@
             cursor: not-allowed;
             opacity: 0.5;
             box-shadow: none;
-        }
-
-        .manifest-view {
-            background: rgba(15, 15, 15, 0.8);
-            padding: 15px;
-            border-radius: 15px;
-            margin-top: 30px;
-            max-height: 200px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.85em;
-            text-align: left;
-            backdrop-filter: blur(10px);
-            border: 1px solid #222;
         }
 
         .manifest-table {
@@ -457,6 +436,71 @@
                 transform: translateY(0);
             }
         }
+
+        .manifest-view {
+            background: rgba(15, 15, 15, 0.8);
+            padding: 15px;
+            border-radius: 15px;
+            margin-top: 30px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85em;
+            text-align: left;
+            backdrop-filter: blur(10px);
+            border: 1px solid #222;
+            position: relative;
+        }
+
+        .manifest-view.current-flash {
+            border-color: #4CAF50;
+        }
+
+        .manifest-view.pending-flash {
+            border-color: #ff9800;
+        }
+
+        .manifest-status {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .manifest-status.current {
+            color: #4CAF50;
+            border: 1px solid #4CAF50;
+        }
+
+        .manifest-status.pending {
+            color: #ff9800;
+            border: 1px solid #ff9800;
+        }
+
+        .manifest-status.empty {
+            color: #666;
+            border: 1px solid #666;
+        }
+
+        .slot-info {
+            font-size: 24px;
+            margin-bottom: 30px;
+            font-weight: 500;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .slot-name {
+            font-size: 14px;
+            color: #4a9eff;
+            margin-left: 15px;
+            font-weight: 400;
+        }
     </style>
 </head>
 <body>
@@ -605,6 +649,7 @@ let usbDevice = null;
 let tiliquaHwVersion = null;
 let currentSlot = null;
 const loadedArchives = new Map();
+const currentManifests = new Map();
 
 // Show loading indicator
 document.getElementById('loading-indicator').classList.add('show');
@@ -636,6 +681,147 @@ initPyodide().catch(err => {
     console.error("Failed to initialize Pyodide:", err);
     document.getElementById('loading-indicator').textContent = "Failed to load Pyodide";
 });
+
+async function readFlashManifests() {
+    if (!pyodide || !tiliquaHwVersion) return;
+    
+    showGlobalMessage("Reading current flash contents...");
+    
+    try {
+        // Get manifest addresses from Python
+        const manifestAddresses = await pyodide.runPythonAsync(`
+from flash_core import get_all_manifest_addresses
+import json
+json.dumps(get_all_manifest_addresses())
+        `);
+        
+        const addresses = JSON.parse(manifestAddresses);
+        const manifestInfos = [];
+        
+        // Read each manifest
+       for (let i = 0; i < addresses.length; i++) {
+           const [slot, address] = addresses[i];
+            try {
+                showGlobalMessage(`Reading slot ${slot} manifest at 0x${address.toString(16)}...`);
+                
+                // Read 512 bytes from the manifest location
+                const args = [
+                    "-c", "dirtyJtag",
+                    "--dump-flash", "-o", `0x${address.toString(16)}`,
+                    "--file-size", "512",
+                    "data"
+                ];
+
+                if (i < addresses.length - 1) {
+                    args.splice(-1, 0, "--skip-reset");
+                }
+                
+                let filesOut = await runOpenFPGALoader(args, {}, {
+                    stdout: (data) => {
+                        if (data) {
+                            const text = new TextDecoder().decode(data);
+                            showGlobalMessage(`${text}`);
+                        }
+                    },
+                    stderr: (data) => {
+                        if (data) {
+                            const text = new TextDecoder().decode(data);
+                            console.error(`Error reading manifest: ${text}`);
+                        }
+                    },
+                });
+                
+                let manifestData = filesOut["data"];
+                if (manifestData) {
+                    // Process the manifest data in Python
+                    pyodide.globals.set('manifest_data', Array.from(manifestData));
+                    pyodide.globals.set('slot', slot);
+                    pyodide.globals.set('address', address);
+                    
+                    const result = await pyodide.runPythonAsync(`
+from flash_core import ManifestInfo
+import json
+
+# Convert array back to bytes
+data_bytes = bytes(manifest_data)
+info = ManifestInfo(slot, address, data_bytes)
+json.dumps(info.to_dict())
+                    `);
+                    
+                    const manifestInfo = JSON.parse(result);
+                    manifestInfos.push(manifestInfo);
+                    
+                    // Store current manifest
+                    currentManifests.set(slot.toString(), manifestInfo);
+                    
+                    // Update UI
+                    updateSlotDisplay(slot.toString(), manifestInfo);
+                }
+                
+            } catch (error) {
+                console.error(`Failed to read slot ${slot}:`, error);
+                showGlobalMessage(`Failed to read slot ${slot}: ${error.message}`, 'error');
+            }
+        }
+        
+        // Show summary
+        showGlobalMessage("\nFlash content summary:");
+        for (const info of manifestInfos) {
+            if (info.is_empty) {
+                showGlobalMessage(`  Slot ${info.slot}: Empty`);
+            } else if (info.is_valid) {
+                const name = info.manifest.name || 'Unnamed';
+                showGlobalMessage(`  Slot ${info.slot}: ${name} (hw_rev=R${info.manifest.hw_rev})`);
+            } else {
+                showGlobalMessage(`  Slot ${info.slot}: Invalid/corrupted data`);
+            }
+        }
+        
+    } catch (error) {
+        showGlobalMessage(`Failed to read flash manifests: ${error.message}`, 'error');
+    }
+}
+
+function updateSlotDisplay(slotId, manifestInfo) {
+    const slotInfo = document.querySelector(`[data-content="${slotId}"] .slot-info`);
+    const manifestView = document.getElementById(`regions-${slotId}`);
+    
+    if (!slotInfo || !manifestView) return;
+    
+    // Clear any existing status
+    manifestView.classList.remove('current-flash', 'pending-flash');
+    const existingStatus = manifestView.querySelector('.manifest-status');
+    if (existingStatus) existingStatus.remove();
+    
+    if (manifestInfo && !manifestInfo.is_empty) {
+        // Show current flash content
+        manifestView.classList.add('current-flash');
+        
+        const status = document.createElement('span');
+        status.className = 'manifest-status current';
+        status.textContent = 'Currently Flashed';
+        manifestView.appendChild(status);
+        
+        if (manifestInfo.is_valid && manifestInfo.manifest) {
+            // Update slot name if available
+            if (manifestInfo.manifest.name) {
+                slotInfo.innerHTML = `Slot ${slotId} <span class="slot-name">${manifestInfo.manifest.name}</span>`;
+            }
+            
+            // Display the manifest
+            displayRegions(slotId, manifestInfo.manifest);
+        } else {
+            manifestView.innerHTML = '<span style="color: #ff6b6b;">Invalid or corrupted manifest data</span>';
+        }
+    } else {
+        // Slot is empty
+        const status = document.createElement('span');
+        status.className = 'manifest-status empty';
+        status.textContent = 'Empty';
+        manifestView.appendChild(status);
+        manifestView.innerHTML += '<span style="color: #666;">No bitstream flashed in this slot</span>';
+    }
+}
 
 // UI functions
 function showTab(slotId) {
@@ -724,6 +910,8 @@ async function scanForTiliqua() {
             
             enableTabs();
             showTab('0');
+
+            await readFlashManifests();
             
             loadedArchives.forEach((data, slotId) => {
                 const button = document.querySelector(`[data-content="${slotId}"] .flash-button`);
@@ -1020,6 +1208,21 @@ async function loadArchive(file, slotId) {
         manifest,
         files
     });
+
+    const manifestView = document.getElementById(`regions-${slotId}`);
+    if (manifestView) {
+        manifestView.classList.remove('current-flash');
+        manifestView.classList.add('pending-flash');
+        
+        // Remove old status and add new one
+        const existingStatus = manifestView.querySelector('.manifest-status');
+        if (existingStatus) existingStatus.remove();
+        
+        const status = document.createElement('span');
+        status.className = 'manifest-status pending';
+        status.textContent = 'Ready to Flash';
+        manifestView.appendChild(status);
+    }
     
     // Display manifest
     displayRegions(slotId, manifest);
@@ -1031,6 +1234,9 @@ function displayRegions(slotId, manifest) {
         console.error(`Could not find regions div for slot ${slotId}`);
         return;
     }
+
+    // Preserve existing status element
+    const existingStatus = regionsDiv.querySelector('.manifest-status');
     
     function createTableFromObject(obj) {
         const rows = [];
@@ -1054,6 +1260,11 @@ function displayRegions(slotId, manifest) {
     }
     
     regionsDiv.innerHTML = createTableFromObject(manifest);
+
+    // Re-add the status element if it existed
+    if (existingStatus) {
+        regionsDiv.appendChild(existingStatus);
+    }
 }
 
 // Initialize all event handlers after DOM is loaded
