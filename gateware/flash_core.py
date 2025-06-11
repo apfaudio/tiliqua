@@ -316,3 +316,59 @@ def parse_manifest_from_flash(data: bytes) -> Optional[Dict]:
 def is_empty_flash(data: bytes) -> bool:
     """Check if a flash segment is empty (all 0xFF)."""
     return all(b == 0xFF for b in data)
+
+def get_manifest_address(slot: int) -> int:
+    """Get the manifest address for a given slot."""
+    return SLOT_BITSTREAM_BASE + (slot + 1) * SLOT_SIZE - MANIFEST_SIZE
+
+
+def parse_manifest_from_bytes(data: bytes) -> Optional[Dict]:
+    """Parse JSON manifest from raw bytes."""
+    try:
+        # Find the end of the JSON data (null terminator or 0xFF)
+        for delimiter in [b'\x00', b'\xff']:
+            end_idx = data.find(delimiter)
+            if end_idx != -1:
+                break
+        else:
+            end_idx = len(data)
+
+        json_bytes = data[:end_idx]
+        if len(json_bytes) == 0:
+            return None
+            
+        return json.loads(json_bytes)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
+def is_flash_empty(data: bytes) -> bool:
+    """Check if a flash segment is empty (all 0xFF)."""
+    return all(b == 0xFF for b in data)
+
+
+class ManifestInfo:
+    """Information about a manifest in flash."""
+    def __init__(self, slot: int, address: int, data: bytes):
+        self.slot = slot
+        self.address = address
+        self.raw_data = data
+        self.is_empty = is_flash_empty(data)
+        self.manifest = None if self.is_empty else parse_manifest_from_bytes(data)
+        self.is_valid = self.manifest is not None
+        
+    def to_dict(self) -> Dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            'slot': self.slot,
+            'address': self.address,
+            'is_empty': self.is_empty,
+            'is_valid': self.is_valid,
+            'manifest': self.manifest,
+            'first_bytes': self.raw_data[:32].hex() if not self.is_empty and not self.is_valid else None
+        }
+
+
+def get_all_manifest_addresses() -> List[Tuple[int, int]]:
+    """Get all manifest addresses. Returns list of (slot, address) tuples."""
+    return [(slot, get_manifest_address(slot)) for slot in range(N_MANIFESTS)]
