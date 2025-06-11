@@ -67,7 +67,6 @@
 
         .scan-button:hover {
             background-color: #1976D2;
-            transform: translateY(-2px);
             box-shadow: 0 6px 30px rgba(33, 150, 243, 0.4);
         }
 
@@ -217,7 +216,6 @@
 
         .file-input-label:hover {
             background: #444;
-            transform: translateY(-2px);
         }
 
         input[type="file"] {
@@ -228,22 +226,19 @@
         .flash-button {
             background-color: #4CAF50;
             color: white;
-            padding: 15px 40px;
+            padding: 12px 30px;
             border: none;
-            border-radius: 30px;
+            border-radius: 25px;
             cursor: pointer;
             font-family: 'Space Grotesk', sans-serif;
             font-weight: 500;
             font-size: 18px;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 20px rgba(76, 175, 80, 0.3);
             margin-top: 20px;
         }
 
         .flash-button:hover:not(:disabled) {
             background-color: #45a049;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 30px rgba(76, 175, 80, 0.4);
         }
 
         .flash-button:disabled {
@@ -293,7 +288,7 @@
             position: fixed;
             right: 0;
             top: 0;
-            width: 400px;
+            width: 30%;
             height: 100vh;
             background: rgba(26, 26, 26, 0.95);
             border-left: 2px solid #333;
@@ -302,11 +297,8 @@
             display: flex;
             flex-direction: column;
             transform: translateX(100%);
-            transition: transform 0.3s ease;
-        }
-
-        .log-panel.show {
             transform: translateX(0);
+            transition: transform 0.3s ease;
         }
 
         .log-panel h3 {
@@ -356,36 +348,6 @@
         .log-line .slot-id {
             color: #4a9eff;
             margin-right: 8px;
-        }
-
-        /* Log toggle button */
-        .log-toggle {
-            position: fixed;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: #333;
-            border: 2px solid #444;
-            color: #fff;
-            padding: 15px;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            z-index: 100;
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .log-toggle:hover {
-            background: #444;
-            border-color: #555;
-        }
-
-        .log-toggle.active {
-            right: 420px;
         }
 
         /* Disconnected overlay */
@@ -470,10 +432,6 @@
             .log-panel {
                 width: 350px;
             }
-
-            .log-toggle.active {
-                right: 370px;
-            }
         }
 
         @media (max-width: 900px) {
@@ -496,23 +454,7 @@
                 right: 0;
                 border-left: none;
                 border-top: 2px solid #333;
-                transform: translateY(100%);
-            }
-
-            .log-panel.show {
                 transform: translateY(0);
-            }
-
-            .log-toggle {
-                top: auto;
-                bottom: 20px;
-                right: 50%;
-                transform: translateX(50%);
-            }
-
-            .log-toggle.active {
-                right: 50%;
-                bottom: 41vh;
             }
         }
     </style>
@@ -554,8 +496,8 @@
                     <div class="file-input-wrapper">
                         <label class="file-input-label" for="file-0">Choose Bitstream</label>
                         <input type="file" accept=".tar.gz" id="file-0">
+                        <button class="flash-button" disabled>Flash</button>
                     </div>
-                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-0"></div>
                 </div>
 
@@ -564,8 +506,8 @@
                     <div class="file-input-wrapper">
                         <label class="file-input-label" for="file-1">Choose Bitstream</label>
                         <input type="file" accept=".tar.gz" id="file-1">
+                        <button class="flash-button" disabled>Flash</button>
                     </div>
-                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-1"></div>
                 </div>
 
@@ -574,8 +516,8 @@
                     <div class="file-input-wrapper">
                         <label class="file-input-label" for="file-2">Choose Bitstream</label>
                         <input type="file" accept=".tar.gz" id="file-2">
+                        <button class="flash-button" disabled>Flash</button>
                     </div>
-                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-2"></div>
                 </div>
 
@@ -584,8 +526,8 @@
                     <div class="file-input-wrapper">
                         <label class="file-input-label" for="file-3">Choose Bitstream</label>
                         <input type="file" accept=".tar.gz" id="file-3">
+                        <button class="flash-button" disabled>Flash</button>
                     </div>
-                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-3"></div>
                 </div>
 
@@ -594,8 +536,8 @@
                     <div class="file-input-wrapper">
                         <label class="file-input-label" for="file-4">Choose Bitstream</label>
                         <input type="file" accept=".tar.gz" id="file-4">
+                        <button class="flash-button" disabled>Flash</button>
                     </div>
-                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-4"></div>
                 </div>
 
@@ -604,8 +546,8 @@
                     <div class="file-input-wrapper">
                         <label class="file-input-label" for="file-5">Choose Bitstream</label>
                         <input type="file" accept=".tar.gz" id="file-5">
+                        <button class="flash-button" disabled>Flash</button>
                     </div>
-                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-5"></div>
                 </div>
 
@@ -614,8 +556,8 @@
                     <div class="file-input-wrapper">
                         <label class="file-input-label" for="file-6">Choose Bitstream</label>
                         <input type="file" accept=".tar.gz" id="file-6">
+                        <button class="flash-button" disabled>Flash</button>
                     </div>
-                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-6"></div>
                 </div>
 
@@ -624,8 +566,8 @@
                     <div class="file-input-wrapper">
                         <label class="file-input-label" for="file-7">Choose Bitstream</label>
                         <input type="file" accept=".tar.gz" id="file-7">
+                        <button class="flash-button" disabled>Flash</button>
                     </div>
-                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-7"></div>
                 </div>
 
@@ -634,8 +576,8 @@
                     <div class="file-input-wrapper">
                         <label class="file-input-label" for="file-bootloader">Choose Bitstream</label>
                         <input type="file" accept=".tar.gz" id="file-bootloader">
+                        <button class="flash-button" disabled>Flash</button>
                     </div>
-                    <button class="flash-button" disabled>Flash</button>
                     <div class="manifest-view" id="regions-bootloader"></div>
                 </div>
 
@@ -647,8 +589,6 @@
             </div>
         </div>
 
-        <button class="log-toggle" id="log-toggle">📋</button>
-        
         <div class="log-panel" id="log-panel">
             <h3>Log</h3>
             <div class="log-content" id="global-log"></div>
@@ -1129,15 +1069,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 showTab(e.target.dataset.slot);
             }
         });
-    });
-    
-    // Log toggle handler
-    const logToggle = document.getElementById('log-toggle');
-    const logPanel = document.getElementById('log-panel');
-    
-    logToggle.addEventListener('click', () => {
-        logPanel.classList.toggle('show');
-        logToggle.classList.toggle('active');
     });
     
     // File input handlers
