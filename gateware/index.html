@@ -3,6 +3,7 @@
 <head>
     <title>Tiliqua Multiboot Flash Tool</title>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         * {
@@ -68,6 +69,11 @@
             background-color: #1976D2;
             transform: translateY(-2px);
             box-shadow: 0 6px 30px rgba(33, 150, 243, 0.4);
+        }
+
+        .scan-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .device-info {
@@ -141,7 +147,6 @@
             background: #222;
             border-color: #444;
             color: #fff;
-            transform: scale(1.05);
         }
 
         .tab-button.active {
@@ -164,13 +169,13 @@
 
         /* Position tabs around left side of circle */
         .tab-button:nth-child(1) { left: -100px; top: 15%; transform: translateY(-50%); }
-        .tab-button:nth-child(2) { left: -100px; top: 20.5%; transform: translateY(-50%)); }
+        .tab-button:nth-child(2) { left: -100px; top: 25%; transform: translateY(-50%); }
         .tab-button:nth-child(3) { left: -100px; top: 35%; transform: translateY(-50%); }
         .tab-button:nth-child(4) { left: -100px; top: 45%; transform: translateY(-50%); }
-        .tab-button:nth-child(5) { left: -100px; top: 55%; transform: translateY(-50%);  }
+        .tab-button:nth-child(5) { left: -100px; top: 55%; transform: translateY(-50%); }
         .tab-button:nth-child(6) { left: -100px; top: 65%; transform: translateY(-50%); }
         .tab-button:nth-child(7) { left: -100px; top: 75%; transform: translateY(-50%); }
-        .tab-button:nth-child(8) { left: -100px; top: 80.5%; transform: translateY(-50%)); }
+        .tab-button:nth-child(8) { left: -100px; top: 85%; transform: translateY(-50%); }
         .tab-button:nth-child(9) { left: -100px; top: 95%; transform: translateY(-50%); }
 
         /* Content inside circle */
@@ -183,10 +188,12 @@
             text-align: center;
             opacity: 0;
             transition: opacity 0.3s ease;
+            pointer-events: none;
         }
 
         .circle-content.active {
             opacity: 1;
+            pointer-events: auto;
         }
 
         .slot-info {
@@ -414,6 +421,52 @@
             text-align: center;
         }
 
+         .loading-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 10, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            display: none;
+        }
+
+        .loading-indicator .spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #2196F3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-top: 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-indicator .loading-text {
+            color: #fff;
+            font-size: 24px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            opacity: 0.9;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .loading-indicator.show {
+            display: flex;
+        }
+
         @media (max-width: 1200px) {
             .circle-container {
                 width: 500px;
@@ -471,10 +524,18 @@
     </style>
 </head>
 <body>
+    <div class="loading-indicator" id="loading-indicator">
+        <div class="loading-text">
+            Loading Flashing Environment...<br>
+            <span style="font-size: 16px; opacity: 0.7;">(fetching pyodide)</span>
+        </div>
+        <div class="spinner"></div>
+    </div>
+
     <div class="main-container">
         <div class="header">
             <h1>Tiliqua Flasher</h1>
-            <button class="scan-button" id="scan-button">Scan for Tiliqua</button>
+            <button class="scan-button" id="scan-button" disabled>Scan for Tiliqua</button>
             <div class="device-info" id="device-info">
                 No device connected. Click "Scan for Tiliqua" to connect.
             </div>
@@ -602,49 +663,61 @@
 
     <script type="module">
 import { runOpenFPGALoader, Exit } from 'https://cdn.jsdelivr.net/npm/@yowasp/openfpgaloader/gen/bundle.js';
-import { Archive } from 'https://cdn.jsdelivr.net/npm/libarchive.js@2.0.2/+esm';
 
-// Constants from the Python script
-const BOOTLOADER_BITSTREAM_ADDR = 0x000000;
-const SLOT_BITSTREAM_BASE = 0x100000;
-const SLOT_SIZE = 0x100000;
-const MANIFEST_SIZE = 1024;
-const FIRMWARE_BASE_SLOT0 = 0x1B0000;
-const FLASH_PAGE_SIZE = 1024;
-const MAX_ERROR_LINES = 100;
-const globalLogHistory = [];
-const N_MANIFESTS = 8;
-
-// Store loaded archives
-const loadedArchives = new Map();
-
-// Store message history for each slot
-const messageHistory = new Map();
-
-// Add at the top of the file
+// Global variables
+let pyodide = null;
+let flashCore = null;
 let usbDevice = null;
 let tiliquaHwVersion = null;
 let currentSlot = null;
+const loadedArchives = new Map();
+
+// Show loading indicator
+document.getElementById('loading-indicator').classList.add('show');
+
+// Initialize Pyodide and load flash_core module
+async function initPyodide() {
+    pyodide = await loadPyodide();
+    
+    // Load the flash_core module
+    const flashCoreCode = `${await fetch('flash_core.py').then(r => r.text())}`;
+    pyodide.FS.writeFile('/home/pyodide/flash_core.py', flashCoreCode);
+    
+    // Import the module
+    await pyodide.runPythonAsync(`
+import sys
+sys.path.append('/home/pyodide')
+from flash_core import FlashCore, N_MANIFESTS, SLOT_BITSTREAM_BASE, SLOT_SIZE, MANIFEST_SIZE
+import json
+`);
+    
+    // Hide loading indicator
+    document.getElementById('loading-indicator').classList.remove('show');
+    document.getElementById('scan-button').disabled = false;
+    showGlobalMessage("Pyodide initialized successfully");
+}
+
+// Initialize Pyodide when page loads
+initPyodide().catch(err => {
+    console.error("Failed to initialize Pyodide:", err);
+    document.getElementById('loading-indicator').textContent = "Failed to load Pyodide";
+});
 
 // UI functions
 function showTab(slotId) {
-    // Hide all content
     document.querySelectorAll('.circle-content').forEach(content => {
         content.classList.remove('active');
     });
     
-    // Remove active from all tabs
     document.querySelectorAll('.tab-button').forEach(tab => {
         tab.classList.remove('active');
     });
     
-    // Show selected content
     const content = document.querySelector(`[data-content="${slotId}"]`);
     if (content) {
         content.classList.add('active');
     }
     
-    // Activate selected tab
     const tab = document.querySelector(`[data-slot="${slotId}"]`);
     if (tab) {
         tab.classList.add('active');
@@ -677,11 +750,9 @@ async function scanForTiliqua() {
     try {
         showGlobalMessage("Scan for Tiliqua...");
         
-        // Request device - we'll filter by product name after connection
         const devices = await navigator.usb.getDevices();
         let tiliquaDevice = null;
         
-        // Check already paired devices first
         for (const device of devices) {
             if (device.productName && (device.productName.toLowerCase().includes('apfbug') || 
                                        device.productName.toLowerCase().includes('apf.audio'))) {
@@ -690,10 +761,9 @@ async function scanForTiliqua() {
             }
         }
         
-        // If not found, request new device
         if (!tiliquaDevice) {
             tiliquaDevice = await navigator.usb.requestDevice({
-                filters: [] // Accept any device, we'll check the name after
+                filters: []
             });
         }
         
@@ -701,34 +771,26 @@ async function scanForTiliqua() {
             throw new Error("No device selected");
         }
         
-        // Check if this is a Tiliqua device
         const productName = tiliquaDevice.productName || "";
         if (!productName.toLowerCase().includes('apfbug') && 
             !productName.toLowerCase().includes('apf.audio')) {
             throw new Error("Selected device is not a Tiliqua debugger");
         }
         
-        // Extract hardware version from product name
         const hwVersionMatch = productName.match(/R(\d+)/);
         if (hwVersionMatch) {
             tiliquaHwVersion = parseInt(hwVersionMatch[1]);
             showGlobalMessage(`Found attached Tiliqua! (hw_rev=${tiliquaHwVersion}, serial=${tiliquaDevice.serialNumber})`);
             
-            // Update device info display
             const deviceInfo = document.getElementById('device-info');
             deviceInfo.textContent = `Connected: ${productName} (hw_rev=R${tiliquaHwVersion}, serial=${tiliquaDevice.serialNumber})`;
             deviceInfo.className = 'device-info connected';
             
-            // Store the device
             usbDevice = tiliquaDevice;
             
-            // Enable tabs
             enableTabs();
-            
-            // Show first tab by default
             showTab('0');
             
-            // Enable flash buttons for loaded archives
             loadedArchives.forEach((data, slotId) => {
                 const button = document.querySelector(`[data-content="${slotId}"] .flash-button`);
                 if (button) {
@@ -746,7 +808,6 @@ async function scanForTiliqua() {
         showGlobalMessage(`Could not find Tiliqua debugger: ${errorMsg}`);
         showGlobalMessage("Check it is turned on, plugged in ('dbg' port), permissions correct, and RP2040 firmware is up to date.");
         
-        // Update device info display
         const deviceInfo = document.getElementById('device-info');
         deviceInfo.textContent = `Error: ${errorMsg}`;
         deviceInfo.className = 'device-info error';
@@ -755,103 +816,188 @@ async function scanForTiliqua() {
     }
 }
 
-function showGlobalMessage(message) {
+function showGlobalMessage(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
     const logContent = document.getElementById('global-log');
     const logLine = document.createElement('div');
-    logLine.className = 'log-line info';
+    logLine.className = `log-line ${type}`;
     logLine.innerHTML = `<span class="timestamp">${timestamp}</span>${message}`;
     logContent.appendChild(logLine);
     logContent.scrollTop = logContent.scrollHeight;
 }
 
+function addToGlobalLog(slotId, message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const lines = message.split('\n');
+    
+    lines.forEach(line => {
+        if (line.trim()) {
+            const logContent = document.getElementById('global-log');
+            const logLine = document.createElement('div');
+            logLine.className = `log-line ${type}`;
+            logLine.innerHTML = `<span class="timestamp">${timestamp}</span><span class="slot-id">[${slotId}]</span>${line}`;
+            logContent.appendChild(logLine);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+    });
+}
+
 // Make handleFlash global
 window.handleFlash = async function(slotId) {
+    if (!pyodide) {
+        showGlobalMessage("Error: Pyodide not initialized yet", 'error');
+        return;
+    }
+    
     const slotData = loadedArchives.get(slotId.toString());
     if (!slotData) return;
     
     try {
-        // Check if we have a device and if not, scan for one
         if (!tiliquaHwVersion) {
-            showError(slotId, "No Tiliqua device connected. Please click 'Scan for Tiliqua' first.");
+            addToGlobalLog(slotId, "No Tiliqua device connected. Please click 'Scan for Tiliqua' first.", 'error');
             return;
         }
 
-        // Show manifest contents first
-        showError(slotId, "Preparing to flash bitstream...");
-        showError(slotId, "\nFinal manifest contents:");
-        showError(slotId, JSON.stringify(slotData.manifest, null, 2));
+        // Use Python core to process the archive
+        const slot = slotId === 'bootloader' ? null : parseInt(slotId);
+
+        // Convert manifest to JSON string to avoid JsProxy issues
+        const manifestJson = JSON.stringify(slotData.manifest);
+        
+        // Convert files to a format we can pass to Python
+        const filesList = [];
+        for (const [name, data] of Object.entries(slotData.files)) {
+            filesList.push([name, Array.from(data)]);
+        }
+        
+        // Pass simple data types to Python
+        pyodide.globals.set('manifest_json', manifestJson);
+        pyodide.globals.set('files_list', filesList);
+        pyodide.globals.set('slot', slot);
+        pyodide.globals.set('hw_rev', tiliquaHwVersion);
+
+        const result = await pyodide.runPythonAsync(`
+# Parse manifest from JSON
+manifest = json.loads(manifest_json)
+
+# Convert files list to dict with bytes
+files = {}
+for name, data_array in files_list:
+    # Convert array of integers back to bytes
+    files[name] = bytes(data_array)
+
+core = FlashCore()
+
+# Validate hardware
+valid, error = core.validate_hardware(hw_rev, manifest["hw_rev"])
+if not valid:
+    raise ValueError(error)
+
+# Check if XIP
+has_xip, xip_offset = core.check_xip_firmware(manifest)
+if has_xip:
+    print("Preparing to flash XIP firmware bitstream to bootloader slot...")
+else:
+    print(f"Preparing to flash bitstream to slot {slot}...")
+
+# Process archive
+operations, regions, updated_manifest = core.process_archive(manifest, files, slot)
+
+# Convert to JSON for JavaScript
+result = {
+    'operations': [
+        {
+            'filename': op.filename,
+            'offset': op.offset,
+            'file_type': op.file_type,
+            'skip_reset': op.skip_reset,
+            'data': bytes(op.data).hex()
+        }
+        for op in operations
+    ],
+    'regions': [
+        {
+            'name': r.name,
+            'addr': r.addr,
+            'size': r.size,
+            'aligned_size': r.aligned_size
+        }
+        for r in sorted(regions)
+    ],
+    'updated_manifest': updated_manifest,
+    'has_xip': has_xip
+}
+
+json.dumps(result)
+`);
+        
+        const processedData = JSON.parse(result);
+        
+        // Show manifest contents
+        if (!processedData.has_xip) {
+            addToGlobalLog(slotId, "\nFinal manifest contents:");
+            addToGlobalLog(slotId, JSON.stringify(processedData.updated_manifest, null, 2));
+        }
         
         // Log regions
-        showError(slotId, "\nRegions to be flashed:");
-        for (const region of slotData.regions.sort((a, b) => a.addr - b.addr)) {
-            const alignedSize = (region.size + FLASH_PAGE_SIZE - 1) & ~(FLASH_PAGE_SIZE - 1);
-            showError(slotId, `  ${region.name}:
+        addToGlobalLog(slotId, "\nRegions to be flashed:");
+        for (const region of processedData.regions) {
+            addToGlobalLog(slotId, `  ${region.name}:
     start: 0x${region.addr.toString(16)}
-    end:   0x${(region.addr + alignedSize - 1).toString(16)}`);
+    end:   0x${(region.addr + region.aligned_size - 1).toString(16)}`);
         }
 
-        // Collect and sort commands
-        const commands = [];
-        
-        for (const region of slotData.regions) {
-            const fileData = await slotData.archive.get(region.filename)?.arrayBuffer();
-            if (!fileData) continue;
-
-            const fileType = region.filename === 'top.bit' ? 'bit' : 'raw';
-            
-            const cmd = {
-                args: [
-                    "-c", "dirtyJtag",
-                    "-f",
-                    "-o", `0x${region.addr.toString(16)}`,
-                    "--file-type", fileType,
-                    "--skip-reset"  // Add for all except last command
-                ],
-                data: new Uint8Array(fileData),
-                name: region.filename,
-                addr: region.addr
-            };
-
-            commands.push(cmd);
-        }
-        
-        // Remove --skip-reset from the last command
-        if (commands.length > 0) {
-            commands[commands.length - 1].args = commands[commands.length - 1].args.filter(arg => arg !== '--skip-reset');
+        // Show commands
+        addToGlobalLog(slotId, "\nThe following commands will be executed:");
+        for (const op of processedData.operations) {
+            const args = [
+                "-c", "dirtyJtag",
+                "-f",
+                "-o", `0x${op.offset.toString(16)}`,
+                "--file-type", op.file_type
+            ];
+            if (op.skip_reset) {
+                args.push("--skip-reset");
+            }
+            addToGlobalLog(slotId, `\t$ openFPGALoader ${args.join(' ')} ${op.filename}`);
         }
 
-        // Show commands in order
-        showError(slotId, "\nThe following commands will be executed:");
-        for (const cmd of commands) {
-            showError(slotId, `\t$ openFPGALoader ${cmd.args.join(' ')} ${cmd.name}`);
-        }
+        addToGlobalLog(slotId, "\nExecuting flash commands...");
 
-        showError(slotId, "\nExecuting flash commands...");
-
-        // Execute commands
-        for (const cmd of commands) {
+        // Execute operations
+        for (const op of processedData.operations) {
             try {
-                // Create a virtual file for the data
+                // Convert hex string back to bytes
+                const data = new Uint8Array(op.data.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                
                 const filesIn = {
-                    'data': cmd.data
+                    'data': data
                 };
                 
-                // Add the filename to the args
-                const args = [...cmd.args, 'data'];
+                const args = [
+                    "-c", "dirtyJtag",
+                    "-f",
+                    "-o", `0x${op.offset.toString(16)}`,
+                    "--file-type", op.file_type
+                ];
                 
-                // Run openFPGALoader with the virtual file
+                if (op.skip_reset) {
+                    args.push("--skip-reset");
+                }
+                
+                args.push('data');
+                
                 await runOpenFPGALoader(args, filesIn, {
                     stdout: (data) => {
                         if (data) {
                             const text = new TextDecoder().decode(data);
-                            showError(slotId, text);
+                            addToGlobalLog(slotId, text);
                         }
                     },
                     stderr: (data) => {
                         if (data) {
                             const text = new TextDecoder().decode(data);
-                            showError(slotId, `stderr: ${text}`);
+                            addToGlobalLog(slotId, `stderr: ${text}`, 'error');
                         }
                     }
                 });
@@ -863,11 +1009,119 @@ window.handleFlash = async function(slotId) {
             }
         }
         
-        showError(slotId, "\nFlashing completed successfully");
+        addToGlobalLog(slotId, "\nFlashing completed successfully", 'success');
     } catch (error) {
-        showError(slotId, `Flash failed: ${error.message}`);
+        addToGlobalLog(slotId, `Flash failed: ${error.message}`, 'error');
     }
 };
+
+// Tar archive reader
+class TarArchive {
+    constructor() {
+        this.files = new Map();
+    }
+
+    set(name, data) {
+        this.files.set(name, data);
+    }
+
+    get(name) {
+        const data = this.files.get(name);
+        if (!data) return null;
+        
+        return {
+            arrayBuffer: () => Promise.resolve(data),
+            text: () => Promise.resolve(new TextDecoder().decode(data))
+        };
+    }
+}
+
+async function readTarGz(file) {
+    const archive = new TarArchive();
+    const fileData = await file.arrayBuffer();
+    const inflated = pako.inflate(new Uint8Array(fileData));
+    
+    let offset = 0;
+    while (offset < inflated.length) {
+        const header = inflated.slice(offset, offset + 512);
+        
+        if (header.every(byte => byte === 0)) {
+            break;
+        }
+        
+        const filename = new TextDecoder().decode(header.slice(0, 100)).split('\0')[0];
+        const sizeStr = new TextDecoder().decode(header.slice(124, 136)).trim();
+        const size = parseInt(sizeStr, 8);
+        
+        offset += 512;
+        
+        if (size > 0) {
+            const content = inflated.slice(offset, offset + size);
+            archive.set(filename, content);
+            offset += (Math.floor((size + 511) / 512) * 512);
+        }
+    }
+    
+    return archive;
+}
+
+async function loadArchive(file, slotId) {
+    if (!pyodide) {
+        throw new Error("Pyodide not initialized yet");
+    }
+    
+    const archive = await readTarGz(file);
+    
+    // Parse manifest
+    const manifest = JSON.parse(await archive.get('manifest.json').text());
+    
+    // Convert files to Python-compatible format
+    const files = {};
+    for (const [name, data] of archive.files) {
+        files[name] = data;
+    }
+    
+    // Don't store the archive object itself to avoid circular references
+    loadedArchives.set(slotId, {  // Keep original slotId
+        archive, 
+        manifest,
+        files
+    });
+    
+    // Display manifest
+    displayRegions(slotId, manifest);
+}
+
+function displayRegions(slotId, manifest) {
+    const regionsDiv = document.getElementById(`regions-${slotId}`);
+    if (!regionsDiv) {
+        console.error(`Could not find regions div for slot ${slotId}`);
+        return;
+    }
+    
+    function createTableFromObject(obj) {
+        const rows = [];
+        function addRow(key, value, indent = 0) {
+            if (key === 'regions') return;
+            
+            if (typeof value === 'object' && value !== null) {
+                Object.entries(value).forEach(([k, v]) => {
+                    addRow(k, v, indent + 2);
+                });
+            } else {
+                rows.push(`<tr><td>${'&nbsp;'.repeat(indent)}${key}</td><td>${value}</td></tr>`);
+            }
+        }
+        
+        Object.entries(manifest).forEach(([key, value]) => {
+            addRow(key, value);
+        });
+        
+        return `<table class="manifest-table">${rows.join('')}</table>`;
+    }
+    
+    regionsDiv.innerHTML = createTableFromObject(manifest);
+}
 
 // Initialize all event handlers after DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -894,8 +1148,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // File input handlers
     document.querySelectorAll('input[type="file"]').forEach(input => {
+        console.log('Setting up handler for input:', input.id);
         input.addEventListener('change', async (e) => {
-            const slotId = e.target.id.split('-')[1];
+            console.log('File input event target:', e.target);
+            console.log('File input id:', e.target.id);
+            const slotId = e.target.id.replace('file-', '');
+            console.log('Extracted slotId:', slotId);
             const file = e.target.files[0];
             if (file) {
                 try {
@@ -913,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 } catch (error) {
-                    showError(slotId, error.message);
+                    addToGlobalLog(slotId, error.message, 'error');
                 }
             }
         });
@@ -929,306 +1187,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Add this helper class at the top of the file
-class TarArchive {
-    constructor() {
-        this.files = new Map();
-    }
-
-    set(name, data) {
-        this.files.set(name, data);
-    }
-
-    get(name) {
-        const data = this.files.get(name);
-        if (!data) return null;
-        
-        return {
-            arrayBuffer: () => Promise.resolve(data),
-            text: () => Promise.resolve(new TextDecoder().decode(data))
-        };
-    }
-}
-
-async function loadArchive(file, slotId) {
-    const archive = await readTarGz(file);
-    
-    // Parse manifest
-    const manifest = JSON.parse(await archive.get('manifest.json').text());
-    
-    // Check hardware version compatibility
-    if (tiliquaHwVersion && manifest.hw_rev !== tiliquaHwVersion) {
-        throw new Error(`Aborting: attached Tiliqua (hw=r${tiliquaHwVersion}) does not match archive (hw=r${manifest.hw_rev}).`);
-    }
-    
-    // Determine if this is XIP firmware
-    let has_xip_firmware = false;
-    let xip_offset = null;
-    for (const region of manifest.regions || []) {
-        if (region.spiflash_src !== null && region.spiflash_src !== undefined) {
-            has_xip_firmware = true;
-            xip_offset = region.spiflash_src;
-            break;
-        }
-    }
-    
-    // Validate slot assignment
-    if (has_xip_firmware && slotId !== 'bootloader') {
-        throw new Error(`Error: XIP firmware bitstreams must be flashed to bootloader slot\nRemove --slot argument to flash at 0x0 with firmware at 0x${xip_offset.toString(16)}`);
-    } else if (!has_xip_firmware && slotId === 'bootloader') {
-        throw new Error("Error: Must specify slot for non-XIP firmware bitstreams");
-    }
-    
-    // Collect regions
-    const regions = [];
-    
-    if (slotId === 'bootloader') {
-        // Handle XIP firmware
-        await handleXipFirmware(archive, manifest, regions);
-    } else {
-        // Handle PSRAM firmware
-        const slot = parseInt(slotId);
-        await handlePsramFirmware(archive, manifest, slot, regions);
-    }
-    
-    // Check for overlaps
-    const slot = slotId === 'bootloader' ? null : parseInt(slotId);
-    const hasOverlap = checkRegionOverlaps(regions, slot);
-    if (hasOverlap[0]) {
-        throw new Error(hasOverlap[1]);
-    }
-    
-    // Store archive and regions
-    loadedArchives.set(slotId, { archive, regions, manifest });
-    
-    // Display manifest
-    displayRegions(slotId, regions, manifest);
-}
-
-async function handleXipFirmware(archive, manifest, regions) {
-    showGlobalMessage("\nPreparing to flash XIP firmware bitstream to bootloader slot...");
-    
-    // Add bootloader bitstream region
-    const bitstreamData = await archive.get('top.bit').arrayBuffer();
-    regions.push({
-        name: 'bootloader bitstream',
-        filename: 'top.bit',
-        addr: BOOTLOADER_BITSTREAM_ADDR,
-        size: bitstreamData.byteLength,
-    });
-    
-    // Add XIP firmware regions
-    for (const region of manifest.regions || []) {
-        if (region.filename && region.spiflash_src !== null && region.spiflash_src !== undefined) {
-            regions.push({
-                name: `firmware '${region.filename}'`,
-                filename: region.filename,
-                addr: region.spiflash_src,
-                size: region.size,
-            });
-        }
-    }
-}
-
-async function handlePsramFirmware(archive, manifest, slot, regions) {
-    showGlobalMessage(`\nPreparing to flash bitstream to slot ${slot}...`);
-    
-    // Calculate addresses
-    const slotBase = SLOT_BITSTREAM_BASE + (slot * SLOT_SIZE);
-    const bitstreamAddr = slotBase;
-    const manifestAddr = (slotBase + SLOT_SIZE) - MANIFEST_SIZE;
-    let firmwareBase = FIRMWARE_BASE_SLOT0 + (slot * SLOT_SIZE);
-    
-    // Add bitstream region
-    const bitstreamData = await archive.get('top.bit').arrayBuffer();
-    regions.push({
-        name: 'bitstream',
-        filename: 'top.bit',
-        addr: bitstreamAddr,
-        size: bitstreamData.byteLength,
-    });
-    
-    // Update manifest and add firmware regions
-    for (const region of manifest.regions || []) {
-        if (!region.filename) continue;
-        
-        if (region.psram_dst !== null && region.psram_dst !== undefined) {
-            // Ensure spiflash_src is not set for PSRAM regions
-            if (region.spiflash_src !== null && region.spiflash_src !== undefined) {
-                throw new Error("Both psram_dst and spiflash_src set");
-            }
-            
-            region.spiflash_src = firmwareBase;
-            showGlobalMessage(`manifest: region ${region.filename}: spiflash_src set to 0x${firmwareBase.toString(16)}`);
-            
-            regions.push({
-                name: region.filename,
-                filename: region.filename,
-                addr: firmwareBase,
-                size: region.size,
-            });
-            
-            // Align to next 4KB boundary
-            firmwareBase += region.size;
-            firmwareBase = (firmwareBase + 0xFFF) & ~0xFFF;
-        }
-    }
-    
-    // Update manifest in archive
-    const manifestJson = JSON.stringify(manifest);
-    archive.set('manifest.json', new TextEncoder().encode(manifestJson));
-    
-    // Add manifest region
-    regions.push({
-        name: 'manifest',
-        filename: 'manifest.json',
-        addr: manifestAddr,
-        size: MANIFEST_SIZE,
-    });
-}
-
-function checkRegionOverlaps(regions, slot) {
-    const alignedRegions = [];
-    
-    for (const r of regions) {
-        const start = r.addr;
-        const size = (r.size + FLASH_PAGE_SIZE - 1) & ~(FLASH_PAGE_SIZE - 1);
-        const end = start + size;
-        alignedRegions.push([start, end, r.name]);
-        
-        if (slot !== null) {
-            const slotStart = Math.floor(start / SLOT_SIZE) * SLOT_SIZE;
-            const slotEnd = slotStart + SLOT_SIZE;
-            if (end > slotEnd) {
-                return [true, `Region '${r.name}' exceeds slot boundary: ends at 0x${end.toString(16)}, slot ends at 0x${slotEnd.toString(16)}`];
-            }
-        }
-    }
-    
-    alignedRegions.sort((a, b) => a[0] - b[0]);
-    
-    for (let i = 0; i < alignedRegions.length - 1; i++) {
-        const currEnd = alignedRegions[i][1];
-        const nextStart = alignedRegions[i + 1][0];
-        if (currEnd > nextStart) {
-            return [true, `Overlap detected between '${alignedRegions[i][2]}' (ends at 0x${currEnd.toString(16)}) and '${alignedRegions[i + 1][2]}' (starts at 0x${nextStart.toString(16)})`];
-        }
-    }
-    
-    return [false, ""];
-}
-
-function displayRegions(slotId, regions, manifest) {
-    const regionsDiv = document.getElementById(`regions-${slotId}`);
-    
-    function createTableFromObject(obj) {
-        const rows = [];
-        function addRow(key, value, indent = 0) {
-            // Skip the regions array
-            if (key === 'regions') return;
-            
-            if (typeof value === 'object' && value !== null) {
-                Object.entries(value).forEach(([k, v]) => {
-                    addRow(k, v, indent + 2);
-                });
-            } else {
-                rows.push(`<tr><td>${'&nbsp;'.repeat(indent)}${key}</td><td>${value}</td></tr>`);
-            }
-        }
-        
-        Object.entries(manifest).forEach(([key, value]) => {
-            addRow(key, value);
-        });
-        
-        return `<table class="manifest-table">${rows.join('')}</table>`;
-    }
-    
-    regionsDiv.innerHTML = createTableFromObject(manifest);
-}
-
-function addToGlobalLog(slotId, message, type = 'info') {
-    const timestamp = new Date().toLocaleTimeString();
-    const lines = message.split('\n');
-    
-    lines.forEach(line => {
-        if (line.trim()) {  // Skip empty lines
-            const logEntry = {
-                timestamp,
-                slotId,
-                message: line,
-                type
-            };
-            globalLogHistory.push(logEntry);
-            
-            // Update display
-            const logContent = document.getElementById('global-log');
-            const logLine = document.createElement('div');
-            logLine.className = `log-line ${type}`;
-            logLine.innerHTML = `<span class="timestamp">${timestamp}</span><span class="slot-id">[${slotId}] </span>${line}`;
-            logContent.appendChild(logLine);
-            
-            // Auto-scroll to bottom
-            logContent.scrollTop = logContent.scrollHeight;
-        }
-    });
-}
-
-function showError(slotId, message) {
-    // Determine message type
-    let type = 'info';
-    if (message.toLowerCase().includes('error') || message.toLowerCase().includes('failed') || message.toLowerCase().includes('aborting')) {
-        type = 'error';
-    } else if (message.toLowerCase().includes('success')) {
-        type = 'success';
-    }
-    
-    // Add to global log
-    addToGlobalLog(slotId, message, type);
-}
-
-async function readTarGz(file) {
-    // Create archive object for our use
-    const archive = new TarArchive();
-    
-    // Read the file
-    const fileData = await file.arrayBuffer();
-    
-    // Decompress gzip
-    const inflated = pako.inflate(new Uint8Array(fileData));
-    
-    // Parse tar - process 512 byte blocks
-    let offset = 0;
-    while (offset < inflated.length) {
-        // Read header block
-        const header = inflated.slice(offset, offset + 512);
-        
-        // Check for end of archive (empty block)
-        if (header.every(byte => byte === 0)) {
-            break;
-        }
-        
-        // Parse filename (100 bytes)
-        const filename = new TextDecoder().decode(header.slice(0, 100)).split('\0')[0];
-        
-        // Parse file size (12 bytes, octal string)
-        const sizeStr = new TextDecoder().decode(header.slice(124, 136)).trim();
-        const size = parseInt(sizeStr, 8);
-        
-        // Move past header
-        offset += 512;
-        
-        // Read file content
-        if (size > 0) {
-            const content = inflated.slice(offset, offset + size);
-            archive.set(filename, content);
-            
-            // Move to next 512-byte boundary
-            offset += (Math.floor((size + 511) / 512) * 512);
-        }
-    }
-    
-    return archive;
-} 
+// Add note about flash_core.py requirement
+showGlobalMessage("Note: This tool requires flash_core.py to be served from the same origin.");
 </script>
 </body>
 </html>
