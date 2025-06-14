@@ -16,6 +16,7 @@ Designs demoing parts of the DSP library. Build any of them as follows:
 """
 
 import os
+import pathlib
 import sys
 import subprocess
 
@@ -785,6 +786,73 @@ class PSRAMMultiDiffuser(wiring.Component):
 
         return m
 
+class Bytebeat(wiring.Component):
+
+    """
+    Bytebeat wrapper.
+    """
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    def elaborate(self, platform):
+        m = Module()
+        with (pathlib.Path(__file__).parent / "bytebeat.v").open('r') as f:
+            platform.add_file("bytebeat.v", f.read())
+
+        a = Signal(4)
+        a_rdy = Signal()
+        b = Signal(4)
+        b_rdy = Signal()        
+        c = Signal(4)
+        c_rdy = Signal()        
+        d = Signal(4)
+        d_rdy = Signal()        
+        abcd_vld = Signal()
+        pcm = Signal(8)
+        pcm_rdy = Signal()
+        pcm_vld = Signal()
+
+        m.d.comb += [
+            a.eq(self.i.payload[0] >> 12),
+            b.eq(self.i.payload[1] >> 12),
+            c.eq(self.i.payload[2] >> 12),
+            d.eq(self.i.payload[3] >> 12),
+            abcd_vld.eq(self.i.valid),
+            self.i.ready.eq(a_rdy | b_rdy | c_rdy | d_rdy),
+        ]
+
+        m.submodules.bytebeat0 = Instance("bytebeat",
+                                          i_clk     = ClockSignal("audio"),
+                                          i_reset   = ResetSignal("audio"),
+                                          i_bytebeat__a_r = a,
+                                          i_bytebeat__a_r_vld = abcd_vld,
+                                          i_bytebeat__b_r = b,
+                                          i_bytebeat__b_r_vld = abcd_vld,
+                                          i_bytebeat__c_r = c,
+                                          i_bytebeat__c_r_vld = abcd_vld,
+                                          i_bytebeat__d_r = d,
+                                          i_bytebeat__d_r_vld = abcd_vld,
+                                          i_bytebeat__output_s_rdy = pcm_rdy,
+                                          o_bytebeat__output_s = pcm,
+                                          o_bytebeat__output_s_vld = pcm_vld,
+                                          o_bytebeat__a_r_rdy = a_rdy,
+                                          o_bytebeat__b_r_rdy = b_rdy,
+                                          o_bytebeat__c_r_rdy = c_rdy,
+                                          o_bytebeat__d_r_rdy = d_rdy,
+        )
+
+        m.d.comb += [
+            pcm_rdy.eq(self.o.ready),
+            self.o.payload[0].eq(pcm),
+            self.o.payload[1].eq(pcm),
+            self.o.payload[2].eq(pcm),
+            self.o.payload[3].eq(pcm),
+            self.o.valid.eq(pcm_vld),
+        ]
+        return m
+
+
 class CoreTop(Elaboratable):
 
     def __init__(self, dsp_core, enable_touch, clock_settings):
@@ -853,6 +921,7 @@ CORES = {
     "sram_diffuser":  (False, SRAMDiffuser),
     "multi_diffuser": (False, PSRAMMultiDiffuser),
     "resampler":      (False, Resampler),
+    "bytebeat": (False, Bytebeat),
 }
 
 def simulation_ports(fragment):
