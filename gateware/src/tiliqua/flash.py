@@ -69,10 +69,10 @@ def scan_for_tiliqua():
     data_lines = [line for line in lines if line and not line.startswith("Bus")]
     for line in data_lines:
         if "apfbug" in line.lower() or "apf.audio" in line.lower():
-            parts = re.split(r'\s{2,}', line.strip())
-            if len(parts) >= 5:
-                serial = parts[3].strip()
-                product = parts[4].strip()
+            parts = re.split(r'\s+', line.strip(), maxsplit=6)
+            if len(parts) == 7:
+                serial = parts[5].strip()
+                product = parts[6].strip()
                 hw_version_match = re.search(r'R(\d+)', product)
                 if hw_version_match:
                     hw_version = int(hw_version_match.group(1))
