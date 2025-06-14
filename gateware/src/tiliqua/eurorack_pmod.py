@@ -460,7 +460,9 @@ class I2CMaster(wiring.Component):
 
     N_JACKS   = 8
     N_LEDS    = N_JACKS * 2
-    N_SENSORS = 16
+    N_SENSORS = 8
+
+    SENSOR_ORDER = [5, 7, 8, 9, 10, 11, 12, 13]
 
     AK4619VN_CFG_48KHZ = [
         0x00, # Register address to start at.
@@ -637,6 +639,9 @@ class I2CMaster(wiring.Component):
 
         # current touch sensor to poll, incremented once per loop
         touch_nsensor = Signal(range(self.N_SENSORS))
+        touch_order = Signal(data.ArrayLayout(unsigned(4), self.N_SENSORS))
+        for n in range(self.N_SENSORS):
+            m.d.comb += touch_order[n].eq(self.SENSOR_ORDER[n])
 
         #
         # Compute codec power management register contents,
@@ -718,7 +723,7 @@ class I2CMaster(wiring.Component):
             #
 
             _,   _,   ix  = i2c_addr (m, ix, self.CY8CMBR3108_ADDR)
-            _,   _,   ix  = i2c_write(m, ix, 0xBA + (touch_nsensor<<1))
+            _,   _,   ix  = i2c_write(m, ix, 0xBA + (touch_order[touch_nsensor]<<1))
             _,   _,   ix  = i2c_read (m, ix, last=True)
             _,   _,   ix  = i2c_wait (m, ix)
 
@@ -731,22 +736,8 @@ class I2CMaster(wiring.Component):
                         m.d.sync += self.touch_err.eq(self.touch_err - 1)
                     with m.Switch(touch_nsensor):
                         for n in range(self.N_SENSORS):
-                            with m.Case(5):
-                                m.d.sync += self.touch[0].eq(i2c.o.payload)
-                            with m.Case(7):
-                                m.d.sync += self.touch[1].eq(i2c.o.payload)
-                            with m.Case(8):
-                                m.d.sync += self.touch[2].eq(i2c.o.payload)
-                            with m.Case(9):
-                                m.d.sync += self.touch[3].eq(i2c.o.payload)
-                            with m.Case(10):
-                                m.d.sync += self.touch[4].eq(i2c.o.payload)
-                            with m.Case(11):
-                                m.d.sync += self.touch[5].eq(i2c.o.payload)
-                            with m.Case(12):
-                                m.d.sync += self.touch[6].eq(i2c.o.payload)
-                            with m.Case(13):
-                                m.d.sync += self.touch[7].eq(i2c.o.payload)
+                            with m.Case(n):
+                                m.d.sync += self.touch[n].eq(i2c.o.payload)
                     m.d.comb += i2c.o.ready.eq(1)
                 with m.Else():
                     with m.If(self.touch_err != 0xff):
