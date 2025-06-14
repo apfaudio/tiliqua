@@ -304,7 +304,7 @@ def top_level_cli(
         archiver.create_archive()
 
         if hw_platform.ila:
-            args_flash_bitstream = ["sudo", "openFPGALoader", "-c", "dirtyJtag",
+            args_flash_bitstream = ["openFPGALoader", "-c", "dirtyJtag",
                                     archiver.bitstream_path]
             subprocess.check_call(args_flash_bitstream, env=os.environ)
             vcd_dst = "out.vcd"

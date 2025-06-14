@@ -55,7 +55,7 @@ def scan_for_tiliqua():
     print("Scan for Tiliqua...")
     try:
         result = subprocess.run(
-            ["sudo", "openFPGALoader", "--scan-usb"],
+            ["openFPGALoader", "--scan-usb"],
             capture_output=True,
             text=True,
             check=True
@@ -117,7 +117,7 @@ def flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str
     Generate an openFPGALoader command to flash a file to the specified offset.
     """
     cmd = [
-        "sudo", "openFPGALoader", "-c", "dirtyJtag",
+        "openFPGALoader", "-c", "dirtyJtag",
         "-f", "-o", f"{hex(offset)}",
     ]
     if file_type != "auto":
@@ -378,7 +378,7 @@ def read_flash_segment(offset: int, size: int, reset: bool = False) -> bytes:
         temp_file_name = tmp_file.name
 
     cmd = [
-        "sudo", "openFPGALoader", "-c", "dirtyJtag",
+        "openFPGALoader", "-c", "dirtyJtag",
         "--dump-flash", "-o", f"{hex(offset)}",
         "--file-size", str(size),
     ]
