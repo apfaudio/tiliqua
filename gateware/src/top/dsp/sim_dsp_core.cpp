@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
         }
 
 
-        // Audio clock domain (Audio stimulation)
+        // Audio clock domain (Audio simulation)
         if (timestamp_ns % (ns_in_audio_cycle/2) == 0) {
             top->clk_audio = !top->clk_audio;
             i2s_driver.post_edge();
