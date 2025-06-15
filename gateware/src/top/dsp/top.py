@@ -823,8 +823,8 @@ class Bytebeat(wiring.Component):
         ]
 
         m.submodules.bytebeat0 = Instance("bytebeat",
-                                          i_clk     = ClockSignal("audio"),
-                                          i_reset   = ResetSignal("audio"),
+                                          i_clk     = ClockSignal("sync"),
+                                          i_reset   = ResetSignal("sync"),
                                           i_bytebeat__a_r = a,
                                           i_bytebeat__a_r_vld = abcd_vld,
                                           i_bytebeat__b_r = b,
@@ -844,10 +844,10 @@ class Bytebeat(wiring.Component):
 
         m.d.comb += [
             pcm_rdy.eq(self.o.ready),
-            self.o.payload[0].eq(pcm),
-            self.o.payload[1].eq(pcm),
-            self.o.payload[2].eq(pcm),
-            self.o.payload[3].eq(pcm),
+            self.o.payload[0].eq(pcm<<7),
+            self.o.payload[1].eq(pcm<<7),
+            self.o.payload[2].eq(pcm<<7),
+            self.o.payload[3].eq(pcm<<7),
             self.o.valid.eq(pcm_vld),
         ]
         return m
