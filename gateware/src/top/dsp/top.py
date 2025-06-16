@@ -795,60 +795,64 @@ class Bytebeat(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    def __init__(self):
+        super().__init__()        
+
     def elaborate(self, platform):
         m = Module()
         with (pathlib.Path(__file__).parent / "bytebeat.v").open('r') as f:
             platform.add_file("bytebeat.v", f.read())
 
         a = Signal(4)
-        a_rdy = Signal()
+        a_ready = Signal()
         b = Signal(4)
-        b_rdy = Signal()        
+        b_ready = Signal()        
         c = Signal(4)
-        c_rdy = Signal()        
+        c_ready = Signal()        
         d = Signal(4)
-        d_rdy = Signal()        
-        abcd_vld = Signal()
+        d_ready = Signal()        
+        abcd_valid = Signal()
         pcm = Signal(8)
-        pcm_rdy = Signal()
-        pcm_vld = Signal()
+        pcm_ready = Signal()
+        pcm_valid = Signal()
 
         m.d.comb += [
-            a.eq(self.i.payload[0] >> 12),
-            b.eq(self.i.payload[1] >> 12),
-            c.eq(self.i.payload[2] >> 12),
-            d.eq(self.i.payload[3] >> 12),
-            abcd_vld.eq(self.i.valid),
-            self.i.ready.eq(a_rdy | b_rdy | c_rdy | d_rdy),
+            a.eq(self.i.payload[0].as_value()[11:15]),
+            b.eq(self.i.payload[1].as_value()[11:15]),
+            c.eq(self.i.payload[2].as_value()[11:15]),
+            d.eq(self.i.payload[3].as_value()[11:15]),
+            abcd_valid.eq(self.i.valid),
+            self.i.ready.eq(a_ready | b_ready | c_ready | d_ready),
         ]
 
         m.submodules.bytebeat0 = Instance("bytebeat",
-                                          i_clk     = ClockSignal("audio"),
-                                          i_reset   = ResetSignal("audio"),
+                                          i_clk     = ClockSignal("sync"),
+                                          i_reset   = ResetSignal("sync"),
                                           i_bytebeat__a_r = a,
-                                          i_bytebeat__a_r_vld = abcd_vld,
+                                          i_bytebeat__a_r_vld = abcd_valid,
                                           i_bytebeat__b_r = b,
-                                          i_bytebeat__b_r_vld = abcd_vld,
+                                          i_bytebeat__b_r_vld = abcd_valid,
                                           i_bytebeat__c_r = c,
-                                          i_bytebeat__c_r_vld = abcd_vld,
+                                          i_bytebeat__c_r_vld = abcd_valid,
                                           i_bytebeat__d_r = d,
-                                          i_bytebeat__d_r_vld = abcd_vld,
-                                          i_bytebeat__output_s_rdy = pcm_rdy,
+                                          i_bytebeat__d_r_vld = abcd_valid,
+                                          i_bytebeat__output_s_rdy = pcm_ready,
                                           o_bytebeat__output_s = pcm,
-                                          o_bytebeat__output_s_vld = pcm_vld,
-                                          o_bytebeat__a_r_rdy = a_rdy,
-                                          o_bytebeat__b_r_rdy = b_rdy,
-                                          o_bytebeat__c_r_rdy = c_rdy,
-                                          o_bytebeat__d_r_rdy = d_rdy,
+                                          o_bytebeat__output_s_vld = pcm_valid,
+                                          o_bytebeat__a_r_rdy = a_ready,
+                                          o_bytebeat__b_r_rdy = b_ready,
+                                          o_bytebeat__c_r_rdy = c_ready,
+                                          o_bytebeat__d_r_rdy = d_ready,
         )
 
+        pcm_16 = pcm << 8
         m.d.comb += [
-            pcm_rdy.eq(self.o.ready),
-            self.o.payload[0].eq(pcm),
-            self.o.payload[1].eq(pcm),
-            self.o.payload[2].eq(pcm),
-            self.o.payload[3].eq(pcm),
-            self.o.valid.eq(pcm_vld),
+            pcm_ready.eq(self.o.ready),
+            self.o.payload[0].eq(pcm_16),
+            self.o.payload[1].eq(pcm_16),
+            self.o.payload[2].eq(pcm_16),
+            self.o.payload[3].eq(pcm_16),
+            self.o.valid.eq(pcm_valid),
         ]
         return m
 
