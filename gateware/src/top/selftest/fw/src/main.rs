@@ -445,6 +445,9 @@ fn main() -> ! {
 
     let mut last_jack = pmod.jack();
 
+    let mut gpio0 = peripherals.GPIO0;
+    let mut gpio1 = peripherals.GPIO1;
+
     irq::scope(|s| {
 
         palette::ColorPalette::default().write_to_hardware(&mut display);
@@ -499,6 +502,9 @@ fn main() -> ! {
                         print_die_temperature(&mut status_report, &dtr);
                         print_psram_stats(&mut status_report, &psram);
                         write!(&mut status_report, "dvi_hpd [active={}]\r\n", dvi_hpd).ok();
+                        write!(&mut status_report, "ex0={:08b} ex1={:08b}\r\n",
+                               gpio0.input().read().bits(),
+                               gpio1.input().read().bits()).ok();
                         ("[status report]", &status_report)
                     }
                 };

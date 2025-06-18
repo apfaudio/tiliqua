@@ -45,7 +45,7 @@ from amaranth.hdl.rec                            import Record
 from amaranth.lib                                import wiring, data, cdc
 from amaranth.lib.wiring                         import Component, In, Out, flipped, connect
 
-from amaranth_soc                                import csr, gpio, wishbone
+from amaranth_soc                                import csr, wishbone
 from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
 
 from luna_soc.gateware.core                      import blockram, timer, uart, spiflash
