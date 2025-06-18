@@ -24,8 +24,8 @@ pub enum AutoZero {
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ReportPage {
-    #[default]
     Startup,
+    #[default]
     Status,
 }
 
