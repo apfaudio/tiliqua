@@ -350,7 +350,7 @@ class TiliquaSoc(Component):
             m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
 
             # Enable LED driver on motherboard
-            m.d.comb += platform.request("mobo_leds_oe").o.eq(1),
+            m.d.comb += platform.request("gpdi_ddc_en").o.eq(1),
 
             # Connect encoder button to RebootProvider
             m.submodules.reboot = reboot = RebootProvider(self.clock_settings.frequencies.sync)

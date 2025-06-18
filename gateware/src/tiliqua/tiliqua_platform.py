@@ -404,9 +404,7 @@ class _TiliquaR4Mobo:
 
 class _TiliquaR5Mobo:
     resources  = _TiliquaR4R5Mobo.resources + [
-        # TODO I2C switch to bridge DVI DDC bus and mobo_i2c bus through level translators.
-        # Resource("gpdi_ddc_en", 0, Pins("11", dir="o", conn=("m2", 0))),
-        Resource("mobo_leds_oe", 0, PinsN("11", dir="o", conn=("m2", 0))),
+        Resource("gpdi_ddc_en", 0, Pins("11", dir="o", conn=("m2", 0))),
 
         # Diffpairs routed to video output, AC-coupled through a DVI redriver IC.
         Resource("dvi", 0,
@@ -414,7 +412,7 @@ class _TiliquaR5Mobo:
             Subsignal("d1", Pins("52", dir="o", conn=("m2", 0))),
             Subsignal("d2", Pins("60", dir="o", conn=("m2", 0))),
             Subsignal("ck", Pins("62", dir="o", conn=("m2", 0))),
-            Attrs(IO_TYPE="LVCMOS33D", DRIVE="8", SLEWRATE="FAST")
+            Attrs(IO_TYPE="LVCMOS33D", DRIVE="16", SLEWRATE="FAST")
          ),
     ]
 
