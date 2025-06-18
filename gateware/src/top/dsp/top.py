@@ -30,7 +30,7 @@ from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 
-from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll
+from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll, usb_audio, types
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua.cli              import top_level_cli
 from tiliqua.delay_line       import DelayLine
@@ -854,6 +854,25 @@ class Bytebeat(wiring.Component):
             self.o.payload[3].eq(pcm_16),
             self.o.valid.eq(pcm_valid),
         ]
+
+        if sim.is_hw(platform):
+            m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
+                    audio_clock=types.AudioClock.FINE_48KHZ, nr_channels=4)
+            # Cleaner way would be to use dsp.Split() and dsp.Merge()
+            # But this works and is simple to understand.
+            cv_latch = Signal.like(self.i.payload)
+            with m.If(self.i.valid):
+                m.d.sync += cv_latch.eq(self.i.payload)
+            m.d.comb += [
+                usbif.i.valid.eq(self.o.valid),
+                # Input payloads on channels 0, 1, 2 (no 3)
+                usbif.i.payload[0].eq(cv_latch[0]),
+                usbif.i.payload[1].eq(cv_latch[1]),
+                usbif.i.payload[2].eq(cv_latch[2]),
+                # Output payload on channel 3
+                usbif.i.payload[3].eq(self.o.payload[0]),
+            ]
+
         return m
 
 
