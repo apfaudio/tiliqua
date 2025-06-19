@@ -40,7 +40,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
 
     resources = [
         # 48MHz master
-        Resource("clk48", 0, Pins("A8", dir="i"), Clock(48e6), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("clk48", 0, Pins("A8", dir="i"), Clock(48e6), Attrs(IO_TYPE="LVCMOS33", PULLMODE="NONE")),
 
         # PROGRAMN, triggers warm self-reconfiguration
         Resource("self_program", 0, PinsN("T13", dir="o"),
@@ -55,7 +55,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             data="N1 M2 M1 L2 L1 K2 K1 K3",
             clk="T3", clk_dir="o", dir="P2", nxt="P1",
             stp="R2", rst="T2", rst_invert=True,
-            attrs=Attrs(IO_TYPE=bank_6_7_iotype)
+            attrs=Attrs(IO_TYPE=bank_6_7_iotype, SLEWRATE="FAST")
         ),
 
         # oSPIRAM / HyperRAM
@@ -66,7 +66,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             Subsignal("rwds",  Pins( "D1", dir="io")),
             Subsignal("cs",    PinsN("B2", dir="o")),
             Subsignal("reset", PinsN("C1", dir="o")),
-            Attrs(IO_TYPE=bank_6_7_iotype)
+            Attrs(IO_TYPE=bank_6_7_iotype, SLEWRATE="FAST")
         ),
 
         # Configuration SPI flash
@@ -75,7 +75,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             Subsignal("sdi",  Pins("T8",  dir="o")),
             Subsignal("sdo",  Pins("T7",  dir="i")),
             Subsignal("cs",   PinsN("N8", dir="o")),
-            Attrs(IO_TYPE="LVCMOS33", DRIVE="4")
+            Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="FAST")
         ),
 
         # Connection to our SPI flash but using quad mode (QSPI)
@@ -85,8 +85,26 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             # See interfaces/flash.py for more information.
             Subsignal("dq",  Pins("T8 T7 M7 N7",  dir="io")),
             Subsignal("cs",  PinsN("N8", dir="o")),
-            Attrs(IO_TYPE="LVCMOS33", DRIVE="4")
+            Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="FAST")
         ),
+
+        # Pseudo-supply pins - connected to supply voltage or GND for routing reasons.
+        Resource("pseudo_vccio", 0,
+                 Pins("E6 E7 D10 E10 E11 F12 J12 K12 L12 N13 P13 M11 P11 P12 R6", dir="o"),
+                 Attrs(IO_TYPE="LVCMOS33")),
+
+        Resource("pseudo_gnd", 0,
+                 Pins("E5 E8 E9 E12 F13 M13 M12 N12 N11", dir="o"),
+                 Attrs(IO_TYPE="LVCMOS33")),
+
+        Resource("pseudo_vccram", 0,
+                 Pins("L4 M4 R5 M5 N5 P4 M6 F5 G5 H5 H4 J4 J5 J3 J1 J2", dir="o"),
+                 Attrs(IO_TYPE=bank_6_7_iotype)),
+
+        Resource("pseudo_gndram", 0,
+                 Pins("L5 L3 M3 N6 P5 P6 F4 G2 G3 H3 H2", dir="o"),
+                 Attrs(IO_TYPE=bank_6_7_iotype)),
+
     ]
 
 class SoldierCrabR2Platform(_SoldierCrabPlatform):
@@ -573,4 +591,10 @@ class RebootProvider(wiring.Component):
                 m.d.sync += button_counter.eq(button_counter + 1)
             with m.Else():
                 m.d.sync += button_counter.eq(0)
+
+        m.d.comb += platform.request("pseudo_vccio").o.eq(-1)
+        m.d.comb += platform.request("pseudo_vccram").o.eq(-1)
+        m.d.comb += platform.request("pseudo_gnd").o.eq(0)
+        m.d.comb += platform.request("pseudo_gndram").o.eq(0)
+
         return m
