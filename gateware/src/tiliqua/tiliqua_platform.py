@@ -40,7 +40,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
 
     resources = [
         # 48MHz master
-        Resource("clk48", 0, Pins("A8", dir="i"), Clock(48e6), Attrs(IO_TYPE="LVCMOS33", PULLMODE="NONE")),
+        Resource("clk48", 0, Pins("A8", dir="i"), Clock(48e6), Attrs(IO_TYPE="LVCMOS33")),
 
         # PROGRAMN, triggers warm self-reconfiguration
         Resource("self_program", 0, PinsN("T13", dir="o"),
@@ -55,7 +55,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             data="N1 M2 M1 L2 L1 K2 K1 K3",
             clk="T3", clk_dir="o", dir="P2", nxt="P1",
             stp="R2", rst="T2", rst_invert=True,
-            attrs=Attrs(IO_TYPE=bank_6_7_iotype, SLEWRATE="FAST")
+            attrs=Attrs(IO_TYPE=bank_6_7_iotype)
         ),
 
         # oSPIRAM / HyperRAM
@@ -66,7 +66,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             Subsignal("rwds",  Pins( "D1", dir="io")),
             Subsignal("cs",    PinsN("B2", dir="o")),
             Subsignal("reset", PinsN("C1", dir="o")),
-            Attrs(IO_TYPE=bank_6_7_iotype, SLEWRATE="FAST")
+            Attrs(IO_TYPE=bank_6_7_iotype)
         ),
 
         # Configuration SPI flash
@@ -75,7 +75,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             Subsignal("sdi",  Pins("T8",  dir="o")),
             Subsignal("sdo",  Pins("T7",  dir="i")),
             Subsignal("cs",   PinsN("N8", dir="o")),
-            Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="FAST")
+            Attrs(IO_TYPE="LVCMOS33", DRIVE="4")
         ),
 
         # Connection to our SPI flash but using quad mode (QSPI)
@@ -85,7 +85,7 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             # See interfaces/flash.py for more information.
             Subsignal("dq",  Pins("T8 T7 M7 N7",  dir="io")),
             Subsignal("cs",  PinsN("N8", dir="o")),
-            Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="FAST")
+            Attrs(IO_TYPE="LVCMOS33", DRIVE="4")
         ),
 
         # Pseudo-supply pins - connected to supply voltage or GND for routing reasons.
