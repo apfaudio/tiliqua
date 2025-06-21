@@ -10,7 +10,7 @@ from amaranth                 import *
 from amaranth.lib             import cdc, wiring
 
 from tiliqua.cli              import top_level_cli
-from tiliqua                  import eurorack_pmod, usb_audio
+from tiliqua                  import eurorack_pmod, usb_audio, dsp
 from tiliqua.tiliqua_platform import RebootProvider
 from vendor.ila               import AsyncSerialILA
 
@@ -35,11 +35,29 @@ class USBAudioTop(Elaboratable):
         wiring.connect(m, pmod0.pins, pmod0_provider.pins)
         m.d.comb += pmod0.codec_mute.eq(reboot.mute)
 
-        m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
-                audio_clock=self.clock_settings.audio_clock, nr_channels=4)
+        m.submodules.pmod1_provider = pmod1_provider = eurorack_pmod.PMODProvider(0)
+        m.submodules.pmod1 = pmod1 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
+        wiring.connect(m, pmod1.pins, pmod1_provider.pins)
+        m.d.comb += pmod1.codec_mute.eq(reboot.mute)
 
-        wiring.connect(m, pmod0.o_cal, usbif.i)
-        wiring.connect(m, usbif.o, pmod0.i_cal)
+        m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
+                audio_clock=self.clock_settings.audio_clock, nr_channels=8)
+
+        # Inputs
+        m.submodules.split40 = split40 = dsp.Split(n_channels=4, source=pmod0.o_cal)
+        m.submodules.split41 = split41 = dsp.Split(n_channels=4, source=pmod1.o_cal)
+        m.submodules.merge80 = merge80 = dsp.Merge(n_channels=8, sink=usbif.i)
+        for ch in range(4):
+            wiring.connect(m, split40.o[ch], merge80.i[ch])
+            wiring.connect(m, split41.o[ch], merge80.i[ch+4])
+
+        # Outputs
+        m.submodules.split80 = split80 = dsp.Split(n_channels=8, source=usbif.o)
+        m.submodules.merge40 = merge40 = dsp.Merge(n_channels=4, sink=pmod0.i_cal)
+        m.submodules.merge41 = merge41 = dsp.Merge(n_channels=4, sink=pmod1.i_cal)
+        for ch in range(4):
+            wiring.connect(m, split80.o[ch], merge40.i[ch])
+            wiring.connect(m, split80.o[ch+4], merge41.i[ch])
 
         if platform.ila:
 
