@@ -51,6 +51,59 @@ class EurorackPmodPinSignature(wiring.Signature):
             "pdn_d":   Out(1),
         })
 
+
+class EurorackPmodIOBuffers(wiring.Component):
+
+    """
+    Adapter to add all IO buffers necessary for eurorack-pmod interfacing.
+    """
+
+    def __init__(self, i2s_pads, aux_pads):
+        self.i2s_pads = i2s_pads
+        self.aux_pads = aux_pads
+        super().__init__({
+            "pins": In(EurorackPmodPinSignature())
+        })
+
+    def elaborate(self, platform):
+        m = Module()
+        # Registered IO buffers are necessary for reliable timing at 192kHz (~50MHz MCLK)
+        # so let's just always use them.
+        m.submodules.ff_sdout1 = ff_sdout1 = io.FFBuffer(
+                "i", self.i2s_pads.sdout1, i_domain="audio")
+        m.submodules.ff_sdin1 = ff_sdin1 = io.FFBuffer(
+                "o", self.i2s_pads.sdin1, o_domain="audio")
+        m.submodules.ff_lrck = ff_lrck = io.FFBuffer(
+                "o", self.i2s_pads.lrck, o_domain="audio")
+        m.submodules.ff_bick = ff_bick = io.FFBuffer(
+                "o", self.i2s_pads.bick, o_domain="audio")
+        # MCLK does not need to be an FFBuffer as the MCLK phase does not matter for
+        # most CODECs. from the AK4619VN datasheet, page 32 'the phase of MCLK is
+        # not critical'. This is important as at 48kHz, we drive MCLK combinatorially from
+        # the audio clock domain, which would not work through an FFBuffer.
+        m.submodules.ff_mclk = ff_mclk = io.Buffer("o", self.i2s_pads.mclk)
+        m.d.comb += [
+            # I2S bus
+            ff_sdin1.o.eq(self.pins.i2s.sdin1),
+            self.pins.i2s.sdout1.eq(ff_sdout1.i),
+            ff_lrck.o.eq(self.pins.i2s.lrck),
+            ff_bick.o.eq(self.pins.i2s.bick),
+            ff_mclk.o.eq(self.pins.i2s.mclk),
+        ],
+        m.d.comb += [
+            # Power clocking (Note: only R3+ has a flip-flop on PDN with pdn_clk).
+            self.aux_pads.pdn_clk.o.eq(self.pins.pdn_clk) if hasattr(self.aux_pads, "pdn_clk") else [],
+            self.aux_pads.pdn_d.o.eq(self.pins.pdn_d),
+            # I2C bus
+            self.aux_pads.i2c_sda.o.eq(self.pins.i2c.sda.o),
+            self.aux_pads.i2c_sda.oe.eq(self.pins.i2c.sda.oe),
+            self.pins.i2c.sda.i.eq(self.aux_pads.i2c_sda.i),
+            self.aux_pads.i2c_scl.o.eq(self.pins.i2c.scl.o),
+            self.aux_pads.i2c_scl.oe.eq(self.pins.i2c.scl.oe),
+            self.pins.i2c.scl.i.eq(self.aux_pads.i2c_scl.i),
+        ]
+        return m
+
 class FFCProvider(wiring.Component):
     """
     Provider for audio interface board connected through FFC on tiliqua-mobo.
@@ -62,45 +115,52 @@ class FFCProvider(wiring.Component):
 
     def elaborate(self, platform):
         m = Module()
-        ffc_i2s = platform.request("audio_ffc_i2s", dir={
-            "sdin1": "-", "sdout1": "-", "lrck": "-", "bick": "-", "mclk": "-",
+        m.submodules.iobuf = iobuf = EurorackPmodIOBuffers(
+            i2s_pads = platform.request("audio_ffc_i2s", dir={
+                "sdin1": "-", "sdout1": "-", "lrck": "-", "bick": "-", "mclk": "-",
+            }),
+            aux_pads = platform.request("audio_ffc_aux")
+        )
+        wiring.connect(m, wiring.flipped(self.pins), iobuf.pins)
+        return m
+
+class PMODProvider(wiring.Component):
+    """
+    Provider for audio interface board connected through a PMOD port.
+    """
+    def __init__(self, pmod_index):
+        self.pmod_index = pmod_index
+        super().__init__({
+            "pins": In(EurorackPmodPinSignature())
         })
-        # Registered IO buffers are necessary for reliable timing at 192kHz (~50MHz MCLK)
-        # so let's just always use them.
-        m.submodules.ff_sdout1 = ff_sdout1 = io.FFBuffer(
-                "i", ffc_i2s.sdout1, i_domain="audio")
-        m.submodules.ff_sdin1 = ff_sdin1 = io.FFBuffer(
-                "o", ffc_i2s.sdin1, o_domain="audio")
-        m.submodules.ff_lrck = ff_lrck = io.FFBuffer(
-                "o", ffc_i2s.lrck, o_domain="audio")
-        m.submodules.ff_bick = ff_bick = io.FFBuffer(
-                "o", ffc_i2s.bick, o_domain="audio")
-        # MCLK does not need to be an FFBuffer as the MCLK phase does not matter for
-        # most CODECs. from the AK4619VN datasheet, page 32 'the phase of MCLK is
-        # not critical'. This is important as at 48kHz, we drive MCLK combinatorially from
-        # the audio clock domain, which would not work through an FFBuffer.
-        m.submodules.ff_mclk = ff_mclk = io.Buffer("o", ffc_i2s.mclk)
-        m.d.comb += [
-            # I2S bus
-            ff_sdin1.o.eq(self.pins.i2s.sdin1),
-            self.pins.i2s.sdout1.eq(ff_sdout1.i),
-            ff_lrck.o.eq(self.pins.i2s.lrck),
-            ff_bick.o.eq(self.pins.i2s.bick),
-            ff_mclk.o.eq(self.pins.i2s.mclk),
-        ],
-        ffc = platform.request("audio_ffc_aux")
-        m.d.comb += [
-            # Power clocking (Note: only R3+ has a flip-flop on PDN with pdn_clk).
-            ffc.pdn_clk.o.eq(self.pins.pdn_clk) if hasattr(ffc, "pdn_clk") else [],
-            ffc.pdn_d.o.eq(self.pins.pdn_d),
-            # I2C bus
-            ffc.i2c_sda.o.eq(self.pins.i2c.sda.o),
-            ffc.i2c_sda.oe.eq(self.pins.i2c.sda.oe),
-            self.pins.i2c.sda.i.eq(ffc.i2c_sda.i),
-            ffc.i2c_scl.o.eq(self.pins.i2c.scl.o),
-            ffc.i2c_scl.oe.eq(self.pins.i2c.scl.oe),
-            self.pins.i2c.scl.i.eq(ffc.i2c_scl.i),
+
+    def elaborate(self, platform):
+        m = Module()
+        pmod_resources = [
+            Resource("audio_pmod_i2s", self.pmod_index,
+                Subsignal("sdin1",   Pins("1", dir="o",  conn=("pmod", self.pmod_index))),
+                Subsignal("sdout1",  Pins("2", dir="i",  conn=("pmod", self.pmod_index))),
+                Subsignal("lrck",    Pins("3", dir="o",  conn=("pmod", self.pmod_index))),
+                Subsignal("bick",    Pins("4", dir="o",  conn=("pmod", self.pmod_index))),
+                Subsignal("mclk",    Pins("10", dir="o", conn=("pmod", self.pmod_index))),
+                Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
+            ),
+            Resource("audio_pmod_aux", self.pmod_index,
+                Subsignal("pdn_d",   Pins("9", dir="o",  conn=("pmod", self.pmod_index))),
+                Subsignal("i2c_sda", Pins("8", dir="io", conn=("pmod", self.pmod_index))),
+                Subsignal("i2c_scl", Pins("7", dir="io", conn=("pmod", self.pmod_index))),
+                Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
+            ),
         ]
+        platform.add_resources(pmod_resources)
+
+        m.submodules.iobuf = iobuf = EurorackPmodIOBuffers(
+            i2s_pads = platform.request("audio_pmod_i2s", self.pmod_index, dir={
+                "sdin1": "-", "sdout1": "-", "lrck": "-", "bick": "-", "mclk": "-",
+            }),
+            aux_pads = platform.request("audio_pmod_aux", self.pmod_index)
+        )
+        wiring.connect(m, wiring.flipped(self.pins), iobuf.pins)
         return m
 
 class I2STDM(wiring.Component):

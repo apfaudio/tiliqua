@@ -785,10 +785,55 @@ class PSRAMMultiDiffuser(wiring.Component):
 
         return m
 
+class TripleMirror(wiring.Component):
+
+    """
+    Example of using extra (external) audio boards.
+
+    Route audio inputs to outputs on 3 audio boards simultaneously: the internal
+    one, and one on each PMOD expansion port. This core assumes all are connected,
+    but nothing bad will happen if one is missing (as long as the unused expansion
+    ports are left disconnected!)
+    """
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    def elaborate(self, platform):
+        m = Module()
+
+        # Instantiate 2 extra external audio boards
+
+        pmod0 = eurorack_pmod.EurorackPmod(self.audio_clock)
+        provider0 = eurorack_pmod.PMODProvider(0)
+        wiring.connect(m, pmod0.pins, provider0.pins)
+        m.submodules += [pmod0, provider0]
+
+        pmod1 = eurorack_pmod.EurorackPmod(self.audio_clock)
+        provider1 = eurorack_pmod.PMODProvider(1)
+        wiring.connect(m, pmod1.pins, provider1.pins)
+        m.submodules += [pmod1, provider1]
+
+        # Route inputs to outputs on all of them
+        #
+        # Since these connections are all streams in the `sync` clock domain,
+        # you can easily change the routing here (i.e route internal audio ins
+        # to external pmod outputs and so forth).
+
+        # Internal 4 inputs -> 4 outputs
+        wiring.connect(m, wiring.flipped(self.i), wiring.flipped(self.o))
+        # ex0 pmod 4 inputs -> 4 outputs
+        wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
+        # ex1 pmod 4 inputs -> 4 outputs
+        wiring.connect(m, pmod1.o_cal, pmod1.i_cal)
+
+        return m
+
 class CoreTop(Elaboratable):
 
     def __init__(self, dsp_core, enable_touch, clock_settings):
         self.core = dsp_core()
+        self.core.audio_clock = clock_settings.audio_clock
         self.touch = enable_touch
         self.clock_settings = clock_settings
         self.pmod0 = eurorack_pmod.EurorackPmod(clock_settings.audio_clock)
@@ -853,6 +898,7 @@ CORES = {
     "sram_diffuser":  (False, SRAMDiffuser),
     "multi_diffuser": (False, PSRAMMultiDiffuser),
     "resampler":      (False, Resampler),
+    "triple_mirror":  (False, TripleMirror),
 }
 
 def simulation_ports(fragment):

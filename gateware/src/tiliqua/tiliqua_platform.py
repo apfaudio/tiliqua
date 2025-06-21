@@ -395,7 +395,7 @@ class _TiliquaR4Mobo:
 
     # Expansion connectors ex0 and ex1
     connectors  = [
-        Connector("pmod", 0, "55 38 66 41 - - 57 35 34 70 - -", conn=("m2", 0)),
+        Connector("pmod", 0, "55 38 66 41 - - 57 35 34 73 - -", conn=("m2", 0)),
         Connector("pmod", 1, "59 63 14 20 - - 61 15 13 22 - -", conn=("m2", 0)),
     ]
 
