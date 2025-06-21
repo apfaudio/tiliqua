@@ -46,12 +46,18 @@ class Mirror(wiring.Component):
     This is the simplest possible core, useful for basic tests.
     """
 
-    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
-    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    def __init__(self, n_audio_boards=1):
+        super().__init__({
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))).array(n_audio_boards),
+            "o": Out(stream.Signature(data.ArrayLayout(ASQ, 4))).array(n_audio_boards),
+        })
+
 
     def elaborate(self, platform):
         m = Module()
-        wiring.connect(m, wiring.flipped(self.i), wiring.flipped(self.o))
+        # connect inputs from board 0 to outputs of board 1 and vice versa
+        wiring.connect(m, wiring.flipped(self.i[0]), wiring.flipped(self.o[1]))
+        wiring.connect(m, wiring.flipped(self.i[1]), wiring.flipped(self.o[0]))
         return m
 
 class QuadNCO(wiring.Component):
@@ -788,10 +794,11 @@ class PSRAMMultiDiffuser(wiring.Component):
 class CoreTop(Elaboratable):
 
     def __init__(self, dsp_core, enable_touch, clock_settings):
-        self.core = dsp_core()
+        self.core = dsp_core(n_audio_boards=2)
         self.touch = enable_touch
         self.clock_settings = clock_settings
         self.pmod0 = eurorack_pmod.EurorackPmod(clock_settings.audio_clock)
+        self.pmod1 = eurorack_pmod.EurorackPmod(clock_settings.audio_clock)
         # Only if this core uses PSRAM
         if hasattr(self.core, "bus"):
             self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
@@ -801,22 +808,28 @@ class CoreTop(Elaboratable):
     def elaborate(self, platform):
         m = Module()
         m.submodules.pmod0 = pmod0 = self.pmod0
+        m.submodules.pmod1 = pmod1 = self.pmod1
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator(
                     self.clock_settings)
-            m.submodules.provider = provider = eurorack_pmod.FFCProvider()
-            wiring.connect(m, pmod0.pins, provider.pins)
+            m.submodules.provider0 = provider0 = eurorack_pmod.FFCProvider()
+            wiring.connect(m, pmod0.pins, provider0.pins)
+            m.submodules.provider1 = provider1 = eurorack_pmod.PMODProvider(1)
+            wiring.connect(m, pmod1.pins, provider1.pins)
             m.submodules.reboot = reboot = RebootProvider(
                     self.clock_settings.frequencies.sync)
             m.submodules.btn = FFSynchronizer(
                     platform.request("encoder").s.i, reboot.button)
             m.d.comb += pmod0.codec_mute.eq(reboot.mute)
+            m.d.comb += pmod1.codec_mute.eq(reboot.mute)
         else:
             m.submodules.car = sim.FakeTiliquaDomainGenerator()
 
         m.submodules.core = self.core
-        wiring.connect(m, pmod0.o_cal, self.core.i)
-        wiring.connect(m, self.core.o, pmod0.i_cal)
+        wiring.connect(m, pmod0.o_cal, self.core.i[0])
+        wiring.connect(m, pmod1.o_cal, self.core.i[1])
+        wiring.connect(m, self.core.o[0], pmod0.i_cal)
+        wiring.connect(m, self.core.o[1], pmod1.i_cal)
 
         if hasattr(self.core, "i_midi") and sim.is_hw(platform):
             # For now, if a core requests midi input, we connect it up
