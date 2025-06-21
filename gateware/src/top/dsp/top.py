@@ -814,7 +814,7 @@ class CoreTop(Elaboratable):
                     self.clock_settings)
             m.submodules.provider0 = provider0 = eurorack_pmod.FFCProvider()
             wiring.connect(m, pmod0.pins, provider0.pins)
-            m.submodules.provider1 = provider1 = eurorack_pmod.PMODProvider(1)
+            m.submodules.provider1 = provider1 = eurorack_pmod.PMODProvider(pmod_index=0)
             wiring.connect(m, pmod1.pins, provider1.pins)
             m.submodules.reboot = reboot = RebootProvider(
                     self.clock_settings.frequencies.sync)
