@@ -184,7 +184,7 @@ class I2STDM(wiring.Component):
     """
 
     N_CHANNELS = 4
-    S_WIDTH    = 16
+    S_WIDTH    = 24
     SLOT_WIDTH = 32
 
     def __init__(self, audio_192=False):
