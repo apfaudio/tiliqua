@@ -149,20 +149,17 @@ class XbeamSoc(TiliquaSoc):
             m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
                     audio_clock=self.clock_settings.audio_clock, nr_channels=4)
 
-        """
         with m.If(self.xbeam_periph.usb_en):
             if sim.is_hw(platform):
                 wiring.connect(m, pmod0.o_cal, usbif.i)
-                wiring.connect(m, usbif.o, pmod0.i_cal)
+                wiring.connect(m, usbif.o, self.xbeam_periph.delay_i)
             else:
                 pass
         with m.Else():
             wiring.connect(m, pmod0.o_cal, self.xbeam_periph.delay_i)
-        """
 
-        wiring.connect(m, self.pmod0.o_cal, pmod0.i_cal)
+        wiring.connect(m, self.xbeam_periph.delay_o, pmod0.i_cal)
 
-        """
         m.submodules.plot_fifo = plot_fifo = fifo.SyncFIFOBuffered(
             width=data.ArrayLayout(eurorack_pmod.ASQ, 4).as_shape().width, depth=256)
 
@@ -175,7 +172,6 @@ class XbeamSoc(TiliquaSoc):
             wiring.connect(m, plot_fifo.r_stream, self.scope_periph.i)
         with m.Else():
             wiring.connect(m, plot_fifo.r_stream, self.vector_periph.i)
-        """
 
         # Memory controller hangs if we start making requests to it straight away.
         with m.If(self.permit_bus_traffic):
