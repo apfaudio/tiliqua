@@ -143,13 +143,13 @@ class PMODProvider(wiring.Component):
                 Subsignal("lrck",    Pins("3", dir="o",  conn=("pmod", self.pmod_index))),
                 Subsignal("bick",    Pins("4", dir="o",  conn=("pmod", self.pmod_index))),
                 Subsignal("mclk",    Pins("10", dir="o", conn=("pmod", self.pmod_index))),
-                Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
+                Attrs(IO_TYPE="LVCMOS33", DRIVE="8")
             ),
             Resource("audio_pmod_aux", self.pmod_index,
                 Subsignal("pdn_d",   Pins("9", dir="o",  conn=("pmod", self.pmod_index))),
                 Subsignal("i2c_sda", Pins("8", dir="io", conn=("pmod", self.pmod_index))),
                 Subsignal("i2c_scl", Pins("7", dir="io", conn=("pmod", self.pmod_index))),
-                Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
+                Attrs(IO_TYPE="LVCMOS33", DRIVE="8")
             ),
         ]
         platform.add_resources(pmod_resources)
@@ -288,14 +288,14 @@ class I2SCalibrator(wiring.Component):
     # These should be accurate to +/- 100mV or so on a fresh unit without
     # requiring any initial calibration.
     DEFAULT_CALIBRATION_R33 = [
-        [-1.158, 0.008], # in (mul, add)
-        [-1.158, 0.008],
-        [-1.158, 0.008],
-        [-1.158, 0.008],
-        [ 0.97,  0.03 ], # out (mul, add)
-        [ 0.97,  0.03 ],
-        [ 0.97,  0.03 ],
-        [ 0.97,  0.03 ],
+        [-1.248, 0.0], # in (mul, add)
+        [-1.248, 0.0],
+        [-1.248, 0.0],
+        [-1.248, 0.0],
+        [ 0.90,  0.0], # out (mul, add)
+        [ 0.90,  0.0],
+        [ 0.90,  0.0],
+        [ 0.90,  0.0],
     ]
 
     def __init__(self, stream_domain="sync", fifo_depth=4):

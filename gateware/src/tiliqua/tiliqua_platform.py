@@ -422,6 +422,10 @@ class _TiliquaR4Mobo:
 
 class _TiliquaR5Mobo:
     resources  = _TiliquaR4R5Mobo.resources + [
+        # Enable motherboard I2C passthrough to DVI port. Normally, this
+        # should probably be disabled (unless we are reading the EDID) as
+        # we don't want to accidentally address some random I2C devices in
+        # the display!
         Resource("gpdi_ddc_en", 0, Pins("11", dir="o", conn=("m2", 0))),
 
         # Diffpairs routed to video output, AC-coupled through a DVI redriver IC.
@@ -434,9 +438,8 @@ class _TiliquaR5Mobo:
          ),
     ]
 
-    # TODO update for rev5 pinswaps vs rev4 (!!)
     connectors  = [
-        Connector("pmod", 0, "55 38 66 41 - - 57 35 34 73 - -", conn=("m2", 0)),
+        Connector("pmod", 0, "38 35 66 41 - - 57 55 34 73 - -", conn=("m2", 0)),
         Connector("pmod", 1, "59 63 14 20 - - 61 15 13 22 - -", conn=("m2", 0)),
     ]
 
