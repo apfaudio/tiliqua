@@ -51,10 +51,10 @@ pub fn f32tofx18(x: f32) -> i32 {
 
 impl CalibrationConstants {
     pub fn default() -> Self {
-        let adc_dscale = -37139i32;
-        let adc_dzero  =    256i32;
-        let dac_dscale =  32725i32;
-        let dac_dzero  =    983i32;
+        let adc_dscale = -40894i32;
+        let adc_dzero  = 0i32;
+        let dac_dscale = 29491i32;
+        let dac_dzero  = 0i32;
         let mut result = Self {
             adc_scale: [adc_dscale; 4],
             adc_zero:  [adc_dzero;  4],
