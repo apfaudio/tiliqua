@@ -1881,7 +1881,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C88795"
+		(property "LCSC" "C88848"
 			(at 0 0 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -3018,6 +3018,18 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C189470"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(hide yes)
+			(uuid "10f10e5a-5f39-45cd-a675-d136a32e3f2a")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -5429,7 +5441,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C88795"
+		(property "LCSC" "C88848"
 			(at 0 0 270)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -13011,7 +13023,7 @@
 		(path "/fab2810c-846b-4fd3-91f6-29ac3e93c045/25191896-45b0-41c5-9a56-9f577c3785a4")
 		(sheetname "/gpdi/")
 		(sheetfile "gpdi.kicad_sch")
-		(attr smd exclude_from_bom)
+		(attr smd)
 		(fp_line
 			(start 1.5 1.5)
 			(end -1.5 1.5)
@@ -25303,6 +25315,18 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C58827"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(hide yes)
+			(uuid "38f886d7-109b-435e-af29-63825cccd903")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
@@ -41526,6 +41550,18 @@
 			(effects
 				(font
 					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C25792"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(hide yes)
+			(uuid "daaf79a2-2ecb-439f-9b5b-0b2ed71bb93a")
+			(effects
+				(font
+					(size 1.27 1.27)
 					(thickness 0.15)
 				)
 			)
