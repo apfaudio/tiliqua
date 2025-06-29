@@ -8,12 +8,15 @@
 # SPDX-License-Identifier: CERN-OHL-W-2.0
 
 from amaranth import *
-from amaranth.lib.memory import Memory
+from amaranth.lib import memory, wiring
+from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
+
+from amaranth_future import fixed
 
 from math import cos, sin, pi
 
-class FixedPointFFT(Elaboratable):
+class FixedPointFFT(wiring.Component):
     """ FFT
 
         Attributes
@@ -48,65 +51,65 @@ class FixedPointFFT(Elaboratable):
 
         Parameters
         ----------
-        bitwidth: int
-            width
+        shape: fixed.Shape
+            shape of desired fixed-point representation
         pts: int
             number of points (should be a power of 2)
-        verbose: bool
-            verbose flag
     """
     def __init__(self,
-                 bitwidth: int=16,
-                 pts:      int=1024,
-                 verbose:  bool=True) -> None:
+                 shape: fixed.Shape=fixed.SQ(1, 17),
+                 pts:   int=1024) -> None:
 
-        self.bitwidth = bitwidth
+        self.shape    = shape
+        self.wshape   = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
         self.pts      = pts
         self.stages   = exact_log2(pts)
 
-        self.start = Signal()
-        self.done = Signal(init=1)
-
-        self.in_i = Signal(signed(bitwidth))
-        self.in_q = Signal(signed(bitwidth))
-        self.out_real = Signal(signed(bitwidth))
-        self.out_imag = Signal(signed(bitwidth))
-        self.strobe_in = Signal()
-        self.strobe_out = Signal()
-
-        self.wf_start = Signal()
-        self.wf_strobe = Signal()
-        self.wf_real = Signal(signed(bitwidth+1))
-        self.wf_imag = Signal(signed(bitwidth+1))
-
-        self.Wr = [int(cos(k*2*pi/pts)*(2**(bitwidth-1))) for k in range(pts)]
-        self.Wi = [int(-sin(k*2*pi/pts)*(2**(bitwidth-1))) for k in range(pts)]
+        self.Wr = [cos(k*2*pi/pts) for k in range(pts)]
+        self.Wi = [-sin(k*2*pi/pts) for k in range(pts)]
 
         # 4-term Blackman-Harris window function is default
-        self.wFr = [int((0.35875-0.48829*cos(k*2*pi/pts)+0.14128*cos(k*4*pi/pts)-0.01168*cos(k*6*pi/pts))*(2**(bitwidth-1))) for k in range(pts)]
+        self.wFr = [0.35875-0.48829*cos(k*2*pi/pts)
+                    +0.14128*cos(k*4*pi/pts)
+                    -0.01168*cos(k*6*pi/pts)
+                    for k in range(pts)]
         self.wFi = [0 for k in range(pts)]
 
-        assert pts == 2**self.stages, f"Points {pts} must be 2**stages {self.stages}"
+        super().__init__({
+            "start":      In(1),
+            "done":       Out(1, init=1),
+
+            "in_i":       In(self.shape),
+            "in_q":       In(self.shape),
+            "out_real":   Out(self.shape),
+            "out_imag":   Out(self.shape),
+
+            "strobe_in":  In(1),
+            "strobe_out": Out(1),
+
+            "wf_start": In(1),
+            "wf_strobe": In(1),
+            "wf_real": In(self.wshape),
+            "wf_imag": In(self.wshape),
+        })
 
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        width = self.bitwidth
-        bw = width + self.stages
-        pts = self.pts
-        m.submodules.xr = xr = Memory(shape=signed(bw), depth=self.pts, init=[])
-        m.submodules.xi = xi = Memory(shape=signed(bw), depth=self.pts, init=[])
-        m.submodules.yr = yr = Memory(shape=signed(bw), depth=self.pts, init=[])
-        m.submodules.yi = yi = Memory(shape=signed(bw), depth=self.pts, init=[])
+        bshape = fixed.SQ(self.shape.i_bits + self.stages, self.shape.f_bits-1)
+        m.submodules.xr = xr = memory.Memory(shape=bshape, depth=self.pts, init=[])
+        m.submodules.xi = xi = memory.Memory(shape=bshape, depth=self.pts, init=[])
+        m.submodules.yr = yr = memory.Memory(shape=bshape, depth=self.pts, init=[])
+        m.submodules.yi = yi = memory.Memory(shape=bshape, depth=self.pts, init=[])
 
-        m.submodules.wFr = wFr = Memory(
-                shape=signed(width+1), depth=self.pts, init=self.wFr)
-        m.submodules.wFi = wFi = Memory(
-                shape=signed(width+1), depth=self.pts, init=self.wFi)
-        m.submodules.Wr = Wr = Memory(
-                shape=signed(width+1), depth=self.pts, init=self.Wr)
-        m.submodules.Wi = Wi = Memory(
-                shape=signed(width+1), depth=self.pts, init=self.Wi)
+        m.submodules.wFr = wFr = memory.Memory(
+                shape=self.wshape,  depth=self.pts, init=self.wFr)
+        m.submodules.wFi = wFi = memory.Memory(
+                shape=self.wshape, depth=self.pts, init=self.wFi)
+        m.submodules.Wr = Wr = memory.Memory(
+                shape=self.wshape, depth=self.pts, init=self.Wr)
+        m.submodules.Wi = Wi = memory.Memory(
+                shape=self.wshape, depth=self.pts, init=self.Wi)
 
         xr_rd = xr.read_port()
         xr_wr = xr.write_port()
@@ -131,17 +134,17 @@ class FixedPointFFT(Elaboratable):
         m.d.comb += revidx.eq(Cat([idx.bit_select(i,1) for i in reversed(range(N))]))
 
         # Window
-        wfr = Signal(signed(width+1))
-        wfi = Signal(signed(width+1))
-        i_cooked = Signal(signed(width))
-        q_cooked = Signal(signed(width))
+        wfr = Signal(self.wshape)
+        wfi = Signal(self.wshape)
+        i_cooked = Signal(self.shape)
+        q_cooked = Signal(self.shape)
         m.d.comb += [
             wFr_rd.addr.eq(idx),
             wfr.eq(wFr_rd.data),
             wFi_rd.addr.eq(idx),
             wfi.eq(wFi_rd.data),
-            i_cooked.eq((wfr*self.in_i - wfi*self.in_q) >> (width-1)),
-            q_cooked.eq((wfr*self.in_q + wfi*self.in_i) >> (width-1)),
+            i_cooked.eq(wfr*self.in_i - wfi*self.in_q),
+            q_cooked.eq(wfr*self.in_q + wfi*self.in_i),
         ]
 
         # Window write
@@ -156,14 +159,14 @@ class FixedPointFFT(Elaboratable):
         stage = Signal(range(N+1))
         mask = Signal(signed(N))
 
-        ar = Signal(signed(bw))
-        ai = Signal(signed(bw))
-        br = Signal(signed(bw))
-        bi = Signal(signed(bw))
+        ar = Signal(bshape)
+        ai = Signal(bshape)
+        br = Signal(bshape)
+        bi = Signal(bshape)
 
         # Coefficients
-        wr = Signal(signed(width+1))
-        wi = Signal(signed(width+1))
+        wr = Signal(self.wshape)
+        wi = Signal(self.wshape)
 
         m.d.comb += [
             widx.eq(idx & mask),
@@ -174,27 +177,27 @@ class FixedPointFFT(Elaboratable):
         ]
 
         # complex multiplication
-        mrr = Signal(signed(bw))
-        mii = Signal(signed(bw))
-        mri = Signal(signed(bw))
-        mir = Signal(signed(bw))
-        bwr = Signal(signed(bw))
-        bwi = Signal(signed(bw))
+        mrr = Signal(bshape)
+        mii = Signal(bshape)
+        mri = Signal(bshape)
+        mir = Signal(bshape)
+        bwr = Signal(bshape)
+        bwi = Signal(bshape)
 
         m.d.comb += [
-            mrr.eq((br * wr) >> (width-1)),
-            mii.eq((bi * wi) >> (width-1)),
-            mri.eq((br * wi) >> (width-1)),
-            mir.eq((bi * wr) >> (width-1)),
+            mrr.eq(br * wr),
+            mii.eq(bi * wi),
+            mri.eq(br * wi),
+            mir.eq(bi * wr),
             bwr.eq(mrr - mii),
             bwi.eq(mri + mir),
         ]
 
         # butterfly
-        si = Signal(signed(bw))
-        sr = Signal(signed(bw))
-        di = Signal(signed(bw))
-        dr = Signal(signed(bw))
+        si = Signal(bshape)
+        sr = Signal(bshape)
+        di = Signal(bshape)
+        dr = Signal(bshape)
         m.d.comb += [
             sr.eq(ar + bwr),
             si.eq(ai + bwi),
@@ -221,7 +224,7 @@ class FixedPointFFT(Elaboratable):
             with m.State("WINDOW_WRLOOP"):
                 m.d.sync += wFr_wr.en.eq(0)
                 m.d.sync += wFi_wr.en.eq(0)
-                with m.If(wfidx >= pts):
+                with m.If(wfidx >= self.pts):
                     m.d.sync += wfidx.eq(0)
                     m.next = "DONE"
                 with m.Else():
@@ -240,7 +243,7 @@ class FixedPointFFT(Elaboratable):
             with m.State("WINDOW"):
                 m.d.sync += xr_wr.en.eq(0)
                 m.d.sync += xi_wr.en.eq(0)
-                with m.If(idx >= pts):
+                with m.If(idx >= self.pts):
                     m.d.sync += [
                         stage.eq(0),
                         idx.eq(0),
@@ -275,7 +278,7 @@ class FixedPointFFT(Elaboratable):
                     yr_wr.en.eq(0),
                     yi_wr.en.eq(0),
                 ]
-                with m.If(idx >= pts):
+                with m.If(idx >= self.pts):
                     m.d.sync += [
                         idx.eq(0),
                         mask.eq(mask>>1),
@@ -382,8 +385,8 @@ class FixedPointFFT(Elaboratable):
                         xi_wr.en.eq(0),
                         xr_wr.data.eq(dr),
                         xi_wr.data.eq(di),
-                        xr_wr.addr.eq(idx+(pts>>1)),
-                        xi_wr.addr.eq(idx+(pts>>1)),
+                        xr_wr.addr.eq(idx+(self.pts>>1)),
+                        xi_wr.addr.eq(idx+(self.pts>>1)),
                     ]
                 with m.Else():
                     m.d.sync += [
@@ -391,8 +394,8 @@ class FixedPointFFT(Elaboratable):
                         yi_wr.en.eq(0),
                         yr_wr.data.eq(dr),
                         yi_wr.data.eq(di),
-                        yr_wr.addr.eq(idx+(pts>>1)),
-                        yi_wr.addr.eq(idx+(pts>>1)),
+                        yr_wr.addr.eq(idx+(self.pts>>1)),
+                        yi_wr.addr.eq(idx+(self.pts>>1)),
                     ]
                 m.next = "WRITEDIFF"
 
@@ -412,7 +415,7 @@ class FixedPointFFT(Elaboratable):
 
             with m.State("OUTPUT"):
                 m.d.sync += self.strobe_out.eq(0)
-                with m.If(idx >= pts):
+                with m.If(idx >= self.pts):
                     m.next = "DONE"
                 with m.Else():
                     with m.If(N & 1):
