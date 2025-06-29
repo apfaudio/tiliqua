@@ -94,10 +94,6 @@ class FixedPointFFT(wiring.Component):
             m.d.comb += W_rd_i.eq(W_rd.data.imag)
         with m.Else():
             m.d.comb += W_rd_i.eq(-W_rd.data.imag)
-        m.d.comb += [
-            bw.real.eq((b.real * W_rd.data.real) - (b.imag * W_rd_i)),
-            bw.imag.eq((b.real * W_rd_i) + (b.imag * W_rd.data.real)),
-        ]
 
         # butterfly
         s = Signal(CQ(bshape))
@@ -202,9 +198,25 @@ class FixedPointFFT(wiring.Component):
                         a.real.eq(x_rd.data.real),
                         a.imag.eq(x_rd.data.imag),
                     ]
-                m.next = "BUTTERFLY"
+                m.next = "BUTTERFLY0"
 
-            with m.State("BUTTERFLY"):
+            with m.State("BUTTERFLY0"):
+                m.d.sync += bw.real.eq(b.real * W_rd.data.real)
+                m.next = "BUTTERFLY1"
+
+            with m.State("BUTTERFLY1"):
+                m.d.sync += bw.real.eq(bw.real - (b.imag * W_rd_i))
+                m.next = "BUTTERFLY2"
+
+            with m.State("BUTTERFLY2"):
+                m.d.sync += bw.imag.eq(b.real * W_rd_i)
+                m.next = "BUTTERFLY3"
+
+            with m.State("BUTTERFLY3"):
+                m.d.sync += bw.imag.eq(bw.imag + (b.imag * W_rd.data.real))
+                m.next = "WRITE-S"
+
+            with m.State("WRITE-S"):
                 with m.If(stage & 1):
                     m.d.sync += [
                         x_wr.en.eq(1),
@@ -219,18 +231,20 @@ class FixedPointFFT(wiring.Component):
                         y_wr.data.imag.eq(s.imag),
                         y_wr.addr.eq(idx),
                     ]
-                m.next = "DIFF"
+                m.next = "WRITE-D"
 
-            with m.State("DIFF"):
+            with m.State("WRITE-D"):
                 # note: _wr still enabled from last state!
                 with m.If(stage & 1):
                     m.d.sync += [
-                        x_wr.data.eq(d),
+                        x_wr.data.real.eq(d.real),
+                        x_wr.data.imag.eq(d.imag),
                         x_wr.addr.eq(idx+(self.pts>>1)),
                     ]
                 with m.Else():
                     m.d.sync += [
-                        y_wr.data.eq(d),
+                        y_wr.data.real.eq(d.real),
+                        y_wr.data.imag.eq(d.imag),
                         y_wr.addr.eq(idx+(self.pts>>1)),
                     ]
                 m.d.sync += idx.eq(idx+1)
