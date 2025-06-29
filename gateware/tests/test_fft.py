@@ -5,6 +5,7 @@ from math import cos, sin, pi
 from amaranth              import *
 from amaranth.sim          import *
 from amaranth.utils        import exact_log2
+from amaranth.lib          import wiring
 
 from amaranth_future       import fixed
 
@@ -22,11 +23,8 @@ class FFTTests(unittest.TestCase):
         fft = FixedPointFFT(pts=256)
         ifft = FixedPointFFT(pts=256, ifft=True)
 
-        m.d.comb += [
-            ifft.in_i.eq(fft.out_real),
-            ifft.in_q.eq(fft.out_imag),
-            ifft.strobe_in.eq(fft.strobe_out),
-        ]
+        wiring.connect(m, fft.o, ifft.i)
+        m.d.comb += ifft.o.ready.eq(1)
 
         m.submodules.fft = fft
         m.submodules.ifft = ifft
@@ -41,34 +39,21 @@ class FFTTests(unittest.TestCase):
 
             # FFT
             await ctx.tick()
-            ctx.set(dut.start, 1)
-            await ctx.tick()
-            ctx.set(dut.start, 0)
-            await ctx.tick()
             await ctx.tick()
             await ctx.tick()
 
             for i in range(PTS):
-                ctx.set(dut.in_i, fixed.Const(I[i], shape=dut.shape))
-                ctx.set(dut.in_q, fixed.Const(Q[i], shape=dut.shape))
+                ctx.set(dut.i.payload.sample.real, fixed.Const(I[i], shape=dut.shape))
+                ctx.set(dut.i.payload.sample.imag, fixed.Const(Q[i], shape=dut.shape))
                 await ctx.tick()
-                ctx.set(dut.strobe_in, 1)
+                ctx.set(dut.i.valid, 1)
                 await ctx.tick()
-                ctx.set(dut.strobe_in, 0)
+                ctx.set(dut.i.valid, 0)
                 await ctx.tick()
                 await ctx.tick()
-                await ctx.tick()
-
-            for _ in range(PTS*LPTS*10):
                 await ctx.tick()
 
-            ctx.set(ifft.start, 1)
-            await ctx.tick()
-            ctx.set(ifft.start, 0)
-            await ctx.tick()
-
-            # Looks that it will take ~13 cycles for read-butterfly-write
-            for _ in range(PTS*LPTS*20):
+            for _ in range(PTS*LPTS*30):
                 await ctx.tick()
 
         sim = Simulator(m)
