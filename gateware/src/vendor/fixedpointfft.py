@@ -165,32 +165,18 @@ class FixedPointFFT(wiring.Component):
         bi = Signal(bshape)
 
         # Coefficients
-        wr = Signal(self.wshape)
-        wi = Signal(self.wshape)
-
         m.d.comb += [
             widx.eq(idx & mask),
             Wr_rd.addr.eq(widx),
             Wi_rd.addr.eq(widx),
-            wr.eq(Wr_rd.data),
-            wi.eq(Wi_rd.data),
         ]
 
         # complex multiplication
-        mrr = Signal(bshape)
-        mii = Signal(bshape)
-        mri = Signal(bshape)
-        mir = Signal(bshape)
         bwr = Signal(bshape)
         bwi = Signal(bshape)
-
         m.d.comb += [
-            mrr.eq(br * wr),
-            mii.eq(bi * wi),
-            mri.eq(br * wi),
-            mir.eq(bi * wr),
-            bwr.eq(mrr - mii),
-            bwi.eq(mri + mir),
+            bwr.eq((br * Wr_rd.data) - (bi * Wi_rd.data)),
+            bwi.eq((br * Wi_rd.data) + (bi * Wr_rd.data)),
         ]
 
         # butterfly
