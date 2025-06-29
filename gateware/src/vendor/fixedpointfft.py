@@ -90,10 +90,6 @@ class FixedPointFFT(wiring.Component):
         bw = Signal(CQ(bshape))
         # conjugate twiddle factors on inverse fft.
         W_rd_i = Signal(bshape)
-        with m.If(self.ifft):
-            m.d.comb += W_rd_i.eq(W_rd.data.imag)
-        with m.Else():
-            m.d.comb += W_rd_i.eq(-W_rd.data.imag)
         mW_rd_r_a = Signal(bshape)
         mW_rd_r_z = Signal(bshape)
         m.d.comb += mW_rd_r_z.eq(mW_rd_r_a * W_rd.data.real)
@@ -186,6 +182,10 @@ class FixedPointFFT(wiring.Component):
                         b.real.eq(x_rd.data.real),
                         b.imag.eq(x_rd.data.imag),
                     ]
+                with m.If(self.ifft):
+                    m.d.sync += W_rd_i.eq(W_rd.data.imag)
+                with m.Else():
+                    m.d.sync += W_rd_i.eq(-W_rd.data.imag)
                 m.next = "READA-BUTTERFLY0"
 
             with m.State("READA-BUTTERFLY0"):
