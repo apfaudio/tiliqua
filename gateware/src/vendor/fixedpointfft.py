@@ -62,9 +62,11 @@ class FixedPointFFT(wiring.Component):
         m.submodules.W = W = memory.Memory(
                 shape=CQ(self.wshape), depth=self.pts, init=twiddle)
 
-        x_rd = x.read_port()
+        x_rd_a = x.read_port()
+        x_rd_b = x.read_port()
         x_wr = x.write_port()
-        y_rd = y.read_port()
+        y_rd_a = y.read_port()
+        y_rd_b = y.read_port()
         y_wr = y.write_port()
 
         W_rd = W.read_port()
@@ -108,11 +110,11 @@ class FixedPointFFT(wiring.Component):
         # output and normalization based on ifft / stages
         rsh = 0 if self.ifft else N
         if N & 1:
-            m.d.comb += self.o.payload.sample.real.eq(y_rd.data.real>>rsh)
-            m.d.comb += self.o.payload.sample.imag.eq(y_rd.data.imag>>rsh)
+            m.d.comb += self.o.payload.sample.real.eq(y_rd_a.data.real>>rsh)
+            m.d.comb += self.o.payload.sample.imag.eq(y_rd_a.data.imag>>rsh)
         else:
-            m.d.comb += self.o.payload.sample.real.eq(x_rd.data.real>>rsh)
-            m.d.comb += self.o.payload.sample.imag.eq(x_rd.data.imag>>rsh)
+            m.d.comb += self.o.payload.sample.real.eq(x_rd_a.data.real>>rsh)
+            m.d.comb += self.o.payload.sample.imag.eq(x_rd_a.data.imag>>rsh)
 
         # Control FSM
         with m.FSM():
@@ -159,59 +161,31 @@ class FixedPointFFT(wiring.Component):
                     m.d.sync += idx.eq(0)
                     m.next = "OUTPUT"
                 with m.Else():
-                    m.next = "ADDRB"
+                    m.next = "ADDR"
 
-            with m.State("ADDRB"):
+            with m.State("ADDR"):
+                m.d.comb += [
+                    x_rd_a.addr.eq(2*idx),
+                    y_rd_a.addr.eq(2*idx),
+                    x_rd_b.addr.eq(2*idx+1),
+                    y_rd_b.addr.eq(2*idx+1),
+                ]
+                m.next = "READ"
+
+            with m.State("READ"):
                 with m.If(stage & 1):
                     m.d.sync += [
-                        y_rd.addr.eq(2*idx+1),
+                        a.real.eq(y_rd_a.data.real),
+                        a.imag.eq(y_rd_a.data.imag),
+                        b.real.eq(y_rd_b.data.real),
+                        b.imag.eq(y_rd_b.data.imag),
                     ]
                 with m.Else():
                     m.d.sync += [
-                        x_rd.addr.eq(2*idx+1),
-                    ]
-                m.next = "ADDRB_LATCHED"
-
-            with m.State("ADDRB_LATCHED"):
-                m.next = "READB"
-
-            with m.State("READB"):
-                with m.If(stage & 1):
-                    m.d.sync += [
-                        b.real.eq(y_rd.data.real),
-                        b.imag.eq(y_rd.data.imag),
-                    ]
-                with m.Else():
-                    m.d.sync += [
-                        b.real.eq(x_rd.data.real),
-                        b.imag.eq(x_rd.data.imag),
-                    ]
-                m.next = "ADDRA"
-
-            with m.State("ADDRA"):
-                with m.If(stage & 1):
-                    m.d.sync += [
-                        y_rd.addr.eq(2*idx),
-                    ]
-                with m.Else():
-                    m.d.sync += [
-                        x_rd.addr.eq(2*idx),
-                    ]
-                m.next = "ADDRA_LATCHED"
-
-            with m.State("ADDRA_LATCHED"):
-                m.next = "READA"
-
-            with m.State("READA"):
-                with m.If(stage & 1):
-                    m.d.sync += [
-                        a.real.eq(y_rd.data.real),
-                        a.imag.eq(y_rd.data.imag),
-                    ]
-                with m.Else():
-                    m.d.sync += [
-                        a.real.eq(x_rd.data.real),
-                        a.imag.eq(x_rd.data.imag),
+                        a.real.eq(x_rd_a.data.real),
+                        a.imag.eq(x_rd_a.data.imag),
+                        b.real.eq(x_rd_b.data.real),
+                        b.imag.eq(x_rd_b.data.imag),
                     ]
                 m.next = "BUTTERFLY"
 
@@ -273,17 +247,17 @@ class FixedPointFFT(wiring.Component):
                     m.next = "RESET"
                 with m.Else():
                     with m.If(N & 1):
-                        m.d.sync += [
-                            y_rd.addr.eq(idx),
-                        ]
+                        m.d.comb += y_rd_a.addr.eq(idx),
                     with m.Else():
-                        m.d.sync += [
-                            x_rd.addr.eq(idx),
-                        ]
+                        m.d.comb += x_rd_a.addr.eq(idx),
                     m.next = "READOUT"
 
             with m.State("READOUT"):
                 m.d.comb += self.o.valid.eq(1)
+                with m.If(N & 1):
+                    m.d.comb += y_rd_a.addr.eq(idx),
+                with m.Else():
+                    m.d.comb += x_rd_a.addr.eq(idx),
                 with m.If(self.o.ready):
                     m.d.sync += [
                         idx.eq(idx+1),
