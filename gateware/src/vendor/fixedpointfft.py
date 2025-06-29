@@ -94,6 +94,12 @@ class FixedPointFFT(wiring.Component):
             m.d.comb += W_rd_i.eq(W_rd.data.imag)
         with m.Else():
             m.d.comb += W_rd_i.eq(-W_rd.data.imag)
+        mW_rd_r_a = Signal(bshape)
+        mW_rd_r_z = Signal(bshape)
+        m.d.comb += mW_rd_r_z.eq(mW_rd_r_a * W_rd.data.real)
+        mW_rd_i_a = Signal(bshape)
+        mW_rd_i_z = Signal(bshape)
+        m.d.comb += mW_rd_i_z.eq(mW_rd_i_a * W_rd_i)
 
         # butterfly
         s = Signal(CQ(bshape))
@@ -201,19 +207,17 @@ class FixedPointFFT(wiring.Component):
                 m.next = "BUTTERFLY0"
 
             with m.State("BUTTERFLY0"):
-                m.d.sync += bw.real.eq(b.real * W_rd.data.real)
+                m.d.comb += mW_rd_r_a.eq(b.real)
+                m.d.sync += bw.real.eq(mW_rd_r_z)
+                m.d.comb += mW_rd_i_a.eq(b.real)
+                m.d.sync += bw.imag.eq(mW_rd_i_z)
                 m.next = "BUTTERFLY1"
 
             with m.State("BUTTERFLY1"):
-                m.d.sync += bw.real.eq(bw.real - (b.imag * W_rd_i))
-                m.next = "BUTTERFLY2"
-
-            with m.State("BUTTERFLY2"):
-                m.d.sync += bw.imag.eq(b.real * W_rd_i)
-                m.next = "BUTTERFLY3"
-
-            with m.State("BUTTERFLY3"):
-                m.d.sync += bw.imag.eq(bw.imag + (b.imag * W_rd.data.real))
+                m.d.comb += mW_rd_i_a.eq(b.imag)
+                m.d.sync += bw.real.eq(bw.real - mW_rd_i_z)
+                m.d.comb += mW_rd_r_a.eq(b.imag)
+                m.d.sync += bw.imag.eq(bw.imag + mW_rd_r_z)
                 m.next = "WRITE-S"
 
             with m.State("WRITE-S"):
