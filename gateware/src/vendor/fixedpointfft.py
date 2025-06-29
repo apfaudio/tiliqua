@@ -26,7 +26,7 @@ class CQ(data.StructLayout):
 class FixedPointFFT(wiring.Component):
 
     def __init__(self,
-                 shape: fixed.Shape=fixed.SQ(1, 17),
+                 shape: fixed.Shape=fixed.SQ(1, 15),
                  pts:   int=1024,
                  ifft = False) -> None:
 
@@ -54,6 +54,7 @@ class FixedPointFFT(wiring.Component):
 
         twiddle = [
             {'real': cos(k*2*pi/self.pts),
+             # conjugate twiddle factors for ifft
              'imag': (1 if self.ifft else -1) * sin(k*2*pi/self.pts)}
             for k in range(self.pts)
         ]

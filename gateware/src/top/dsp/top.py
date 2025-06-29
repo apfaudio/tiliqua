@@ -829,6 +829,44 @@ class TripleMirror(wiring.Component):
 
         return m
 
+class FFT(wiring.Component):
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.split4 = split4 = dsp.Split(n_channels=4)
+        m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4)
+        wiring.connect(m, wiring.flipped(self.i), split4.i)
+        wiring.connect(m, merge4.o, wiring.flipped(self.o))
+
+        from vendor.fixedpointfft import FixedPointFFT
+        m.submodules.fft = fft = FixedPointFFT(pts=2048)
+
+        """
+        # TODO stream adapter?
+        wiring.connect(m, split4.o[0], fft.i)
+        wiring.connect(m, fft.o, merge4.i[0])
+        """
+
+        m.d.comb += [
+            fft.i.valid.eq(split4.o[0].valid),
+            fft.i.payload.sample.real.eq(split4.o[0].payload),
+            split4.o[0].ready.eq(fft.i.ready),
+
+            merge4.i[0].valid.eq(fft.o.valid),
+            merge4.i[0].payload.eq(fft.o.payload.sample.real),
+            fft.o.ready.eq(merge4.i[0].ready),
+        ]
+
+        wiring.connect(m, split4.o[1], merge4.i[1])
+        wiring.connect(m, split4.o[2], merge4.i[2])
+        wiring.connect(m, split4.o[3], merge4.i[3])
+
+        return m
+
 class CoreTop(Elaboratable):
 
     def __init__(self, dsp_core, enable_touch, clock_settings):
@@ -899,6 +937,7 @@ CORES = {
     "multi_diffuser": (False, PSRAMMultiDiffuser),
     "resampler":      (False, Resampler),
     "triple_mirror":  (False, TripleMirror),
+    "fft":            (False, FFT),
 }
 
 def simulation_ports(fragment):
