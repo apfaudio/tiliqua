@@ -89,10 +89,11 @@ class FixedPointFFT(wiring.Component):
         # complex multiplication
         bw = Signal(CQ(bshape))
         # conjugate twiddle factors on inverse fft.
+        W_rd_r = Signal(bshape)
         W_rd_i = Signal(bshape)
         mW_rd_r_a = Signal(bshape)
         mW_rd_r_z = Signal(bshape)
-        m.d.comb += mW_rd_r_z.eq(mW_rd_r_a * W_rd.data.real)
+        m.d.comb += mW_rd_r_z.eq(mW_rd_r_a * W_rd_r)
         mW_rd_i_a = Signal(bshape)
         mW_rd_i_z = Signal(bshape)
         m.d.comb += mW_rd_i_z.eq(mW_rd_i_a * W_rd_i)
@@ -176,15 +177,21 @@ class FixedPointFFT(wiring.Component):
                     m.d.sync += [
                         b.real.eq(y_rd.data.real),
                         b.imag.eq(y_rd.data.imag),
+                        mW_rd_r_a.eq(y_rd.data.real),
+                        mW_rd_i_a.eq(y_rd.data.real),
                     ]
                 with m.Else():
                     m.d.sync += [
                         b.real.eq(x_rd.data.real),
                         b.imag.eq(x_rd.data.imag),
+                        mW_rd_r_a.eq(x_rd.data.real),
+                        mW_rd_i_a.eq(x_rd.data.real),
                     ]
                 with m.If(self.ifft):
+                    m.d.sync += W_rd_r.eq(W_rd.data.real)
                     m.d.sync += W_rd_i.eq(W_rd.data.imag)
                 with m.Else():
+                    m.d.sync += W_rd_r.eq(W_rd.data.real)
                     m.d.sync += W_rd_i.eq(-W_rd.data.imag)
                 m.next = "READA-BUTTERFLY0"
 
@@ -201,16 +208,14 @@ class FixedPointFFT(wiring.Component):
                         a.imag.eq(x_rd.data.imag),
                     ]
                 # BUTTERFLY0
-                m.d.comb += mW_rd_r_a.eq(b.real)
+                m.d.sync += mW_rd_i_a.eq(b.imag)
+                m.d.sync += mW_rd_r_a.eq(b.imag)
                 m.d.sync += bw.real.eq(mW_rd_r_z)
-                m.d.comb += mW_rd_i_a.eq(b.real)
                 m.d.sync += bw.imag.eq(mW_rd_i_z)
                 m.next = "BUTTERFLY1"
 
             with m.State("BUTTERFLY1"):
-                m.d.comb += mW_rd_i_a.eq(b.imag)
                 m.d.sync += bw.real.eq(bw.real - mW_rd_i_z)
-                m.d.comb += mW_rd_r_a.eq(b.imag)
                 m.d.sync += bw.imag.eq(bw.imag + mW_rd_r_z)
                 m.next = "WRITE-S"
 
