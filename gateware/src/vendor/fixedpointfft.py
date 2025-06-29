@@ -207,52 +207,31 @@ class FixedPointFFT(wiring.Component):
             with m.State("BUTTERFLY"):
                 with m.If(stage & 1):
                     m.d.sync += [
+                        x_wr.en.eq(1),
                         x_wr.data.real.eq(s.real),
                         x_wr.data.imag.eq(s.imag),
                         x_wr.addr.eq(idx),
                     ]
                 with m.Else():
                     m.d.sync += [
+                        y_wr.en.eq(1),
                         y_wr.data.real.eq(s.real),
                         y_wr.data.imag.eq(s.imag),
                         y_wr.addr.eq(idx),
                     ]
-                m.next = "WRITESUM"
+                m.next = "DIFF"
 
-            with m.State("WRITESUM"):
+            with m.State("DIFF"):
+                # note: _wr still enabled from last state!
                 with m.If(stage & 1):
                     m.d.sync += [
-                        x_wr.en.eq(1),
-                    ]
-                with m.Else():
-                    m.d.sync += [
-                        y_wr.en.eq(1),
-                    ]
-                m.next = "ADDRDIFF"
-
-            with m.State("ADDRDIFF"):
-                with m.If(stage & 1):
-                    m.d.sync += [
-                        x_wr.en.eq(0),
                         x_wr.data.eq(d),
                         x_wr.addr.eq(idx+(self.pts>>1)),
                     ]
                 with m.Else():
                     m.d.sync += [
-                        y_wr.en.eq(0),
                         y_wr.data.eq(d),
                         y_wr.addr.eq(idx+(self.pts>>1)),
-                    ]
-                m.next = "WRITEDIFF"
-
-            with m.State("WRITEDIFF"):
-                with m.If(stage & 1):
-                    m.d.sync += [
-                        x_wr.en.eq(1),
-                    ]
-                with m.Else():
-                    m.d.sync += [
-                        y_wr.en.eq(1),
                     ]
                 m.d.sync += idx.eq(idx+1)
                 m.next = "FFTLOOP"
