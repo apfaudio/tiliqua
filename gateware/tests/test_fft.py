@@ -20,7 +20,7 @@ class FFTTests(unittest.TestCase):
         m = Module()
 
         fft = FixedPointFFT(pts=256)
-        ifft = FixedPointFFT(pts=256, shape=fixed.SQ(1, 32))
+        ifft = FixedPointFFT(pts=256, ifft=True)
 
         m.d.comb += [
             ifft.in_i.eq(fft.out_real),

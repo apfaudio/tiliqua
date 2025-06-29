@@ -58,22 +58,23 @@ class FixedPointFFT(wiring.Component):
     """
     def __init__(self,
                  shape: fixed.Shape=fixed.SQ(1, 17),
-                 pts:   int=1024) -> None:
+                 pts:   int=1024,
+                 ifft = False) -> None:
 
+        self.ifft     = ifft
         self.shape    = shape
         self.wshape   = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
         self.pts      = pts
         self.stages   = exact_log2(pts)
 
         self.Wr = [cos(k*2*pi/pts) for k in range(pts)]
-        self.Wi = [-sin(k*2*pi/pts) for k in range(pts)]
+        if self.ifft:
+            self.Wi = [sin(k*2*pi/pts) for k in range(pts)]
+        else:
+            self.Wi = [-sin(k*2*pi/pts) for k in range(pts)]
 
-        # 4-term Blackman-Harris window function is default
-        self.wFr = [0.35875-0.48829*cos(k*2*pi/pts)
-                    +0.14128*cos(k*4*pi/pts)
-                    -0.01168*cos(k*6*pi/pts)
-                    for k in range(pts)]
-        self.wFi = [0 for k in range(pts)]
+        self.wFr = [1.0 for k in range(pts)]
+        self.wFi = [0.0 for k in range(pts)]
 
         super().__init__({
             "start":      In(1),
@@ -417,16 +418,28 @@ class FixedPointFFT(wiring.Component):
                     m.next = "READOUT"
 
             with m.State("READOUT"):
-                with m.If(N & 1):
-                    m.d.sync += [
-                        self.out_real.eq(yr_rd.data>>N),
-                        self.out_imag.eq(yi_rd.data>>N),
-                    ]
-                with m.Else():
-                    m.d.sync += [
-                        self.out_real.eq(xr_rd.data>>N),
-                        self.out_imag.eq(xi_rd.data>>N),
-                    ]
+                if self.ifft:
+                    with m.If(N & 1):
+                        m.d.sync += [
+                            self.out_real.eq(yr_rd.data),
+                            self.out_imag.eq(yi_rd.data),
+                        ]
+                    with m.Else():
+                        m.d.sync += [
+                            self.out_real.eq(xr_rd.data),
+                            self.out_imag.eq(xi_rd.data),
+                        ]
+                else:
+                    with m.If(N & 1):
+                        m.d.sync += [
+                            self.out_real.eq(yr_rd.data>>N),
+                            self.out_imag.eq(yi_rd.data>>N),
+                        ]
+                    with m.Else():
+                        m.d.sync += [
+                            self.out_real.eq(xr_rd.data>>N),
+                            self.out_imag.eq(xi_rd.data>>N),
+                        ]
                 m.d.sync += [
                     idx.eq(idx+1),
                 ]
