@@ -17,7 +17,19 @@ class FFTTests(unittest.TestCase):
 
     def test_fft(self):
 
+        m = Module()
+
         fft = FixedPointFFT(pts=256)
+        ifft = FixedPointFFT(pts=256, shape=fixed.SQ(1, 32))
+
+        m.d.comb += [
+            ifft.in_i.eq(fft.out_real),
+            ifft.in_q.eq(fft.out_imag),
+            ifft.strobe_in.eq(fft.strobe_out),
+        ]
+
+        m.submodules.fft = fft
+        m.submodules.ifft = ifft
 
         async def testbench(ctx):
             dut = fft
@@ -36,6 +48,7 @@ class FFTTests(unittest.TestCase):
             #WR =[0.3635819-0.4891775*cos(k*2*pi/PTS)+0.1365995*cos(k*4*pi/PTS)-0.0106411*cos(k*6*pi/PTS) for k in range(PTS)]
             WI =[0.0 for i in range(PTS)]
 
+            """
             await ctx.tick()
             ctx.set(dut.wf_start, 1)
             await ctx.tick()
@@ -58,6 +71,7 @@ class FFTTests(unittest.TestCase):
             # Waiting done
             for _ in range(16):
                 await ctx.tick()
+            """
 
             # FFT
             await ctx.tick()
@@ -79,11 +93,19 @@ class FFTTests(unittest.TestCase):
                 await ctx.tick()
                 await ctx.tick()
 
-            # Looks that it will take ~13 cycles for read-butterfly-write
-            for _ in range(PTS*LPTS*13):
+            for _ in range(PTS*LPTS*10):
                 await ctx.tick()
 
-        sim = Simulator(fft)
+            ctx.set(ifft.start, 1)
+            await ctx.tick()
+            ctx.set(ifft.start, 0)
+            await ctx.tick()
+
+            # Looks that it will take ~13 cycles for read-butterfly-write
+            for _ in range(PTS*LPTS*20):
+                await ctx.tick()
+
+        sim = Simulator(m)
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_fft.vcd", "w")):

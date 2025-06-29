@@ -428,9 +428,12 @@ class FixedPointFFT(wiring.Component):
                         self.out_imag.eq(xi_rd.data>>N),
                     ]
                 m.d.sync += [
-                    self.strobe_out.eq(1),
                     idx.eq(idx+1),
                 ]
+                m.next = "WAITO"
+
+            with m.State("WAITO"):
+                m.d.sync += self.strobe_out.eq(1)
                 m.next = "OUTPUT"
 
             with m.State("DONE"):
