@@ -169,31 +169,27 @@ class FixedPointFFT(wiring.Component):
                     m.d.sync += idx.eq(0)
                     m.next = "OUTPUT"
                 with m.Else():
-                    m.next = "ADDRB"
-
-            with m.State("ADDRB"):
-                with m.If(stage & 1):
                     m.d.comb += y_rd.addr.eq(2*idx+1)
-                with m.Else():
                     m.d.comb += x_rd.addr.eq(2*idx+1)
-                m.next = "READB"
+                    m.next = "READB"
 
             with m.State("READB"):
+                m.d.comb += y_rd.addr.eq(2*idx)
+                m.d.comb += x_rd.addr.eq(2*idx)
                 with m.If(stage & 1):
-                    m.d.comb += y_rd.addr.eq(2*idx)
                     m.d.sync += [
                         b.real.eq(y_rd.data.real),
                         b.imag.eq(y_rd.data.imag),
                     ]
                 with m.Else():
-                    m.d.comb += x_rd.addr.eq(2*idx)
                     m.d.sync += [
                         b.real.eq(x_rd.data.real),
                         b.imag.eq(x_rd.data.imag),
                     ]
-                m.next = "READA"
+                m.next = "READA-BUTTERFLY0"
 
-            with m.State("READA"):
+            with m.State("READA-BUTTERFLY0"):
+                # READA
                 with m.If(stage & 1):
                     m.d.sync += [
                         a.real.eq(y_rd.data.real),
@@ -204,9 +200,7 @@ class FixedPointFFT(wiring.Component):
                         a.real.eq(x_rd.data.real),
                         a.imag.eq(x_rd.data.imag),
                     ]
-                m.next = "BUTTERFLY0"
-
-            with m.State("BUTTERFLY0"):
+                # BUTTERFLY0
                 m.d.comb += mW_rd_r_a.eq(b.real)
                 m.d.sync += bw.real.eq(mW_rd_r_z)
                 m.d.comb += mW_rd_i_a.eq(b.real)
