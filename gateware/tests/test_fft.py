@@ -4,7 +4,7 @@ from math import cos, sin, pi
 
 from amaranth              import *
 from amaranth.sim          import *
-from amaranth.utils        import log2_int
+from amaranth.utils        import exact_log2
 
 from amaranth_future       import fixed
 
@@ -19,10 +19,10 @@ class FFTTests(unittest.TestCase):
 
         fft = FixedPointFFT(bitwidth=18, pts=256)
 
-        def testbench():
+        async def testbench(ctx):
             dut = fft
             PTS = 256
-            LPTS = log2_int(PTS)
+            LPTS = exact_log2(PTS)
 
             I =[int(cos(2*16*pi*i/PTS) * (2**16-1)) for i in range(PTS)]
             Q =[int(sin(2*16*pi*i/PTS) * (2**16-1)) for i in range(PTS)]
@@ -36,56 +36,56 @@ class FFTTests(unittest.TestCase):
             #WR =[int((0.3635819-0.4891775*cos(k*2*pi/PTS)+0.1365995*cos(k*4*pi/PTS)-0.0106411*cos(k*6*pi/PTS))*(2**17-1)) for k in range(PTS)]
             WI =[0 for i in range(PTS)]
 
-            yield Tick()
-            yield dut.wf_start.eq(1)
-            yield Tick()
-            yield dut.wf_start.eq(0)
-            yield Tick()
-            yield Tick()
-            yield Tick()
+            await ctx.tick()
+            ctx.set(dut.wf_start, 1)
+            await ctx.tick()
+            ctx.set(dut.wf_start, 0)
+            await ctx.tick()
+            await ctx.tick()
+            await ctx.tick()
 
             for i in range(PTS):
-                yield dut.wf_real.eq(WR[i])
-                yield dut.wf_imag.eq(WI[i])
-                yield Tick()
-                yield dut.wf_strobe.eq(1)
-                yield Tick()
-                yield dut.wf_strobe.eq(0)
-                yield Tick()
-                yield Tick()
-                yield Tick()
+                ctx.set(dut.wf_real, WR[i])
+                ctx.set(dut.wf_imag, WI[i])
+                await ctx.tick()
+                ctx.set(dut.wf_strobe, 1)
+                await ctx.tick()
+                ctx.set(dut.wf_strobe, 0)
+                await ctx.tick()
+                await ctx.tick()
+                await ctx.tick()
 
             # Waiting done
             for _ in range(16):
-                yield Tick()
+                await ctx.tick()
 
             # FFT
-            yield Tick()
-            yield dut.start.eq(1)
-            yield Tick()
-            yield dut.start.eq(0)
-            yield Tick()
-            yield Tick()
-            yield Tick()
+            await ctx.tick()
+            ctx.set(dut.start, 1)
+            await ctx.tick()
+            ctx.set(dut.start, 0)
+            await ctx.tick()
+            await ctx.tick()
+            await ctx.tick()
 
             for i in range(PTS):
-                yield dut.in_i.eq(I[i])
-                yield dut.in_q.eq(Q[i])
-                yield Tick()
-                yield dut.strobe_in.eq(1)
-                yield Tick()
-                yield dut.strobe_in.eq(0)
-                yield Tick()
-                yield Tick()
-                yield Tick()
+                ctx.set(dut.in_i, I[i])
+                ctx.set(dut.in_q, Q[i])
+                await ctx.tick()
+                ctx.set(dut.strobe_in, 1)
+                await ctx.tick()
+                ctx.set(dut.strobe_in, 0)
+                await ctx.tick()
+                await ctx.tick()
+                await ctx.tick()
 
             # Looks that it will take ~13 cycles for read-butterfly-write
             for _ in range(PTS*LPTS*13):
-                yield Tick()
+                await ctx.tick()
 
         sim = Simulator(fft)
         sim.add_clock(1e-6)
-        sim.add_process(testbench)
+        sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_fft.vcd", "w")):
             sim.run()
 
