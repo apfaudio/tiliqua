@@ -8,8 +8,8 @@
 # SPDX-License-Identifier: CERN-OHL-W-2.0
 
 from amaranth import *
-from amaranth import Signal, Module, Elaboratable, Memory
-from amaranth.utils import log2_int
+from amaranth.lib.memory import Memory
+from amaranth.utils import exact_log2
 
 from math import cos, sin, pi
 
@@ -62,10 +62,10 @@ class FixedPointFFT(Elaboratable):
 
         self.bitwidth = bitwidth
         self.pts      = pts
-        self.stages   = log2_int(pts)
+        self.stages   = exact_log2(pts)
 
         self.start = Signal()
-        self.done = Signal(reset=1)
+        self.done = Signal(init=1)
 
         self.in_i = Signal(signed(bitwidth))
         self.in_q = Signal(signed(bitwidth))
@@ -94,32 +94,36 @@ class FixedPointFFT(Elaboratable):
         width = self.bitwidth
         bw = width + self.stages
         pts = self.pts
-        xr = Memory(width=bw, depth=self.pts, name="xr")
-        xi = Memory(width=bw, depth=self.pts, name="xi")
-        yr = Memory(width=bw, depth=self.pts, name="yr")
-        yi = Memory(width=bw, depth=self.pts, name="yi")
+        m.submodules.xr = xr = Memory(shape=signed(bw), depth=self.pts, init=[])
+        m.submodules.xi = xi = Memory(shape=signed(bw), depth=self.pts, init=[])
+        m.submodules.yr = yr = Memory(shape=signed(bw), depth=self.pts, init=[])
+        m.submodules.yi = yi = Memory(shape=signed(bw), depth=self.pts, init=[])
 
-        wFr = Memory(width=width+1, depth=self.pts, init=self.wFr, name="wFr")
-        wFi = Memory(width=width+1, depth=self.pts, init=self.wFi, name="wFi")
-        Wr = Memory(width=width+1, depth=self.pts, init=self.Wr, name="Wr")
-        Wi = Memory(width=width+1, depth=self.pts, init=self.Wi, name="Wi")
+        m.submodules.wFr = wFr = Memory(
+                shape=signed(width+1), depth=self.pts, init=self.wFr)
+        m.submodules.wFi = wFi = Memory(
+                shape=signed(width+1), depth=self.pts, init=self.wFi)
+        m.submodules.Wr = Wr = Memory(
+                shape=signed(width+1), depth=self.pts, init=self.Wr)
+        m.submodules.Wi = Wi = Memory(
+                shape=signed(width+1), depth=self.pts, init=self.Wi)
 
-        m.submodules.xr_rd = xr_rd = xr.read_port()
-        m.submodules.xr_wr = xr_wr = xr.write_port()
-        m.submodules.xi_rd = xi_rd = xi.read_port()
-        m.submodules.xi_wr = xi_wr = xi.write_port()
-        m.submodules.yr_rd = yr_rd = yr.read_port()
-        m.submodules.yr_wr = yr_wr = yr.write_port()
-        m.submodules.yi_rd = yi_rd = yi.read_port()
-        m.submodules.yi_wr = yi_wr = yi.write_port()
+        xr_rd = xr.read_port()
+        xr_wr = xr.write_port()
+        xi_rd = xi.read_port()
+        xi_wr = xi.write_port()
+        yr_rd = yr.read_port()
+        yr_wr = yr.write_port()
+        yi_rd = yi.read_port()
+        yi_wr = yi.write_port()
 
-        m.submodules.wFr_rd = wFr_rd = wFr.read_port()
-        m.submodules.wFr_wr = wFr_wr = wFr.write_port()
-        m.submodules.wFi_rd = wFi_rd = wFi.read_port()
-        m.submodules.wFi_wr = wFi_wr = wFi.write_port()
+        wFr_rd = wFr.read_port()
+        wFr_wr = wFr.write_port()
+        wFi_rd = wFi.read_port()
+        wFi_wr = wFi.write_port()
 
-        m.submodules.Wr_rd = Wr_rd = Wr.read_port()
-        m.submodules.Wi_rd = Wi_rd = Wi.read_port()
+        Wr_rd = Wr.read_port()
+        Wi_rd = Wi.read_port()
 
         N = self.stages
         idx = Signal(N+1)
@@ -199,7 +203,7 @@ class FixedPointFFT(Elaboratable):
         ]
 
         # Control FSM
-        with m.FSM(reset="IDLE"):
+        with m.FSM(init="IDLE"):
             with m.State("IDLE"):
                 with m.If(self.start):
                     m.d.sync += [
