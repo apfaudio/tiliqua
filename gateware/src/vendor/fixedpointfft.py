@@ -17,45 +17,7 @@ from amaranth_future import fixed
 from math import cos, sin, pi
 
 class FixedPointFFT(wiring.Component):
-    """ FFT
 
-        Attributes
-        ----------
-        in_i: Signal(width), I input
-            Filter real part of input signal
-        in_q: Signal(width), I input
-            Filter imaginary part of input signal
-        out_real: Signal(width), out
-            FFT real part of output
-        out_imag: Signal(width), out
-            FFT imaginary part of output
-        strobe_in: Signal(), input
-            Input strobe, must be 1 sys clock period
-        strobe_out: Signal(), out
-            Output strobe
-        start: Signal(), I input
-            Start trigger of FFT
-        done: Signal(), out
-            Flag of the end of operations (FFT and loading window function)
-
-        Attributes for window function load
-        -----------------------------------
-        wf_real: Signal(width+1), out
-            real part of window function
-        wf_imag: Signal(width+1), out
-            imaginary part of window function
-        wf_strobe: Signal(), input
-            Input strobe for window function, must be 1 sys clock period
-        wf_start: Signal(), I input
-            Start trigger of loading window function
-
-        Parameters
-        ----------
-        shape: fixed.Shape
-            shape of desired fixed-point representation
-        pts: int
-            number of points (should be a power of 2)
-    """
     def __init__(self,
                  shape: fixed.Shape=fixed.SQ(1, 17),
                  pts:   int=1024,
@@ -72,9 +34,6 @@ class FixedPointFFT(wiring.Component):
             self.Wi = [sin(k*2*pi/pts) for k in range(pts)]
         else:
             self.Wi = [-sin(k*2*pi/pts) for k in range(pts)]
-
-        self.wFr = [1.0 for k in range(pts)]
-        self.wFi = [0.0 for k in range(pts)]
 
         super().__init__({
             "start":      In(1),
@@ -103,10 +62,6 @@ class FixedPointFFT(wiring.Component):
         m.submodules.yr = yr = memory.Memory(shape=bshape, depth=self.pts, init=[])
         m.submodules.yi = yi = memory.Memory(shape=bshape, depth=self.pts, init=[])
 
-        m.submodules.wFr = wFr = memory.Memory(
-                shape=self.wshape,  depth=self.pts, init=self.wFr)
-        m.submodules.wFi = wFi = memory.Memory(
-                shape=self.wshape, depth=self.pts, init=self.wFi)
         m.submodules.Wr = Wr = memory.Memory(
                 shape=self.wshape, depth=self.pts, init=self.Wr)
         m.submodules.Wi = Wi = memory.Memory(
@@ -121,11 +76,6 @@ class FixedPointFFT(wiring.Component):
         yi_rd = yi.read_port()
         yi_wr = yi.write_port()
 
-        wFr_rd = wFr.read_port()
-        wFr_wr = wFr.write_port()
-        wFi_rd = wFi.read_port()
-        wFi_wr = wFi.write_port()
-
         Wr_rd = Wr.read_port()
         Wi_rd = Wi.read_port()
 
@@ -133,27 +83,6 @@ class FixedPointFFT(wiring.Component):
         idx = Signal(N+1)
         revidx = Signal(N)
         m.d.comb += revidx.eq(Cat([idx.bit_select(i,1) for i in reversed(range(N))]))
-
-        # Window
-        wfr = Signal(self.wshape)
-        wfi = Signal(self.wshape)
-        i_cooked = Signal(self.shape)
-        q_cooked = Signal(self.shape)
-        m.d.comb += [
-            wFr_rd.addr.eq(idx),
-            wfr.eq(wFr_rd.data),
-            wFi_rd.addr.eq(idx),
-            wfi.eq(wFi_rd.data),
-            i_cooked.eq(wfr*self.in_i - wfi*self.in_q),
-            q_cooked.eq(wfr*self.in_q + wfi*self.in_i),
-        ]
-
-        # Window write
-        wfidx = Signal(range(self.pts+1))
-        m.d.comb += [
-            wFr_wr.data.eq(self.wf_real),
-            wFi_wr.data.eq(self.wf_imag),
-        ]
 
         # FFT
         widx = Signal(N)
@@ -200,34 +129,9 @@ class FixedPointFFT(wiring.Component):
                         self.done.eq(0),
                         idx.eq(0),
                     ]
-                    m.next = "WINDOW"
-                with m.Elif(self.wf_start):
-                    m.d.sync += [
-                        self.done.eq(0),
-                        wfidx.eq(0),
-                    ]
-                    m.next = "WINDOW_WRLOOP"
+                    m.next = "LOAD1"
 
-            with m.State("WINDOW_WRLOOP"):
-                m.d.sync += wFr_wr.en.eq(0)
-                m.d.sync += wFi_wr.en.eq(0)
-                with m.If(wfidx >= self.pts):
-                    m.d.sync += wfidx.eq(0)
-                    m.next = "DONE"
-                with m.Else():
-                    m.d.sync += wfidx.eq(wfidx+1)
-                    m.next = "WINDOW_WR"
-
-            with m.State("WINDOW_WR"):
-                with m.If(self.wf_strobe):
-                    m.d.sync += [
-                        wFr_wr.addr.eq(wfidx),
-                        wFr_wr.en.eq(1),
-                        wFi_wr.en.eq(1),
-                    ]
-                    m.next = "WINDOW_WRLOOP"
-
-            with m.State("WINDOW"):
+            with m.State("LOAD1"):
                 m.d.sync += xr_wr.en.eq(0)
                 m.d.sync += xi_wr.en.eq(0)
                 with m.If(idx >= self.pts):
@@ -238,25 +142,20 @@ class FixedPointFFT(wiring.Component):
                     ]
                     m.next = "FFTLOOP"
                 with m.Else():
-                    m.next = "WINDOW_MUL"
+                    m.next = "LOAD2"
 
-            with m.State("WINDOW_MUL"):
+            with m.State("LOAD2"):
                 with m.If(self.strobe_in):
                     m.d.sync += [
-                        xr_wr.data.eq(i_cooked),
-                        xi_wr.data.eq(q_cooked),
+                        xr_wr.data.eq(self.in_i),
+                        xi_wr.data.eq(self.in_q),
                         xr_wr.addr.eq(revidx),
                         xi_wr.addr.eq(revidx),
+                        xr_wr.en.eq(1),
+                        xi_wr.en.eq(1),
+                        idx.eq(idx+1),
                     ]
-                    m.next = "WINDOW_WRITE"
-
-            with m.State("WINDOW_WRITE"):
-                m.d.sync += [
-                    xr_wr.en.eq(1),
-                    xi_wr.en.eq(1),
-                    idx.eq(idx+1),
-                ]
-                m.next = "WINDOW"
+                    m.next = "LOAD1"
 
             with m.State("FFTLOOP"):
                 m.d.sync += [
@@ -442,11 +341,8 @@ class FixedPointFFT(wiring.Component):
                         ]
                 m.d.sync += [
                     idx.eq(idx+1),
+                    self.strobe_out.eq(1),
                 ]
-                m.next = "WAITO"
-
-            with m.State("WAITO"):
-                m.d.sync += self.strobe_out.eq(1)
                 m.next = "OUTPUT"
 
             with m.State("DONE"):
