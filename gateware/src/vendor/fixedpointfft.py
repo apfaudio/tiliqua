@@ -114,6 +114,11 @@ class FixedPointFFT(wiring.Component):
             m.d.comb += self.o.payload.sample.real.eq(x_rd.data.real>>rsh)
             m.d.comb += self.o.payload.sample.imag.eq(x_rd.data.imag>>rsh)
 
+        with m.If(N & 1):
+            m.d.comb += y_rd.addr.eq(idx),
+        with m.Else():
+            m.d.comb += x_rd.addr.eq(idx),
+
         # Control FSM
         with m.FSM():
             with m.State("RESET"):
@@ -163,43 +168,24 @@ class FixedPointFFT(wiring.Component):
 
             with m.State("ADDRB"):
                 with m.If(stage & 1):
-                    m.d.sync += [
-                        y_rd.addr.eq(2*idx+1),
-                    ]
+                    m.d.comb += y_rd.addr.eq(2*idx+1)
                 with m.Else():
-                    m.d.sync += [
-                        x_rd.addr.eq(2*idx+1),
-                    ]
-                m.next = "ADDRB_LATCHED"
-
-            with m.State("ADDRB_LATCHED"):
+                    m.d.comb += x_rd.addr.eq(2*idx+1)
                 m.next = "READB"
 
             with m.State("READB"):
                 with m.If(stage & 1):
+                    m.d.comb += y_rd.addr.eq(2*idx)
                     m.d.sync += [
                         b.real.eq(y_rd.data.real),
                         b.imag.eq(y_rd.data.imag),
                     ]
                 with m.Else():
+                    m.d.comb += x_rd.addr.eq(2*idx)
                     m.d.sync += [
                         b.real.eq(x_rd.data.real),
                         b.imag.eq(x_rd.data.imag),
                     ]
-                m.next = "ADDRA"
-
-            with m.State("ADDRA"):
-                with m.If(stage & 1):
-                    m.d.sync += [
-                        y_rd.addr.eq(2*idx),
-                    ]
-                with m.Else():
-                    m.d.sync += [
-                        x_rd.addr.eq(2*idx),
-                    ]
-                m.next = "ADDRA_LATCHED"
-
-            with m.State("ADDRA_LATCHED"):
                 m.next = "READA"
 
             with m.State("READA"):
@@ -272,14 +258,6 @@ class FixedPointFFT(wiring.Component):
                 with m.If(idx >= self.pts):
                     m.next = "RESET"
                 with m.Else():
-                    with m.If(N & 1):
-                        m.d.sync += [
-                            y_rd.addr.eq(idx),
-                        ]
-                    with m.Else():
-                        m.d.sync += [
-                            x_rd.addr.eq(idx),
-                        ]
                     m.next = "READOUT"
 
             with m.State("READOUT"):

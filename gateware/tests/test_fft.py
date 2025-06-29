@@ -53,7 +53,7 @@ class FFTTests(unittest.TestCase):
                 await ctx.tick()
                 await ctx.tick()
 
-            for _ in range(PTS*LPTS*30):
+            for _ in range(PTS*LPTS*18):
                 await ctx.tick()
 
         sim = Simulator(m)
