@@ -21,7 +21,11 @@ class FFTTests(unittest.TestCase):
         m = Module()
 
         fft = FixedPointFFT(pts=256)
-        ifft = FixedPointFFT(pts=256, ifft=True)
+        ifft = FixedPointFFT(pts=256)
+        m.d.comb += [
+            fft.ifft.eq(0),
+            ifft.ifft.eq(1),
+        ]
 
         wiring.connect(m, fft.o, ifft.i)
         m.d.comb += ifft.o.ready.eq(1)

@@ -27,16 +27,15 @@ class FixedPointFFT(wiring.Component):
 
     def __init__(self,
                  shape: fixed.Shape=fixed.SQ(1, 15),
-                 pts:   int=1024,
-                 ifft = False) -> None:
+                 pts:   int=1024) -> None:
 
-        self.ifft     = ifft
         self.shape    = shape
         self.wshape   = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
         self.pts      = pts
         self.stages   = exact_log2(pts)
 
         super().__init__({
+            "ifft": In(1, init=0),
             "i": In(stream.Signature(data.StructLayout({
                 "sample": CQ(self.shape)
             }))),
@@ -54,8 +53,7 @@ class FixedPointFFT(wiring.Component):
 
         twiddle = [
             {'real': cos(k*2*pi/self.pts),
-             # conjugate twiddle factors for ifft
-             'imag': (1 if self.ifft else -1) * sin(k*2*pi/self.pts)}
+             'imag': sin(k*2*pi/self.pts)}
             for k in range(self.pts)
         ]
 
@@ -90,9 +88,15 @@ class FixedPointFFT(wiring.Component):
 
         # complex multiplication
         bw = Signal(CQ(bshape))
+        # conjugate twiddle factors on inverse fft.
+        W_rd_i = Signal(bshape)
+        with m.If(self.ifft):
+            m.d.comb += W_rd_i.eq(W_rd.data.imag)
+        with m.Else():
+            m.d.comb += W_rd_i.eq(-W_rd.data.imag)
         m.d.comb += [
-            bw.real.eq((b.real * W_rd.data.real) - (b.imag * W_rd.data.imag)),
-            bw.imag.eq((b.real * W_rd.data.imag) + (b.imag * W_rd.data.real)),
+            bw.real.eq((b.real * W_rd.data.real) - (b.imag * W_rd_i)),
+            bw.imag.eq((b.real * W_rd_i) + (b.imag * W_rd.data.real)),
         ]
 
         # butterfly
@@ -106,13 +110,12 @@ class FixedPointFFT(wiring.Component):
         ]
 
         # output and normalization based on ifft / stages
-        rsh = 0 if self.ifft else N
         if N & 1:
-            m.d.comb += self.o.payload.sample.real.eq(y_rd.data.real>>rsh)
-            m.d.comb += self.o.payload.sample.imag.eq(y_rd.data.imag>>rsh)
+            m.d.comb += self.o.payload.sample.real.eq(y_rd.data.real>>Mux(self.ifft, 0, N))
+            m.d.comb += self.o.payload.sample.imag.eq(y_rd.data.imag>>Mux(self.ifft, 0, N))
         else:
-            m.d.comb += self.o.payload.sample.real.eq(x_rd.data.real>>rsh)
-            m.d.comb += self.o.payload.sample.imag.eq(x_rd.data.imag>>rsh)
+            m.d.comb += self.o.payload.sample.real.eq(x_rd.data.real>>Mux(self.ifft, 0, N))
+            m.d.comb += self.o.payload.sample.imag.eq(x_rd.data.imag>>Mux(self.ifft, 0, N))
 
         with m.If(N & 1):
             m.d.comb += y_rd.addr.eq(idx),
