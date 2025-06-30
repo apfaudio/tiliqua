@@ -87,7 +87,7 @@ class FixedPointFFT(wiring.Component):
         # to the current twiddle factor real/imag components, so a mux
         # is only needed on one side of the DSP tile inputs.
         bw = Signal(CQ(bshape))
-        W_rd_l = Signal(CQ(bshape))
+        W_rd_l = Signal(CQ(wshape))
         mW_rd_r_a = Signal(bshape)
         mW_rd_r_z = Signal(bshape)
         m.d.comb += mW_rd_r_z.eq(mW_rd_r_a * W_rd_l.real)
