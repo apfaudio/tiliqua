@@ -28,12 +28,8 @@ class FixedPointFFT(wiring.Component):
     def __init__(self,
                  shape: fixed.Shape=fixed.SQ(1, 15),
                  pts:   int=1024) -> None:
-
-        self.shape    = shape
-        self.wshape   = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
-        self.pts      = pts
-        self.stages   = exact_log2(pts)
-
+        self.pts   = pts
+        self.shape = shape
         super().__init__({
             "ifft": In(1, init=0),
             "i": In(stream.Signature(data.StructLayout({
@@ -47,58 +43,62 @@ class FixedPointFFT(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        bshape = fixed.SQ(self.shape.i_bits + self.stages, self.shape.f_bits-1)
+        # number of stages in FFT
+        n_stages = exact_log2(self.pts)
+        # butterfly / accumulator shape
+        bshape = fixed.SQ(self.shape.i_bits + n_stages, self.shape.f_bits-1)
+        # twiddle factor / window shape
+        wshape = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
+
+        # Complex ping-pong RAM for FFT stages (input, processing and output)
         m.submodules.x = x = memory.Memory(shape=CQ(bshape), depth=self.pts, init=[])
         m.submodules.y = y = memory.Memory(shape=CQ(bshape), depth=self.pts, init=[])
-
-        twiddle = [
-            {'real': cos(k*2*pi/self.pts),
-             'imag': sin(k*2*pi/self.pts)}
-            for k in range(self.pts)
-        ]
-
-        m.submodules.W = W = memory.Memory(
-                shape=CQ(self.wshape), depth=self.pts, init=twiddle)
-
         x_rd = x.read_port()
         x_wr = x.write_port()
         y_rd = y.read_port()
         y_wr = y.write_port()
 
+        # complex ROM for FFT twiddle factors
+        twiddle = [
+            {'real': cos(k*2*pi/self.pts),
+             'imag': sin(k*2*pi/self.pts)}
+            for k in range(self.pts)
+        ]
+        m.submodules.W = W = memory.Memory(
+                shape=CQ(wshape), depth=self.pts, init=twiddle)
         W_rd = W.read_port()
 
-        N = self.stages
-        idx = Signal(N+1)
-        revidx = Signal(N)
-        m.d.comb += revidx.eq(Cat([idx.bit_select(i,1) for i in reversed(range(N))]))
+        # FFT addressing
+        idx = Signal(n_stages+1)
+        revidx = Signal(n_stages)
+        stage = Signal(range(n_stages+1))
+        m.d.comb += revidx.eq(Cat([idx.bit_select(i,1) for i in reversed(range(n_stages))]))
 
-        # FFT
-        widx = Signal(N)
-        stage = Signal(range(N+1))
-        mask = Signal(signed(N))
-
-        a = Signal(CQ(bshape))
-        b = Signal(CQ(bshape))
-
-        # Coefficients
+        # Twiddle factor addressing
+        widx = Signal(n_stages)
+        mask = Signal(signed(n_stages))
         m.d.comb += [
             widx.eq(idx & mask),
             W_rd.addr.eq(widx),
         ]
 
-        # complex multiplication
+        # Complex multiplication by twiddle factors requires 4
+        # multiplies. Instead we supply 2 multipliers wired up
+        # to the current twiddle factor real/imag components, so a mux
+        # is only needed on one side of the DSP tile inputs.
         bw = Signal(CQ(bshape))
-        # conjugate twiddle factors on inverse fft.
-        W_rd_r = Signal(bshape)
-        W_rd_i = Signal(bshape)
+        W_rd_l = Signal(CQ(bshape))
         mW_rd_r_a = Signal(bshape)
         mW_rd_r_z = Signal(bshape)
-        m.d.comb += mW_rd_r_z.eq(mW_rd_r_a * W_rd_r)
+        m.d.comb += mW_rd_r_z.eq(mW_rd_r_a * W_rd_l.real)
         mW_rd_i_a = Signal(bshape)
         mW_rd_i_z = Signal(bshape)
-        m.d.comb += mW_rd_i_z.eq(mW_rd_i_a * W_rd_i)
+        m.d.comb += mW_rd_i_z.eq(mW_rd_i_a * W_rd_l.imag)
 
-        # butterfly
+        # Butterfly sum and difference calculation based on
+        # result of twiddle factor multiplication.
+        a = Signal(CQ(bshape))
+        b = Signal(CQ(bshape))
         s = Signal(CQ(bshape))
         d = Signal(CQ(bshape))
         m.d.comb += [
@@ -108,18 +108,23 @@ class FixedPointFFT(wiring.Component):
             d.imag.eq(a.imag - bw.imag),
         ]
 
-        # output and normalization based on ifft / stages
-        if N & 1:
-            m.d.comb += self.o.payload.sample.real.eq(y_rd.data.real>>Mux(self.ifft, 0, N))
-            m.d.comb += self.o.payload.sample.imag.eq(y_rd.data.imag>>Mux(self.ifft, 0, N))
+        # Output and normalization based on ifft / n_stages
+        if n_stages & 1:
+            m.d.comb += self.o.payload.sample.real.eq(y_rd.data.real>>Mux(self.ifft, 0, n_stages))
+            m.d.comb += self.o.payload.sample.imag.eq(y_rd.data.imag>>Mux(self.ifft, 0, n_stages))
         else:
-            m.d.comb += self.o.payload.sample.real.eq(x_rd.data.real>>Mux(self.ifft, 0, N))
-            m.d.comb += self.o.payload.sample.imag.eq(x_rd.data.imag>>Mux(self.ifft, 0, N))
+            m.d.comb += self.o.payload.sample.real.eq(x_rd.data.real>>Mux(self.ifft, 0, n_stages))
+            m.d.comb += self.o.payload.sample.imag.eq(x_rd.data.imag>>Mux(self.ifft, 0, n_stages))
 
-        with m.If(N & 1):
-            m.d.comb += y_rd.addr.eq(idx),
-        with m.Else():
-            m.d.comb += x_rd.addr.eq(idx),
+        # Default RAM addressing and write enable
+        m.d.comb += [
+            y_rd.addr.eq(idx),
+            x_rd.addr.eq(idx),
+        ]
+        m.d.sync += [
+            x_wr.en.eq(0),
+            y_wr.en.eq(0),
+        ]
 
         # Control FSM
         with m.FSM():
@@ -128,12 +133,11 @@ class FixedPointFFT(wiring.Component):
                 m.next = "LOAD1"
 
             with m.State("LOAD1"):
-                m.d.sync += x_wr.en.eq(0)
                 with m.If(idx >= self.pts):
                     m.d.sync += [
                         stage.eq(0),
                         idx.eq(0),
-                        mask.eq(~((2 << (N-2))-1)),
+                        mask.eq(~((2 << (n_stages-2))-1)),
                     ]
                     m.next = "FFTLOOP"
                 with m.Else():
@@ -152,25 +156,28 @@ class FixedPointFFT(wiring.Component):
                     m.next = "LOAD1"
 
             with m.State("FFTLOOP"):
-                m.d.sync += [
-                    x_wr.en.eq(0),
-                    y_wr.en.eq(0),
-                ]
+                # Don't write anything to RAM until necessary.
                 with m.If(idx >= self.pts):
+                    # This stage is complete. Move to next stage.
                     m.d.sync += [
                         idx.eq(0),
                         mask.eq(mask>>1),
                         stage.eq(stage+1),
                     ]
-                with m.If(stage >= N):
+                with m.If(stage >= n_stages):
+                    # FFT calculation is complete. Output result.
                     m.d.sync += idx.eq(0)
                     m.next = "OUTPUT"
                 with m.Else():
+                    # This stage requires more processing. Set up
+                    # a read for 'B' from RAM.
                     m.d.comb += y_rd.addr.eq(2*idx+1)
                     m.d.comb += x_rd.addr.eq(2*idx+1)
                     m.next = "READB"
 
             with m.State("READB"):
+                # Read out 'B' from RAM, latch it to the complex multiplier
+                # inputs, and simultaneously set up a read for 'A' from RAM.
                 m.d.comb += y_rd.addr.eq(2*idx)
                 m.d.comb += x_rd.addr.eq(2*idx)
                 with m.If(stage & 1):
@@ -187,16 +194,18 @@ class FixedPointFFT(wiring.Component):
                         mW_rd_r_a.eq(x_rd.data.real),
                         mW_rd_i_a.eq(x_rd.data.real),
                     ]
+                # Latch current twiddle factors from memory to cut timing.
                 with m.If(self.ifft):
-                    m.d.sync += W_rd_r.eq(W_rd.data.real)
-                    m.d.sync += W_rd_i.eq(W_rd.data.imag)
+                    # conjugate twiddle factors on inverse fft.
+                    m.d.sync += W_rd_l.real.eq(W_rd.data.real)
+                    m.d.sync += W_rd_l.imag.eq(W_rd.data.imag)
                 with m.Else():
-                    m.d.sync += W_rd_r.eq(W_rd.data.real)
-                    m.d.sync += W_rd_i.eq(-W_rd.data.imag)
+                    m.d.sync += W_rd_l.real.eq(W_rd.data.real)
+                    m.d.sync += W_rd_l.imag.eq(-W_rd.data.imag)
                 m.next = "READA-BUTTERFLY0"
 
             with m.State("READA-BUTTERFLY0"):
-                # READA
+                # Read out 'A' from RAM, latch it to the butterfly inputs.
                 with m.If(stage & 1):
                     m.d.sync += [
                         a.real.eq(y_rd.data.real),
@@ -207,7 +216,8 @@ class FixedPointFFT(wiring.Component):
                         a.real.eq(x_rd.data.real),
                         a.imag.eq(x_rd.data.imag),
                     ]
-                # BUTTERFLY0
+                # Latch first 2 multiplies into 'bw' and set up the next 2
+                # multiplies (4 needed for the overall complex multiply).
                 m.d.sync += mW_rd_i_a.eq(b.imag)
                 m.d.sync += mW_rd_r_a.eq(b.imag)
                 m.d.sync += bw.real.eq(mW_rd_r_z)
@@ -215,11 +225,13 @@ class FixedPointFFT(wiring.Component):
                 m.next = "BUTTERFLY1"
 
             with m.State("BUTTERFLY1"):
+                # Accumulate second 2 multiplies into 'bw'.
                 m.d.sync += bw.real.eq(bw.real - mW_rd_i_z)
                 m.d.sync += bw.imag.eq(bw.imag + mW_rd_r_z)
                 m.next = "WRITE-S"
 
             with m.State("WRITE-S"):
+                # Set up a write to RAM of the butterfly sum term.
                 with m.If(stage & 1):
                     m.d.sync += [
                         x_wr.en.eq(1),
@@ -237,15 +249,17 @@ class FixedPointFFT(wiring.Component):
                 m.next = "WRITE-D"
 
             with m.State("WRITE-D"):
-                # note: _wr still enabled from last state!
+                # Set up a write to RAM of the butterfly diff term.
                 with m.If(stage & 1):
                     m.d.sync += [
+                        x_wr.en.eq(1),
                         x_wr.data.real.eq(d.real),
                         x_wr.data.imag.eq(d.imag),
                         x_wr.addr.eq(idx+(self.pts>>1)),
                     ]
                 with m.Else():
                     m.d.sync += [
+                        y_wr.en.eq(1),
                         y_wr.data.real.eq(d.real),
                         y_wr.data.imag.eq(d.imag),
                         y_wr.addr.eq(idx+(self.pts>>1)),
