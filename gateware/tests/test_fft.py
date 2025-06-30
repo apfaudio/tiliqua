@@ -1,3 +1,4 @@
+import sys
 import unittest
 
 from math import cos, sin, pi
@@ -14,55 +15,85 @@ from tiliqua               import dsp
 
 from vendor.fixedpointfft  import FixedPointFFT
 
+from parameterized         import parameterized
+import numpy as np
+import scipy.fft
+
 class FFTTests(unittest.TestCase):
 
-    def test_fft(self):
+    @parameterized.expand([
+        ["dual_cosine", 256, fixed.SQ(1, 22), lambda n: 0.7*cos(2*pi*n/17) + 0.2*cos(2*pi*n/10)],
+    ])
+    def test_fft_ifft(self, name, pts, shape, stimulus_function):
+
+        """
+        Run FFT followed by IFFT and verify the result matches our original signal.
+        """
 
         m = Module()
 
-        fft = FixedPointFFT(pts=256)
-        ifft = FixedPointFFT(pts=256)
+        # FFT directly followed by IFFT
+        fft = FixedPointFFT(pts=pts, shape=shape)
+        ifft = FixedPointFFT(pts=pts, shape=shape)
         m.d.comb += [
             fft.ifft.eq(0),
             ifft.ifft.eq(1),
         ]
-
         wiring.connect(m, fft.o, ifft.i)
         m.d.comb += ifft.o.ready.eq(1)
-
         m.submodules.fft = fft
         m.submodules.ifft = ifft
 
+        def stimulus_values():
+            for n in range(0, sys.maxsize):
+                yield fixed.Const(stimulus_function(n), shape=fft.shape)
+
+        async def stimulus_i(ctx):
+            s = stimulus_values()
+            while True:
+                await ctx.tick().until(fft.i.ready)
+                ctx.set(fft.i.valid, 1)
+                ctx.set(fft.i.payload.sample.real, next(s))
+                ctx.set(fft.i.payload.sample.imag, fixed.Const(0.0, shape=fft.shape))
+                await ctx.tick()
+                ctx.set(fft.i.valid, 0)
+                await ctx.tick()
+
         async def testbench(ctx):
-            dut = fft
-            PTS = 256
-            LPTS = exact_log2(PTS)
-
-            I =[0.5*cos(2*16*pi*i/PTS) for i in range(PTS)]
-            Q =[0.5*sin(2*16*pi*i/PTS) for i in range(PTS)]
-
-            # FFT
-            await ctx.tick()
-            await ctx.tick()
-            await ctx.tick()
-
-            for i in range(PTS):
-                ctx.set(dut.i.payload.sample.real, fixed.Const(I[i], shape=dut.shape))
-                ctx.set(dut.i.payload.sample.imag, fixed.Const(Q[i], shape=dut.shape))
-                await ctx.tick()
-                ctx.set(dut.i.valid, 1)
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
-                await ctx.tick()
-                await ctx.tick()
+            samples_i = []
+            samples_fr = []
+            samples_fi = []
+            samples_o = []
+            while True:
+                if ctx.get(fft.i.valid & fft.i.ready):
+                    # forward FFT inputs
+                    samples_i.append(ctx.get(fft.i.payload.sample.real).as_float())
+                if ctx.get(fft.o.valid & fft.o.ready):
+                    # forward FFT outputs (frequency domain)
+                    samples_fr.append(ctx.get(fft.o.payload.sample.real).as_float())
+                    samples_fi.append(ctx.get(fft.o.payload.sample.imag).as_float())
+                if ctx.get(ifft.o.valid & ifft.o.ready):
+                    # inverse FFT outputs (should match original signal)
+                    samples_o.append(ctx.get(ifft.o.payload.sample.real).as_float())
+                    if len(samples_o) == pts:
+                        break
                 await ctx.tick()
 
-            for _ in range(PTS*LPTS*20):
-                await ctx.tick()
+            s_i = np.array(samples_i[:pts], dtype=float)
+            s_f = (np.array(samples_fr[:pts], dtype=float) +
+                   1j * np.array(samples_fi[:pts], dtype=float))
+            s_o = np.array(samples_o, dtype=float)
+            s_i_fft = scipy.fft.fft(s_i, norm="forward")
+            s_freq_delta = np.abs(s_f - s_i_fft)
+            s_time_delta = np.abs(s_o - s_i)
+            # These tolerances depend on how wide the fixed point type is.
+            assert np.all(s_freq_delta < 1e-5)
+            assert np.all(s_time_delta < 1e-4)
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
+        sim.add_process(stimulus_i)
         sim.add_testbench(testbench)
-        with sim.write_vcd(vcd_file=open("test_fft.vcd", "w")):
+        with sim.write_vcd(vcd_file=open("test_fft_ifft_{name}.vcd", "w")):
             sim.run()
 
