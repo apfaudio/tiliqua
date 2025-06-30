@@ -22,6 +22,70 @@ class CQ(data.StructLayout):
             "imag": shape,
         })
 
+class RealWindow(wiring.Component):
+    def __init__(self,
+                 shape: fixed.Shape,
+                 sz:    int) -> None:
+        self.sz   = sz
+        self.shape = shape
+        super().__init__({
+            "i": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": self.shape
+            }))),
+            "o": Out(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            })))
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        # 4-term Blackman-Harris window
+        wFr = [0.35875-0.48829*cos(k*2*pi/self.sz)
+               +0.14128*cos(k*4*pi/self.sz)
+               -0.01168*cos(k*6*pi/self.sz)
+               for k in range(self.sz)]
+
+        wshape = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
+        m.submodules.wFr = wFr = memory.Memory(
+                shape=wshape, depth=self.sz, init=wFr)
+
+        wFr_rd = wFr.read_port()
+
+        i_latch = Signal.like(self.i.payload.sample)
+        wfidx = Signal(range(self.sz+1))
+        m.d.comb += wFr_rd.addr.eq(wfidx)
+        m.d.comb += self.o.payload.sample.imag.eq(0)
+        with m.FSM():
+            with m.State("RESET"):
+                m.d.sync += wfidx.eq(0)
+                m.d.comb += self.i.ready.eq(1)
+                with m.If(self.i.valid & self.i.payload.first):
+                    m.d.sync += i_latch.eq(self.i.payload.sample)
+                    m.d.sync += self.o.payload.first.eq(1)
+                    m.next = "WINDOW"
+            with m.State("NEXT"):
+                m.d.comb += self.i.ready.eq(1)
+                m.d.sync += self.o.payload.first.eq(0)
+                with m.If(self.i.valid):
+                    m.d.sync += i_latch.eq(self.i.payload.sample)
+                    m.next = "WINDOW"
+            with m.State("WINDOW"):
+                m.d.sync += self.o.payload.sample.real.eq(
+                        wFr_rd.data*self.i.payload.sample),
+                m.next = "OUT"
+            with m.State("OUT"):
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
+                    with m.If(wfidx != (self.sz - 1)):
+                        m.d.sync += wfidx.eq(wfidx+1)
+                        m.next = "NEXT"
+                    with m.Else():
+                        m.next = "RESET"
+        return m
+
 class FFT(wiring.Component):
 
     """Fixed-point forward or inverse Fast Fourier Transform.
@@ -51,9 +115,11 @@ class FFT(wiring.Component):
         super().__init__({
             "ifft": In(1, init=0),
             "i": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
                 "sample": CQ(self.shape)
             }))),
             "o": Out(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
                 "sample": CQ(self.shape)
             })))
         })

@@ -93,6 +93,66 @@ class FFTTests(unittest.TestCase):
         sim.add_clock(1e-6)
         sim.add_process(stimulus_i)
         sim.add_testbench(testbench)
-        with sim.write_vcd(vcd_file=open(f"test_fft_{name}.vcd", "w")):
+        with sim.write_vcd(vcd_file=open(f"test_fft_ifft_{name}.vcd", "w")):
+            sim.run()
+
+    @parameterized.expand([
+        ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/17) + 0.2*cos(2*pi*n/10)],
+    ])
+    def test_fft_window(self, name, sz, shape, stimulus_function):
+
+        m = Module()
+
+        window = fft.RealWindow(sz=sz, shape=shape)
+        ffft = fft.FFT(sz=sz, shape=shape)
+        wiring.connect(m, window.o, ffft.i)
+        m.d.comb += ffft.o.ready.eq(1)
+        m.submodules.ffft = ffft
+        m.submodules.window = window
+
+        def stimulus_values():
+            for n in range(0, sys.maxsize):
+                yield fixed.Const(stimulus_function(n), shape=shape)
+
+        async def stimulus_i(ctx):
+            s = stimulus_values()
+            ctx.set(window.i.payload.first, 1)
+            while True:
+                await ctx.tick().until(window.i.ready)
+                ctx.set(window.i.valid, 1)
+                ctx.set(window.i.payload.sample, next(s))
+                await ctx.tick()
+                ctx.set(window.i.valid, 0)
+                ctx.set(window.i.payload.first, 0)
+                await ctx.tick()
+
+        async def testbench(ctx):
+            samples_i = []
+            samples_fr = []
+            samples_fi = []
+            while True:
+                if ctx.get(ffft.i.valid & ffft.i.ready):
+                    # forward FFT inputs
+                    samples_i.append(ctx.get(ffft.i.payload.sample.real).as_float())
+                if ctx.get(ffft.o.valid & ffft.o.ready):
+                    # forward FFT outputs (frequency domain)
+                    samples_fr.append(ctx.get(ffft.o.payload.sample.real).as_float())
+                    samples_fi.append(ctx.get(ffft.o.payload.sample.imag).as_float())
+                    if len(samples_fr) == sz:
+                        break
+                await ctx.tick()
+
+            s_i = np.array(samples_i[:sz], dtype=float)
+            s_f = (np.array(samples_fr[:sz], dtype=float) +
+                   1j * np.array(samples_fi[:sz], dtype=float))
+            s_i_fft = scipy.fft.fft(s_i, norm="forward")
+            s_freq_delta = np.abs(s_f - s_i_fft)
+            print(max(s_freq_delta))
+
+        sim = Simulator(m)
+        sim.add_clock(1e-6)
+        sim.add_process(stimulus_i)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open(f"test_fft_window_{name}.vcd", "w")):
             sim.run()
 
