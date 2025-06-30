@@ -46,7 +46,7 @@ class FixedPointFFT(wiring.Component):
         # number of stages in FFT
         n_stages = exact_log2(self.pts)
         # butterfly / accumulator shape
-        bshape = fixed.SQ(self.shape.i_bits + n_stages, self.shape.f_bits-1)
+        bshape = fixed.SQ(self.shape.i_bits + n_stages, self.shape.f_bits)
         # twiddle factor / window shape
         wshape = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
 

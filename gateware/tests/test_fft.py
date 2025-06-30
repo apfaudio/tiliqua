@@ -22,7 +22,7 @@ import scipy.fft
 class FFTTests(unittest.TestCase):
 
     @parameterized.expand([
-        ["dual_cosine", 256, fixed.SQ(1, 22), lambda n: 0.7*cos(2*pi*n/17) + 0.2*cos(2*pi*n/10)],
+        ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/17) + 0.2*cos(2*pi*n/10)],
     ])
     def test_fft_ifft(self, name, pts, shape, stimulus_function):
 
@@ -86,9 +86,10 @@ class FFTTests(unittest.TestCase):
             s_i_fft = scipy.fft.fft(s_i, norm="forward")
             s_freq_delta = np.abs(s_f - s_i_fft)
             s_time_delta = np.abs(s_o - s_i)
+            print(max(s_freq_delta), max(s_time_delta))
             # These tolerances depend on how wide the fixed point type is.
-            assert np.all(s_freq_delta < 1e-5)
-            assert np.all(s_time_delta < 1e-4)
+            assert np.all(s_freq_delta < 4e-5)
+            assert np.all(s_time_delta < 5e-3)
 
         sim = Simulator(m)
         sim.add_clock(1e-6)

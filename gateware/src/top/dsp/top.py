@@ -843,7 +843,7 @@ class FFT(wiring.Component):
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
         from vendor.fixedpointfft import FixedPointFFT
-        m.submodules.fft = fft = FixedPointFFT(pts=2048)
+        m.submodules.fft = fft = FixedPointFFT(shape=ASQ, pts=1024)
 
         """
         # TODO stream adapter?
