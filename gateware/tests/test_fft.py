@@ -93,6 +93,6 @@ class FFTTests(unittest.TestCase):
         sim.add_clock(1e-6)
         sim.add_process(stimulus_i)
         sim.add_testbench(testbench)
-        with sim.write_vcd(vcd_file=open("test_fft_ifft_{name}.vcd", "w")):
+        with sim.write_vcd(vcd_file=open(f"test_fft_{name}.vcd", "w")):
             sim.run()
 
