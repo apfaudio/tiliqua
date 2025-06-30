@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
+# Copyright (c) 2024 S. Holzapfel <me@sebholzapfel.com>
 #
-# from 'https://github.com/amaranth-farm/amlib/blob/main/amlib/dsp/fixedpointfft.py'
-# with some modifications to work in this repository.
+# SPDX-License-Identifier: CERN-OHL-S-2.0
 #
-# Copyright (c) 2022-2023 Kaz Kojima <kkojima@rr.iij4u.or.jp>
-#
-# SPDX-License-Identifier: CERN-OHL-W-2.0
+
+"""Fixed-point FFT and utility components."""
 
 from amaranth import *
 from amaranth.lib import memory, wiring, data, stream
@@ -17,18 +15,38 @@ from amaranth_future import fixed
 from math import cos, sin, pi
 
 class CQ(data.StructLayout):
+    """Complex number formed by a pair of fixed.SQ"""
     def __init__(self, shape: fixed.SQ):
         super().__init__({
             "real": shape,
             "imag": shape,
         })
 
-class FixedPointFFT(wiring.Component):
+class FFT(wiring.Component):
+
+    """Fixed-point forward or inverse Fast Fourier Transform.
+
+    This processes blocks of fixed-point numbers of shape ``shape`` in
+    blocks of size ``sz``. Outputs are available / clocked out ``sz*log2(sz)*6``
+    clocks after all the inputs have been clocked in.
+
+    When the core is idle, the ``ifft`` signal may be set to 1 to put the core
+    into 'inverse FFT' mode. Otherwise, it is in 'forward FFT' mode. This FFT
+    core normalizes the forward pass by 1/N. This matches the behaviour
+    of ``scipy.fft(norm="forward")``. In 'inverse FFT' mode, there is no
+    normalization and the twiddle factors are conjugated as necessary.
+
+    There are many tradeoffs an FFT implementation can make. This one aims
+    for low area and DSP tile usage. It is an iterative implementation that
+    only performs 2 multiplies at a time. The core FFT loop takes 6 cycles,
+    where 2 of these are arithmetic and the rest are memory operations.
+    The algorithm implemented here is Radix-2, Cooley-Tukey.
+    """
 
     def __init__(self,
                  shape: fixed.Shape=fixed.SQ(1, 15),
-                 pts:   int=1024) -> None:
-        self.pts   = pts
+                 sz:    int=1024) -> None:
+        self.sz   = sz
         self.shape = shape
         super().__init__({
             "ifft": In(1, init=0),
@@ -44,15 +62,15 @@ class FixedPointFFT(wiring.Component):
         m = Module()
 
         # number of stages in FFT
-        n_stages = exact_log2(self.pts)
+        n_stages = exact_log2(self.sz)
         # butterfly / accumulator shape
         bshape = fixed.SQ(self.shape.i_bits + n_stages, self.shape.f_bits)
         # twiddle factor / window shape
         wshape = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
 
         # Complex ping-pong RAM for FFT stages (input, processing and output)
-        m.submodules.x = x = memory.Memory(shape=CQ(bshape), depth=self.pts, init=[])
-        m.submodules.y = y = memory.Memory(shape=CQ(bshape), depth=self.pts, init=[])
+        m.submodules.x = x = memory.Memory(shape=CQ(bshape), depth=self.sz, init=[])
+        m.submodules.y = y = memory.Memory(shape=CQ(bshape), depth=self.sz, init=[])
         x_rd = x.read_port()
         x_wr = x.write_port()
         y_rd = y.read_port()
@@ -60,12 +78,12 @@ class FixedPointFFT(wiring.Component):
 
         # complex ROM for FFT twiddle factors
         twiddle = [
-            {'real': cos(k*2*pi/self.pts),
-             'imag': sin(k*2*pi/self.pts)}
-            for k in range(self.pts)
+            {'real': cos(k*2*pi/self.sz),
+             'imag': sin(k*2*pi/self.sz)}
+            for k in range(self.sz)
         ]
         m.submodules.W = W = memory.Memory(
-                shape=CQ(wshape), depth=self.pts, init=twiddle)
+                shape=CQ(wshape), depth=self.sz, init=twiddle)
         W_rd = W.read_port()
 
         # FFT addressing
@@ -133,7 +151,7 @@ class FixedPointFFT(wiring.Component):
                 m.next = "LOAD1"
 
             with m.State("LOAD1"):
-                with m.If(idx >= self.pts):
+                with m.If(idx >= self.sz):
                     m.d.sync += [
                         stage.eq(0),
                         idx.eq(0),
@@ -157,7 +175,7 @@ class FixedPointFFT(wiring.Component):
 
             with m.State("FFTLOOP"):
                 # Don't write anything to RAM until necessary.
-                with m.If(idx >= self.pts):
+                with m.If(idx >= self.sz):
                     # This stage is complete. Move to next stage.
                     m.d.sync += [
                         idx.eq(0),
@@ -255,20 +273,20 @@ class FixedPointFFT(wiring.Component):
                         x_wr.en.eq(1),
                         x_wr.data.real.eq(d.real),
                         x_wr.data.imag.eq(d.imag),
-                        x_wr.addr.eq(idx+(self.pts>>1)),
+                        x_wr.addr.eq(idx+(self.sz>>1)),
                     ]
                 with m.Else():
                     m.d.sync += [
                         y_wr.en.eq(1),
                         y_wr.data.real.eq(d.real),
                         y_wr.data.imag.eq(d.imag),
-                        y_wr.addr.eq(idx+(self.pts>>1)),
+                        y_wr.addr.eq(idx+(self.sz>>1)),
                     ]
                 m.d.sync += idx.eq(idx+1)
                 m.next = "FFTLOOP"
 
             with m.State("OUTPUT"):
-                with m.If(idx >= self.pts):
+                with m.If(idx >= self.sz):
                     m.next = "RESET"
                 with m.Else():
                     m.next = "READOUT"

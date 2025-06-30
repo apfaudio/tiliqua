@@ -29,7 +29,7 @@ from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 
-from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll
+from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll, fft
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua.cli              import top_level_cli
 from tiliqua.delay_line       import DelayLine
@@ -842,23 +842,16 @@ class FFT(wiring.Component):
         wiring.connect(m, wiring.flipped(self.i), split4.i)
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
-        from vendor.fixedpointfft import FixedPointFFT
-        m.submodules.fft = fft = FixedPointFFT(shape=ASQ, pts=1024)
-
-        """
-        # TODO stream adapter?
-        wiring.connect(m, split4.o[0], fft.i)
-        wiring.connect(m, fft.o, merge4.i[0])
-        """
+        m.submodules.ft = ft = fft.FFT(shape=ASQ, sz=1024)
 
         m.d.comb += [
-            fft.i.valid.eq(split4.o[0].valid),
-            fft.i.payload.sample.real.eq(split4.o[0].payload),
-            split4.o[0].ready.eq(fft.i.ready),
+            ft.i.valid.eq(split4.o[0].valid),
+            ft.i.payload.sample.real.eq(split4.o[0].payload),
+            split4.o[0].ready.eq(ft.i.ready),
 
-            merge4.i[0].valid.eq(fft.o.valid),
-            merge4.i[0].payload.eq(fft.o.payload.sample.real),
-            fft.o.ready.eq(merge4.i[0].ready),
+            merge4.i[0].valid.eq(ft.o.valid),
+            merge4.i[0].payload.eq(ft.o.payload.sample.real),
+            ft.o.ready.eq(merge4.i[0].ready),
         ]
 
         wiring.connect(m, split4.o[1], merge4.i[1])
