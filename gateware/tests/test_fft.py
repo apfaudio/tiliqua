@@ -19,7 +19,6 @@ import scipy.fft
 
 class FFTTests(unittest.TestCase):
 
-    '''
     @parameterized.expand([
         ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/17) + 0.2*cos(2*pi*n/10)],
     ])
@@ -107,7 +106,7 @@ class FFTTests(unittest.TestCase):
 
         m = Module()
 
-        window = fft.RealWindow(sz=sz, shape=shape)
+        window = fft.Window(sz=sz, shape=shape)
         ffft = fft.FFT(sz=sz, shape=shape)
         wiring.connect(m, window.o, ffft.i)
         m.d.comb += ffft.o.ready.eq(1)
@@ -159,7 +158,6 @@ class FFTTests(unittest.TestCase):
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open(f"test_fft_window_{name}.vcd", "w")):
             sim.run()
-    '''
 
     @parameterized.expand([
         ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/200) + 0.2*cos(2*pi*n/10)],
@@ -175,11 +173,10 @@ class FFTTests(unittest.TestCase):
         m.submodules.window = window
         m.submodules.overlap = overlap
 
-        #wiring.connect(m, window.o, ffft.i)
         wiring.connect(m, window.o, overlap.i)
         m.d.comb += overlap.o.ready.eq(1)
 
-        '''
+        """
         ffft = fft.FFT(sz=sz, shape=shape)
         ifft = fft.FFT(sz=sz, shape=shape)
         m.d.comb += [
@@ -188,9 +185,10 @@ class FFTTests(unittest.TestCase):
         ]
         m.submodules.ffft = ffft
         m.submodules.ifft = ifft
+        wiring.connect(m, window.o, ffft.i)
         wiring.connect(m, ffft.o, ifft.i)
         wiring.connect(m, ifft.o, overlap.i)
-        '''
+        """
 
         def stimulus_values():
             for n in range(0, sys.maxsize):
@@ -207,7 +205,7 @@ class FFTTests(unittest.TestCase):
                 await ctx.tick()
 
         async def testbench(ctx):
-            N = sz*2
+            N = sz*4
             samples_i = []
             samples_o = []
             while True:
@@ -218,13 +216,18 @@ class FFTTests(unittest.TestCase):
                     if len(samples_o) == N:
                         break
                 await ctx.tick()
-            s_i = np.array(samples_i[:N], dtype=float)
-            s_o = np.array(samples_o[:N], dtype=float)
+            s_i = np.array(samples_i[sz:N], dtype=float)
+            s_o = np.array(samples_o[sz:N], dtype=float)
+            s_io_delta = np.abs(s_o - s_i)
+            print(max(s_io_delta))
+            assert np.all(s_io_delta < 2e-4)
+            """
             import matplotlib.pyplot as plt
             plt.plot(s_i)
             plt.plot(s_o)
             plt.plot(s_o-s_i)
             plt.show()
+            """
 
         sim = Simulator(m)
         sim.add_clock(1.667e-8)
