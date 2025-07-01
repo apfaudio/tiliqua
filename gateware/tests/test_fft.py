@@ -169,24 +169,28 @@ class FFTTests(unittest.TestCase):
         m = Module()
 
         window = fft.STFTWindow(sz=sz, shape=shape, n_overlap=sz//2)
-        ffft = fft.FFT(sz=sz, shape=shape)
-        ifft = fft.FFT(sz=sz, shape=shape)
         overlap = fft.OverlapAdd(sz=sz, shape=shape, n_overlap=sz//2)
 
+
+        m.submodules.window = window
+        m.submodules.overlap = overlap
+
+        #wiring.connect(m, window.o, ffft.i)
+        wiring.connect(m, window.o, overlap.i)
+        m.d.comb += overlap.o.ready.eq(1)
+
+        '''
+        ffft = fft.FFT(sz=sz, shape=shape)
+        ifft = fft.FFT(sz=sz, shape=shape)
         m.d.comb += [
             ffft.ifft.eq(0),
             ifft.ifft.eq(1),
         ]
-
-        m.submodules.window = window
         m.submodules.ffft = ffft
         m.submodules.ifft = ifft
-        m.submodules.overlap = overlap
-
-        wiring.connect(m, window.o, ffft.i)
         wiring.connect(m, ffft.o, ifft.i)
         wiring.connect(m, ifft.o, overlap.i)
-        m.d.comb += overlap.o.ready.eq(1)
+        '''
 
         def stimulus_values():
             for n in range(0, sys.maxsize):
@@ -203,13 +207,24 @@ class FFTTests(unittest.TestCase):
                 await ctx.tick()
 
         async def testbench(ctx):
+            N = sz*2
+            samples_i = []
             samples_o = []
             while True:
-                if ctx.get(window.o.valid & window.o.ready):
-                    samples_o.append(ctx.get(window.o.payload.sample.real).as_float())
-                    if len(samples_o) == sz*5:
+                if ctx.get(window.i.valid & window.i.ready):
+                    samples_i.append(ctx.get(window.i.payload).as_float())
+                if ctx.get(overlap.o.valid & overlap.o.ready):
+                    samples_o.append(ctx.get(overlap.o.payload).as_float())
+                    if len(samples_o) == N:
                         break
                 await ctx.tick()
+            s_i = np.array(samples_i[:N], dtype=float)
+            s_o = np.array(samples_o[:N], dtype=float)
+            import matplotlib.pyplot as plt
+            plt.plot(s_i)
+            plt.plot(s_o)
+            plt.plot(s_o-s_i)
+            plt.show()
 
         sim = Simulator(m)
         sim.add_clock(1.667e-8)
