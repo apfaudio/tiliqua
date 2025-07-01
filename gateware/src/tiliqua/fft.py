@@ -335,10 +335,8 @@ class Window(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        # 4-term Blackman-Harris window
-        wFr = [0.35875-0.48829*cos(k*2*pi/self.sz)
-               +0.14128*cos(k*4*pi/self.sz)
-               -0.01168*cos(k*6*pi/self.sz)
+        # Default: Hann window
+        wFr = [0.5 - 0.5*cos(k*2*pi/self.sz)
                for k in range(self.sz)]
 
         wshape = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
@@ -455,5 +453,75 @@ class STFTWindow(wiring.Component):
                     ]
                 with m.Else():
                     m.next = "FILL"
+
+        return m
+
+class OverlapAdd(wiring.Component):
+
+    def __init__(self,
+                 shape:     fixed.Shape,
+                 sz:        int,
+                 n_overlap: int) -> None:
+
+        self.sz        = sz
+        self.shape     = shape
+        self.n_overlap = n_overlap
+
+        super().__init__({
+            "i": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+            "o": Out(stream.Signature(self.shape))
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.fifo1 = fifo1 = fifo.SyncFIFOBuffered(
+            width=self.shape.as_shape().width, depth=self.sz)
+        m.submodules.fifo2 = fifo2 = fifo.SyncFIFOBuffered(
+            width=self.shape.as_shape().width, depth=self.sz)
+
+        swap_fifos = Signal()
+        m.d.comb += swap_fifos.eq(
+                self.i.valid & self.i.ready & self.i.payload.first)
+
+        with m.FSM():
+            with m.State("PRE-FILL"):
+                with m.If(fifo2.w_level != self.n_overlap):
+                    m.d.comb += [
+                        fifo2.w_en.eq(1),
+                        fifo2.w_data.eq(0),
+                    ]
+                with m.Elif(self.i.valid & self.i.payload.first):
+                    m.next = "FIFO1"
+            with m.State("FIFO1"):
+                m.d.comb += [
+                    self.i.ready.eq(fifo1.w_rdy),
+                    fifo1.w_en.eq(self.i.valid),
+                    fifo1.w_data.eq(self.i.payload.sample.real)
+                ]
+                with m.If((fifo1.w_level != 0) & swap_fifos):
+                    m.next = "FIFO2"
+            with m.State("FIFO2"):
+                m.d.comb += [
+                    self.i.ready.eq(fifo2.w_rdy),
+                    fifo2.w_en.eq(self.i.valid),
+                    fifo2.w_data.eq(self.i.payload.sample.real)
+                ]
+                with m.If((fifo2.w_level != 0) & swap_fifos):
+                    m.next = "FIFO1"
+
+        out_a = Signal(self.shape)
+        out_b = Signal(self.shape)
+        m.d.comb += [
+            self.o.valid.eq(fifo1.r_rdy & fifo2.r_rdy),
+            out_a.eq(fifo1.r_data),
+            out_b.eq(fifo2.r_data),
+            self.o.payload.eq(out_a + out_b),
+            fifo1.r_en.eq(self.o.valid & self.o.ready),
+            fifo2.r_en.eq(self.o.valid & self.o.ready),
+        ]
 
         return m

@@ -169,8 +169,11 @@ class FFTTests(unittest.TestCase):
         m = Module()
 
         window = fft.STFTWindow(sz=sz, shape=shape, n_overlap=sz//2)
-        m.d.comb += window.o.ready.eq(1)
+        overlap = fft.OverlapAdd(sz=sz, shape=shape, n_overlap=sz//2)
+        m.d.comb += overlap.o.ready.eq(1)
         m.submodules.window = window
+        m.submodules.overlap = overlap
+        wiring.connect(m, window.o, overlap.i)
 
         def stimulus_values():
             for n in range(0, sys.maxsize):
@@ -191,7 +194,7 @@ class FFTTests(unittest.TestCase):
             while True:
                 if ctx.get(window.o.valid & window.o.ready):
                     samples_o.append(ctx.get(window.o.payload.sample.real).as_float())
-                    if len(samples_o) == sz*3:
+                    if len(samples_o) == sz*5:
                         break
                 await ctx.tick()
 
