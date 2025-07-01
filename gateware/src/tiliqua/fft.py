@@ -424,18 +424,20 @@ class STFTWindow(wiring.Component):
 
         m.d.comb += [
             self.window.i.payload.sample.eq(self.i.payload),
-            self.window.i.payload.first.eq(n_samples == 0),
+            self.window.i.payload.first.eq(
+                overlap_fifo.r_level == self.n_overlap),
             overlap_fifo.w_data.eq(self.i.payload),
             self.window.i.valid.eq(self.i.valid),
             self.i.ready.eq(self.window.i.ready),
         ]
 
         with m.FSM():
-            with m.State("WINDOW"):
-                with m.If(n_samples == (self.sz - self.n_overlap - 1)):
+            with m.State("START"):
+                m.d.comb += self.window.i.payload.first.eq(1)
+                with m.If(n_samples == (self.sz - self.n_overlap)):
                     m.next = "FILL"
             with m.State("FILL"):
-                with m.If(n_samples == 0):
+                with m.If(overlap_fifo.r_level == self.n_overlap):
                     m.d.comb += [
                         self.i.ready.eq(0),
                         self.window.i.valid.eq(0),
@@ -452,6 +454,6 @@ class STFTWindow(wiring.Component):
                         overlap_fifo.r_en.eq(self.window.i.ready),
                     ]
                 with m.Else():
-                    m.next = "WINDOW"
+                    m.next = "FILL"
 
         return m
