@@ -846,6 +846,7 @@ class FFT(wiring.Component):
 
         m.d.comb += [
             ft.i.valid.eq(split4.o[0].valid),
+            ft.i.payload.first.eq(1), # just keep going
             ft.i.payload.sample.real.eq(split4.o[0].payload),
             split4.o[0].ready.eq(ft.i.ready),
 

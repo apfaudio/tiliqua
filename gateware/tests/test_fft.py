@@ -49,13 +49,16 @@ class FFTTests(unittest.TestCase):
         async def stimulus_i(ctx):
             s = stimulus_values()
             while True:
-                await ctx.tick().until(ffft.i.ready)
-                ctx.set(ffft.i.valid, 1)
-                ctx.set(ffft.i.payload.sample.real, next(s))
-                ctx.set(ffft.i.payload.sample.imag, fixed.Const(0.0, shape=shape))
-                await ctx.tick()
-                ctx.set(ffft.i.valid, 0)
-                await ctx.tick()
+                ctx.set(ffft.i.payload.first, 1)
+                for _ in range(sz):
+                    await ctx.tick().until(ffft.i.ready)
+                    ctx.set(ffft.i.valid, 1)
+                    ctx.set(ffft.i.payload.sample.real, next(s))
+                    ctx.set(ffft.i.payload.sample.imag, fixed.Const(0.0, shape=shape))
+                    await ctx.tick()
+                    ctx.set(ffft.i.valid, 0)
+                    ctx.set(ffft.i.payload.first, 0)
+                    await ctx.tick()
 
         async def testbench(ctx):
             samples_i = []
