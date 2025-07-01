@@ -169,11 +169,24 @@ class FFTTests(unittest.TestCase):
         m = Module()
 
         window = fft.STFTWindow(sz=sz, shape=shape, n_overlap=sz//2)
+        ffft = fft.FFT(sz=sz, shape=shape)
+        ifft = fft.FFT(sz=sz, shape=shape)
         overlap = fft.OverlapAdd(sz=sz, shape=shape, n_overlap=sz//2)
-        m.d.comb += overlap.o.ready.eq(1)
+
+        m.d.comb += [
+            ffft.ifft.eq(0),
+            ifft.ifft.eq(1),
+        ]
+
         m.submodules.window = window
+        m.submodules.ffft = ffft
+        m.submodules.ifft = ifft
         m.submodules.overlap = overlap
-        wiring.connect(m, window.o, overlap.i)
+
+        wiring.connect(m, window.o, ffft.i)
+        wiring.connect(m, ffft.o, ifft.i)
+        wiring.connect(m, ifft.o, overlap.i)
+        m.d.comb += overlap.o.ready.eq(1)
 
         def stimulus_values():
             for n in range(0, sys.maxsize):
@@ -199,7 +212,7 @@ class FFTTests(unittest.TestCase):
                 await ctx.tick()
 
         sim = Simulator(m)
-        sim.add_clock(1e-6)
+        sim.add_clock(1.667e-8)
         sim.add_process(stimulus_i)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open(f"test_stft_window_{name}.vcd", "w")):
