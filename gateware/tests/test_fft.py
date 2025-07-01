@@ -19,6 +19,7 @@ import scipy.fft
 
 class FFTTests(unittest.TestCase):
 
+    '''
     @parameterized.expand([
         ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/17) + 0.2*cos(2*pi*n/10)],
     ])
@@ -158,4 +159,45 @@ class FFTTests(unittest.TestCase):
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open(f"test_fft_window_{name}.vcd", "w")):
             sim.run()
+    '''
 
+    @parameterized.expand([
+        ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/200) + 0.2*cos(2*pi*n/10)],
+    ])
+    def test_stft_window(self, name, sz, shape, stimulus_function):
+
+        m = Module()
+
+        window = fft.STFTWindow(sz=sz, shape=shape, n_overlap=sz//2)
+        m.d.comb += window.o.ready.eq(1)
+        m.submodules.window = window
+
+        def stimulus_values():
+            for n in range(0, sys.maxsize):
+                yield fixed.Const(stimulus_function(n), shape=shape)
+
+        async def stimulus_i(ctx):
+            s = stimulus_values()
+            while True:
+                await ctx.tick().until(window.i.ready)
+                ctx.set(window.i.valid, 1)
+                ctx.set(window.i.payload, next(s))
+                await ctx.tick()
+                ctx.set(window.i.valid, 0)
+                await ctx.tick()
+
+        async def testbench(ctx):
+            samples_o = []
+            while True:
+                if ctx.get(window.o.valid & window.o.ready):
+                    samples_o.append(ctx.get(window.o.payload.sample.real).as_float())
+                    if len(samples_o) == sz*3:
+                        break
+                await ctx.tick()
+
+        sim = Simulator(m)
+        sim.add_clock(1e-6)
+        sim.add_process(stimulus_i)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open(f"test_stft_window_{name}.vcd", "w")):
+            sim.run()

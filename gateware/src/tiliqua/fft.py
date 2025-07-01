@@ -6,7 +6,7 @@
 """Fixed-point FFT and utility components."""
 
 from amaranth import *
-from amaranth.lib import memory, wiring, data, stream
+from amaranth.lib import memory, wiring, data, stream, fifo
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
@@ -305,7 +305,17 @@ class FFT(wiring.Component):
 
         return m
 
-class RealWindow(wiring.Component):
+class Window(wiring.Component):
+
+    """
+    Apply a real window function of size ``sz`` to samples of
+    ``shape``. Uses a single multiplier. ``payload.first`` is
+    used to synchronize the start of windowing.
+
+    This core takes real samples, and emits complex samples
+    ready for an FFT operation.
+    """
+
     def __init__(self,
                  shape: fixed.Shape,
                  sz:    int) -> None:
@@ -369,3 +379,79 @@ class RealWindow(wiring.Component):
                         m.next = "RESET"
         return m
 
+
+class STFTWindow(wiring.Component):
+
+    """
+    Short-time Fourier Transform Windower
+
+    Continuously compute (windowed and optionally overlapping)
+    blocks of a real, time-domain input.
+    """
+
+    def __init__(self,
+                 shape:     fixed.Shape,
+                 sz:        int,
+                 n_overlap: int) -> None:
+
+        self.sz        = sz
+        self.shape     = shape
+        self.n_overlap = n_overlap
+
+        self.window = Window(sz=sz, shape=shape)
+
+        super().__init__({
+            "i": In(stream.Signature(self.shape)),
+            "o": Out(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            })))
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.overlap_fifo = overlap_fifo = fifo.SyncFIFOBuffered(
+            width=self.shape.as_shape().width, depth=self.n_overlap)
+
+        m.submodules.window = self.window
+
+        wiring.connect(m, self.window.o, wiring.flipped(self.o))
+
+        n_samples = Signal(range(self.sz), init=0)
+        with m.If(self.i.valid & self.i.ready):
+            m.d.sync += n_samples.eq(n_samples+1)
+
+        m.d.comb += [
+            self.window.i.payload.sample.eq(self.i.payload),
+            self.window.i.payload.first.eq(n_samples == 0),
+            overlap_fifo.w_data.eq(self.i.payload),
+            self.window.i.valid.eq(self.i.valid),
+            self.i.ready.eq(self.window.i.ready),
+        ]
+
+        with m.FSM():
+            with m.State("WINDOW"):
+                with m.If(n_samples == (self.sz - self.n_overlap - 1)):
+                    m.next = "FILL"
+            with m.State("FILL"):
+                with m.If(n_samples == 0):
+                    m.d.comb += [
+                        self.i.ready.eq(0),
+                        self.window.i.valid.eq(0),
+                    ]
+                    m.next = "DRAIN"
+                with m.Else():
+                    m.d.comb += overlap_fifo.w_en.eq(self.i.valid & self.i.ready)
+            with m.State("DRAIN"):
+                with m.If(overlap_fifo.r_level != 0):
+                    m.d.comb += [
+                        self.i.ready.eq(0),
+                        self.window.i.valid.eq(1),
+                        self.window.i.payload.sample.eq(overlap_fifo.r_data),
+                        overlap_fifo.r_en.eq(self.window.i.ready),
+                    ]
+                with m.Else():
+                    m.next = "WINDOW"
+
+        return m
