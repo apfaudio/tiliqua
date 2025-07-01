@@ -365,7 +365,7 @@ class Window(wiring.Component):
                     m.next = "WINDOW"
             with m.State("WINDOW"):
                 m.d.sync += self.o.payload.sample.real.eq(
-                        wFr_rd.data*self.i.payload.sample),
+                        wFr_rd.data*i_latch),
                 m.next = "OUT"
             with m.State("OUT"):
                 m.d.comb += self.o.valid.eq(1)
@@ -484,8 +484,12 @@ class OverlapAdd(wiring.Component):
             width=self.shape.as_shape().width, depth=self.sz)
 
         swap_fifos = Signal()
-        m.d.comb += swap_fifos.eq(
-                self.i.valid & self.i.ready & self.i.payload.first)
+        m.d.comb += [
+            swap_fifos.eq(
+                self.i.valid & self.i.ready & self.i.payload.first),
+            fifo1.w_data.eq(self.i.payload.sample.real),
+            fifo2.w_data.eq(self.i.payload.sample.real),
+        ]
 
         with m.FSM():
             with m.State("PRE-FILL"):
@@ -494,23 +498,26 @@ class OverlapAdd(wiring.Component):
                         fifo2.w_en.eq(1),
                         fifo2.w_data.eq(0),
                     ]
-                with m.Elif(self.i.valid & self.i.payload.first):
-                    m.next = "FIFO1"
+                with m.Else():
+                    m.d.comb += self.i.ready.eq(1)
+                    with m.If(swap_fifos):
+                        m.d.comb += fifo1.w_en.eq(1)
+                        m.next = "FIFO1"
             with m.State("FIFO1"):
                 m.d.comb += [
                     self.i.ready.eq(fifo1.w_rdy),
-                    fifo1.w_en.eq(self.i.valid),
-                    fifo1.w_data.eq(self.i.payload.sample.real)
+                    fifo1.w_en.eq(self.i.valid & ~self.i.payload.first),
                 ]
-                with m.If((fifo1.w_level != 0) & swap_fifos):
+                with m.If(swap_fifos):
+                    m.d.comb += fifo2.w_en.eq(1)
                     m.next = "FIFO2"
             with m.State("FIFO2"):
                 m.d.comb += [
                     self.i.ready.eq(fifo2.w_rdy),
-                    fifo2.w_en.eq(self.i.valid),
-                    fifo2.w_data.eq(self.i.payload.sample.real)
+                    fifo2.w_en.eq(self.i.valid & ~self.i.payload.first),
                 ]
-                with m.If((fifo2.w_level != 0) & swap_fifos):
+                with m.If(swap_fifos):
+                    m.d.comb += fifo1.w_en.eq(1)
                     m.next = "FIFO1"
 
         out_a = Signal(self.shape)
