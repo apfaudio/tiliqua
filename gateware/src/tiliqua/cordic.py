@@ -40,7 +40,7 @@ class MagPhaseCordic(wiring.Component):
             depth=self.iterations, 
             init=atan_values
         )
-        atan_rd = atan_rom.read_port()
+        atan_rd = atan_rom.read_port(domain='comb')
 
         # State registers
         x = Signal(self.internal_shape)
@@ -69,8 +69,7 @@ class MagPhaseCordic(wiring.Component):
         ]
 
         # Input handling - convert to internal representation
-        x_in = Signal(self.internal_shape)
-        y_in = Signal(self.internal_shape)
+        in_latch = Signal.like(self.i.payload)
 
         # Handle input quadrant adjustment
         quadrant = Signal(2)
@@ -83,42 +82,29 @@ class MagPhaseCordic(wiring.Component):
             with m.State("IDLE"):
                 m.d.comb += self.i.ready.eq(1)
                 with m.If(self.i.valid):
-                    # Vectoring mode: rotate the input vector to the positive x-axis
-                    # We need to handle the quadrants correctly
-                    x_in = self.i.payload.real
-                    y_in = self.i.payload.imag
-                    # Quadrant detection and rotation to Q1/Q4
-                    with m.If((x_in >= 0) & (y_in >= 0)):  # Q1
-                        m.d.sync += [
-                            x.eq(x_in),
-                            y.eq(y_in),
-                            quadrant_adjust.eq(0),
-                        ]
-                    with m.Elif((x_in < 0) & (y_in >= 0)):  # Q2
-                        m.d.sync += [
-                            x.eq(-x_in),
-                            y.eq(-y_in),
-                            quadrant_adjust.eq(fixed.Const(1.0, self.internal_shape).as_value()),  # π
-                        ]
-                    with m.Elif((x_in < 0) & (y_in < 0)):  # Q3
-                        m.d.sync += [
-                            x.eq(-x_in),
-                            y.eq(-y_in),
-                            quadrant_adjust.eq(fixed.Const(-1.0, self.internal_shape).as_value()),  # -π
-                        ]
-                    with m.Else():  # Q4: x >= 0, y < 0
-                        m.d.sync += [
-                            x.eq(x_in),
-                            y.eq(y_in),
-                            quadrant_adjust.eq(0),
-                        ]
-                    m.d.sync += [
-                        z.eq(0),
-                        iteration.eq(0),
-                    ]
-                    m.next = "ITERATE"
+                    m.d.sync += in_latch.eq(self.i.payload)
+                    m.next = "QUADRANT"
 
-            with m.State("WAIT"):
+            with m.State("QUADRANT"):
+                m.d.sync += [
+                    z.eq(0),
+                    iteration.eq(0),
+                    quadrant_adjust.eq(0)
+                ]
+                with m.If((in_latch.real >= 0)):  # Q1, Q4
+                    m.d.sync += [
+                        x.eq(in_latch.real),
+                        y.eq(in_latch.imag),
+                    ]
+                with m.Else():
+                    m.d.sync += [
+                        x.eq(-in_latch.real),
+                        y.eq(-in_latch.imag),
+                    ]
+                    with m.If(in_latch.imag >= 0):
+                        m.d.sync += quadrant_adjust.eq(fixed.Const(1.0))  # Q2
+                    with m.Else():
+                        m.d.sync += quadrant_adjust.eq(fixed.Const(-1.0)) # Q3
                 m.next = "ITERATE"
 
             with m.State("ITERATE"):
@@ -136,7 +122,7 @@ class MagPhaseCordic(wiring.Component):
                             z.eq(z + atan_rd.data),
                         ]
                     m.d.sync += iteration.eq(iteration + 1)
-                    m.next = "WAIT"
+                    m.next = "ITERATE"
                 with m.Else():
                     m.next = "OUTPUT"
 
