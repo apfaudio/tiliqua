@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     top->trace(tfp, 99);  // Trace 99 levels of hierarchy (or see below)
     tfp->open("simx.fst");
 #endif
-    uint64_t sim_time =  10000000000;
+    uint64_t sim_time =  100000000000;
 
     contextp->timeInc(1);
     top->rst_sync = 1;

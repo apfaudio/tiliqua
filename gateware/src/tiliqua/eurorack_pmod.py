@@ -298,7 +298,7 @@ class I2SCalibrator(wiring.Component):
         [ 0.97,  0.03 ],
     ]
 
-    def __init__(self, stream_domain="sync", fifo_depth=4):
+    def __init__(self, stream_domain="sync", fifo_depth=256):
         self.stream_domain = stream_domain
         self.fifo_depth = fifo_depth
         super().__init__()

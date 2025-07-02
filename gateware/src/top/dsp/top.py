@@ -842,22 +842,18 @@ class FFT(wiring.Component):
         wiring.connect(m, wiring.flipped(self.i), split4.i)
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
-        m.submodules.ft = ft = fft.FFT(shape=ASQ, sz=1024)
+        m.submodules.stft = stft = fft.STFTSynthesizer(shape=ASQ, sz=256)
+        wiring.connect(m, stft.o_freq, stft.i_freq)
+        wiring.connect(m, split4.o[0], stft.i)
+        wiring.connect(m, stft.o, merge4.i[0])
 
-        m.d.comb += [
-            ft.i.valid.eq(split4.o[0].valid),
-            ft.i.payload.first.eq(1), # just keep going
-            ft.i.payload.sample.real.eq(split4.o[0].payload),
-            split4.o[0].ready.eq(ft.i.ready),
+        wiring.connect(m, split4.o[1], dsp.ASQ_READY)
+        wiring.connect(m, split4.o[2], dsp.ASQ_READY)
+        wiring.connect(m, split4.o[3], dsp.ASQ_READY)
 
-            merge4.i[0].valid.eq(ft.o.valid),
-            merge4.i[0].payload.eq(ft.o.payload.sample.real),
-            ft.o.ready.eq(merge4.i[0].ready),
-        ]
-
-        wiring.connect(m, split4.o[1], merge4.i[1])
-        wiring.connect(m, split4.o[2], merge4.i[2])
-        wiring.connect(m, split4.o[3], merge4.i[3])
+        wiring.connect(m, dsp.ASQ_VALID, merge4.i[1])
+        wiring.connect(m, dsp.ASQ_VALID, merge4.i[2])
+        wiring.connect(m, dsp.ASQ_VALID, merge4.i[3])
 
         return m
 
