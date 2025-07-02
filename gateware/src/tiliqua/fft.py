@@ -44,12 +44,13 @@ class FFT(wiring.Component):
     """
 
     def __init__(self,
-                 shape: fixed.Shape=fixed.SQ(1, 15),
-                 sz:    int=1024) -> None:
+                 shape:        fixed.Shape=fixed.SQ(1, 15),
+                 sz:           int=1024,
+                 default_ifft: bool=False) -> None:
         self.sz   = sz
         self.shape = shape
         super().__init__({
-            "ifft": In(1, init=0),
+            "ifft": In(1, init=1 if default_ifft else 0),
             "i": In(stream.Signature(data.StructLayout({
                 "first": unsigned(1),
                 "sample": CQ(self.shape)
@@ -309,11 +310,12 @@ class Window(wiring.Component):
 
     """
     Apply a real window function of size ``sz`` to samples of
-    ``shape``. Uses a single multiplier. ``payload.first`` is
+    ``CQ(shape)``. Uses a single multiplier. ``payload.first`` is
     used to synchronize the start of windowing.
 
-    This core takes real samples, and emits complex samples
-    ready for an FFT operation.
+    Note: this core takes and emits 'complex' samples ready for
+    an FFT operation, however it currently zeroes `imag` and
+    only windows the `real` component.
     """
 
     def __init__(self,
@@ -345,7 +347,7 @@ class Window(wiring.Component):
 
         wFr_rd = wFr.read_port()
 
-        i_latch = Signal.like(self.i.payload.sample.real)
+        i_latch = Signal.like(self.i.payload.sample)
         wfidx = Signal(range(self.sz+1))
         m.d.comb += wFr_rd.addr.eq(wfidx)
         m.d.comb += self.o.payload.sample.imag.eq(0)
@@ -354,18 +356,22 @@ class Window(wiring.Component):
                 m.d.sync += wfidx.eq(0)
                 m.d.comb += self.i.ready.eq(1)
                 with m.If(self.i.valid & self.i.payload.first):
-                    m.d.sync += i_latch.eq(self.i.payload.sample.real)
+                    m.d.sync += i_latch.eq(self.i.payload.sample)
                     m.d.sync += self.o.payload.first.eq(1)
                     m.next = "WINDOW"
             with m.State("NEXT"):
                 m.d.comb += self.i.ready.eq(1)
                 m.d.sync += self.o.payload.first.eq(0)
                 with m.If(self.i.valid):
-                    m.d.sync += i_latch.eq(self.i.payload.sample.real)
+                    m.d.sync += i_latch.eq(self.i.payload.sample)
                     m.next = "WINDOW"
             with m.State("WINDOW"):
                 m.d.sync += self.o.payload.sample.real.eq(
-                        wFr_rd.data*i_latch),
+                        wFr_rd.data*i_latch.real),
+                # TODO complex windowing?
+                #m.d.sync += self.o.payload.sample.imag.eq(
+                #        wFr_rd.data*i_latch.imag),
+                m.d.comb += self.o.payload.sample.imag.eq(0)
                 m.next = "OUT"
             with m.State("OUT"):
                 m.d.comb += self.o.valid.eq(1)
@@ -378,28 +384,19 @@ class Window(wiring.Component):
         return m
 
 
-class STFTWindow(wiring.Component):
-
-    """
-    Short-time Fourier Transform Windower
-
-    Continuously compute (windowed and optionally overlapping)
-    blocks of a real, time-domain input.
-    """
+class ComputeOverlappingBlocks(wiring.Component):
 
     def __init__(self,
                  shape:     fixed.Shape,
                  sz:        int,
-                 n_overlap: int) -> None:
+                 n_overlap: int):
 
         self.sz        = sz
         self.shape     = shape
         self.n_overlap = n_overlap
 
-        self.window = Window(sz=sz, shape=shape)
-
         super().__init__({
-            "i": In(stream.Signature(CQ(self.shape))),
+            "i": In(stream.Signature(self.shape)),
             "o": Out(stream.Signature(data.StructLayout({
                 "first": unsigned(1),
                 "sample": CQ(self.shape)
@@ -412,33 +409,29 @@ class STFTWindow(wiring.Component):
         m.submodules.overlap_fifo = overlap_fifo = fifo.SyncFIFOBuffered(
             width=self.shape.as_shape().width, depth=self.n_overlap)
 
-        m.submodules.window = self.window
-
-        wiring.connect(m, self.window.o, wiring.flipped(self.o))
-
         n_samples = Signal(range(self.sz), init=0)
         with m.If(self.i.valid & self.i.ready):
             m.d.sync += n_samples.eq(n_samples+1)
 
         m.d.comb += [
-            self.window.i.payload.sample.eq(self.i.payload),
-            self.window.i.payload.first.eq(
+            self.o.payload.sample.eq(self.i.payload),
+            self.o.payload.first.eq(
                 overlap_fifo.r_level == self.n_overlap),
             overlap_fifo.w_data.eq(self.i.payload),
-            self.window.i.valid.eq(self.i.valid),
-            self.i.ready.eq(self.window.i.ready),
+            self.o.valid.eq(self.i.valid),
+            self.i.ready.eq(self.o.ready),
         ]
 
         with m.FSM():
             with m.State("START"):
-                m.d.comb += self.window.i.payload.first.eq(1)
+                m.d.comb += self.o.payload.first.eq(1)
                 with m.If(n_samples == (self.sz - self.n_overlap)):
                     m.next = "FILL"
             with m.State("FILL"):
                 with m.If(overlap_fifo.r_level == self.n_overlap):
                     m.d.comb += [
                         self.i.ready.eq(0),
-                        self.window.i.valid.eq(0),
+                        self.o.valid.eq(0),
                     ]
                     m.next = "DRAIN"
                 with m.Else():
@@ -447,21 +440,21 @@ class STFTWindow(wiring.Component):
                 with m.If(overlap_fifo.r_level != 0):
                     m.d.comb += [
                         self.i.ready.eq(0),
-                        self.window.i.valid.eq(1),
-                        self.window.i.payload.sample.eq(overlap_fifo.r_data),
-                        overlap_fifo.r_en.eq(self.window.i.ready),
+                        self.o.valid.eq(1),
+                        self.o.payload.sample.eq(overlap_fifo.r_data),
+                        overlap_fifo.r_en.eq(self.o.ready),
                     ]
                 with m.Else():
                     m.next = "FILL"
 
         return m
 
-class OverlapAdd(wiring.Component):
+class OverlapAddBlocks(wiring.Component):
 
     def __init__(self,
                  shape:     fixed.Shape,
                  sz:        int,
-                 n_overlap: int) -> None:
+                 n_overlap: int):
 
         self.sz        = sz
         self.shape     = shape
@@ -487,8 +480,8 @@ class OverlapAdd(wiring.Component):
         m.d.comb += [
             swap_fifos.eq(
                 self.i.valid & self.i.ready & self.i.payload.first),
-            fifo1.w_data.eq(self.i.payload.sample.real),
-            fifo2.w_data.eq(self.i.payload.sample.real),
+            fifo1.w_data.eq(self.i.payload.sample),
+            fifo2.w_data.eq(self.i.payload.sample),
         ]
 
         with m.FSM():
@@ -530,5 +523,63 @@ class OverlapAdd(wiring.Component):
             fifo1.r_en.eq(self.o.valid & self.o.ready),
             fifo2.r_en.eq(self.o.valid & self.o.ready),
         ]
+
+        return m
+
+class STFTSynthesizer(wiring.Component):
+
+    def __init__(self,
+                 shape: fixed.Shape,
+                 sz:    int):
+
+        self.sz        = sz
+        self.shape     = shape
+
+        self.overlap_blocks   = ComputeOverlappingBlocks(sz=sz, shape=shape, n_overlap=sz//2)
+        self.window_analysis  = Window(sz=sz, shape=shape)
+        self.fft              = FFT(sz=sz, shape=shape)
+        self.window_synthesis = Window(sz=sz, shape=shape)
+        self.ifft             = FFT(sz=sz, shape=shape, default_ifft=True)
+        self.overlap_add      = OverlapAddBlocks(sz=sz, shape=shape, n_overlap=sz//2)
+
+        super().__init__({
+            # Time domain input and resynthesized output
+            "i": In(stream.Signature(self.shape)),
+            "o": Out(stream.Signature(self.shape)),
+            # Frequency domain analysis and resynthesis blocks, to be hooked
+            # up to user frequency-domain block processing logic. If `o_freq`
+            # is connected straight to `i_freq` the output will simply
+            # resynthesize the input unmodified.
+            "o_freq": Out(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+            "i_freq": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.overlap_blocks   = self.overlap_blocks
+        m.submodules.window_analysis  = self.window_analysis
+        m.submodules.fft              = self.fft
+        m.submodules.ifft             = self.ifft
+        m.submodules.window_synthesis = self.window_synthesis
+        m.submodules.overlap_add      = self.overlap_add
+
+        # Continuous time-domain input -> windowed overlapping frequency domain blocks
+        wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
+        wiring.connect(m, self.overlap_blocks.o, self.window_analysis.i)
+        wiring.connect(m, self.window_analysis.o, self.fft.i)
+        wiring.connect(m, self.fft.o, wiring.flipped(self.o_freq))
+
+        # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
+        wiring.connect(m, wiring.flipped(self.i_freq), self.ifft.i)
+        wiring.connect(m, self.ifft.o, self.window_synthesis.i)
+        wiring.connect(m, self.window_synthesis.o, self.overlap_add.i)
+        wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))
 
         return m

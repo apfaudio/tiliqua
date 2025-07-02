@@ -164,32 +164,13 @@ class FFTTests(unittest.TestCase):
     @parameterized.expand([
         ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/200) + 0.2*cos(2*pi*n/10)],
     ])
-    def test_stft_window(self, name, sz, shape, stimulus_function):
+    def test_stft(self, name, sz, shape, stimulus_function):
 
         m = Module()
-
-        window = fft.STFTWindow(sz=sz, shape=shape, n_overlap=sz//2)
-        overlap = fft.OverlapAdd(sz=sz, shape=shape, n_overlap=sz//2)
-
-        m.submodules.window = window
-        m.submodules.window2 = window2 = fft.Window(sz=sz, shape=shape)
-        m.submodules.overlap = overlap
-
-        #wiring.connect(m, window.o, overlap.i)
-        m.d.comb += overlap.o.ready.eq(1)
-
-        ffft = fft.FFT(sz=sz, shape=shape)
-        ifft = fft.FFT(sz=sz, shape=shape)
-        m.d.comb += [
-            ffft.ifft.eq(0),
-            ifft.ifft.eq(1),
-        ]
-        m.submodules.ffft = ffft
-        m.submodules.ifft = ifft
-        wiring.connect(m, window.o, ffft.i)
-        wiring.connect(m, ffft.o, ifft.i)
-        wiring.connect(m, ifft.o, window2.i)
-        wiring.connect(m, window2.o, overlap.i)
+        m.submodules.dut = dut = fft.STFTSynthesizer(sz=sz, shape=shape)
+        # Passthrough (resynthesize) in frequency domain.
+        wiring.connect(m, dut.o_freq, dut.i_freq)
+        m.d.comb += dut.o.ready.eq(1)
 
         def stimulus_values():
             for n in range(0, sys.maxsize):
@@ -198,11 +179,11 @@ class FFTTests(unittest.TestCase):
         async def stimulus_i(ctx):
             s = stimulus_values()
             while True:
-                await ctx.tick().until(window.i.ready)
-                ctx.set(window.i.valid, 1)
-                ctx.set(window.i.payload.real, next(s))
+                await ctx.tick().until(dut.i.ready)
+                ctx.set(dut.i.valid, 1)
+                ctx.set(dut.i.payload, next(s))
                 await ctx.tick()
-                ctx.set(window.i.valid, 0)
+                ctx.set(dut.i.valid, 0)
                 await ctx.tick()
 
         async def testbench(ctx):
@@ -210,10 +191,10 @@ class FFTTests(unittest.TestCase):
             samples_i = []
             samples_o = []
             while True:
-                if ctx.get(window.i.valid & window.i.ready):
-                    samples_i.append(ctx.get(window.i.payload.real).as_float())
-                if ctx.get(overlap.o.valid & overlap.o.ready):
-                    samples_o.append(ctx.get(overlap.o.payload).as_float())
+                if ctx.get(dut.i.valid & dut.i.ready):
+                    samples_i.append(ctx.get(dut.i.payload).as_float())
+                if ctx.get(dut.o.valid & dut.o.ready):
+                    samples_o.append(ctx.get(dut.o.payload).as_float())
                     if len(samples_o) == N:
                         break
                 await ctx.tick()
@@ -232,5 +213,5 @@ class FFTTests(unittest.TestCase):
         sim.add_clock(1.667e-8)
         sim.add_process(stimulus_i)
         sim.add_testbench(testbench)
-        with sim.write_vcd(vcd_file=open(f"test_stft_window_{name}.vcd", "w")):
+        with sim.write_vcd(vcd_file=open(f"test_stft_{name}.vcd", "w")):
             sim.run()
