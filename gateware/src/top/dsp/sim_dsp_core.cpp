@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     I2SDriver i2s_driver(top);
 
     for (int i = 0; i != 10000; ++i) {
-        i2s_driver.inject_sample(0, (int16_t)10000.0*sin((float)i / 50.0));
+        i2s_driver.inject_sample(0, (int16_t)100.0*(i % 100 - 50));
         i2s_driver.inject_sample(1, (int16_t)10000.0*sin((float)i / 10.0));
         i2s_driver.inject_sample(2, (int16_t)10000.0*sin((float)i / 30.0));
         i2s_driver.inject_sample(3, (int16_t)10000.0*sin((float)i /  5.0));

@@ -9,7 +9,7 @@ from math import atan, pi
 
 from tiliqua.fft import CQ
 
-class MagPhaseCordic(wiring.Component):
+class RectToPolarCordic(wiring.Component):
 
     # CORDIC gain constant
     K = 1.646760258121
@@ -143,4 +143,92 @@ class MagPhaseCordic(wiring.Component):
                 with m.If(self.o.ready):
                     m.next = "IDLE"
 
+        return m
+
+class SimpleVocoder(wiring.Component):
+
+    def __init__(self,
+                 shape: fixed.Shape,
+                 sz:    int):
+
+        self.sz        = sz
+        self.shape     = shape
+
+        super().__init__({
+            # All frequency domain spectra in blocks.
+            "i_carrier": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+            "i_modulator": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+            "o": Out(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        """
+        mag = Signal(self.shape)
+        m.d.comb += [
+            # TODO frame synchronization
+            self.i_carrier.ready.eq(self.o.ready),
+            self.i_modulator.ready.eq(self.o.ready),
+            self.o.valid.eq(self.i_carrier.valid),
+            self.o.payload.first.eq(self.i_carrier.payload.first),
+            # TODO real magnitude calculation
+            mag.eq(
+                (self.i_carrier.payload.sample.real*self.i_carrier.payload.sample.real +
+                 self.i_carrier.payload.sample.imag*self.i_carrier.payload.sample.imag)>>1
+            ),
+            # TODO normalize modulator vector
+            self.o.payload.sample.real.eq(mag * self.i_modulator.payload.sample.real),
+            self.o.payload.sample.imag.eq(mag * self.i_modulator.payload.sample.imag),
+        ]
+        """
+        m.submodules.cordic = cordic = RectToPolarCordic(self.shape)
+        l_carrier   = Signal.like(self.i_carrier.payload.sample)
+        l_modulator = Signal.like(self.i_modulator.payload.sample)
+        l_first     = Signal()
+        with m.FSM():
+            with m.State("IDLE"):
+                m.d.comb += [
+                    self.i_carrier.ready.eq(1),
+                    self.i_modulator.ready.eq(1),
+                ]
+                with m.If(self.i_carrier.valid & self.i_modulator.valid):
+                    m.d.sync += [
+                        l_carrier.eq(self.i_carrier.payload.sample),
+                        l_modulator.eq(self.i_modulator.payload.sample),
+                        l_first.eq(self.i_carrier.payload.first),
+                    ]
+                    m.next = "CORDIC"
+
+            with m.State("CORDIC"):
+                m.d.comb += [
+                    cordic.i.valid.eq(1),
+                    cordic.i.payload.eq(l_modulator),
+                    cordic.o.ready.eq(1),
+                ]
+                with m.If(cordic.o.valid):
+                    m.d.sync += [
+                        self.o.payload.sample.real.eq(
+                            l_carrier.real * cordic.o.payload.magnitude),
+                        self.o.payload.sample.imag.eq(
+                            l_carrier.imag * cordic.o.payload.magnitude),
+                    ]
+                    m.next = "OUTPUT"
+
+            with m.State("OUTPUT"):
+                m.d.comb += [
+                    self.o.valid.eq(1),
+                    self.o.payload.first.eq(l_first),
+                ]
+                with m.If(self.o.ready):
+                    m.next = "IDLE"
         return m

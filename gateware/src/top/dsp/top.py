@@ -29,7 +29,7 @@ from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 
-from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll, fft
+from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll, fft, cordic
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua.cli              import top_level_cli
 from tiliqua.delay_line       import DelayLine
@@ -845,7 +845,7 @@ class FFT(wiring.Component):
         m.submodules.analyzer0 = analyzer0 = fft.STFTAnalyzer(shape=ASQ, sz=256)
         m.submodules.analyzer1 = analyzer1 = fft.STFTAnalyzer(shape=ASQ, sz=256)
         m.submodules.synthesizer = synthesizer = fft.STFTSynthesizer(shape=ASQ, sz=256)
-        m.submodules.vocoder = vocoder = fft.SimpleVocoder(shape=ASQ, sz=256)
+        m.submodules.vocoder = vocoder = cordic.SimpleVocoder(shape=ASQ, sz=256)
 
         wiring.connect(m, analyzer0.o, vocoder.i_carrier)
         wiring.connect(m, analyzer1.o, vocoder.i_modulator)

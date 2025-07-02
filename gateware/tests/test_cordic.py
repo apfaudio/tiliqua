@@ -18,7 +18,7 @@ class CordicTests(unittest.TestCase):
 
     def test_cordic_vector(self):
 
-        dut = cordic.MagPhaseCordic(self.SHAPE)
+        dut = cordic.RectToPolarCordic(self.SHAPE)
 
         async def send_complex(ctx, real, imag):
             ctx.set(dut.i.payload.real, fixed.Const(real, shape=self.SHAPE, clamp=True))
