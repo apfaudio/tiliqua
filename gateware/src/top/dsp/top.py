@@ -842,12 +842,19 @@ class FFT(wiring.Component):
         wiring.connect(m, wiring.flipped(self.i), split4.i)
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
-        m.submodules.stft = stft = fft.STFTProcessor(shape=ASQ, sz=256)
-        wiring.connect(m, stft.o_freq, stft.i_freq)
-        wiring.connect(m, split4.o[0], stft.i)
-        wiring.connect(m, stft.o, merge4.i[0])
+        m.submodules.analyzer0 = analyzer0 = fft.STFTAnalyzer(shape=ASQ, sz=256)
+        m.submodules.analyzer1 = analyzer1 = fft.STFTAnalyzer(shape=ASQ, sz=256)
+        m.submodules.synthesizer = synthesizer = fft.STFTSynthesizer(shape=ASQ, sz=256)
+        m.submodules.vocoder = vocoder = fft.SimpleVocoder(shape=ASQ, sz=256)
 
-        wiring.connect(m, split4.o[1], dsp.ASQ_READY)
+        wiring.connect(m, analyzer0.o, vocoder.i_carrier)
+        wiring.connect(m, analyzer1.o, vocoder.i_modulator)
+        wiring.connect(m, vocoder.o, synthesizer.i)
+
+        wiring.connect(m, split4.o[0], analyzer0.i)
+        wiring.connect(m, split4.o[1], analyzer1.i)
+        wiring.connect(m, synthesizer.o, merge4.i[0])
+
         wiring.connect(m, split4.o[2], dsp.ASQ_READY)
         wiring.connect(m, split4.o[3], dsp.ASQ_READY)
 
