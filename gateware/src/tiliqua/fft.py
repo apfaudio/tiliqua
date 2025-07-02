@@ -526,7 +526,7 @@ class OverlapAddBlocks(wiring.Component):
 
         return m
 
-class STFTSynthesizer(wiring.Component):
+class STFTAnalyzer(wiring.Component):
 
     def __init__(self,
                  shape: fixed.Shape,
@@ -538,9 +538,77 @@ class STFTSynthesizer(wiring.Component):
         self.overlap_blocks   = ComputeOverlappingBlocks(sz=sz, shape=shape, n_overlap=sz//2)
         self.window_analysis  = Window(sz=sz, shape=shape)
         self.fft              = FFT(sz=sz, shape=shape)
-        self.window_synthesis = Window(sz=sz, shape=shape)
+
+        super().__init__({
+            "i": In(stream.Signature(self.shape)),
+            "o": Out(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.overlap_blocks   = self.overlap_blocks
+        m.submodules.window_analysis  = self.window_analysis
+        m.submodules.fft              = self.fft
+
+        # Continuous time-domain input -> windowed overlapping frequency domain blocks
+        wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
+        wiring.connect(m, self.overlap_blocks.o, self.window_analysis.i)
+        wiring.connect(m, self.window_analysis.o, self.fft.i)
+        wiring.connect(m, self.fft.o, wiring.flipped(self.o))
+
+        return m
+
+class STFTSynthesizer(wiring.Component):
+
+    def __init__(self,
+                 shape: fixed.Shape,
+                 sz:    int):
+
+        self.sz        = sz
+        self.shape     = shape
+
         self.ifft             = FFT(sz=sz, shape=shape, default_ifft=True)
+        self.window_synthesis = Window(sz=sz, shape=shape)
         self.overlap_add      = OverlapAddBlocks(sz=sz, shape=shape, n_overlap=sz//2)
+
+        super().__init__({
+            "i": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+            "o": Out(stream.Signature(self.shape)),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.ifft             = self.ifft
+        m.submodules.window_synthesis = self.window_synthesis
+        m.submodules.overlap_add      = self.overlap_add
+
+        # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
+        wiring.connect(m, wiring.flipped(self.i), self.ifft.i)
+        wiring.connect(m, self.ifft.o, self.window_synthesis.i)
+        wiring.connect(m, self.window_synthesis.o, self.overlap_add.i)
+        wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))
+
+        return m
+
+class STFTProcessor(wiring.Component):
+
+    def __init__(self,
+                 shape: fixed.Shape,
+                 sz:    int):
+
+        self.sz        = sz
+        self.shape     = shape
+
+        self.analyzer    = STFTAnalyzer(shape=shape, sz=sz)
+        self.synthesizer = STFTSynthesizer(shape=shape, sz=sz)
 
         super().__init__({
             # Time domain input and resynthesized output
@@ -563,23 +631,14 @@ class STFTSynthesizer(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        m.submodules.overlap_blocks   = self.overlap_blocks
-        m.submodules.window_analysis  = self.window_analysis
-        m.submodules.fft              = self.fft
-        m.submodules.ifft             = self.ifft
-        m.submodules.window_synthesis = self.window_synthesis
-        m.submodules.overlap_add      = self.overlap_add
+        m.submodules.analyzer = self.analyzer
+        m.submodules.synthesizer = self.synthesizer
 
-        # Continuous time-domain input -> windowed overlapping frequency domain blocks
-        wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
-        wiring.connect(m, self.overlap_blocks.o, self.window_analysis.i)
-        wiring.connect(m, self.window_analysis.o, self.fft.i)
-        wiring.connect(m, self.fft.o, wiring.flipped(self.o_freq))
+        wiring.connect(m, wiring.flipped(self.i), self.analyzer.i)
+        wiring.connect(m, self.analyzer.o, wiring.flipped(self.o_freq))
 
         # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
-        wiring.connect(m, wiring.flipped(self.i_freq), self.ifft.i)
-        wiring.connect(m, self.ifft.o, self.window_synthesis.i)
-        wiring.connect(m, self.window_synthesis.o, self.overlap_add.i)
-        wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))
+        wiring.connect(m, wiring.flipped(self.i_freq), self.synthesizer.i)
+        wiring.connect(m, self.synthesizer.o, wiring.flipped(self.o))
 
         return m

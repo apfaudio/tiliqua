@@ -842,7 +842,7 @@ class FFT(wiring.Component):
         wiring.connect(m, wiring.flipped(self.i), split4.i)
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
-        m.submodules.stft = stft = fft.STFTSynthesizer(shape=ASQ, sz=256)
+        m.submodules.stft = stft = fft.STFTProcessor(shape=ASQ, sz=256)
         wiring.connect(m, stft.o_freq, stft.i_freq)
         wiring.connect(m, split4.o[0], stft.i)
         wiring.connect(m, stft.o, merge4.i[0])

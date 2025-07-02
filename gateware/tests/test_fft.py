@@ -167,7 +167,7 @@ class FFTTests(unittest.TestCase):
     def test_stft(self, name, sz, shape, stimulus_function):
 
         m = Module()
-        m.submodules.dut = dut = fft.STFTSynthesizer(sz=sz, shape=shape)
+        m.submodules.dut = dut = fft.STFTProcessor(sz=sz, shape=shape)
         # Passthrough (resynthesize) in frequency domain.
         wiring.connect(m, dut.o_freq, dut.i_freq)
         m.d.comb += dut.o.ready.eq(1)
