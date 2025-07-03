@@ -15,8 +15,13 @@
 #include "plot.h"
 #include "i2s.h"
 #include "psram.h"
+#include "tinywav.h"
 
 #include <cmath>
+
+#define NUM_CHANNELS 1
+#define SAMPLE_RATE 48000
+#define BLOCK_SIZE 480
 
 int main(int argc, char** argv) {
 
@@ -30,7 +35,7 @@ int main(int argc, char** argv) {
     top->trace(tfp, 99);  // Trace 99 levels of hierarchy (or see below)
     tfp->open("simx.fst");
 #endif
-    uint64_t sim_time =  100000000000;
+    uint64_t sim_time =  500000000000;
 
     contextp->timeInc(1);
     top->rst_sync = 1;
@@ -67,9 +72,22 @@ int main(int argc, char** argv) {
 
     I2SDriver i2s_driver(top);
 
-    for (int i = 0; i != 10000; ++i) {
-        i2s_driver.inject_sample(0, (int16_t)100.0*(i % 100 - 50));
-        i2s_driver.inject_sample(1, (int16_t)10000.0*sin((float)i / 10.0));
+    TinyWav wav_read;
+    tinywav_open_read(&wav_read,
+        "in.wav",
+        TW_INLINE
+    );
+
+    for (int i = 0; i != 48000; ++i) {
+        i2s_driver.inject_sample(0, (int16_t)150.0*((int16_t)(i % 200) - 100));
+        if (i % BLOCK_SIZE == 0) {
+            float samples[NUM_CHANNELS * BLOCK_SIZE];
+            tinywav_read_f(&wav_read, samples, BLOCK_SIZE);
+            for (int j = 0; j != BLOCK_SIZE; ++j) {
+                i2s_driver.inject_sample(1, (int16_t)(samples[j]*16000.0));
+            }
+        }
+        //i2s_driver.inject_sample(1, (int16_t)10000.0*sin((float)i / 10.0));
         i2s_driver.inject_sample(2, (int16_t)10000.0*sin((float)i / 30.0));
         i2s_driver.inject_sample(3, (int16_t)10000.0*sin((float)i /  5.0));
     }
@@ -113,6 +131,8 @@ int main(int argc, char** argv) {
     tfp->close();
 #endif
 
+
+    /*
     signalsmith::plot::Plot2D plot(1200, 400);
     for (int ax = 0; ax != 4; ++ax) {
         auto &axes = plot.newY(1.0 - 0.25*ax, 1.0 - 0.25*(ax+1));
@@ -125,6 +145,25 @@ int main(int argc, char** argv) {
         }
     }
     plot.write("sim-i2s-outputs.svg");
+    */
+
+    TinyWav wav_write;
+    tinywav_open_write(&wav_write,
+        NUM_CHANNELS,
+        SAMPLE_RATE,
+        TW_FLOAT32,
+        TW_INLINE,
+        "out.wav"
+    );
+    auto s_out = i2s_driver.get_captured_samples(0);
+    for (int i = 0; i < s_out.size()-BLOCK_SIZE; i+=BLOCK_SIZE) {
+        float samples[BLOCK_SIZE];
+        for (int j = 0; j != BLOCK_SIZE; ++j) {
+            samples[j] = ((float)s_out[i+j])/32768.0;
+        }
+        tinywav_write_f(&wav_write, samples, BLOCK_SIZE);
+    }
+    tinywav_close_write(&wav_write);
 
     return 0;
 }

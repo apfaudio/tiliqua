@@ -196,7 +196,7 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
                           ] + [
                                f for f in sim_platform.files
                                if f.endswith(".svh") or f.endswith(".sv") or f.endswith(".v")
-                          ],
+                          ] + ['src/tb_cpp/tinywav.c'],
                           env=os.environ)
 
     print(f"run verilated binary '{verilator_dst}/Vtiliqua_soc'...")
