@@ -829,7 +829,38 @@ class TripleMirror(wiring.Component):
 
         return m
 
-class FFT(wiring.Component):
+class STFTMirror(wiring.Component):
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.stft = stft = fft.STFTProcessorSmall(
+            sz=256, shape=ASQ)
+        # Passthrough (resynthesize) in frequency domain.
+        wiring.connect(m, stft.o_freq, stft.i_freq)
+
+        m.submodules.split4 = split4 = dsp.Split(n_channels=4)
+        m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4)
+        wiring.connect(m, wiring.flipped(self.i), split4.i)
+        wiring.connect(m, merge4.o, wiring.flipped(self.o))
+
+        wiring.connect(m, split4.o[0], stft.i)
+        wiring.connect(m, stft.o, merge4.i[0])
+
+        wiring.connect(m, split4.o[1], dsp.ASQ_READY)
+        wiring.connect(m, split4.o[2], dsp.ASQ_READY)
+        wiring.connect(m, split4.o[3], dsp.ASQ_READY)
+
+        wiring.connect(m, dsp.ASQ_VALID, merge4.i[1])
+        wiring.connect(m, dsp.ASQ_VALID, merge4.i[2])
+        wiring.connect(m, dsp.ASQ_VALID, merge4.i[3])
+
+        return m
+
+class Vocoder(wiring.Component):
 
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
@@ -934,7 +965,8 @@ CORES = {
     "multi_diffuser": (False, PSRAMMultiDiffuser),
     "resampler":      (False, Resampler),
     "triple_mirror":  (False, TripleMirror),
-    "fft":            (False, FFT),
+    "vocoder":        (False, Vocoder),
+    "stft_mirror":    (False, STFTMirror),
 }
 
 def simulation_ports(fragment):

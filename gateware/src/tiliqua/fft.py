@@ -598,7 +598,7 @@ class STFTSynthesizer(wiring.Component):
 
         return m
 
-class STFTProcessor(wiring.Component):
+class STFTProcessorPipelined(wiring.Component):
 
     def __init__(self,
                  shape: fixed.Shape,
@@ -640,5 +640,80 @@ class STFTProcessor(wiring.Component):
         # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
         wiring.connect(m, wiring.flipped(self.i_freq), self.synthesizer.i)
         wiring.connect(m, self.synthesizer.o, wiring.flipped(self.o))
+
+        return m
+
+class STFTProcessorSmall(wiring.Component):
+
+    def __init__(self,
+                 shape: fixed.Shape,
+                 sz:    int):
+
+        self.sz        = sz
+        self.shape     = shape
+
+        self.overlap_blocks = ComputeOverlappingBlocks(sz=sz, shape=shape, n_overlap=sz//2)
+        self.window         = Window(sz=sz, shape=shape)
+        self.fft            = FFT(sz=sz, shape=shape)
+        self.overlap_add    = OverlapAddBlocks(sz=sz, shape=shape, n_overlap=sz//2)
+
+        super().__init__({
+            # Time domain input and resynthesized output
+            "i": In(stream.Signature(self.shape)),
+            "o": Out(stream.Signature(self.shape)),
+            # Frequency domain analysis and resynthesis blocks, to be hooked
+            # up to user frequency-domain block processing logic. If `o_freq`
+            # is connected straight to `i_freq` the output will simply
+            # resynthesize the input unmodified.
+            "o_freq": Out(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+            "i_freq": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.overlap_blocks   = self.overlap_blocks
+        m.submodules.window           = self.window
+        m.submodules.fft              = self.fft
+        m.submodules.overlap_add      = self.overlap_add
+
+        m.submodules.pfifo = pfifo = fifo.SyncFIFOBuffered(
+            width=33, depth=self.sz)
+
+        wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
+        wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))
+
+        n_samples = Signal(range(self.sz+1), init=0)
+
+        with m.FSM():
+            with m.State("LOAD"):
+                m.d.comb += self.fft.ifft.eq(0)
+                wiring.connect(m, self.overlap_blocks.o, self.window.i)
+                wiring.connect(m, self.window.o, self.fft.i)
+                with m.If(self.overlap_blocks.o.valid & self.overlap_blocks.o.ready):
+                    m.d.sync += n_samples.eq(n_samples+1)
+                with m.If(n_samples == self.sz):
+                    m.next = "ANALYZE"
+            with m.State("ANALYZE"):
+                wiring.connect(m, self.window.o, self.fft.i)
+                wiring.connect(m, self.fft.o, wiring.flipped(self.o_freq))
+                wiring.connect(m, wiring.flipped(self.i_freq), pfifo.w_stream)
+                with m.If(pfifo.w_level == self.sz):
+                    m.next = "SYNTHESIZE"
+            with m.State("SYNTHESIZE"):
+                m.d.comb += self.fft.ifft.eq(1)
+                wiring.connect(m, pfifo.r_stream, self.fft.i)
+                wiring.connect(m, self.fft.o, self.window.i)
+                wiring.connect(m, self.window.o, self.overlap_add.i)
+                with m.If(self.window.o.valid & self.window.o.ready):
+                    m.d.sync += n_samples.eq(n_samples-1)
+                with m.If(n_samples == 0):
+                    m.next = "LOAD"
 
         return m
