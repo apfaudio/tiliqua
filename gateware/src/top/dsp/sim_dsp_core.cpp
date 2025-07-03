@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
     top->trace(tfp, 99);  // Trace 99 levels of hierarchy (or see below)
     tfp->open("simx.fst");
 #endif
-    uint64_t sim_time =  500000000000;
+    uint64_t sim_time =  2000000000000;
 
     contextp->timeInc(1);
     top->rst_sync = 1;
@@ -72,17 +72,28 @@ int main(int argc, char** argv) {
 
     I2SDriver i2s_driver(top);
 
-    TinyWav wav_read;
-    tinywav_open_read(&wav_read,
-        "in.wav",
+    TinyWav wav_read0;
+    tinywav_open_read(&wav_read0,
+        "carrier.wav",
+        TW_INLINE
+    );
+    TinyWav wav_read1;
+    tinywav_open_read(&wav_read1,
+        "modulator.wav",
         TW_INLINE
     );
 
-    for (int i = 0; i != 48000; ++i) {
-        i2s_driver.inject_sample(0, (int16_t)150.0*((int16_t)(i % 200) - 100));
+    for (int i = 0; i != 70000; ++i) {
+        // Sawtooth carrier
+        //i2s_driver.inject_sample(0, (int16_t)70.0*((int16_t)(i % 400) - 200));
+        // .wav modulator
         if (i % BLOCK_SIZE == 0) {
             float samples[NUM_CHANNELS * BLOCK_SIZE];
-            tinywav_read_f(&wav_read, samples, BLOCK_SIZE);
+            tinywav_read_f(&wav_read0, samples, BLOCK_SIZE);
+            for (int j = 0; j != BLOCK_SIZE; ++j) {
+                i2s_driver.inject_sample(0, (int16_t)(samples[j]*16000.0));
+            }
+            tinywav_read_f(&wav_read1, samples, BLOCK_SIZE);
             for (int j = 0; j != BLOCK_SIZE; ++j) {
                 i2s_driver.inject_sample(1, (int16_t)(samples[j]*16000.0));
             }

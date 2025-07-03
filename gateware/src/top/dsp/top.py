@@ -845,7 +845,7 @@ class FFT(wiring.Component):
         m.submodules.analyzer0 = analyzer0 = fft.STFTAnalyzer(shape=ASQ, sz=256)
         m.submodules.analyzer1 = analyzer1 = fft.STFTAnalyzer(shape=ASQ, sz=256)
         m.submodules.synthesizer = synthesizer = fft.STFTSynthesizer(shape=ASQ, sz=256)
-        m.submodules.vocoder = vocoder = cordic.SimpleVocoder(shape=ASQ, sz=256)
+        m.submodules.vocoder = vocoder = cordic.SimpleVocoder(shape=ASQ)
 
         wiring.connect(m, analyzer0.o, vocoder.i_carrier)
         wiring.connect(m, analyzer1.o, vocoder.i_modulator)

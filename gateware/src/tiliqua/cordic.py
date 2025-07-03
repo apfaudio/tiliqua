@@ -148,10 +148,8 @@ class RectToPolarCordic(wiring.Component):
 class SimpleVocoder(wiring.Component):
 
     def __init__(self,
-                 shape: fixed.Shape,
-                 sz:    int):
+                 shape: fixed.Shape):
 
-        self.sz        = sz
         self.shape     = shape
 
         super().__init__({
@@ -173,28 +171,11 @@ class SimpleVocoder(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        """
-        mag = Signal(self.shape)
-        m.d.comb += [
-            # TODO frame synchronization
-            self.i_carrier.ready.eq(self.o.ready),
-            self.i_modulator.ready.eq(self.o.ready),
-            self.o.valid.eq(self.i_carrier.valid),
-            self.o.payload.first.eq(self.i_carrier.payload.first),
-            # TODO real magnitude calculation
-            mag.eq(
-                (self.i_carrier.payload.sample.real*self.i_carrier.payload.sample.real +
-                 self.i_carrier.payload.sample.imag*self.i_carrier.payload.sample.imag)>>1
-            ),
-            # TODO normalize modulator vector
-            self.o.payload.sample.real.eq(mag * self.i_modulator.payload.sample.real),
-            self.o.payload.sample.imag.eq(mag * self.i_modulator.payload.sample.imag),
-        ]
-        """
         m.submodules.cordic = cordic = RectToPolarCordic(self.shape)
         l_carrier   = Signal.like(self.i_carrier.payload.sample)
         l_modulator = Signal.like(self.i_modulator.payload.sample)
         l_first     = Signal()
+
         with m.FSM():
             with m.State("IDLE"):
                 m.d.comb += [
@@ -218,9 +199,9 @@ class SimpleVocoder(wiring.Component):
                 with m.If(cordic.o.valid):
                     m.d.sync += [
                         self.o.payload.sample.real.eq(
-                            l_carrier.real * cordic.o.payload.magnitude),
+                            (l_carrier.real * cordic.o.payload.magnitude)<<2),
                         self.o.payload.sample.imag.eq(
-                            l_carrier.imag * cordic.o.payload.magnitude),
+                            (l_carrier.imag * cordic.o.payload.magnitude)<<2),
                     ]
                     m.next = "OUTPUT"
 
@@ -231,4 +212,5 @@ class SimpleVocoder(wiring.Component):
                 ]
                 with m.If(self.o.ready):
                     m.next = "IDLE"
+
         return m
