@@ -15,10 +15,12 @@ class RectToPolarCordic(wiring.Component):
     # CORDIC gain constant
     K = 1.646760258121
 
-    def __init__(self, shape: fixed.Shape, iterations: int = None):
+    def __init__(self, shape: fixed.Shape, iterations: int = None,
+                 magnitude_correction=True):
         self.shape = shape
         self.iterations = iterations or shape.i_bits + shape.f_bits
         self.internal_shape = fixed.SQ(self.shape.i_bits + 2, self.shape.f_bits)
+        self.magnitude_correction = magnitude_correction
         super().__init__({
             "i": In(stream.Signature(CQ(shape))),
             "o": Out(stream.Signature(data.StructLayout({
@@ -79,6 +81,15 @@ class RectToPolarCordic(wiring.Component):
 
         quadrant_adjust = Signal(self.internal_shape)
 
+        # Output assignments
+        m.d.comb += self.o.payload.phase.eq(z + quadrant_adjust),
+        if self.magnitude_correction:
+            # Scale magnitude by 1/K to compensate for CORDIC gain
+            m.d.comb += self.o.payload.magnitude.eq(
+                x * fixed.Const(1.0/self.K, self.internal_shape))
+        else:
+            m.d.comb += self.o.payload.magnitude.eq(x)
+
         with m.FSM():
             with m.State("IDLE"):
                 m.d.comb += self.i.ready.eq(1)
@@ -128,25 +139,32 @@ class RectToPolarCordic(wiring.Component):
                     m.next = "OUTPUT"
 
             with m.State("OUTPUT"):
-                # Scale magnitude by 1/K to compensate for CORDIC gain
-                mag_scaled = Signal(self.internal_shape)
-                m.d.comb += mag_scaled.eq(
-                    x * fixed.Const(1.0/self.K, self.internal_shape))
-                # Apply quadrant adjustment to phase
-                phase_adjusted = Signal(self.internal_shape)
-                m.d.comb += phase_adjusted.eq(z + quadrant_adjust)
-                # Output the results
-                m.d.comb += [
-                    self.o.valid.eq(1),
-                    self.o.payload.magnitude.eq(mag_scaled),
-                    self.o.payload.phase.eq(phase_adjusted),
-                ]
+                m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
                     m.next = "IDLE"
 
         return m
 
 class SimpleVocoder(wiring.Component):
+
+    """
+    Consume 2 sets of frequency-domain information representing a
+    'carrier' and 'modulator'. The (real) magnitude of the 'modulator'
+    spectra is multiplied by the (complex) 'carrier' spectra, creating
+    a classic vocoder effect where the timbre of the 'carrier' dominates,
+    but is filtered spectrally by the 'modulator'
+
+    This core runs a Rectangular-to-Polar conversion on each 'modulator'
+    datapoint, discards the phase and uses the magnitude to compute:
+
+        out.real = carrier.real * modulator.magnitude
+        out.imag = carrier.imag * modulator.magnitude
+
+    A single multiplier is shared for this, to reduce resource usage.
+    Additionally, the CORDIC is run without magnitude correction, which
+    saves another multiplier at the cost of everything being multiplied
+    by a constant factor (which makes no difference here).
+    """
 
     def __init__(self,
                  shape: fixed.Shape):
@@ -172,7 +190,8 @@ class SimpleVocoder(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        m.submodules.cordic = cordic = RectToPolarCordic(self.shape)
+        m.submodules.cordic = cordic = RectToPolarCordic(
+                self.shape, magnitude_correction=False)
         l_carrier   = Signal.like(self.i_carrier.payload.sample)
         l_modulator = Signal.like(self.i_modulator.payload.sample)
         l_first     = Signal()
@@ -182,6 +201,12 @@ class SimpleVocoder(wiring.Component):
         wiring.connect(m, wiring.flipped(self.i_carrier), merge2.i[0])
         wiring.connect(m, wiring.flipped(self.i_modulator), merge2.i[1])
 
+        # Shared multiplier for carrier * mag(modulator) terms
+        modulator_a = Signal(self.shape)
+        modulator_b = Signal(self.shape)
+        modulator_z = Signal(self.shape)
+        m.d.comb +=  modulator_z.eq((modulator_a * modulator_b)<<2)
+
         with m.FSM():
             with m.State("IDLE"):
                 m.d.comb += merge2.o.ready.eq(1)
@@ -189,7 +214,8 @@ class SimpleVocoder(wiring.Component):
                     m.d.sync += [
                         l_carrier.eq(merge2.o.payload[0].sample),
                         l_modulator.eq(merge2.o.payload[1].sample),
-                        # TODO alignment
+                        # TODO frame alignment (not needed for STFT cores
+                        # with shared reset.)
                         l_first.eq(merge2.o.payload[0].first),
                     ]
                     m.next = "CORDIC"
@@ -201,13 +227,18 @@ class SimpleVocoder(wiring.Component):
                     cordic.o.ready.eq(1),
                 ]
                 with m.If(cordic.o.valid):
-                    m.d.sync += [
-                        self.o.payload.sample.real.eq(
-                            (l_carrier.real * cordic.o.payload.magnitude)<<2),
-                        self.o.payload.sample.imag.eq(
-                            (l_carrier.imag * cordic.o.payload.magnitude)<<2),
-                    ]
-                    m.next = "OUTPUT"
+                    m.d.sync += modulator_b.eq(cordic.o.payload.magnitude)
+                    m.next = "REAL"
+
+            with m.State("REAL"):
+                m.d.comb += modulator_a.eq(l_carrier.real)
+                m.d.sync += self.o.payload.sample.real.eq(modulator_z)
+                m.next = "IMAG"
+
+            with m.State("IMAG"):
+                m.d.comb += modulator_a.eq(l_carrier.imag)
+                m.d.sync += self.o.payload.sample.imag.eq(modulator_z)
+                m.next = "OUTPUT"
 
             with m.State("OUTPUT"):
                 m.d.comb += [
