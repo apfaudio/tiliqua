@@ -850,13 +850,8 @@ class STFTMirror(wiring.Component):
         wiring.connect(m, split4.o[0], stft.i)
         wiring.connect(m, stft.o, merge4.i[0])
 
-        wiring.connect(m, split4.o[1], dsp.ASQ_READY)
-        wiring.connect(m, split4.o[2], dsp.ASQ_READY)
-        wiring.connect(m, split4.o[3], dsp.ASQ_READY)
-
-        wiring.connect(m, dsp.ASQ_VALID, merge4.i[1])
-        wiring.connect(m, dsp.ASQ_VALID, merge4.i[2])
-        wiring.connect(m, dsp.ASQ_VALID, merge4.i[3])
+        split4.wire_ready(m, [1, 2, 3])
+        merge4.wire_valid(m, [1, 2, 3])
 
         return m
 
@@ -886,12 +881,8 @@ class Vocoder(wiring.Component):
         wiring.connect(m, split4.o[1], analyzer1.i)
         wiring.connect(m, synthesizer.o, merge4.i[0])
 
-        wiring.connect(m, split4.o[2], dsp.ASQ_READY)
-        wiring.connect(m, split4.o[3], dsp.ASQ_READY)
-
-        wiring.connect(m, dsp.ASQ_VALID, merge4.i[1])
-        wiring.connect(m, dsp.ASQ_VALID, merge4.i[2])
-        wiring.connect(m, dsp.ASQ_VALID, merge4.i[3])
+        split4.wire_ready(m, [2, 3])
+        merge4.wire_valid(m, [1, 2, 3])
 
         return m
 

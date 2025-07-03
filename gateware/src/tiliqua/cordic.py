@@ -8,6 +8,7 @@ from amaranth_future import fixed
 from math import atan, pi
 
 from tiliqua.fft import CQ
+from tiliqua import dsp
 
 class RectToPolarCordic(wiring.Component):
 
@@ -176,17 +177,20 @@ class SimpleVocoder(wiring.Component):
         l_modulator = Signal.like(self.i_modulator.payload.sample)
         l_first     = Signal()
 
+        m.submodules.merge2 = merge2 = dsp.Merge(
+                n_channels=2, shape=self.i_carrier.payload.shape())
+        wiring.connect(m, wiring.flipped(self.i_carrier), merge2.i[0])
+        wiring.connect(m, wiring.flipped(self.i_modulator), merge2.i[1])
+
         with m.FSM():
             with m.State("IDLE"):
-                m.d.comb += [
-                    self.i_carrier.ready.eq(1),
-                    self.i_modulator.ready.eq(1),
-                ]
-                with m.If(self.i_carrier.valid & self.i_modulator.valid):
+                m.d.comb += merge2.o.ready.eq(1)
+                with m.If(merge2.o.valid):
                     m.d.sync += [
-                        l_carrier.eq(self.i_carrier.payload.sample),
-                        l_modulator.eq(self.i_modulator.payload.sample),
-                        l_first.eq(self.i_carrier.payload.first),
+                        l_carrier.eq(merge2.o.payload[0].sample),
+                        l_modulator.eq(merge2.o.payload[1].sample),
+                        # TODO alignment
+                        l_first.eq(merge2.o.payload[0].first),
                     ]
                     m.next = "CORDIC"
 
