@@ -885,6 +885,20 @@ class Vocoder(wiring.Component):
 
         return m
 
+class Noise(wiring.Component):
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    def elaborate(self, platform):
+        m = Module()
+        m.submodules.noise = noise = dsp.WhiteNoise()
+        m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4)
+        wiring.connect(m, merge4.o, wiring.flipped(self.o))
+        wiring.connect(m, noise.o, merge4.i[0])
+        merge4.wire_valid(m, [1, 2, 3])
+        return m
+
 class CoreTop(Elaboratable):
 
     def __init__(self, dsp_core, enable_touch, clock_settings):
@@ -957,6 +971,7 @@ CORES = {
     "triple_mirror":  (False, TripleMirror),
     "vocoder":        (False, Vocoder),
     "stft_mirror":    (False, STFTMirror),
+    "noise":          (False, Noise),
 }
 
 def simulation_ports(fragment):
