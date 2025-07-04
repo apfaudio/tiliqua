@@ -205,7 +205,10 @@ class SimpleVocoder(wiring.Component):
         modulator_a = Signal(self.shape)
         modulator_b = Signal(self.shape)
         modulator_z = Signal(self.shape)
-        m.d.comb +=  modulator_z.eq((modulator_a * modulator_b)<<2)
+        with m.If(~l_first):
+            m.d.comb += modulator_z.eq((modulator_a * modulator_b)<<3)
+        with m.Else():
+            m.d.comb += modulator_z.eq(0)
 
         with m.FSM():
             with m.State("IDLE"):
