@@ -20,9 +20,6 @@ FFT_SZ = 16
 
 class FFTTests(unittest.TestCase):
 
-    def gaussian(x, mu, sig):
-        return 1./(np.sqrt(2.*np.pi)*sig)*np.exp(-np.power((x - mu)/sig, 2.)/2)
-
     @parameterized.expand([
         ["r_impulse", FFT_SZ, fixed.SQ(2, 30),
          lambda n: 1 if n == 0 else 0],
@@ -59,7 +56,14 @@ class FFTTests(unittest.TestCase):
 
         print(name)
 
+        m = Module()
         dut = fft.FFT(sz=sz, shape=shape)
+        ifft = fft.FFT(sz=sz, shape=shape)
+        wiring.connect(m, dut.o, ifft.i)
+        m.d.comb += ifft.ifft.eq(1)
+        m.d.comb += ifft.o.ready.eq(1)
+        m.submodules.dut = dut
+        m.submodules.ifft = ifft
 
         def stimulus_values():
             for n in range(0, sys.maxsize):
@@ -68,7 +72,6 @@ class FFTTests(unittest.TestCase):
 
         async def stimulus_i(ctx):
             s = stimulus_values()
-            ctx.set(dut.o.ready, 1)
             while True:
                 ctx.set(dut.i.payload.first, 1)
                 for _ in range(sz):
@@ -83,37 +86,41 @@ class FFTTests(unittest.TestCase):
                     await ctx.tick()
 
         async def testbench(ctx):
-            samples_ir = []
-            samples_ii = []
-            samples_fr = []
-            samples_fi = []
+            s_i = []
+            s_f = []
+            s_o = []
+            def complex_from_payload(payload):
+                return (ctx.get(payload.sample.real).as_float() +
+                        1j * ctx.get(payload.sample.imag).as_float())
             while True:
                 if ctx.get(dut.i.valid & dut.i.ready):
                     # forward FFT inputs
-                    samples_ir.append(ctx.get(dut.i.payload.sample.real).as_float())
-                    samples_ii.append(ctx.get(dut.i.payload.sample.imag).as_float())
+                    s_i.append(complex_from_payload(dut.i.payload))
                 if ctx.get(dut.o.valid & dut.o.ready):
                     # forward FFT outputs (frequency domain)
-                    samples_fr.append(ctx.get(dut.o.payload.sample.real).as_float())
-                    samples_fi.append(ctx.get(dut.o.payload.sample.imag).as_float())
-                    if len(samples_fr) == sz:
+                    s_f.append(complex_from_payload(dut.o.payload))
+                if ctx.get(ifft.o.valid & ifft.o.ready):
+                    # inverse FFT outputs (should match original signal)
+                    s_o.append(complex_from_payload(ifft.o.payload))
+                    if len(s_o) == sz:
                         break
                 await ctx.tick()
 
-            s_i = (np.array(samples_ir[:sz], dtype=float) +
-                   1j * np.array(samples_ii[:sz], dtype=float))
-            s_f = (np.array(samples_fr[:sz], dtype=float) +
-                   1j * np.array(samples_fi[:sz], dtype=float))
+            s_i = np.array(s_i[:sz])
+            s_f = np.array(s_f[:sz])
+            s_o = np.array(s_o[:sz])
             s_i_fft = np.fft.fft(s_i, norm="forward")
             s_freq_delta = np.abs(s_f - s_i_fft)
+            s_time_delta = np.abs(s_o - s_i)
             """
             print(s_i)
             print(s_f)
             print(s_i_fft)
             """
-            print(max(s_freq_delta))
+            print(max(s_freq_delta), max(s_time_delta))
             # These tolerances depend on how wide the fixed point type is.
             assert np.all(s_freq_delta < 1.5e-9)
+            assert np.all(s_time_delta < 1e-8)
             """
             import matplotlib.pyplot as plt
             plt.plot(s_f)
@@ -121,7 +128,7 @@ class FFTTests(unittest.TestCase):
             plt.show()
             """
 
-        sim = Simulator(dut)
+        sim = Simulator(m)
         sim.add_clock(1e-6)
         sim.add_process(stimulus_i)
         sim.add_testbench(testbench)
@@ -129,86 +136,6 @@ class FFTTests(unittest.TestCase):
             sim.run()
 
     '''
-    @parameterized.expand([
-        ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/17) + 0.2*cos(2*pi*n/10)],
-    ])
-    def test_fft_ifft(self, name, sz, shape, stimulus_function):
-
-        """
-        Run FFT followed by IFFT and verify the result matches our original signal.
-        """
-
-        m = Module()
-
-        # FFT directly followed by IFFT
-        ffft = fft.FFT(sz=sz, shape=shape)
-        ifft = fft.FFT(sz=sz, shape=shape)
-        m.d.comb += [
-            ffft.ifft.eq(0),
-            ifft.ifft.eq(1),
-        ]
-        wiring.connect(m, ffft.o, ifft.i)
-        m.d.comb += ifft.o.ready.eq(1)
-        m.submodules.ffft = ffft
-        m.submodules.ifft = ifft
-
-        def stimulus_values():
-            for n in range(0, sys.maxsize):
-                yield fixed.Const(stimulus_function(n), shape=shape)
-
-        async def stimulus_i(ctx):
-            s = stimulus_values()
-            while True:
-                ctx.set(ffft.i.payload.first, 1)
-                for _ in range(sz):
-                    await ctx.tick().until(ffft.i.ready)
-                    ctx.set(ffft.i.valid, 1)
-                    ctx.set(ffft.i.payload.sample.real, next(s))
-                    ctx.set(ffft.i.payload.sample.imag, fixed.Const(0.0, shape=shape))
-                    await ctx.tick()
-                    ctx.set(ffft.i.valid, 0)
-                    ctx.set(ffft.i.payload.first, 0)
-                    await ctx.tick()
-
-        async def testbench(ctx):
-            samples_i = []
-            samples_fr = []
-            samples_fi = []
-            samples_o = []
-            while True:
-                if ctx.get(ffft.i.valid & ffft.i.ready):
-                    # forward FFT inputs
-                    samples_i.append(ctx.get(ffft.i.payload.sample.real).as_float())
-                if ctx.get(ffft.o.valid & ffft.o.ready):
-                    # forward FFT outputs (frequency domain)
-                    samples_fr.append(ctx.get(ffft.o.payload.sample.real).as_float())
-                    samples_fi.append(ctx.get(ffft.o.payload.sample.imag).as_float())
-                if ctx.get(ifft.o.valid & ifft.o.ready):
-                    # inverse FFT outputs (should match original signal)
-                    samples_o.append(ctx.get(ifft.o.payload.sample.real).as_float())
-                    if len(samples_o) == sz:
-                        break
-                await ctx.tick()
-
-            s_i = np.array(samples_i[:sz], dtype=float)
-            s_f = (np.array(samples_fr[:sz], dtype=float) +
-                   1j * np.array(samples_fi[:sz], dtype=float))
-            s_o = np.array(samples_o, dtype=float)
-            s_i_fft = scipy.fft.fft(s_i, norm="forward")
-            s_freq_delta = np.abs(s_f - s_i_fft)
-            s_time_delta = np.abs(s_o - s_i)
-            print(max(s_freq_delta), max(s_time_delta))
-            # These tolerances depend on how wide the fixed point type is.
-            assert np.all(s_freq_delta < 4e-5)
-            assert np.all(s_time_delta < 5e-3)
-
-        sim = Simulator(m)
-        sim.add_clock(1e-6)
-        sim.add_process(stimulus_i)
-        sim.add_testbench(testbench)
-        with sim.write_vcd(vcd_file=open(f"test_fft_ifft_{name}.vcd", "w")):
-            sim.run()
-
     @parameterized.expand([
         ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/17) + 0.2*cos(2*pi*n/10)],
     ])
