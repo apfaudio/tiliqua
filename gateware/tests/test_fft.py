@@ -54,7 +54,13 @@ class FFTTests(unittest.TestCase):
     ])
     def test_fft(self, name, sz, shape, stimulus_function):
 
-        print(name)
+        """
+        For a set of stimuli, verify:
+        1) The frequency response of our forward fft is numerically close to
+           the frequency response of ``numpy.fft`` for the same time domain input.
+        2) The time-domain signal after having passed through an ``ifft(fft(x))``
+           round trip is numerically close to the original time domain signal.
+        """
 
         m = Module()
         dut = fft.FFT(sz=sz, shape=shape)
@@ -93,6 +99,8 @@ class FFTTests(unittest.TestCase):
                 return (ctx.get(payload.sample.real).as_float() +
                         1j * ctx.get(payload.sample.imag).as_float())
             while True:
+                # Three tap-off points used for validation - before the
+                # fft, after the fft, and after the ifft(fft(x)) round trip.
                 if ctx.get(dut.i.valid & dut.i.ready):
                     # forward FFT inputs
                     s_i.append(complex_from_payload(dut.i.payload))
@@ -106,27 +114,20 @@ class FFTTests(unittest.TestCase):
                         break
                 await ctx.tick()
 
+            # Convert results into numpy arrays of complex type. The simulation
+            # may have fed more than 1 block into the fft by the time we have
+            # enough output samples, so only take the first `sz` elements.
             s_i = np.array(s_i[:sz])
             s_f = np.array(s_f[:sz])
             s_o = np.array(s_o[:sz])
+
+            # Validation criteria
+            # Note: these tolerances depend on how wide the fixed point type is
             s_i_fft = np.fft.fft(s_i, norm="forward")
             s_freq_delta = np.abs(s_f - s_i_fft)
-            s_time_delta = np.abs(s_o - s_i)
-            """
-            print(s_i)
-            print(s_f)
-            print(s_i_fft)
-            """
-            print(max(s_freq_delta), max(s_time_delta))
-            # These tolerances depend on how wide the fixed point type is.
             assert np.all(s_freq_delta < 1.5e-9)
+            s_time_delta = np.abs(s_o - s_i)
             assert np.all(s_time_delta < 1e-8)
-            """
-            import matplotlib.pyplot as plt
-            plt.plot(s_f)
-            plt.plot(s_i_fft)
-            plt.show()
-            """
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
