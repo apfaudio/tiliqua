@@ -145,6 +145,87 @@ class RectToPolarCordic(wiring.Component):
 
         return m
 
+class SpectralEnvelope(wiring.Component):
+
+    def __init__(self,
+                 shape: fixed.Shape,
+                 sz: int):
+        self.shape = shape
+        self.sz    = sz
+        super().__init__({
+            "i": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(self.shape)
+            }))),
+            "o": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": self.shape
+            }))),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.cordic = cordic = RectToPolarCordic(
+                self.shape, magnitude_correction=False)
+
+        cordic_mag = Signal(cordic.internal_shape)
+
+        idx = Signal(range(self.sz+1))
+
+        m.submodules.mem = mem = memory.Memory(shape=cordic.internal_shape, depth=self.sz, init=[])
+        mem_rd = mem.read_port()
+        mem_wr = mem.write_port()
+
+        beta = 0.7
+        a = fixed.Const(beta, shape=cordic.internal_shape)
+        b = fixed.Const(1-beta, shape=cordic.internal_shape)
+
+        m.d.comb += [
+            mem_rd.addr.eq(idx),
+            mem_rd.en.eq(1),
+            mem_wr.addr.eq(idx),
+            mem_wr.data.eq(mem_rd.data*a + cordic_mag*b)
+        ]
+
+        m.d.sync += mem_wr.en.eq(0)
+
+        with m.FSM():
+            with m.State("IDLE"):
+                m.d.comb += self.i.ready.eq(1)
+                with m.If(self.i.valid):
+                    m.d.sync += cordic.i.payload.real.eq(self.i.payload.sample.real)
+                    m.d.sync += cordic.i.payload.imag.eq(self.i.payload.sample.imag)
+                    with m.If(self.i.payload.first):
+                        m.d.sync += idx.eq(0)
+                    with m.Else():
+                        m.d.sync += idx.eq(idx+1)
+                    m.next = "CORDIC"
+
+            with m.State("CORDIC"):
+                m.d.comb += [
+                    cordic.i.valid.eq(1),
+                    cordic.o.ready.eq(1),
+                ]
+                with m.If(cordic.o.valid):
+                    m.d.sync += cordic_mag.eq(cordic.o.payload.magnitude)
+                    m.next = "UPDATE"
+
+            with m.State("UPDATE"):
+                m.d.sync += [
+                    mem_wr.en.eq(1),
+                    self.o.payload.first.eq(idx == 0),
+                    self.o.payload.sample.eq(mem_wr.data),
+                ]
+                m.next = "OUTPUT"
+
+            with m.State("OUTPUT"):
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
+                    m.next = "IDLE"
+
+        return m
+
 class SimpleVocoder(wiring.Component):
 
     """
@@ -167,9 +248,11 @@ class SimpleVocoder(wiring.Component):
     """
 
     def __init__(self,
-                 shape: fixed.Shape):
+                 shape: fixed.Shape,
+                 sz: int):
 
-        self.shape     = shape
+        self.shape = shape
+        self.sz    = sz
 
         super().__init__({
             # All frequency domain spectra in blocks.
@@ -190,8 +273,8 @@ class SimpleVocoder(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        m.submodules.cordic = cordic = RectToPolarCordic(
-                self.shape, magnitude_correction=False)
+        m.submodules.envelope = envelope = SpectralEnvelope(shape=self.shape, sz=self.sz)
+
         l_carrier   = Signal.like(self.i_carrier.payload.sample)
         l_modulator = Signal.like(self.i_modulator.payload.sample)
         l_first     = Signal()
@@ -205,10 +288,7 @@ class SimpleVocoder(wiring.Component):
         modulator_a = Signal(self.shape)
         modulator_b = Signal(self.shape)
         modulator_z = Signal(self.shape)
-        with m.If(~l_first):
-            m.d.comb += modulator_z.eq((modulator_a * modulator_b)<<3)
-        with m.Else():
-            m.d.comb += modulator_z.eq(0)
+        m.d.comb += modulator_z.eq((modulator_a * modulator_b)<<3)
 
         with m.FSM():
             with m.State("IDLE"):
@@ -221,16 +301,18 @@ class SimpleVocoder(wiring.Component):
                         # with shared reset.)
                         l_first.eq(merge2.o.payload[0].first),
                     ]
-                    m.next = "CORDIC"
+                    m.next = "ENVELOPE"
 
-            with m.State("CORDIC"):
+            with m.State("ENVELOPE"):
                 m.d.comb += [
-                    cordic.i.valid.eq(1),
-                    cordic.i.payload.eq(l_modulator),
-                    cordic.o.ready.eq(1),
+                    envelope.i.valid.eq(1),
+                    envelope.i.payload.sample.real.eq(l_modulator.real),
+                    envelope.i.payload.sample.imag.eq(l_modulator.imag),
+                    envelope.i.payload.first.eq(l_first),
+                    envelope.o.ready.eq(1),
                 ]
-                with m.If(cordic.o.valid):
-                    m.d.sync += modulator_b.eq(cordic.o.payload.magnitude)
+                with m.If(envelope.o.valid):
+                    m.d.sync += modulator_b.eq(envelope.o.payload.sample)
                     m.next = "REAL"
 
             with m.State("REAL"):

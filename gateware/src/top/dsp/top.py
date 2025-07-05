@@ -870,7 +870,7 @@ class Vocoder(wiring.Component):
 
         m.submodules.stft = stft = fft.STFTProcessorSmall(shape=ASQ, sz=256)
         m.submodules.analyzer1 = analyzer1 = fft.STFTAnalyzer(shape=ASQ, sz=256)
-        m.submodules.vocoder = vocoder = cordic.SimpleVocoder(shape=ASQ)
+        m.submodules.vocoder = vocoder = cordic.SimpleVocoder(shape=ASQ, sz=256)
 
         wiring.connect(m, stft.o_freq, vocoder.i_carrier)
         wiring.connect(m, analyzer1.o, vocoder.i_modulator)
