@@ -15,9 +15,118 @@ from tiliqua               import dsp, fft
 
 from parameterized         import parameterized
 import numpy as np
-import scipy.fft
+
+FFT_SZ = 16
 
 class FFTTests(unittest.TestCase):
+
+    def gaussian(x, mu, sig):
+        return 1./(np.sqrt(2.*np.pi)*sig)*np.exp(-np.power((x - mu)/sig, 2.)/2)
+
+    @parameterized.expand([
+        ["r_impulse", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 1 if n == 0 else 0],
+        ["i_impulse", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 1j if n == 0 else 0],
+        ["all_zero", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 0],
+        ["r_all_one", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 1],
+        ["i_all_one", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 1j],
+        ["r_alternate", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 1.0 if n % 2 == 0 else -1.0],
+        ["i_alternate", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 1j if n % 2 == 0 else -1j],
+        ["e_even", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: cos(8*2*np.pi*n/FFT_SZ) + 1j * sin(8*2*np.pi*n/FFT_SZ)],
+        ["e_fraction", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: cos((43./7)*2*np.pi*n/FFT_SZ) + 1j * sin((43./7)*2*np.pi*n/FFT_SZ)],
+        ["r_cos_fraction", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: cos((43./7)*2*np.pi*n/FFT_SZ)],
+        ["r_cos_fraction_small", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 0.1*cos((43./7)*2*np.pi*n/FFT_SZ)],
+        ["i_cos_fraction", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 1j*cos((43./7)*2*np.pi*n/FFT_SZ)],
+        ["r_sin_fraction", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: sin((43./7)*2*np.pi*n/FFT_SZ)],
+        ["i_sin_fraction", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 1j*sin((43./7)*2*np.pi*n/FFT_SZ)],
+        ["r_pulse", FFT_SZ, fixed.SQ(2, 30),
+         lambda n: 1 if n < 4 else 0],
+    ])
+    def test_fft(self, name, sz, shape, stimulus_function):
+
+        print(name)
+
+        dut = fft.FFT(sz=sz, shape=shape)
+
+        def stimulus_values():
+            for n in range(0, sys.maxsize):
+                yield (fixed.Const((stimulus_function(n)+0*1j).real, shape=shape),
+                       fixed.Const((stimulus_function(n)+0*1j).imag, shape=shape))
+
+        async def stimulus_i(ctx):
+            s = stimulus_values()
+            ctx.set(dut.o.ready, 1)
+            while True:
+                ctx.set(dut.i.payload.first, 1)
+                for _ in range(sz):
+                    await ctx.tick().until(dut.i.ready)
+                    real, imag = next(s)
+                    ctx.set(dut.i.valid, 1)
+                    ctx.set(dut.i.payload.sample.real, real)
+                    ctx.set(dut.i.payload.sample.imag, imag)
+                    await ctx.tick()
+                    ctx.set(dut.i.valid, 0)
+                    ctx.set(dut.i.payload.first, 0)
+                    await ctx.tick()
+
+        async def testbench(ctx):
+            samples_ir = []
+            samples_ii = []
+            samples_fr = []
+            samples_fi = []
+            while True:
+                if ctx.get(dut.i.valid & dut.i.ready):
+                    # forward FFT inputs
+                    samples_ir.append(ctx.get(dut.i.payload.sample.real).as_float())
+                    samples_ii.append(ctx.get(dut.i.payload.sample.imag).as_float())
+                if ctx.get(dut.o.valid & dut.o.ready):
+                    # forward FFT outputs (frequency domain)
+                    samples_fr.append(ctx.get(dut.o.payload.sample.real).as_float())
+                    samples_fi.append(ctx.get(dut.o.payload.sample.imag).as_float())
+                    if len(samples_fr) == sz:
+                        break
+                await ctx.tick()
+
+            s_i = (np.array(samples_ir[:sz], dtype=float) +
+                   1j * np.array(samples_ii[:sz], dtype=float))
+            s_f = (np.array(samples_fr[:sz], dtype=float) +
+                   1j * np.array(samples_fi[:sz], dtype=float))
+            s_i_fft = np.fft.fft(s_i, norm="forward")
+            s_freq_delta = np.abs(s_f - s_i_fft)
+            """
+            print(s_i)
+            print(s_f)
+            print(s_i_fft)
+            """
+            print(max(s_freq_delta))
+            # These tolerances depend on how wide the fixed point type is.
+            assert np.all(s_freq_delta < 1.5e-9)
+            """
+            import matplotlib.pyplot as plt
+            plt.plot(s_f)
+            plt.plot(s_i_fft)
+            plt.show()
+            """
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_process(stimulus_i)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open(f"test_fft_{name}.vcd", "w")):
+            sim.run()
 
     '''
     @parameterized.expand([
@@ -159,7 +268,6 @@ class FFTTests(unittest.TestCase):
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open(f"test_fft_window_{name}.vcd", "w")):
             sim.run()
-    '''
 
     @parameterized.expand([
         ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/200) + 0.2*cos(2*pi*n/10)],
@@ -215,3 +323,4 @@ class FFTTests(unittest.TestCase):
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open(f"test_stft_{name}.vcd", "w")):
             sim.run()
+    '''
