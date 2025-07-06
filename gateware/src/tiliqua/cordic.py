@@ -221,7 +221,6 @@ class BlockLPF(wiring.Component):
 
         return m
 
-"""
 class SpectralEnvelope(wiring.Component):
 
     def __init__(self,
@@ -234,7 +233,7 @@ class SpectralEnvelope(wiring.Component):
                 "first": unsigned(1),
                 "sample": CQ(self.shape)
             }))),
-            "o": In(stream.Signature(data.StructLayout({
+            "o": Out(stream.Signature(data.StructLayout({
                 "first": unsigned(1),
                 "sample": self.shape
             }))),
@@ -242,67 +241,17 @@ class SpectralEnvelope(wiring.Component):
 
     def elaborate(self, platform) -> Module:
         m = Module()
-
         m.submodules.cordic = cordic = RectToPolarCordic(
                 self.shape, magnitude_correction=False)
-
-        cordic_mag = Signal(cordic.internal_shape)
-
-        idx = Signal(range(self.sz+1))
-
-        m.submodules.mem = mem = memory.Memory(shape=cordic.internal_shape, depth=self.sz, init=[])
-        mem_rd = mem.read_port()
-        mem_wr = mem.write_port()
-
-        beta = 0.75
-        a = fixed.Const(beta, shape=cordic.internal_shape)
-        b = fixed.Const(1-beta, shape=cordic.internal_shape)
-
-        m.d.comb += [
-            mem_rd.addr.eq(idx),
-            mem_rd.en.eq(1),
-            mem_wr.addr.eq(idx),
-            mem_wr.data.eq(mem_rd.data*a + cordic_mag*b)
-        ]
-
-        m.d.sync += mem_wr.en.eq(0)
-
-        with m.FSM():
-            with m.State("IDLE"):
-                m.d.comb += self.i.ready.eq(1)
-                with m.If(self.i.valid):
-                    m.d.sync += cordic.i.payload.real.eq(self.i.payload.sample.real)
-                    m.d.sync += cordic.i.payload.imag.eq(self.i.payload.sample.imag)
-                    with m.If(self.i.payload.first):
-                        m.d.sync += idx.eq(0)
-                    with m.Else():
-                        m.d.sync += idx.eq(idx+1)
-                    m.next = "CORDIC"
-
-            with m.State("CORDIC"):
-                m.d.comb += [
-                    cordic.i.valid.eq(1),
-                    cordic.o.ready.eq(1),
-                ]
-                with m.If(cordic.o.valid):
-                    m.d.sync += cordic_mag.eq(cordic.o.payload.magnitude)
-                    m.next = "UPDATE"
-
-            with m.State("UPDATE"):
-                m.d.sync += [
-                    mem_wr.en.eq(1),
-                    self.o.payload.first.eq(idx == 0),
-                    self.o.payload.sample.eq(mem_wr.data),
-                ]
-                m.next = "OUTPUT"
-
-            with m.State("OUTPUT"):
-                m.d.comb += self.o.valid.eq(1)
-                with m.If(self.o.ready):
-                    m.next = "IDLE"
-
+        m.submodules.block_lpf = block_lpf = BlockLPF(
+                self.shape, self.sz)
+        wiring.connect(m, wiring.flipped(self.i), cordic.i)
+        dsp.connect_remap(m, cordic.o, block_lpf.i, lambda o, i : [
+            i.payload.sample.eq(o.payload.magnitude),
+            i.payload.first.eq(o.payload.first),
+        ])
+        wiring.connect(m, block_lpf.o, wiring.flipped(self.o))
         return m
-"""
 
 class SimpleVocoder(wiring.Component):
 
@@ -351,23 +300,17 @@ class SimpleVocoder(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        m.submodules.cordic = cordic = RectToPolarCordic(
-                self.shape, magnitude_correction=False)
-        m.submodules.block_lpf = block_lpf = BlockLPF(
-                self.shape, self.sz)
-        wiring.connect(m, wiring.flipped(self.i_modulator), cordic.i)
-        dsp.connect_remap(m, cordic.o, block_lpf.i, lambda o, i : [
-            i.payload.sample.eq(o.payload.magnitude),
-            i.payload.first.eq(o.payload.first),
-        ])
+        m.submodules.spectral_envelope = spectral_envelope = SpectralEnvelope(
+            shape=self.shape, sz=self.sz)
 
         l_carrier   = Signal.like(self.i_carrier.payload.sample)
         l_first     = Signal()
 
         m.submodules.merge2 = merge2 = dsp.Merge(
-                [self.i_carrier.payload.shape(), block_lpf.o.payload.shape()])
+                [self.i_carrier.payload.shape(), spectral_envelope.o.payload.shape()])
         wiring.connect(m, wiring.flipped(self.i_carrier), merge2.i0)
-        wiring.connect(m, block_lpf.o, merge2.i1)
+        wiring.connect(m, wiring.flipped(self.i_modulator), spectral_envelope.i)
+        wiring.connect(m, spectral_envelope.o, merge2.i1)
 
         # Shared multiplier for carrier * mag(modulator) terms
         modulator_a = Signal(self.shape)
