@@ -5,6 +5,8 @@
 
 """Fixed-point FFT and utility components."""
 
+from enum import Enum
+
 from amaranth import *
 from amaranth.lib import memory, wiring, data, stream, fifo
 from amaranth.lib.wiring import In, Out
@@ -318,11 +320,19 @@ class Window(wiring.Component):
     only windows the `real` component.
     """
 
+    class Function(Enum):
+        HANN      = lambda k, sz: 0.5 - 0.5*cos(k*2*pi/sz)
+        SQRT_HANN = lambda k, sz: sqrt(0.5 - 0.5*cos(k*2*pi/sz))
+        RECT      = lambda k, sz: 1.
+
     def __init__(self,
                  shape: fixed.Shape,
-                 sz:    int) -> None:
+                 sz:    int,
+                 # Default: sqrt(Hann) window for STFT
+                 window_function = Function.SQRT_HANN) -> None:
         self.sz   = sz
         self.shape = shape
+        self.window_function = window_function
         super().__init__({
             "i": In(stream.Signature(data.StructLayout({
                 "first": unsigned(1),
@@ -337,9 +347,7 @@ class Window(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        # Default: sqrt(Hann) window
-        wFr = [sqrt(0.5 - 0.5*cos(k*2*pi/self.sz))
-               for k in range(self.sz)]
+        wFr = [self.window_function(k, self.sz) for k in range(self.sz)]
 
         wshape = fixed.SQ(self.shape.i_bits+1, self.shape.f_bits)
         m.submodules.wFr = wFr = memory.Memory(
@@ -536,7 +544,7 @@ class STFTAnalyzer(wiring.Component):
         self.shape     = shape
 
         self.overlap_blocks   = ComputeOverlappingBlocks(sz=sz, shape=shape, n_overlap=sz//2)
-        self.window_analysis  = Window(sz=sz, shape=shape)
+        self.window_analysis  = Window(sz=sz, shape=shape, window_function=Window.Function.HANN)
         self.fft              = FFT(sz=sz, shape=shape)
 
         super().__init__({
@@ -653,7 +661,7 @@ class STFTProcessorSmall(wiring.Component):
         self.shape     = shape
 
         self.overlap_blocks = ComputeOverlappingBlocks(sz=sz, shape=shape, n_overlap=sz//2)
-        self.window         = Window(sz=sz, shape=shape)
+        self.window         = Window(sz=sz, shape=shape, window_function=Window.Function.SQRT_HANN)
         self.fft            = FFT(sz=sz, shape=shape)
         self.overlap_add    = OverlapAddBlocks(sz=sz, shape=shape, n_overlap=sz//2)
 
