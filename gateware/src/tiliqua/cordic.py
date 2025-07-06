@@ -306,11 +306,13 @@ class SimpleVocoder(wiring.Component):
         l_carrier   = Signal.like(self.i_carrier.payload.sample)
         l_first     = Signal()
 
-        m.submodules.merge2 = merge2 = dsp.Merge(
-                [self.i_carrier.payload.shape(), spectral_envelope.o.payload.shape()])
-        wiring.connect(m, wiring.flipped(self.i_carrier), merge2.i0)
+        m.submodules.merge2 = merge2 = dsp.Merge(n_channels=2, shape=self.i_carrier.payload.shape())
+        wiring.connect(m, wiring.flipped(self.i_carrier), merge2.i[0])
         wiring.connect(m, wiring.flipped(self.i_modulator), spectral_envelope.i)
-        wiring.connect(m, spectral_envelope.o, merge2.i1)
+        dsp.connect_remap(m, spectral_envelope.o, merge2.i[1], lambda o, i : [
+            i.payload.sample.real.eq(o.payload.sample),
+            i.payload.first.eq(o.payload.first),
+        ])
 
         # Shared multiplier for carrier * mag(modulator) terms
         modulator_a = Signal(self.shape)
@@ -323,11 +325,11 @@ class SimpleVocoder(wiring.Component):
                 m.d.comb += merge2.o.ready.eq(1)
                 with m.If(merge2.o.valid):
                     m.d.sync += [
-                        l_carrier.eq(merge2.o.payload.ch0.sample),
-                        modulator_b.eq(merge2.o.payload.ch1.sample),
+                        l_carrier.eq(merge2.o.payload[0].sample),
+                        modulator_b.eq(merge2.o.payload[1].sample.real),
                         # TODO frame alignment (not needed for STFT cores
                         # with shared reset.)
-                        l_first.eq(merge2.o.payload.ch0.first),
+                        l_first.eq(merge2.o.payload[0].first),
                     ]
                     m.next = "REAL"
 

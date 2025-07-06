@@ -107,71 +107,47 @@ class Split(wiring.Component):
                            stream.Signature(self.shape, always_ready=True).flip().create())
 
 class Merge(wiring.Component):
+
     """
-    Consumes payloads from multiple independent streams with potentially different signatures
-    and merges them into a single synchronized stream.
+    Consumes payloads from multiple independent streams and merges them into a single stream.
+
     This class is inspired by previous work in the lambdalib and LiteX projects.
     """
-    def __init__(self, shapes, sink=None):
+
+    def __init__(self, n_channels, sink=None, shape=ASQ):
         """
-        shapes : list of signatures or shapes
-            The signatures/shapes for each independent incoming stream.
-            Can be a list of shapes (for backward compatibility) or a list of stream signatures.
+        n_channels : int
+            The number of independent incoming streams.
         sink : stream, optional
             Optional outgoing stream to pass through to :py:`wiring.connect` on
             elaboration. This argument means you do not have to hook up :py:`self.o`
             and can make some pipelines a little easier to read.
         """
-        self.shapes = shapes
-        self.n_channels = len(shapes)
-        self.sink = sink
-        
-        # Create input signatures - handle both shape and signature inputs
-        input_sigs = []
-        for i, shape_or_sig in enumerate(shapes):
-            if isinstance(shape_or_sig, stream.Signature):
-                input_sigs.append(shape_or_sig)
-            else:
-                # Assume it's a shape, create a signature
-                input_sigs.append(stream.Signature(shape_or_sig))
-        
-        # Create output signature as a struct containing all input payloads
-        output_members = {}
-        for i, sig in enumerate(input_sigs):
-            output_members[f"ch{i}"] = sig.members['payload'].shape
-        
-        output_payload = data.StructLayout(output_members)
-        
+        self.n_channels = n_channels
+        self.sink       = sink
+        self.shape      = shape
         super().__init__({
-            "o": Out(stream.Signature(output_payload)),
-        } | {f"i{i}": In(sig) for i, sig in enumerate(input_sigs)})
-    
+            "i": In(stream.Signature(shape)).array(n_channels),
+            "o": Out(stream.Signature(data.ArrayLayout(shape, n_channels))),
+        })
+
     def elaborate(self, platform):
         m = Module()
-        
-        # All inputs must be ready when output is ready and valid
-        for n in range(self.n_channels):
-            m.d.comb += getattr(self, f'i{n}').ready.eq(self.o.ready & self.o.valid)
-        
-        # Connect each input payload to the corresponding output struct member
-        for n in range(self.n_channels):
-            m.d.comb += self.o.payload[f"ch{n}"].eq(getattr(self, f'i{n}').payload)
-        
-        # Output is valid only when all inputs are valid (synchronized)
-        m.d.comb += self.o.valid.eq(Cat([getattr(self, f'i{n}').valid for n in range(self.n_channels)]).all())
-        
+
+        m.d.comb += [self.i[n].ready.eq(self.o.ready & self.o.valid) for n in range(self.n_channels)]
+        m.d.comb += [self.o.payload[n].eq(self.i[n].payload) for n in range(self.n_channels)]
+        m.d.comb += self.o.valid.eq(Cat([self.i[n].valid for n in range(self.n_channels)]).all())
+
         if self.sink is not None:
             wiring.connect(m, self.o, self.sink)
-        
+
         return m
-    
+
     def wire_valid(self, m, channels):
-        """Set specified input channels as permanently VALID so they don't block progress."""
+        """Set in channels as permanently VALID so they don't block progress."""
         for n in channels:
-            if n < self.n_channels:
-                # Create an always-valid stream with the same signature as the input
-                always_valid_sig = stream.Signature(self.shapes[n], always_valid=True)
-                wiring.connect(m, always_valid_sig.create(), getattr(self, f'i{n}'))
+            wiring.connect(m, stream.Signature(self.shape, always_valid=True).create(),
+                           self.i[n])
 
 def connect_remap(m, stream_o, stream_i, mapping):
     """
