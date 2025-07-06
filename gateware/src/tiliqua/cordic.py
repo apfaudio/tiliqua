@@ -241,6 +241,17 @@ class BlockLPF(wiring.Component):
 
 class SpectralEnvelope(wiring.Component):
 
+    """
+    Given a block of complex frequency-domain samples, extract the
+    amplitude from each one and filter each amplitude in the block
+    independently with a one-pole smoother, emitting a corresponding
+    block representing the evolving spectral envelope.
+
+    The rect-to-polar CORDIC is run without magnitude correction, which
+    saves another multiplier at the cost of everything being multiplied
+    by a constant factor (which makes no difference here).
+    """
+
     def __init__(self,
                  shape: fixed.Shape,
                  sz: int):
@@ -275,21 +286,18 @@ class SimpleVocoder(wiring.Component):
 
     """
     Consume 2 sets of frequency-domain information representing a
-    'carrier' and 'modulator'. The (real) magnitude of the 'modulator'
+    'carrier' and 'modulator'. The (real) envelope of the 'modulator'
     spectra is multiplied by the (complex) 'carrier' spectra, creating
     a classic vocoder effect where the timbre of the 'carrier' dominates,
     but is filtered spectrally by the 'modulator'
 
-    This core runs a Rectangular-to-Polar conversion on each 'modulator'
-    datapoint, discards the phase and uses the magnitude to compute:
+    This core computes the spectral envelope of the modulator by filtering
+    the magnitude of each frequency band, see ``SpectralEnvelope`` for details.
+    Put simply, this core computes:
 
-        out.real = carrier.real * modulator.magnitude
-        out.imag = carrier.imag * modulator.magnitude
+        out.real = carrier.real * modulator.envelope_magnitude
+        out.imag = carrier.imag * modulator.envelope_magnitude
 
-    A single multiplier is shared for this, to reduce resource usage.
-    Additionally, the CORDIC is run without magnitude correction, which
-    saves another multiplier at the cost of everything being multiplied
-    by a constant factor (which makes no difference here).
     """
 
     def __init__(self,
