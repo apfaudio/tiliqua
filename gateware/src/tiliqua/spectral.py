@@ -7,7 +7,7 @@ from amaranth_future import fixed
 
 from math import atan, pi
 
-from tiliqua.fft import CQ
+from tiliqua.fft import CQ, Block
 from tiliqua import dsp, mac, cordic
 
 class BlockLPF(wiring.Component):
@@ -37,14 +37,8 @@ class BlockLPF(wiring.Component):
             # Low-pass 1-pole smoothing constant, 0 (slow response) to 1 (fast response).
             "beta": In(self.shape, init=fixed.Const(0.75, shape=self.shape)),
             # Blockwise sets of signals to filter.
-            "i": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": self.shape
-            }))),
-            "o": Out(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": self.shape
-            }))),
+            "i": In(stream.Signature(Block(self.shape))),
+            "o": Out(stream.Signature(Block(self.shape))),
         })
 
     def elaborate(self, platform) -> Module:
@@ -125,14 +119,8 @@ class SpectralEnvelope(wiring.Component):
         self.shape = shape
         self.sz    = sz
         super().__init__({
-            "i": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
-            "o": Out(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": self.shape
-            }))),
+            "i": In(stream.Signature(Block(CQ(self.shape)))),
+            "o": Out(stream.Signature(Block(self.shape))),
         })
 
     def elaborate(self, platform) -> Module:
@@ -142,10 +130,7 @@ class SpectralEnvelope(wiring.Component):
         m.submodules.block_lpf = block_lpf = BlockLPF(
                 self.shape, self.sz)
         wiring.connect(m, wiring.flipped(self.i), rect_to_polar.i)
-        dsp.connect_remap(m, rect_to_polar.o, block_lpf.i, lambda o, i : [
-            i.payload.sample.eq(o.payload.magnitude),
-            i.payload.first.eq(o.payload.first),
-        ])
+        cordic.connect_magnitude_to_sq(m, rect_to_polar.o, block_lpf.i)
         wiring.connect(m, block_lpf.o, wiring.flipped(self.o))
         return m
 
@@ -176,18 +161,9 @@ class SpectralCrossSynthesis(wiring.Component):
 
         super().__init__({
             # All frequency domain spectra in blocks.
-            "i_carrier": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
-            "i_modulator": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
-            "o": Out(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
+            "i_carrier": In(stream.Signature(Block(CQ(self.shape)))),
+            "i_modulator": In(stream.Signature(Block(CQ(self.shape)))),
+            "o": Out(stream.Signature(Block(CQ(self.shape)))),
         })
 
     def elaborate(self, platform) -> Module:

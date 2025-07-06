@@ -24,6 +24,33 @@ class CQ(data.StructLayout):
             "imag": shape,
         })
 
+class Block(data.StructLayout):
+    """Block of samples, first of each has 'first' flag asserted."""
+    def __init__(self, shape):
+        super().__init__({
+            "first": unsigned(1),
+            "sample": shape
+        })
+
+def connect_sq_to_real(m, stream_o, stream_i):
+    m.d.comb += [
+        stream_i.valid.eq(stream_o.valid),
+        stream_o.ready.eq(stream_i.ready),
+        stream_i.payload.sample.real.eq(stream_o.payload.sample),
+        stream_i.payload.sample.imag.eq(0),
+    ]
+    if hasattr(stream_o.payload, 'first') or hasattr(stream_i.payload, 'first'):
+        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first),
+
+def connect_real_to_sq(m, stream_o, stream_i):
+    m.d.comb += [
+        stream_i.valid.eq(stream_o.valid),
+        stream_o.ready.eq(stream_i.ready),
+        stream_i.payload.sample.eq(stream_o.payload.sample.real),
+    ]
+    if hasattr(stream_o.payload, 'first') or hasattr(stream_i.payload, 'first'):
+        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first),
+
 class FFT(wiring.Component):
 
     """Fixed-point forward or inverse Fast Fourier Transform.
@@ -46,21 +73,15 @@ class FFT(wiring.Component):
     """
 
     def __init__(self,
-                 shape:        fixed.Shape=fixed.SQ(1, 15),
+                 shape:        fixed.SQ=fixed.SQ(1, 15),
                  sz:           int=1024,
                  default_ifft: bool=False) -> None:
         self.sz   = sz
         self.shape = shape
         super().__init__({
             "ifft": In(1, init=1 if default_ifft else 0),
-            "i": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
-            "o": Out(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            })))
+            "i": In(stream.Signature(Block(CQ(self.shape)))),
+            "o": Out(stream.Signature(Block(CQ(self.shape)))),
         })
 
     def elaborate(self, platform) -> Module:
@@ -326,7 +347,7 @@ class Window(wiring.Component):
         RECT      = lambda k, sz: 1.
 
     def __init__(self,
-                 shape: fixed.Shape,
+                 shape: fixed.SQ,
                  sz:    int,
                  # Default: sqrt(Hann) window for STFT
                  window_function = Function.SQRT_HANN) -> None:
@@ -334,14 +355,8 @@ class Window(wiring.Component):
         self.shape = shape
         self.window_function = window_function
         super().__init__({
-            "i": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape),
-            }))),
-            "o": Out(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape),
-            })))
+            "i": In(stream.Signature(Block(self.shape))),
+            "o": Out(stream.Signature(Block(self.shape))),
         })
 
     def elaborate(self, platform) -> Module:
@@ -358,7 +373,6 @@ class Window(wiring.Component):
         i_latch = Signal.like(self.i.payload.sample)
         wfidx = Signal(range(self.sz+1))
         m.d.comb += wFr_rd.addr.eq(wfidx)
-        m.d.comb += self.o.payload.sample.imag.eq(0)
         with m.FSM():
             with m.State("RESET"):
                 m.d.sync += wfidx.eq(0)
@@ -374,12 +388,7 @@ class Window(wiring.Component):
                     m.d.sync += i_latch.eq(self.i.payload.sample)
                     m.next = "WINDOW"
             with m.State("WINDOW"):
-                m.d.sync += self.o.payload.sample.real.eq(
-                        wFr_rd.data*i_latch.real),
-                # TODO complex windowing?
-                #m.d.sync += self.o.payload.sample.imag.eq(
-                #        wFr_rd.data*i_latch.imag),
-                m.d.comb += self.o.payload.sample.imag.eq(0)
+                m.d.sync += self.o.payload.sample.eq(wFr_rd.data*i_latch),
                 m.next = "OUT"
             with m.State("OUT"):
                 m.d.comb += self.o.valid.eq(1)
@@ -395,7 +404,7 @@ class Window(wiring.Component):
 class ComputeOverlappingBlocks(wiring.Component):
 
     def __init__(self,
-                 shape:     fixed.Shape,
+                 shape:     fixed.SQ,
                  sz:        int,
                  n_overlap: int):
 
@@ -405,10 +414,7 @@ class ComputeOverlappingBlocks(wiring.Component):
 
         super().__init__({
             "i": In(stream.Signature(self.shape)),
-            "o": Out(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            })))
+            "o": Out(stream.Signature(Block(self.shape))),
         })
 
     def elaborate(self, platform) -> Module:
@@ -460,7 +466,7 @@ class ComputeOverlappingBlocks(wiring.Component):
 class OverlapAddBlocks(wiring.Component):
 
     def __init__(self,
-                 shape:     fixed.Shape,
+                 shape:     fixed.SQ,
                  sz:        int,
                  n_overlap: int):
 
@@ -469,10 +475,7 @@ class OverlapAddBlocks(wiring.Component):
         self.n_overlap = n_overlap
 
         super().__init__({
-            "i": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
+            "i": In(stream.Signature(Block(self.shape))),
             "o": Out(stream.Signature(self.shape))
         })
 
@@ -537,7 +540,7 @@ class OverlapAddBlocks(wiring.Component):
 class STFTAnalyzer(wiring.Component):
 
     def __init__(self,
-                 shape: fixed.Shape,
+                 shape: fixed.SQ,
                  sz:    int):
 
         self.sz        = sz
@@ -549,10 +552,7 @@ class STFTAnalyzer(wiring.Component):
 
         super().__init__({
             "i": In(stream.Signature(self.shape)),
-            "o": Out(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
+            "o": Out(stream.Signature(Block(CQ(self.shape)))),
         })
 
     def elaborate(self, platform) -> Module:
@@ -565,7 +565,7 @@ class STFTAnalyzer(wiring.Component):
         # Continuous time-domain input -> windowed overlapping frequency domain blocks
         wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
         wiring.connect(m, self.overlap_blocks.o, self.window_analysis.i)
-        wiring.connect(m, self.window_analysis.o, self.fft.i)
+        connect_sq_to_real(m, self.window_analysis.o, self.fft.i)
         wiring.connect(m, self.fft.o, wiring.flipped(self.o))
 
         return m
@@ -573,7 +573,7 @@ class STFTAnalyzer(wiring.Component):
 class STFTSynthesizer(wiring.Component):
 
     def __init__(self,
-                 shape: fixed.Shape,
+                 shape: fixed.SQ,
                  sz:    int):
 
         self.sz        = sz
@@ -584,10 +584,7 @@ class STFTSynthesizer(wiring.Component):
         self.overlap_add      = OverlapAddBlocks(sz=sz, shape=shape, n_overlap=sz//2)
 
         super().__init__({
-            "i": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
+            "i": In(stream.Signature(Block(CQ(self.shape)))),
             "o": Out(stream.Signature(self.shape)),
         })
 
@@ -600,7 +597,7 @@ class STFTSynthesizer(wiring.Component):
 
         # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
         wiring.connect(m, wiring.flipped(self.i), self.ifft.i)
-        wiring.connect(m, self.ifft.o, self.window_synthesis.i)
+        connect_real_to_sq(m, self.ifft.o, self.window_synthesis.i)
         wiring.connect(m, self.window_synthesis.o, self.overlap_add.i)
         wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))
 
@@ -609,7 +606,7 @@ class STFTSynthesizer(wiring.Component):
 class STFTProcessorPipelined(wiring.Component):
 
     def __init__(self,
-                 shape: fixed.Shape,
+                 shape: fixed.SQ,
                  sz:    int):
 
         self.sz        = sz
@@ -626,14 +623,8 @@ class STFTProcessorPipelined(wiring.Component):
             # up to user frequency-domain block processing logic. If `o_freq`
             # is connected straight to `i_freq` the output will simply
             # resynthesize the input unmodified.
-            "o_freq": Out(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
-            "i_freq": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
+            "o_freq": Out(stream.Signature(Block(CQ(self.shape)))),
+            "i_freq": In(stream.Signature(Block(CQ(self.shape)))),
         })
 
     def elaborate(self, platform) -> Module:
@@ -654,7 +645,7 @@ class STFTProcessorPipelined(wiring.Component):
 class STFTProcessorSmall(wiring.Component):
 
     def __init__(self,
-                 shape: fixed.Shape,
+                 shape: fixed.SQ,
                  sz:    int):
 
         self.sz        = sz
@@ -673,14 +664,8 @@ class STFTProcessorSmall(wiring.Component):
             # up to user frequency-domain block processing logic. If `o_freq`
             # is connected straight to `i_freq` the output will simply
             # resynthesize the input unmodified.
-            "o_freq": Out(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
-            "i_freq": In(stream.Signature(data.StructLayout({
-                "first": unsigned(1),
-                "sample": CQ(self.shape)
-            }))),
+            "o_freq": Out(stream.Signature(Block(CQ(self.shape)))),
+            "i_freq": In(stream.Signature(Block(CQ(self.shape)))),
         })
 
     def elaborate(self, platform) -> Module:
@@ -703,13 +688,13 @@ class STFTProcessorSmall(wiring.Component):
             with m.State("LOAD"):
                 m.d.comb += self.fft.ifft.eq(0)
                 wiring.connect(m, self.overlap_blocks.o, self.window.i)
-                wiring.connect(m, self.window.o, self.fft.i)
+                connect_sq_to_real(m, self.window.o, self.fft.i)
                 with m.If(self.overlap_blocks.o.valid & self.overlap_blocks.o.ready):
                     m.d.sync += n_samples.eq(n_samples+1)
                 with m.If(n_samples == self.sz):
                     m.next = "ANALYZE"
             with m.State("ANALYZE"):
-                wiring.connect(m, self.window.o, self.fft.i)
+                connect_sq_to_real(m, self.window.o, self.fft.i)
                 wiring.connect(m, self.fft.o, wiring.flipped(self.o_freq))
                 wiring.connect(m, wiring.flipped(self.i_freq), pfifo.w_stream)
                 with m.If(pfifo.w_level == self.sz):
@@ -717,7 +702,7 @@ class STFTProcessorSmall(wiring.Component):
             with m.State("SYNTHESIZE"):
                 m.d.comb += self.fft.ifft.eq(1)
                 wiring.connect(m, pfifo.r_stream, self.fft.i)
-                wiring.connect(m, self.fft.o, self.window.i)
+                connect_real_to_sq(m, self.fft.o, self.window.i)
                 wiring.connect(m, self.window.o, self.overlap_add.i)
                 with m.If(self.window.o.valid & self.window.o.ready):
                     m.d.sync += n_samples.eq(n_samples-1)
