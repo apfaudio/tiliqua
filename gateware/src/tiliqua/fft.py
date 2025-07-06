@@ -684,7 +684,7 @@ class STFTProcessorSmall(wiring.Component):
         m.submodules.overlap_add      = self.overlap_add
 
         m.submodules.pfifo = pfifo = fifo.SyncFIFOBuffered(
-            width=37, depth=self.sz)
+            width=self.i_freq.payload.shape().size, depth=self.sz)
 
         wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
         wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))

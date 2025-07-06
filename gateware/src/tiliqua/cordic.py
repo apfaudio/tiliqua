@@ -177,7 +177,7 @@ class SpectralEnvelope(wiring.Component):
         mem_rd = mem.read_port()
         mem_wr = mem.write_port()
 
-        beta = 0.7
+        beta = 0.75
         a = fixed.Const(beta, shape=cordic.internal_shape)
         b = fixed.Const(1-beta, shape=cordic.internal_shape)
 
