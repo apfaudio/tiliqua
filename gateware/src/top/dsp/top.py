@@ -868,20 +868,29 @@ class Vocoder(wiring.Component):
         wiring.connect(m, wiring.flipped(self.i), split4.i)
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
-        m.submodules.stft = stft = fft.STFTProcessorSmall(shape=ASQ, sz=256)
+        m.submodules.stft0 = stft0 = fft.STFTProcessorSmall(shape=ASQ, sz=256)
+        m.submodules.stft1 = stft1 = fft.STFTProcessorSmall(shape=ASQ, sz=256)
         m.submodules.analyzer1 = analyzer1 = fft.STFTAnalyzer(shape=ASQ, sz=256)
-        m.submodules.vocoder = vocoder = cordic.SimpleVocoder(shape=ASQ, sz=256)
+        m.submodules.analyzer2 = analyzer2 = fft.STFTAnalyzer(shape=ASQ, sz=256)
+        m.submodules.vocoder0 = vocoder0 = cordic.SimpleVocoder(shape=ASQ, sz=256)
+        m.submodules.vocoder1 = vocoder1 = cordic.SimpleVocoder(shape=ASQ, sz=256)
 
-        wiring.connect(m, stft.o_freq, vocoder.i_carrier)
-        wiring.connect(m, analyzer1.o, vocoder.i_modulator)
-        wiring.connect(m, vocoder.o, stft.i_freq)
+        wiring.connect(m, stft0.o_freq, vocoder0.i_carrier)
+        wiring.connect(m, analyzer1.o, vocoder0.i_modulator)
+        wiring.connect(m, vocoder0.o, stft0.i_freq)
 
-        wiring.connect(m, split4.o[0], stft.i)
-        wiring.connect(m, split4.o[1], analyzer1.i)
-        wiring.connect(m, stft.o, merge4.i0)
+        wiring.connect(m, stft1.o_freq, vocoder1.i_carrier)
+        wiring.connect(m, analyzer2.o, vocoder1.i_modulator)
+        wiring.connect(m, vocoder1.o, stft1.i_freq)
 
-        split4.wire_ready(m, [2, 3])
-        merge4.wire_valid(m, [1, 2, 3])
+        wiring.connect(m, split4.o[0], stft0.i)
+        wiring.connect(m, split4.o[1], stft1.i)
+        wiring.connect(m, split4.o[2], analyzer1.i)
+        wiring.connect(m, split4.o[3], analyzer2.i)
+        wiring.connect(m, stft0.o, merge4.i0)
+        wiring.connect(m, stft1.o, merge4.i1)
+
+        merge4.wire_valid(m, [2, 3])
 
         return m
 
