@@ -22,8 +22,12 @@ class RectToPolarCordic(wiring.Component):
         self.internal_shape = fixed.SQ(self.shape.i_bits + 2, self.shape.f_bits)
         self.magnitude_correction = magnitude_correction
         super().__init__({
-            "i": In(stream.Signature(CQ(shape))),
+            "i": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": CQ(shape)
+            }))),
             "o": Out(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
                 "magnitude": self.internal_shape,
                 "phase": self.internal_shape,
             })))
@@ -83,6 +87,7 @@ class RectToPolarCordic(wiring.Component):
 
         # Output assignments
         m.d.comb += self.o.payload.phase.eq(z + quadrant_adjust),
+        m.d.comb += self.o.payload.first.eq(in_latch.first),
         if self.magnitude_correction:
             # Scale magnitude by 1/K to compensate for CORDIC gain
             m.d.comb += self.o.payload.magnitude.eq(
@@ -103,17 +108,17 @@ class RectToPolarCordic(wiring.Component):
                     iteration.eq(0),
                     quadrant_adjust.eq(0)
                 ]
-                with m.If((in_latch.real >= 0)):  # Q1, Q4
+                with m.If((in_latch.sample.real >= 0)):  # Q1, Q4
                     m.d.sync += [
-                        x.eq(in_latch.real),
-                        y.eq(in_latch.imag),
+                        x.eq(in_latch.sample.real),
+                        y.eq(in_latch.sample.imag),
                     ]
                 with m.Else():
                     m.d.sync += [
-                        x.eq(-in_latch.real),
-                        y.eq(-in_latch.imag),
+                        x.eq(-in_latch.sample.real),
+                        y.eq(-in_latch.sample.imag),
                     ]
-                    with m.If(in_latch.imag >= 0):
+                    with m.If(in_latch.sample.imag >= 0):
                         m.d.sync += quadrant_adjust.eq(fixed.Const(1.0))  # Q2
                     with m.Else():
                         m.d.sync += quadrant_adjust.eq(fixed.Const(-1.0)) # Q3
@@ -145,6 +150,78 @@ class RectToPolarCordic(wiring.Component):
 
         return m
 
+class BlockLPF(wiring.Component):
+
+    def __init__(self,
+                 shape: fixed.Shape,
+                 sz: int):
+        self.shape = shape
+        self.sz    = sz
+        super().__init__({
+            "i": In(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": self.shape
+            }))),
+            "o": Out(stream.Signature(data.StructLayout({
+                "first": unsigned(1),
+                "sample": self.shape
+            }))),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        idx = Signal(range(self.sz+1))
+
+        m.submodules.mem = mem = memory.Memory(shape=self.shape, depth=self.sz, init=[])
+        mem_rd = mem.read_port()
+        mem_wr = mem.write_port()
+
+        beta = 0.75
+        a = fixed.Const(beta, shape=self.shape)
+        b = fixed.Const(1-beta, shape=self.shape)
+
+        l_in = Signal(self.shape)
+
+        m.d.comb += [
+            mem_rd.addr.eq(idx),
+            mem_rd.en.eq(1),
+            mem_wr.addr.eq(idx),
+            mem_wr.data.eq(mem_rd.data*a + l_in*b)
+        ]
+
+        m.d.sync += mem_wr.en.eq(0)
+
+        with m.FSM():
+            with m.State("IDLE"):
+                m.d.comb += self.i.ready.eq(1)
+                with m.If(self.i.valid):
+                    m.d.sync += l_in.eq(self.i.payload.sample)
+                    with m.If(self.i.payload.first):
+                        m.d.sync += idx.eq(0)
+                    with m.Else():
+                        m.d.sync += idx.eq(idx+1)
+                    m.next = "READ"
+
+            with m.State("READ"):
+                m.next = "UPDATE"
+
+            with m.State("UPDATE"):
+                m.d.sync += [
+                    mem_wr.en.eq(1),
+                    self.o.payload.first.eq(idx == 0),
+                    self.o.payload.sample.eq(mem_wr.data),
+                ]
+                m.next = "OUTPUT"
+
+            with m.State("OUTPUT"):
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
+                    m.next = "IDLE"
+
+        return m
+
+"""
 class SpectralEnvelope(wiring.Component):
 
     def __init__(self,
@@ -225,6 +302,7 @@ class SpectralEnvelope(wiring.Component):
                     m.next = "IDLE"
 
         return m
+"""
 
 class SimpleVocoder(wiring.Component):
 
@@ -273,16 +351,23 @@ class SimpleVocoder(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        m.submodules.envelope = envelope = SpectralEnvelope(shape=self.shape, sz=self.sz)
+        m.submodules.cordic = cordic = RectToPolarCordic(
+                self.shape, magnitude_correction=False)
+        m.submodules.block_lpf = block_lpf = BlockLPF(
+                self.shape, self.sz)
+        wiring.connect(m, wiring.flipped(self.i_modulator), cordic.i)
+        dsp.connect_remap(m, cordic.o, block_lpf.i, lambda o, i : [
+            i.payload.sample.eq(o.payload.magnitude),
+            i.payload.first.eq(o.payload.first),
+        ])
 
         l_carrier   = Signal.like(self.i_carrier.payload.sample)
-        l_modulator = Signal.like(self.i_modulator.payload.sample)
         l_first     = Signal()
 
         m.submodules.merge2 = merge2 = dsp.Merge(
-                n_channels=2, shape=self.i_carrier.payload.shape())
-        wiring.connect(m, wiring.flipped(self.i_carrier), merge2.i[0])
-        wiring.connect(m, wiring.flipped(self.i_modulator), merge2.i[1])
+                [self.i_carrier.payload.shape(), block_lpf.o.payload.shape()])
+        wiring.connect(m, wiring.flipped(self.i_carrier), merge2.i0)
+        wiring.connect(m, block_lpf.o, merge2.i1)
 
         # Shared multiplier for carrier * mag(modulator) terms
         modulator_a = Signal(self.shape)
@@ -295,24 +380,12 @@ class SimpleVocoder(wiring.Component):
                 m.d.comb += merge2.o.ready.eq(1)
                 with m.If(merge2.o.valid):
                     m.d.sync += [
-                        l_carrier.eq(merge2.o.payload[0].sample),
-                        l_modulator.eq(merge2.o.payload[1].sample),
+                        l_carrier.eq(merge2.o.payload.ch0.sample),
+                        modulator_b.eq(merge2.o.payload.ch1.sample),
                         # TODO frame alignment (not needed for STFT cores
                         # with shared reset.)
-                        l_first.eq(merge2.o.payload[0].first),
+                        l_first.eq(merge2.o.payload.ch0.first),
                     ]
-                    m.next = "ENVELOPE"
-
-            with m.State("ENVELOPE"):
-                m.d.comb += [
-                    envelope.i.valid.eq(1),
-                    envelope.i.payload.sample.real.eq(l_modulator.real),
-                    envelope.i.payload.sample.imag.eq(l_modulator.imag),
-                    envelope.i.payload.first.eq(l_first),
-                    envelope.o.ready.eq(1),
-                ]
-                with m.If(envelope.o.valid):
-                    m.d.sync += modulator_b.eq(envelope.o.payload.sample)
                     m.next = "REAL"
 
             with m.State("REAL"):

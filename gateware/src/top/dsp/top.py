@@ -863,8 +863,8 @@ class Vocoder(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.split4 = split4 = dsp.Split(n_channels=4)
-        m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4)
+        m.submodules.split4 = split4 = dsp.Split(4)
+        m.submodules.merge4 = merge4 = dsp.Merge([ASQ]*4)
         wiring.connect(m, wiring.flipped(self.i), split4.i)
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
@@ -878,7 +878,7 @@ class Vocoder(wiring.Component):
 
         wiring.connect(m, split4.o[0], stft.i)
         wiring.connect(m, split4.o[1], analyzer1.i)
-        wiring.connect(m, stft.o, merge4.i[0])
+        wiring.connect(m, stft.o, merge4.i0)
 
         split4.wire_ready(m, [2, 3])
         merge4.wire_valid(m, [1, 2, 3])
