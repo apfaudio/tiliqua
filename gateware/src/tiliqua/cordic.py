@@ -8,7 +8,7 @@ from amaranth_future import fixed
 from math import atan, pi
 
 from tiliqua.fft import CQ
-from tiliqua import dsp
+from tiliqua import dsp, mac
 
 class RectToPolarCordic(wiring.Component):
 
@@ -152,12 +152,24 @@ class RectToPolarCordic(wiring.Component):
 
 class BlockLPF(wiring.Component):
 
+    """
+    This is an array (size `sz`) of one-pole low-pass filters with a single
+    adjustable smoothing constant `beta`. The `i.payload.first` and `o.payload.first`
+    flags are used to track which filter memory should be addressed for each
+    sample, without requiring separate streams for each channel.
+    """
+
     def __init__(self,
                  shape: fixed.Shape,
-                 sz: int):
+                 sz: int,
+                 macp = None):
         self.shape = shape
         self.sz    = sz
+        self.macp = macp or mac.MAC.default()
         super().__init__({
+            # Low-pass 1-pole smoothing constant, 0 (slow response) to 1 (fast response).
+            "beta": In(self.shape, init=fixed.Const(0.75, shape=self.shape)),
+            # Blockwise sets of signals to filter.
             "i": In(stream.Signature(data.StructLayout({
                 "first": unsigned(1),
                 "sample": self.shape
@@ -171,23 +183,19 @@ class BlockLPF(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        idx = Signal(range(self.sz+1))
+        m.submodules.macp = mp = self.macp
 
         m.submodules.mem = mem = memory.Memory(shape=self.shape, depth=self.sz, init=[])
         mem_rd = mem.read_port()
         mem_wr = mem.write_port()
 
-        beta = 0.75
-        a = fixed.Const(beta, shape=self.shape)
-        b = fixed.Const(1-beta, shape=self.shape)
-
+        idx = Signal(range(self.sz+1))
         l_in = Signal(self.shape)
 
         m.d.comb += [
-            mem_rd.addr.eq(idx),
             mem_rd.en.eq(1),
+            mem_rd.addr.eq(idx),
             mem_wr.addr.eq(idx),
-            mem_wr.data.eq(mem_rd.data*a + l_in*b)
         ]
 
         m.d.sync += mem_wr.en.eq(0)
@@ -204,7 +212,17 @@ class BlockLPF(wiring.Component):
                     m.next = "READ"
 
             with m.State("READ"):
-                m.next = "UPDATE"
+                m.next = "MAC1"
+
+            with m.State("MAC1"):
+                with mp.Multiply(m, a=mem_rd.data, b=self.beta):
+                    m.d.sync += mem_wr.data.eq(mp.z)
+                    m.next = "MAC2"
+
+            with m.State("MAC2"):
+                with mp.Multiply(m, a=l_in, b=(fixed.Const(0.99, shape=self.shape)-self.beta)):
+                    m.d.sync += mem_wr.data.eq(mem_wr.data + mp.z)
+                    m.next = "UPDATE"
 
             with m.State("UPDATE"):
                 m.d.sync += [
