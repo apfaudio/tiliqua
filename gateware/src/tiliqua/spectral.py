@@ -130,7 +130,7 @@ class SpectralEnvelope(wiring.Component):
         m.submodules.block_lpf = block_lpf = BlockLPF(
                 self.shape, self.sz)
         wiring.connect(m, wiring.flipped(self.i), rect_to_polar.i)
-        cordic.connect_magnitude_to_sq(m, rect_to_polar.o, block_lpf.i)
+        wiring.connect(m, cordic.polar_magnitude(rect_to_polar.o), block_lpf.i)
         wiring.connect(m, block_lpf.o, wiring.flipped(self.o))
         return m
 

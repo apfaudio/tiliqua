@@ -32,24 +32,18 @@ class Block(data.StructLayout):
             "sample": shape
         })
 
-def connect_sq_to_real(m, stream_o, stream_i):
-    m.d.comb += [
-        stream_i.valid.eq(stream_o.valid),
-        stream_o.ready.eq(stream_i.ready),
-        stream_i.payload.sample.real.eq(stream_o.payload.sample),
-        stream_i.payload.sample.imag.eq(0),
-    ]
-    if hasattr(stream_o.payload, 'first') or hasattr(stream_i.payload, 'first'):
-        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first),
-
-def connect_real_to_sq(m, stream_o, stream_i):
-    m.d.comb += [
-        stream_i.valid.eq(stream_o.valid),
-        stream_o.ready.eq(stream_i.ready),
-        stream_i.payload.sample.eq(stream_o.payload.sample.real),
-    ]
-    if hasattr(stream_o.payload, 'first') or hasattr(stream_i.payload, 'first'):
-        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first),
+def cq_real(s):
+    """Stream adapter: take the 'real' component of a CQ stream."""
+    a = stream.Signature(Block(s.payload.sample.real.shape()))
+    if isinstance(s.signature, wiring.FlippedSignature):
+        a = a.flip()
+    o = a.create()
+    o.payload.sample = s.payload.sample.real
+    o.valid = s.valid
+    o.ready = s.ready
+    if hasattr(o.payload, 'first') or hasattr(s.payload, 'first'):
+        o.payload.first = s.payload.first
+    return o
 
 class FFT(wiring.Component):
 
@@ -565,7 +559,7 @@ class STFTAnalyzer(wiring.Component):
         # Continuous time-domain input -> windowed overlapping frequency domain blocks
         wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
         wiring.connect(m, self.overlap_blocks.o, self.window_analysis.i)
-        connect_sq_to_real(m, self.window_analysis.o, self.fft.i)
+        wiring.connect(m, self.window_analysis.o, cq_real(self.fft.i))
         wiring.connect(m, self.fft.o, wiring.flipped(self.o))
 
         return m
@@ -597,7 +591,7 @@ class STFTSynthesizer(wiring.Component):
 
         # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
         wiring.connect(m, wiring.flipped(self.i), self.ifft.i)
-        connect_real_to_sq(m, self.ifft.o, self.window_synthesis.i)
+        wiring.connect(m, cq_real(self.ifft.o), self.window_synthesis.i)
         wiring.connect(m, self.window_synthesis.o, self.overlap_add.i)
         wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))
 
@@ -688,13 +682,13 @@ class STFTProcessorSmall(wiring.Component):
             with m.State("LOAD"):
                 m.d.comb += self.fft.ifft.eq(0)
                 wiring.connect(m, self.overlap_blocks.o, self.window.i)
-                connect_sq_to_real(m, self.window.o, self.fft.i)
+                wiring.connect(m, self.window.o, cq_real(self.fft.i))
                 with m.If(self.overlap_blocks.o.valid & self.overlap_blocks.o.ready):
                     m.d.sync += n_samples.eq(n_samples+1)
                 with m.If(n_samples == self.sz):
                     m.next = "ANALYZE"
             with m.State("ANALYZE"):
-                connect_sq_to_real(m, self.window.o, self.fft.i)
+                wiring.connect(m, self.window.o, cq_real(self.fft.i))
                 wiring.connect(m, self.fft.o, wiring.flipped(self.o_freq))
                 wiring.connect(m, wiring.flipped(self.i_freq), pfifo.w_stream)
                 with m.If(pfifo.w_level == self.sz):
@@ -702,7 +696,7 @@ class STFTProcessorSmall(wiring.Component):
             with m.State("SYNTHESIZE"):
                 m.d.comb += self.fft.ifft.eq(1)
                 wiring.connect(m, pfifo.r_stream, self.fft.i)
-                connect_real_to_sq(m, self.fft.o, self.window.i)
+                wiring.connect(m, cq_real(self.fft.o), self.window.i)
                 wiring.connect(m, self.window.o, self.overlap_add.i)
                 with m.If(self.window.o.valid & self.window.o.ready):
                     m.d.sync += n_samples.eq(n_samples-1)
