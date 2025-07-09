@@ -1345,3 +1345,33 @@ class Duplicate(wiring.Component):
                 self.o.payload.eq(current_sample),
             ]
         return m
+
+class WhiteNoise(wiring.Component):
+
+    """
+    https://www.musicdsp.org/en/latest/Synthesis/216-fast-whitenoise-generator.html
+    """
+
+    o: Out(stream.Signature(ASQ))
+
+    def elaborate(self, platform):
+        m = Module()
+
+        x0 = Signal(unsigned(32), init=0x67452301)
+        x1 = Signal(unsigned(32), init=0xefcdab89)
+
+        m.d.comb += [
+            self.o.payload.as_value().eq(x1>>(ASQ.f_bits+ASQ.i_bits)),
+        ]
+
+        with m.FSM() as fsm:
+            with m.State('X'):
+                m.d.sync += x1.eq(x1+x0)
+                m.next = 'OUT'
+            with m.State('OUT'):
+                m.d.comb += self.o.valid.eq(1),
+                with m.If(self.o.ready):
+                    m.d.sync += x0.eq(x0^x1)
+                    m.next = 'X'
+
+        return m
