@@ -1,3 +1,10 @@
+# Copyright (c) 2024 S. Holzapfel <me@sebholzapfel.com>
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+#
+
+"""Utilities for computing trigonometric functions in hardware."""
+
 from amaranth import *
 from amaranth.lib import wiring, data, stream, memory
 from amaranth.lib.wiring import In, Out
@@ -11,15 +18,53 @@ from tiliqua.complex import CQ
 
 class RectToPolarCordic(wiring.Component):
 
-    # CORDIC gain constant
+    """Iteratively compute magnitude and phase of complex numbers.
+
+    This core uses a CORDIC (Coordinate Rotation Digital Computer) approach
+    to convert rectangular to polar complex numbers using only shifts and adds.
+
+    This is useful for extracting power spectra from frequency-domain blocks.
+
+    Given a complex number in rectangular coordinates, this core emits:
+
+    .. code-block:: text
+
+        o.payload.magnitude = S*sqrt(i.payload.real**2 + i.payload.imag**2)
+        o.payload.phase     = atan2(i.payload.imag, i.payload.real) / pi
+
+        S: =1 if 'magnitude_correction' is True, and =K (CORDIC gain) otherwise
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(Block(CQ(shape))))`
+        Stream of incoming complex numbers in rectangular coordinates.
+    o : :py:`Out(stream.Signature(Block(Polar(self.internal_shape))))`
+        Stream of outgoing complex numbers in polar coordinates.
+    """
+
+    #: CORDIC gain constant.
     K = 1.646760258121
 
     def __init__(self, shape: fixed.Shape, iterations: int = None,
                  magnitude_correction=True):
+        """
+        shape : Shape
+            Shape of fixed-point number to use for incoming :class:`CQ` stream.
+        iterations : int
+            Number of iterations of computation. Higher is better accuracy, but
+            requires more clock cycles. This defaults to the number of bits
+            in the provided ``shape``.
+        magnitude_correction : bool
+            Whether to consume an additional multiplier to correct for the CORDIC gain
+            constant. For some applications, this is not needed and can be used to
+            save a multiplier.
+        """
+
         self.shape = shape
         self.iterations = iterations or shape.i_bits + shape.f_bits
         self.internal_shape = fixed.SQ(self.shape.i_bits + 2, self.shape.f_bits)
         self.magnitude_correction = magnitude_correction
+
         super().__init__({
             # TODO: Block wrapper should be lifted into dedicated component, as this
             # core doesn't really need to care about block positions!
@@ -30,8 +75,10 @@ class RectToPolarCordic(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        # Create ROM for arctangent values
-        # atan(2^-i) for i in range(iterations)
+        #
+        # Arctangent ROM initialization
+        #
+
         atan_values = []
         for i in range(self.iterations):
             angle = atan(1.0 / (1<<i)) / pi
@@ -43,12 +90,12 @@ class RectToPolarCordic(wiring.Component):
         )
         atan_rd = atan_rom.read_port(domain='comb')
 
-        # State registers
+        #
+        # State and iteration registers
+        #
         x = Signal(self.internal_shape)
         y = Signal(self.internal_shape)
         z = Signal(self.internal_shape)
-
-        # Iteration counter
         iteration = Signal(range(self.iterations + 1))
 
         # Shifted versions for current iteration
@@ -58,15 +105,14 @@ class RectToPolarCordic(wiring.Component):
         # Direction of rotation (sign of y)
         d = Signal()
 
-        # ROM addressing
-        m.d.comb += atan_rd.addr.eq(iteration)
-
-        # Compute shifted values
         m.d.comb += [
+            # ROM addressing
+            atan_rd.addr.eq(iteration),
+            # Shifted values
             x_shift.eq(x >> iteration),
             y_shift.eq(y >> iteration),
-            # Direction based on sign of y (we want to drive y to zero)
-            d.eq((x<0) ^ (y<0)),  # y < 0 means rotate clockwise (d=1)
+            # Direction
+            d.eq((x<0)^(y<0)),
         ]
 
         # Input handling - convert to internal representation
