@@ -29,7 +29,7 @@ from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 
-from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll
+from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll, fft, spectral
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua.cli              import top_level_cli
 from tiliqua.delay_line       import DelayLine
@@ -829,6 +829,99 @@ class TripleMirror(wiring.Component):
 
         return m
 
+class STFTMirror(wiring.Component):
+
+    """
+    Simple test of the ``STFTProcessor`` component. Take channel 0,
+    convert blocks into frequency-domain spectra and back again, and
+    then emit the same time-domain signal out channel 0.
+    """
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.stft = stft = fft.STFTProcessor(
+            sz=256, shape=ASQ)
+        # Passthrough (resynthesize) in frequency domain.
+        wiring.connect(m, stft.o_freq, stft.i_freq)
+
+        m.submodules.split4 = split4 = dsp.Split(n_channels=4)
+        m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4)
+        wiring.connect(m, wiring.flipped(self.i), split4.i)
+        wiring.connect(m, merge4.o, wiring.flipped(self.o))
+
+        wiring.connect(m, split4.o[0], stft.i)
+        wiring.connect(m, stft.o, merge4.i[0])
+
+        split4.wire_ready(m, [1, 2, 3])
+        merge4.wire_valid(m, [1, 2, 3])
+
+        return m
+
+class Vocoder(wiring.Component):
+
+    """
+    STFT-based spectral cross-synthesis (vocoder-like)
+
+    Channel 0 is the 'carrier', channel 1 is the 'modulator'.
+    The spectral envelope of the modulator is applied to the
+    carrier in the frequency domain, the result of which is
+    emitted out channel 0.
+
+    Use relatively high levels and some compression on the
+    modulator to get decent intelligibility.
+    """
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.split4 = split4 = dsp.Split(4)
+        m.submodules.merge4 = merge4 = dsp.Merge(4)
+        wiring.connect(m, wiring.flipped(self.i), split4.i)
+        wiring.connect(m, merge4.o, wiring.flipped(self.o))
+
+        fftsz = 256 # FFT block size
+        m.submodules.stft0 = stft0 = fft.STFTProcessor(shape=ASQ, sz=fftsz)
+        m.submodules.analyzer1 = analyzer1 = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
+        m.submodules.vocoder0 = vocoder0 = spectral.SpectralCrossSynthesis(shape=ASQ, sz=fftsz)
+
+        wiring.connect(m, stft0.o_freq, vocoder0.i_carrier)
+        wiring.connect(m, analyzer1.o, vocoder0.i_modulator)
+        wiring.connect(m, vocoder0.o, stft0.i_freq)
+
+        wiring.connect(m, split4.o[0], stft0.i)
+        wiring.connect(m, split4.o[1], analyzer1.i)
+        wiring.connect(m, stft0.o, merge4.i[0])
+
+        split4.wire_ready(m, [2, 3])
+        merge4.wire_valid(m, [1, 2, 3])
+
+        return m
+
+class Noise(wiring.Component):
+
+    """
+    Digital white noise, output on channel 0.
+    """
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    def elaborate(self, platform):
+        m = Module()
+        m.submodules.noise = noise = dsp.WhiteNoise()
+        m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4)
+        wiring.connect(m, merge4.o, wiring.flipped(self.o))
+        wiring.connect(m, noise.o, merge4.i[0])
+        merge4.wire_valid(m, [1, 2, 3])
+        return m
+
 class CoreTop(Elaboratable):
 
     def __init__(self, dsp_core, enable_touch, clock_settings):
@@ -899,6 +992,9 @@ CORES = {
     "multi_diffuser": (False, PSRAMMultiDiffuser),
     "resampler":      (False, Resampler),
     "triple_mirror":  (False, TripleMirror),
+    "stft_mirror":    (False, STFTMirror),
+    "vocoder":        (False, Vocoder),
+    "noise":          (False, Noise),
 }
 
 def simulation_ports(fragment):
