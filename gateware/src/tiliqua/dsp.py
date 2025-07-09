@@ -44,7 +44,7 @@ class Split(wiring.Component):
     This class is inspired by previous work in the lambdalib and LiteX projects.
     """
 
-    def __init__(self, n_channels, replicate=False, source=None):
+    def __init__(self, n_channels, replicate=False, source=None, shape=ASQ):
         """
         n_channels : int
             The number of independent output streams. See usage above.
@@ -55,19 +55,20 @@ class Split(wiring.Component):
             elaboration. This argument means you do not have to hook up :py:`self.i`
             and can make some pipelines a little easier to read.
         """
-        self.n_channels = n_channels
-        self.replicate  = replicate
-        self.source     = source
+        self.n_channels   = n_channels
+        self.replicate    = replicate
+        self.source       = source
+        self.shape        = shape
 
         if self.replicate:
             super().__init__({
-                "i": In(stream.Signature(ASQ)),
-                "o": Out(stream.Signature(ASQ)).array(n_channels),
+                "i": In(stream.Signature(shape)),
+                "o": Out(stream.Signature(shape)).array(n_channels),
             })
         else:
             super().__init__({
-                "i": In(stream.Signature(data.ArrayLayout(ASQ, n_channels))),
-                "o": Out(stream.Signature(ASQ)).array(n_channels),
+                "i": In(stream.Signature(data.ArrayLayout(shape, n_channels))),
+                "o": Out(stream.Signature(shape)).array(n_channels),
             })
 
     def elaborate(self, platform):
@@ -102,7 +103,8 @@ class Split(wiring.Component):
     def wire_ready(self, m, channels):
         """Set out channels as permanently READY so they don't block progress."""
         for n in channels:
-            wiring.connect(m, self.o[n], ASQ_READY)
+            wiring.connect(m, self.o[n],
+                           stream.Signature(self.shape, always_ready=True).flip().create())
 
 class Merge(wiring.Component):
 
@@ -112,7 +114,7 @@ class Merge(wiring.Component):
     This class is inspired by previous work in the lambdalib and LiteX projects.
     """
 
-    def __init__(self, n_channels, sink=None):
+    def __init__(self, n_channels, sink=None, shape=ASQ):
         """
         n_channels : int
             The number of independent incoming streams.
@@ -123,9 +125,10 @@ class Merge(wiring.Component):
         """
         self.n_channels = n_channels
         self.sink       = sink
+        self.shape      = shape
         super().__init__({
-            "i": In(stream.Signature(ASQ)).array(n_channels),
-            "o": Out(stream.Signature(data.ArrayLayout(ASQ, n_channels))),
+            "i": In(stream.Signature(shape)).array(n_channels),
+            "o": Out(stream.Signature(data.ArrayLayout(shape, n_channels))),
         })
 
     def elaborate(self, platform):
@@ -143,7 +146,8 @@ class Merge(wiring.Component):
     def wire_valid(self, m, channels):
         """Set in channels as permanently VALID so they don't block progress."""
         for n in channels:
-            wiring.connect(m, stream.Signature(ASQ, always_valid=True).create(), self.i[n])
+            wiring.connect(m, stream.Signature(self.shape, always_valid=True).create(),
+                           self.i[n])
 
 def connect_remap(m, stream_o, stream_i, mapping):
     """
