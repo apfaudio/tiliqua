@@ -38,6 +38,7 @@ class Block(data.StructLayout):
         Payload of this sample in the block.
     """
     def __init__(self, shape):
+        # TODO: future - add expected size as metadata and verify on wiring.connect ?
         super().__init__({
             "first": unsigned(1),
             "sample": shape
@@ -48,6 +49,9 @@ def connect_without_payload(m, stream_o, stream_i):
         stream_i.valid.eq(stream_o.valid),
         stream_o.ready.eq(stream_i.ready),
     ]
-    if hasattr(stream_o.payload, 'first') or hasattr(stream_i.payload, 'first'):
+    shape_o = stream_o.payload.shape()
+    shape_i = stream_i.payload.shape()
+    if isinstance(shape_o, Block) or isinstance(shape_i, Block):
+        assert isinstance(shape_o, Block) and isinstance(shape_i, Block)
         m.d.comb += stream_i.payload.first.eq(stream_o.payload.first)
 
