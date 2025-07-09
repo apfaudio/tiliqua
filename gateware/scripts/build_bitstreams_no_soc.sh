@@ -20,6 +20,9 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm dsp build --dsp-core=sram_diffuser" \
   "pdm dsp build --dsp-core=multi_diffuser" \
   "pdm dsp build --dsp-core=resampler" \
+  "pdm dsp build --dsp-core=noise" \
+  "pdm dsp build --dsp-core=stft_mirror" \
+  "pdm dsp build --dsp-core=vocoder" \
   "pdm vectorscope_no_soc build --fs-192khz" \
   "pdm bootstub build" \
   "pdm usb_audio build" \
