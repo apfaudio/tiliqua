@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 #
 
-"""Fixed-point FFT and utility components."""
+"""Utilities for frequency-domain analysis and synthesis."""
 
 from enum import Enum
 
@@ -17,7 +17,18 @@ from amaranth_future import fixed
 from math import cos, sin, pi, sqrt
 
 class CQ(data.StructLayout):
-    """Complex number formed by a pair of fixed.SQ"""
+    """:class:`data.StructLayout` representing a complex number, formed by a pair of numbers.
+
+    shape : fixed.SQ
+        Shape of the fixed-point types used for real and imaginary components.
+
+    Members
+    -------
+    real : :py:`shape`
+        Real component of complex number.
+    imag : :py:`shape`
+        Imaginary component of complex number.
+    """
     def __init__(self, shape: fixed.SQ):
         super().__init__({
             "real": shape,
@@ -25,7 +36,34 @@ class CQ(data.StructLayout):
         })
 
 class Block(data.StructLayout):
-    """Block of samples, first of each has 'first' flag asserted."""
+    """:class:`data.StructLayout` representing a 'Block' of samples.
+
+    shape : Shape
+        Shape of the ``sample`` payload of elements in this block.
+
+    This is normally used in combination with  :class:`stream.Signature`, where
+    ``valid``, ``ready`` and ``payload.first`` are used to delineate samples
+    inside. Blocks are transferred one sample at a time - a practical example
+    with blocks of length 8:
+
+    .. code-block:: text
+
+                         |-- block 1 --| |-- block 2 --| |---
+        payload.sample:  0 1 2 3 4 5 6 7 8 A B C D E F G H I ...
+        payload.first:   -_______________-_______________-__
+        valid:           -_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-
+        ready:           (all ones)
+
+    Most cores here are assuming they are working with blocks of some predefined
+    size - that is, each producer/consumer must expect the same size of :class:`Block`.
+
+    Members
+    -------
+    first : :py:`unsigned(1)`
+        Strobe asserted for first sample in a block, deasserted otherwise.
+    sample : :py:`shape`
+        Payload of this sample in the block.
+    """
     def __init__(self, shape):
         super().__init__({
             "first": unsigned(1),
@@ -39,34 +77,40 @@ def connect_sq_to_real(m, stream_o, stream_i):
         stream_i.payload.sample.real.eq(stream_o.payload.sample),
         stream_i.payload.sample.imag.eq(0),
     ]
-    if hasattr(stream_o.payload, 'first') or hasattr(stream_i.payload, 'first'):
+    if isinstance(stream_o.payload.shape(), Block) or isinstance(stream_i.payload.shape(), Block):
         m.d.comb += stream_i.payload.first.eq(stream_o.payload.first),
 
 def connect_real_to_sq(m, stream_o, stream_i):
-    m.d.comb += [
-        stream_i.valid.eq(stream_o.valid),
-        stream_o.ready.eq(stream_i.ready),
-        stream_i.payload.sample.eq(stream_o.payload.sample.real),
-    ]
-    if hasattr(stream_o.payload, 'first') or hasattr(stream_i.payload, 'first'):
-        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first),
+    return connect_sq_to_real(m, stream_i, stream_o)
 
 class FFT(wiring.Component):
 
-    """Fixed-point Fast Fourier Transform (forward or inverse).
+    """Fixed-point Fast Fourier Transform.
 
     Overview
     --------
 
-    This processes blocks of complex fixed-point numbers of shape ``CQ(shape)`` in
-    blocks of size ``sz``. Outputs are available / clocked out ``sz*log2(sz)*6``
-    clocks after all the inputs have been clocked in.
+    This core computes the DFT of complex, fixed-point samples (specifically,
+    power-of-two chunks, represented by :class:`Block` of :class:`CQ`). It can be run
+    in 'forward' or 'inverse' mode, and is generally designed to match the behaviour
+    of ``scipy.fft(norm="forward")``.
 
-    When the core is idle, the ``ifft`` signal may be set to 1 to put the core
-    into 'inverse FFT' mode. Otherwise, it is in 'forward FFT' mode. This FFT
-    core normalizes the forward pass by 1/N. This matches the behaviour
-    of ``scipy.fft(norm="forward")``. In 'inverse FFT' mode, there is no
-    normalization, and the twiddle factors are conjugated as required.
+    Input and output samples are clocked in FIFO order. Block processing only begins
+    once ``sz`` elements (an entire block) has been clocked at ``self.i``. Some time
+    later, the core clocks the transformed block out ``self.o``, before clocking in
+    the next block. See the 'Design' section for further details on throughput.
+
+    Switching modes
+    ---------------
+
+    When the core is idle (nothing is clocked into the core and ``i.ready`` is strobed),
+    the ``ifft`` signal may be set to 1 to put the core into 'inverse FFT' mode.
+    Otherwise, it is in 'forward FFT' mode.
+
+        - In forward mode, this FFT core normalizes the outputs by 1/N, and the
+          twiddle factors are not conjugated.
+        - In 'inverse FFT' mode, there is no normalization, and the twiddle factors
+          are conjugated as required.
 
     Design
     ------
@@ -77,18 +121,81 @@ class FFT(wiring.Component):
     where 2 of these are arithmetic and the rest are memory operations.
     The algorithm implemented here is 'Cooley-Tukey, Decimation-in-Time, Radix-2'.
 
+    Latency, resource usage
+    ^^^^^^^^^^^^^^^^^^^^^^^
+    As this core only performs 2 multiplies at a time, it only requires 2 DSP tiles,
+    assuming the ``shape`` specified is small enough. For 16-bit samples at an
+    FFT size of 1024, the extra bits needed to account for overflow requires 4x
+    18-bit multipliers on an ECP5.
+
+    Outputs take ``sz*log2(sz)*6`` system clocks to be computed after all the
+    inputs have been clocked in. That is, an FFT of size 1024 would take about
+    ``log2(1024)*6 == 60`` system clocks per sample, for a maximum throughput around
+    1Msample/sec if we had a 60MHz master clock (in reality a bit less accounting for
+    the input and output clocking times).
+
+    This core instantiates 3 memories, which all scale with ``sz``. A ROM for the
+    twiddle factor (coefficient) memory, and 2 RAMs which are shared for input
+    and output sample storage as well as intermediate calculations. An interesting
+    addition to this core in the future may be to support external memory for huge
+    FFT sizes.
+
+    Internals
+    ^^^^^^^^^
+
+    .. note::
+
+        Reading this is not necessary to use the core. I advise reading up a bit on how
+        FFT algorithms work before diving deeper into this. It's just a few notes to anyone
+        interested in understanding this core more deeply.
+
+    This core has 3 main 'phases' in its overall state machine - an input phase (``LOAD1`` and
+    ``LOAD2``), calculation/loop phases (``FFTLOOP`` to ``WRITE-D``) and an output phase
+    (``READ-OUTPUT``).
+
+    The loop phase has an inner counter ``idx``, for the index of the current sample compared
+    to the total block size, and an outer counter ``stage`` which goes from 0 to ``log2(sz)``.
+    Once ``stage`` reaches ``log2(sz)``, the calculations are complete. The input and output
+    phases are simpler to understand, so we'll focus on this loop phase.
+
+    On every loop iteration, we read all needed values from memory and calculate the butterfly
+    sum/difference outputs. Muxes are shown to represent the A / B ping-ponging between
+    which memory they fetch from in even and odd stages (Stage 0 ``X->A, Y->B``, Stage 1
+    ``X->B, Y->A`` and so on up to Stage ``log2(sz)``).
+
+    .. code-block:: text
+
+        ┌─────────┐     ┌─────────┐     ┌─────────┐
+        │  X RAM  │-\\ /-│  Y RAM  │     │  W ROM  │
+        └────┬────┘  X  └────┬────┘     └────┬────┘
+             ▼      / \\      ▼               │
+            MUX<────   ────>MUX              │
+             │               │               │
+             A               B               │
+             │               │               │
+             │         ┌─────┴─────┐         │
+             └────────>┤ Butterfly ├<────────┘
+                       │  S=A+B×W  │
+                       │  D=A-B×W  │
+                       └─────┬─────┘
+                             │S,D
+
+    Once the calculation is complete, the S, D values are written back in a similar ping-pong
+    way to either the X or Y RAMs, depending on which 'stage' we are in. There are 6 states
+    inside the FFT loop required for each iteration of this calculation. Some of them do
+    arithmetic and memory accesses in the same state - in general the timing of each state is
+    optimized to hit around 80MHz on a slowest speed-grade ECP5.
+
     Members
     -------
+    i : :py:`In(stream.Signature(Block(CQ(self.shape))))`
+        Incoming stream of blocks of complex samples.
+    o : :py:`Out(stream.Signature(Block(CQ(self.shape))))`
+        Outgoing stream of blocks of complex samples.
     ifft : :py:`In(1, init=default_ifft)`
         ``0`` for forward FFT with ``1/N`` normalization. ``1`` for inverse FFT.
         May only be changed when the core is idle ('ready' and not midway through
         a block!).
-    i : :py:`In(stream.Signature(Block(CQ(self.shape))))`
-        Incoming stream of blocks of complex samples, must be delineated by ``payload.first``
-        at intervals matching the ``sz`` of this FFT.
-    o : :py:`Out(stream.Signature(Block(CQ(self.shape))))`
-        Outgoing stream of blocks of complex samples, will be delineated by ``payload.first``
-        at intervals matching the ``sz`` of this FFT.
     """
 
     def __init__(self,
@@ -98,13 +205,12 @@ class FFT(wiring.Component):
         """
         shape : fixed.SQ
             Shape of the fixed-point types used for inputs and outputs. This is
-            the shape of a single number, this core wraps it in ``Block(CQ(shape))``.
+            the shape of a single number, this core wraps it in :class:`Block`\\(:class:`CQ`\\(shape)).
         sz : int
-            Size of the FFT/IFFT. Inputs to this core must delineate blocks with a
-            ``payload.first`` strobe every ``sz`` elements.
+            Size of the FFT/IFFT blocks. Must be a power of 2.
         default_ifft : bool
             Default state of the ``self.ifft`` signal, can be used to create an IFFT
-            instead of an FFT by default, without needing to connect this signal.
+            instead of an FFT by default, without needing to explicitly connect the signal.
         """
         self.sz   = sz
         self.shape = shape
@@ -362,34 +468,32 @@ class Window(wiring.Component):
     """Pointwise window function.
 
     Apply a real window function of size ``sz`` to blocks of
-    ``shape``. Uses a single multiplier. ``payload.first`` is
-    used to synchronize the start of windowing to each block.
-
-    Note: this core takes and emits 'complex' samples ready for
-    an FFT operation, however it currently zeroes `imag` and
-    only windows the `real` component.
+    ``shape``.
 
     Design
     ------
 
     This core is iterative and uses a single multiplier. It does not
     store any samples, the windowed samples are available at the output
-    immediately after they are provided at the input.
+    2 clocks after they are provided at the input.
 
     Members
     -------
     i : :py:`In(stream.Signature(Block(self.shape)))`
-        Incoming stream of blocks of real samples, must be delineated by ``payload.first``
+        Incoming stream of blocks of real samples.
         at intervals matching the ``sz`` of this component.
     o : :py:`Out(stream.Signature(Block(self.shape)))`
-        Outgoing stream of blocks of real samples, will be delineated by ``payload.first``
+        Outgoing stream of blocks of real samples.
         at intervals matching the ``sz`` of this component.
     """
 
     class Function(Enum):
-        """Function used to calculate ``Window`` constants."""
+        """Enumeration representing different window functions for :class:`Window`."""
+        #:
         HANN      = lambda k, sz: 0.5 - 0.5*cos(k*2*pi/sz)
+        #:
         SQRT_HANN = lambda k, sz: sqrt(0.5 - 0.5*cos(k*2*pi/sz))
+        #:
         RECT      = lambda k, sz: 1.
 
     def __init__(self,
@@ -401,10 +505,9 @@ class Window(wiring.Component):
         """
         shape : fixed.SQ
             Shape of the fixed-point types used for inputs and outputs. This is
-            the shape of a single number, this core wraps it in ``Block(shape)``.
+            the shape of a single number, this core wraps it in :class:`Block`\\(shape).
         sz : int
-            Size of the window function. Inputs to this core must delineate blocks
-            with a ``payload.first`` strobe every ``sz`` elements.
+            Size of the window function.
         window_function : Function
             Function used to calculate window function constants (type of window).
         """
@@ -460,9 +563,9 @@ class Window(wiring.Component):
 
 class ComputeOverlappingBlocks(wiring.Component):
 
-    """Real sample stream to (overlapping) ``Block`` stream conversion.
+    """Real sample stream to (overlapping) :class:`Block` stream conversion.
 
-    This core is a building block for the ``STFT`` family of components. It takes
+    This core is a building block for the :class:`STFTProcessor` family of components. It takes
     a continuous (non-delineated) stream of samples, and sends delineated blocks
     of samples, which may be overlapping, for use by further processing.
 
@@ -498,7 +601,7 @@ class ComputeOverlappingBlocks(wiring.Component):
     i : :py:`In(stream.Signature(self.shape))`
         Incoming (continuous) stream of real samples.
     o : :py:`Out(stream.Signature(Block(self.shape)))`
-        Outgoing stream of blocks of real samples, will be delineated by ``payload.first``
+        Outgoing stream of blocks of real samples.
         at intervals matching the ``sz`` of this component.
     """
 
@@ -509,10 +612,9 @@ class ComputeOverlappingBlocks(wiring.Component):
         """
         shape : fixed.SQ
             Shape of the fixed-point types used for inputs and outputs. This is
-            the shape of a single number, this core wraps it in ``Block(shape)``.
+            the shape of a single number, this core wraps it in :class:`Block`\\(shape).
         sz : int
-            Size of the output blocks. Outputs of this core are delineated by blocks
-            with a ``payload.first`` strobe every ``sz`` elements.
+            Size of the output blocks.
         n_overlap : int
             Number of elements shared between adjacent output blocks.
         """
@@ -576,9 +678,9 @@ class ComputeOverlappingBlocks(wiring.Component):
         return m
 
 class OverlapAddBlocks(wiring.Component):
-    """Convert ``Block`` stream to continuous samples by 'Overlap-Add'.
+    """Convert :class:`Block` stream to continuous samples by 'Overlap-Add'.
 
-    This core is a building block for the ``STFT`` family of components. It takes
+    This core is a building block for the :class:`STFTProcessor` family of components. It takes
     overlapping, delineated blocks of samples, adds up the overlapping elements
     and sends a stream of (non-delineated) continuous samples.
 
@@ -605,9 +707,9 @@ class OverlapAddBlocks(wiring.Component):
     'overlapping' parts of each input block, and that there are less output samples
     than input samples as a result.
 
-    Note that connecting a ``ComputeOverlappingBlocks`` straight to an ``OverlapAddBlocks``
+    Note that connecting a :class:`ComputeOverlappingBlocks` straight to an :class:`OverlapAddBlocks`
     will not reconstruct the original signal, unless the samples are windowed (tapered)
-    for perfect reconstruction. For an example, see the ``STFT`` family of components.
+    for perfect reconstruction. For an example, see the :class:`STFTProcessor` family of components.
 
     Design
     ------
@@ -618,8 +720,7 @@ class OverlapAddBlocks(wiring.Component):
     Members
     -------
     i : :py:`In(stream.Signature(Block(self.shape)))`
-        Incoming stream of blocks of overlapping real samples. Must be delineated by
-        ``payload.first`` at intervals matching the ``sz`` of this component.
+        Incoming stream of blocks of overlapping real samples.
     o : :py:`Out(stream.Signature(self.shape))`
         Outgoing stream of continuous real samples.
     """
@@ -631,10 +732,9 @@ class OverlapAddBlocks(wiring.Component):
         """
         shape : fixed.SQ
             Shape of the fixed-point types used for inputs and outputs. This is
-            the shape of a single number, this core wraps it in ``Block(shape)``.
+            the shape of a single number, this core wraps it in :class:`Block`\\(shape).
         sz : int
-            Size of the input blocks. Inputs to this core are delineated by blocks
-            with a ``payload.first`` strobe every ``sz`` elements.
+            Size of the input blocks.
         n_overlap : int
             Number of elements shared between adjacent input blocks.
         """
@@ -715,17 +815,19 @@ class STFTProcessor(wiring.Component):
 
     The general flow of operations:
 
-        - ``i`` (samples in) -> ``ComputeOverlappingBlocks`` -> ``Window`` -> ``FFT`` -> ``o_freq``
-        - ``i_freq`` -> ``FFT`` (inverse) -> ``Window`` -> ``OverlapAddBlocks`` -> ``o`` (samples out)
+        - ``i`` (samples in) -> :class:`ComputeOverlappingBlocks` -> :class:`Window` -> :class:`FFT` -> ``o_freq``
+        - ``i_freq`` -> :class:`FFT` (inverse) -> :class:`Window` -> :class:`OverlapAddBlocks` -> ``o`` (samples out)
 
     If ``o_freq`` and ``i_freq`` frequency-domain streams are directly connected together
     with no processing logic, this core will perfectly resynthesize the original signal.
 
+    :class:`Window.Function.SQRT_HANN` windowing is used in both the analysis and synthesis stages.
+
     Design
     ------
 
-    Unlike ``STFTProcessorPipelined``, this implementation saves area by time-multiplexing
-    ``FFT`` and ``Window`` cores between analysis and synthesis operations, at the cost of
+    Unlike :class:`STFTProcessorPipelined`, this implementation saves area by time-multiplexing
+    :class:`FFT` and :class:`Window` cores between analysis and synthesis operations, at the cost of
     reduced throughput. For audio purposes, this core is easily still fast enough for real-time
     processing.
 
@@ -828,9 +930,9 @@ class STFTAnalyzer(wiring.Component):
     This core allows frequency-domain analysis of time-domain samples by passing them through
     the following signal flow:
 
-        - ``i`` (samples in) -> ``ComputeOverlappingBlocks`` -> ``Window`` -> ``FFT`` -> ``o``
+        - ``i`` (samples in) -> :class:`ComputeOverlappingBlocks` -> :class:`Window` -> :class:`FFT` -> ``o``
 
-    For a more resource-efficient STFT that performs both analysis and synthesis, see ``STFTProcessor``.
+    For a more resource-efficient STFT that performs both analysis and synthesis, see :class:`STFTProcessor`.
 
     Members
     -------
@@ -848,8 +950,7 @@ class STFTAnalyzer(wiring.Component):
             Shape of the fixed-point samples used for inputs and outputs.
         sz : int
             Size of the frequency-domain blocks used internally and exposed for frequency
-            domain processing. ``o`` is delineated by blocks with a ``payload.first`` strobe
-            every ``sz`` elements.
+            domain processing.
         """
 
         self.sz        = sz
@@ -906,8 +1007,7 @@ class STFTSynthesizer(wiring.Component):
             Shape of the fixed-point samples used for inputs and outputs.
         sz : int
             Size of the frequency-domain blocks used internally and exposed for frequency
-            domain processing. ``i`` must be delineated by blocks with a ``payload.first`` strobe
-            every ``sz`` elements.
+            domain processing. 
         """
 
         self.sz        = sz
@@ -944,13 +1044,13 @@ class STFTProcessorPipelined(wiring.Component):
     This core performs both analysis and re-synthesis of time-domain samples by passing
     them through the frequency domain for spectral processing by user logic.
 
-    This is a simpler-to-understand version of ``STFTProcessor`` as it does not share
-    the ``Window`` or ``FFT`` cores, making it higher throughput, but also higher
+    This is a simpler-to-understand version of :class:`STFTProcessor` as it does not share
+    the :class:`Window` or :class:`FFT` cores, making it higher throughput, but also higher
     resource usage, because it can perform the FFT and IFFT at the same time.
 
-    This core is mostly used for testing the ``STFTAnalyzer`` and ``STFTSynthesizer``
+    This core is mostly used for testing the :class:`STFTAnalyzer` and :class:`STFTSynthesizer`
     components in isolation, and doesn't make much sense to use in real projects compared
-    to just using the ``STFTProcessor`` above, which is much more resource efficient
+    to just using the :class:`STFTProcessor` above, which is much more resource efficient
     for audio applications. Unless you have super high sample rates.
 
     Members
@@ -973,8 +1073,7 @@ class STFTProcessorPipelined(wiring.Component):
             Shape of the fixed-point samples used for inputs and outputs.
         sz : int
             Size of the frequency-domain blocks used internally and exposed for frequency
-            domain processing. ``o_freq`` and ``i_freq`` are delineated by blocks
-            with a ``payload.first`` strobe every ``sz`` elements.
+            domain processing.
         """
 
         self.sz        = sz
@@ -1009,4 +1108,3 @@ class STFTProcessorPipelined(wiring.Component):
         wiring.connect(m, self.synthesizer.o, wiring.flipped(self.o))
 
         return m
-
