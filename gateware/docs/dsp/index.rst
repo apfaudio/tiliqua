@@ -26,4 +26,5 @@ DSP Components
    resample
    oneshot
    stream
+   fft
    misc

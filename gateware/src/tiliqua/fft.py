@@ -53,9 +53,12 @@ def connect_real_to_sq(m, stream_o, stream_i):
 
 class FFT(wiring.Component):
 
-    """Fixed-point forward or inverse Fast Fourier Transform.
+    """Fixed-point Fast Fourier Transform (forward or inverse).
 
-    This processes blocks of fixed-point numbers of shape ``shape`` in
+    Overview
+    --------
+
+    This processes blocks of complex fixed-point numbers of shape ``CQ(shape)`` in
     blocks of size ``sz``. Outputs are available / clocked out ``sz*log2(sz)*6``
     clocks after all the inputs have been clocked in.
 
@@ -63,19 +66,46 @@ class FFT(wiring.Component):
     into 'inverse FFT' mode. Otherwise, it is in 'forward FFT' mode. This FFT
     core normalizes the forward pass by 1/N. This matches the behaviour
     of ``scipy.fft(norm="forward")``. In 'inverse FFT' mode, there is no
-    normalization and the twiddle factors are conjugated as necessary.
+    normalization, and the twiddle factors are conjugated as required.
+
+    Design
+    ------
 
     There are many tradeoffs an FFT implementation can make. This one aims
     for low area and DSP tile usage. It is an iterative implementation that
     only performs 2 multiplies at a time. The core FFT loop takes 6 cycles,
     where 2 of these are arithmetic and the rest are memory operations.
-    The algorithm implemented here is Radix-2, Cooley-Tukey.
+    The algorithm implemented here is 'Cooley-Tukey, Decimation-in-Time, Radix-2'.
+
+    Members
+    -------
+    ifft : :py:`In(1, init=default_ifft)`
+        ``0`` for forward FFT with ``1/N`` normalization. ``1`` for inverse FFT.
+        May only be changed when the core is idle ('ready' and not midway through
+        a block!).
+    i : :py:`In(stream.Signature(Block(CQ(self.shape))))`
+        Incoming stream of blocks of complex samples, must be delineated by ``payload.first``
+        at intervals matching the ``sz`` of this FFT.
+    o : :py:`Out(stream.Signature(Block(CQ(self.shape))))`
+        Outgoing stream of blocks of complex samples, will be delineated by ``payload.first``
+        at intervals matching the ``sz`` of this FFT.
     """
 
     def __init__(self,
                  shape:        fixed.SQ=fixed.SQ(1, 15),
                  sz:           int=1024,
                  default_ifft: bool=False) -> None:
+        """
+        shape : fixed.SQ
+            Shape of the fixed-point types used for inputs and outputs. This is
+            the shape of a single number, this core wraps it in ``Block(CQ(shape))``.
+        sz : int
+            Size of the FFT/IFFT. Inputs to this core must delineate blocks with a
+            ``payload.first`` strobe every ``sz`` elements.
+        default_ifft : bool
+            Default state of the ``self.ifft`` signal, can be used to create an IFFT
+            instead of an FFT by default, without needing to connect this signal.
+        """
         self.sz   = sz
         self.shape = shape
         super().__init__({
@@ -170,7 +200,6 @@ class FFT(wiring.Component):
             y_wr.en.eq(0),
         ]
 
-        # Control FSM
         with m.FSM():
             with m.State("RESET"):
                 m.d.sync += idx.eq(0)
@@ -201,7 +230,6 @@ class FFT(wiring.Component):
                     m.next = "LOAD1"
 
             with m.State("FFTLOOP"):
-                # Don't write anything to RAM until necessary.
                 with m.If(idx >= self.sz):
                     # This stage is complete. Move to next stage.
                     m.d.sync += [
@@ -331,17 +359,35 @@ class FFT(wiring.Component):
 
 class Window(wiring.Component):
 
-    """
-    Apply a real window function of size ``sz`` to samples of
-    ``CQ(shape)``. Uses a single multiplier. ``payload.first`` is
-    used to synchronize the start of windowing.
+    """Pointwise window function.
+
+    Apply a real window function of size ``sz`` to blocks of
+    ``shape``. Uses a single multiplier. ``payload.first`` is
+    used to synchronize the start of windowing to each block.
 
     Note: this core takes and emits 'complex' samples ready for
     an FFT operation, however it currently zeroes `imag` and
     only windows the `real` component.
+
+    Design
+    ------
+
+    This core is iterative and uses a single multiplier. It does not
+    store any samples, the windowed samples are available at the output
+    immediately after they are provided at the input.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(Block(self.shape)))`
+        Incoming stream of blocks of real samples, must be delineated by ``payload.first``
+        at intervals matching the ``sz`` of this component.
+    o : :py:`Out(stream.Signature(Block(self.shape)))`
+        Outgoing stream of blocks of real samples, will be delineated by ``payload.first``
+        at intervals matching the ``sz`` of this component.
     """
 
     class Function(Enum):
+        """Function used to calculate ``Window`` constants."""
         HANN      = lambda k, sz: 0.5 - 0.5*cos(k*2*pi/sz)
         SQRT_HANN = lambda k, sz: sqrt(0.5 - 0.5*cos(k*2*pi/sz))
         RECT      = lambda k, sz: 1.
@@ -351,6 +397,17 @@ class Window(wiring.Component):
                  sz:    int,
                  # Default: sqrt(Hann) window for STFT
                  window_function = Function.SQRT_HANN) -> None:
+
+        """
+        shape : fixed.SQ
+            Shape of the fixed-point types used for inputs and outputs. This is
+            the shape of a single number, this core wraps it in ``Block(shape)``.
+        sz : int
+            Size of the window function. Inputs to this core must delineate blocks
+            with a ``payload.first`` strobe every ``sz`` elements.
+        window_function : Function
+            Function used to calculate window function constants (type of window).
+        """
         self.sz   = sz
         self.shape = shape
         self.window_function = window_function
@@ -403,10 +460,65 @@ class Window(wiring.Component):
 
 class ComputeOverlappingBlocks(wiring.Component):
 
+    """Real sample stream to (overlapping) ``Block`` stream conversion.
+
+    This core is a building block for the ``STFT`` family of components. It takes
+    a continuous (non-delineated) stream of samples, and sends delineated blocks
+    of samples, which may be overlapping, for use by further processing.
+
+    Here is a quick example to illustrate. From the input perspective, each sample
+    would correspond to the following output samples (taking sz=8, n_overlap=4):
+
+    .. code-block:: text
+
+        Input:    0 1 2 3 4 5 6 7 8 9 A B C D E F ...
+        Block 1:  0 1 2 3 4 5 6 7
+        Block 2:          4 5 6 7 8 9 A B
+        Block 3:                  8 9 A B C D E F
+
+    Looking at this from the output perspective:
+
+    .. code-block:: text
+
+        payload.sample:  0 1 2 3 4 5 6 7 4 5 6 7 8 9 A B 8 9 A B C D E F
+        payload.first:   1               1               1
+
+    To avoid backpressure on the input stream, the incoming sample rate should be much
+    slower than the system clock, and rate of processing the output blocks (which is easily
+    achievable with audio signals).
+
+    Design
+    ------
+
+    This core uses a single ``SyncFIFO`` for storage of size ``n_overlap``, which is
+    continuously filled and drained between blocks to create overlapping outputs.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(self.shape))`
+        Incoming (continuous) stream of real samples.
+    o : :py:`Out(stream.Signature(Block(self.shape)))`
+        Outgoing stream of blocks of real samples, will be delineated by ``payload.first``
+        at intervals matching the ``sz`` of this component.
+    """
+
     def __init__(self,
                  shape:     fixed.SQ,
                  sz:        int,
                  n_overlap: int):
+        """
+        shape : fixed.SQ
+            Shape of the fixed-point types used for inputs and outputs. This is
+            the shape of a single number, this core wraps it in ``Block(shape)``.
+        sz : int
+            Size of the output blocks. Outputs of this core are delineated by blocks
+            with a ``payload.first`` strobe every ``sz`` elements.
+        n_overlap : int
+            Number of elements shared between adjacent output blocks.
+        """
+
+        # TODO: currently, only even overlap is tested, as required by STFT.
+        assert n_overlap == (sz // 2)
 
         self.sz        = sz
         self.shape     = shape
@@ -464,11 +576,68 @@ class ComputeOverlappingBlocks(wiring.Component):
         return m
 
 class OverlapAddBlocks(wiring.Component):
+    """Convert ``Block`` stream to continuous samples by 'Overlap-Add'.
+
+    This core is a building block for the ``STFT`` family of components. It takes
+    overlapping, delineated blocks of samples, adds up the overlapping elements
+    and sends a stream of (non-delineated) continuous samples.
+
+    Again, an example for (sz=8, n_overlap=4). From the input perspective, say we have:
+
+    .. code-block:: text
+
+        payload.sample:  0 1 2 3 4 5 6 7 8 9 A B C D E F G H I J ...
+        payload.first:   1               1               1
+
+    This core would send out the following stream:
+
+    .. code-block:: text
+
+        Block 1:  0 1 2 3 4 5 6 7
+        Block 2:          8 9 A B C D E F
+        Block 3:                  G H I J ...
+
+        Out:      0 1 2 3 4 5 6 7 C D E J
+                  + + + + + + + + + + + +
+                  X X X X 8 9 A B G H I F ... (X == zero padding)
+
+    From above, it should be clear that each output sample is formed by summing the
+    'overlapping' parts of each input block, and that there are less output samples
+    than input samples as a result.
+
+    Note that connecting a ``ComputeOverlappingBlocks`` straight to an ``OverlapAddBlocks``
+    will not reconstruct the original signal, unless the samples are windowed (tapered)
+    for perfect reconstruction. For an example, see the ``STFT`` family of components.
+
+    Design
+    ------
+
+    This core uses two ``SyncFIFO`` for storage of size ``sz``, which are both
+    continuously filled and drained as necessary to add up the correct overlapping parts.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(Block(self.shape)))`
+        Incoming stream of blocks of overlapping real samples. Must be delineated by
+        ``payload.first`` at intervals matching the ``sz`` of this component.
+    o : :py:`Out(stream.Signature(self.shape))`
+        Outgoing stream of continuous real samples.
+    """
 
     def __init__(self,
                  shape:     fixed.SQ,
                  sz:        int,
                  n_overlap: int):
+        """
+        shape : fixed.SQ
+            Shape of the fixed-point types used for inputs and outputs. This is
+            the shape of a single number, this core wraps it in ``Block(shape)``.
+        sz : int
+            Size of the input blocks. Inputs to this core are delineated by blocks
+            with a ``payload.first`` strobe every ``sz`` elements.
+        n_overlap : int
+            Number of elements shared between adjacent input blocks.
+        """
 
         self.sz        = sz
         self.shape     = shape
@@ -537,116 +706,57 @@ class OverlapAddBlocks(wiring.Component):
 
         return m
 
-class STFTAnalyzer(wiring.Component):
+class STFTProcessor(wiring.Component):
+
+    """Short-Time Fourier Transform ('Overlap-Add') with shared FFT core.
+
+    This core performs both analysis and re-synthesis of time-domain samples by passing
+    them through the frequency domain for spectral processing by user logic.
+
+    The general flow of operations:
+
+        - ``i`` (samples in) -> ``ComputeOverlappingBlocks`` -> ``Window`` -> ``FFT`` -> ``o_freq``
+        - ``i_freq`` -> ``FFT`` (inverse) -> ``Window`` -> ``OverlapAddBlocks`` -> ``o`` (samples out)
+
+    If ``o_freq`` and ``i_freq`` frequency-domain streams are directly connected together
+    with no processing logic, this core will perfectly resynthesize the original signal.
+
+    Design
+    ------
+
+    Unlike ``STFTProcessorPipelined``, this implementation saves area by time-multiplexing
+    ``FFT`` and ``Window`` cores between analysis and synthesis operations, at the cost of
+    reduced throughput. For audio purposes, this core is easily still fast enough for real-time
+    processing.
+
+    At a high level, the components are connected in a different sequence depending
+    on which state the core is in. The core contains a single `SyncFIFO` used to buffer
+    all the outputs of user (frequency domain) processing logic. This is required to
+    avoid backpressure on the user logic while it is disconnected from the IFFT stage.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(shape))`
+        Continuous time-domain input stream
+    o : :py:`Out(stream.Signature(shape))`
+        Continuous time-domain output stream (reconstructed)
+    o_freq : :py:`Out(stream.Signature(Block(CQ(shape))))`
+        Frequency-domain output blocks for processing by user logic
+    i_freq : :py:`In(stream.Signature(Block(CQ(shape))))`
+        Frequency-domain input blocks after processing by user logic
+    """
 
     def __init__(self,
                  shape: fixed.SQ,
                  sz:    int):
-
-        self.sz        = sz
-        self.shape     = shape
-
-        self.overlap_blocks   = ComputeOverlappingBlocks(sz=sz, shape=shape, n_overlap=sz//2)
-        self.window_analysis  = Window(sz=sz, shape=shape, window_function=Window.Function.HANN)
-        self.fft              = FFT(sz=sz, shape=shape)
-
-        super().__init__({
-            "i": In(stream.Signature(self.shape)),
-            "o": Out(stream.Signature(Block(CQ(self.shape)))),
-        })
-
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        m.submodules.overlap_blocks   = self.overlap_blocks
-        m.submodules.window_analysis  = self.window_analysis
-        m.submodules.fft              = self.fft
-
-        # Continuous time-domain input -> windowed overlapping frequency domain blocks
-        wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
-        wiring.connect(m, self.overlap_blocks.o, self.window_analysis.i)
-        connect_sq_to_real(m, self.window_analysis.o, self.fft.i)
-        wiring.connect(m, self.fft.o, wiring.flipped(self.o))
-
-        return m
-
-class STFTSynthesizer(wiring.Component):
-
-    def __init__(self,
-                 shape: fixed.SQ,
-                 sz:    int):
-
-        self.sz        = sz
-        self.shape     = shape
-
-        self.ifft             = FFT(sz=sz, shape=shape, default_ifft=True)
-        self.window_synthesis = Window(sz=sz, shape=shape)
-        self.overlap_add      = OverlapAddBlocks(sz=sz, shape=shape, n_overlap=sz//2)
-
-        super().__init__({
-            "i": In(stream.Signature(Block(CQ(self.shape)))),
-            "o": Out(stream.Signature(self.shape)),
-        })
-
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        m.submodules.ifft             = self.ifft
-        m.submodules.window_synthesis = self.window_synthesis
-        m.submodules.overlap_add      = self.overlap_add
-
-        # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
-        wiring.connect(m, wiring.flipped(self.i), self.ifft.i)
-        connect_real_to_sq(m, self.ifft.o, self.window_synthesis.i)
-        wiring.connect(m, self.window_synthesis.o, self.overlap_add.i)
-        wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))
-
-        return m
-
-class STFTProcessorPipelined(wiring.Component):
-
-    def __init__(self,
-                 shape: fixed.SQ,
-                 sz:    int):
-
-        self.sz        = sz
-        self.shape     = shape
-
-        self.analyzer    = STFTAnalyzer(shape=shape, sz=sz)
-        self.synthesizer = STFTSynthesizer(shape=shape, sz=sz)
-
-        super().__init__({
-            # Time domain input and resynthesized output
-            "i": In(stream.Signature(self.shape)),
-            "o": Out(stream.Signature(self.shape)),
-            # Frequency domain analysis and resynthesis blocks, to be hooked
-            # up to user frequency-domain block processing logic. If `o_freq`
-            # is connected straight to `i_freq` the output will simply
-            # resynthesize the input unmodified.
-            "o_freq": Out(stream.Signature(Block(CQ(self.shape)))),
-            "i_freq": In(stream.Signature(Block(CQ(self.shape)))),
-        })
-
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        m.submodules.analyzer = self.analyzer
-        m.submodules.synthesizer = self.synthesizer
-
-        wiring.connect(m, wiring.flipped(self.i), self.analyzer.i)
-        wiring.connect(m, self.analyzer.o, wiring.flipped(self.o_freq))
-
-        # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
-        wiring.connect(m, wiring.flipped(self.i_freq), self.synthesizer.i)
-        wiring.connect(m, self.synthesizer.o, wiring.flipped(self.o))
-
-        return m
-
-class STFTProcessorSmall(wiring.Component):
-
-    def __init__(self,
-                 shape: fixed.SQ,
-                 sz:    int):
+        """
+        shape : fixed.SQ
+            Shape of the fixed-point samples used for inputs and outputs.
+        sz : int
+            Size of the frequency-domain blocks used internally and exposed for frequency
+            domain processing. ``o_freq`` and ``i_freq`` are delineated by blocks
+            with a ``payload.first`` strobe every ``sz`` elements.
+        """
 
         self.sz        = sz
         self.shape     = shape
@@ -710,3 +820,193 @@ class STFTProcessorSmall(wiring.Component):
                     m.next = "LOAD"
 
         return m
+
+class STFTAnalyzer(wiring.Component):
+
+    """Short-Time Fourier Transform for spectral analysis.
+
+    This core allows frequency-domain analysis of time-domain samples by passing them through
+    the following signal flow:
+
+        - ``i`` (samples in) -> ``ComputeOverlappingBlocks`` -> ``Window`` -> ``FFT`` -> ``o``
+
+    For a more resource-efficient STFT that performs both analysis and synthesis, see ``STFTProcessor``.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(shape))`
+        Continuous time-domain input stream
+    o : :py:`Out(stream.Signature(Block(CQ(shape))))`
+        Frequency-domain output blocks for processing by user logic
+    """
+
+    def __init__(self,
+                 shape: fixed.SQ,
+                 sz:    int):
+        """
+        shape : fixed.SQ
+            Shape of the fixed-point samples used for inputs and outputs.
+        sz : int
+            Size of the frequency-domain blocks used internally and exposed for frequency
+            domain processing. ``o`` is delineated by blocks with a ``payload.first`` strobe
+            every ``sz`` elements.
+        """
+
+        self.sz        = sz
+        self.shape     = shape
+
+        self.overlap_blocks   = ComputeOverlappingBlocks(sz=sz, shape=shape, n_overlap=sz//2)
+        self.window_analysis  = Window(sz=sz, shape=shape, window_function=Window.Function.HANN)
+        self.fft              = FFT(sz=sz, shape=shape)
+
+        super().__init__({
+            "i": In(stream.Signature(self.shape)),
+            "o": Out(stream.Signature(Block(CQ(self.shape)))),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.overlap_blocks   = self.overlap_blocks
+        m.submodules.window_analysis  = self.window_analysis
+        m.submodules.fft              = self.fft
+
+        # Continuous time-domain input -> windowed overlapping frequency domain blocks
+        wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
+        wiring.connect(m, self.overlap_blocks.o, self.window_analysis.i)
+        connect_sq_to_real(m, self.window_analysis.o, self.fft.i)
+        wiring.connect(m, self.fft.o, wiring.flipped(self.o))
+
+        return m
+
+class STFTSynthesizer(wiring.Component):
+
+    """Short-Time Fourier Transform for spectral synthesis.
+
+    This core allows frequency-domain synthesis of time-domain samples by passing them through
+    the following signal flow:
+
+        - ``i_freq`` -> :class:`FFT` (inverse) -> :class:`Window` -> :class:`OverlapAddBlocks` -> ``o`` (samples out)
+
+    For a more resource-efficient STFT that performs both analysis and synthesis, see :class:`STFTProcessor`.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(Block(CQ(shape))))`
+        Frequency-domain input blocks used for synthesis.
+    o : :py:`Out(stream.Signature(shape))`
+        Continuous time-domain output stream
+    """
+
+    def __init__(self,
+                 shape: fixed.SQ,
+                 sz:    int):
+        """
+        shape : fixed.SQ
+            Shape of the fixed-point samples used for inputs and outputs.
+        sz : int
+            Size of the frequency-domain blocks used internally and exposed for frequency
+            domain processing. ``i`` must be delineated by blocks with a ``payload.first`` strobe
+            every ``sz`` elements.
+        """
+
+        self.sz        = sz
+        self.shape     = shape
+
+        self.ifft             = FFT(sz=sz, shape=shape, default_ifft=True)
+        self.window_synthesis = Window(sz=sz, shape=shape)
+        self.overlap_add      = OverlapAddBlocks(sz=sz, shape=shape, n_overlap=sz//2)
+
+        super().__init__({
+            "i": In(stream.Signature(Block(CQ(self.shape)))),
+            "o": Out(stream.Signature(self.shape)),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.ifft             = self.ifft
+        m.submodules.window_synthesis = self.window_synthesis
+        m.submodules.overlap_add      = self.overlap_add
+
+        # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
+        wiring.connect(m, wiring.flipped(self.i), self.ifft.i)
+        connect_real_to_sq(m, self.ifft.o, self.window_synthesis.i)
+        wiring.connect(m, self.window_synthesis.o, self.overlap_add.i)
+        wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))
+
+        return m
+
+class STFTProcessorPipelined(wiring.Component):
+
+    """Short-Time Fourier Transform ('Overlap-Add') with separate FFT/IFFT cores.
+
+    This core performs both analysis and re-synthesis of time-domain samples by passing
+    them through the frequency domain for spectral processing by user logic.
+
+    This is a simpler-to-understand version of ``STFTProcessor`` as it does not share
+    the ``Window`` or ``FFT`` cores, making it higher throughput, but also higher
+    resource usage, because it can perform the FFT and IFFT at the same time.
+
+    This core is mostly used for testing the ``STFTAnalyzer`` and ``STFTSynthesizer``
+    components in isolation, and doesn't make much sense to use in real projects compared
+    to just using the ``STFTProcessor`` above, which is much more resource efficient
+    for audio applications. Unless you have super high sample rates.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(shape))`
+        Continuous time-domain input stream
+    o : :py:`Out(stream.Signature(shape))`
+        Continuous time-domain output stream (reconstructed)
+    o_freq : :py:`Out(stream.Signature(Block(CQ(shape))))`
+        Frequency-domain output blocks for processing by user logic
+    i_freq : :py:`In(stream.Signature(Block(CQ(shape))))`
+        Frequency-domain input blocks after processing by user logic
+    """
+
+    def __init__(self,
+                 shape: fixed.SQ,
+                 sz:    int):
+        """
+        shape : fixed.SQ
+            Shape of the fixed-point samples used for inputs and outputs.
+        sz : int
+            Size of the frequency-domain blocks used internally and exposed for frequency
+            domain processing. ``o_freq`` and ``i_freq`` are delineated by blocks
+            with a ``payload.first`` strobe every ``sz`` elements.
+        """
+
+        self.sz        = sz
+        self.shape     = shape
+
+        self.analyzer    = STFTAnalyzer(shape=shape, sz=sz)
+        self.synthesizer = STFTSynthesizer(shape=shape, sz=sz)
+
+        super().__init__({
+            # Time domain input and resynthesized output
+            "i": In(stream.Signature(self.shape)),
+            "o": Out(stream.Signature(self.shape)),
+            # Frequency domain analysis and resynthesis blocks, to be hooked
+            # up to user frequency-domain block processing logic. If `o_freq`
+            # is connected straight to `i_freq` the output will simply
+            # resynthesize the input unmodified.
+            "o_freq": Out(stream.Signature(Block(CQ(self.shape)))),
+            "i_freq": In(stream.Signature(Block(CQ(self.shape)))),
+        })
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.analyzer = self.analyzer
+        m.submodules.synthesizer = self.synthesizer
+
+        wiring.connect(m, wiring.flipped(self.i), self.analyzer.i)
+        wiring.connect(m, self.analyzer.o, wiring.flipped(self.o_freq))
+
+        # Processed frequency-domain blocks -> continuous time-domain output (using overlap-add)
+        wiring.connect(m, wiring.flipped(self.i_freq), self.synthesizer.i)
+        wiring.connect(m, self.synthesizer.o, wiring.flipped(self.o))
+
+        return m
+
