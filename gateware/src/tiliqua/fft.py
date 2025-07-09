@@ -14,74 +14,10 @@ from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
 
+from tiliqua.complex import CQ, connect_sq_to_real, connect_real_to_sq
+from tiliqua.block   import Block
+
 from math import cos, sin, pi, sqrt
-
-class CQ(data.StructLayout):
-    """:class:`data.StructLayout` representing a complex number, formed by a pair of numbers.
-
-    shape : fixed.SQ
-        Shape of the fixed-point types used for real and imaginary components.
-
-    Members
-    -------
-    real : :py:`shape`
-        Real component of complex number.
-    imag : :py:`shape`
-        Imaginary component of complex number.
-    """
-    def __init__(self, shape: fixed.SQ):
-        super().__init__({
-            "real": shape,
-            "imag": shape,
-        })
-
-class Block(data.StructLayout):
-    """:class:`data.StructLayout` representing a 'Block' of samples.
-
-    shape : Shape
-        Shape of the ``sample`` payload of elements in this block.
-
-    This is normally used in combination with  :class:`stream.Signature`, where
-    ``valid``, ``ready`` and ``payload.first`` are used to delineate samples
-    inside. Blocks are transferred one sample at a time - a practical example
-    with blocks of length 8:
-
-    .. code-block:: text
-
-                         |-- block 1 --| |-- block 2 --| |---
-        payload.sample:  0 1 2 3 4 5 6 7 8 A B C D E F G H I ...
-        payload.first:   -_______________-_______________-__
-        valid:           -_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-
-        ready:           (all ones)
-
-    Most cores here are assuming they are working with blocks of some predefined
-    size - that is, each producer/consumer must expect the same size of :class:`Block`.
-
-    Members
-    -------
-    first : :py:`unsigned(1)`
-        Strobe asserted for first sample in a block, deasserted otherwise.
-    sample : :py:`shape`
-        Payload of this sample in the block.
-    """
-    def __init__(self, shape):
-        super().__init__({
-            "first": unsigned(1),
-            "sample": shape
-        })
-
-def connect_sq_to_real(m, stream_o, stream_i):
-    m.d.comb += [
-        stream_i.valid.eq(stream_o.valid),
-        stream_o.ready.eq(stream_i.ready),
-        stream_i.payload.sample.real.eq(stream_o.payload.sample),
-        stream_i.payload.sample.imag.eq(0),
-    ]
-    if isinstance(stream_o.payload.shape(), Block) or isinstance(stream_i.payload.shape(), Block):
-        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first),
-
-def connect_real_to_sq(m, stream_o, stream_i):
-    return connect_sq_to_real(m, stream_i, stream_o)
 
 class FFT(wiring.Component):
 
@@ -467,8 +403,7 @@ class Window(wiring.Component):
 
     """Pointwise window function.
 
-    Apply a real window function of size ``sz`` to blocks of
-    ``shape``.
+    Apply a real window function of size ``sz`` to blocks of ``shape``.
 
     Design
     ------
@@ -944,20 +879,23 @@ class STFTAnalyzer(wiring.Component):
 
     def __init__(self,
                  shape: fixed.SQ,
-                 sz:    int):
+                 sz:    int,
+                 window_function = Window.Function.HANN):
         """
         shape : fixed.SQ
             Shape of the fixed-point samples used for inputs and outputs.
         sz : int
             Size of the frequency-domain blocks used internally and exposed for frequency
             domain processing.
+        window : Window.Function
+            Window function applied to time-domain blocks the FFT.
         """
 
         self.sz        = sz
         self.shape     = shape
 
         self.overlap_blocks   = ComputeOverlappingBlocks(sz=sz, shape=shape, n_overlap=sz//2)
-        self.window_analysis  = Window(sz=sz, shape=shape, window_function=Window.Function.HANN)
+        self.window_analysis  = Window(sz=sz, shape=shape, window_function=window_function)
         self.fft              = FFT(sz=sz, shape=shape)
 
         super().__init__({
@@ -1001,20 +939,23 @@ class STFTSynthesizer(wiring.Component):
 
     def __init__(self,
                  shape: fixed.SQ,
-                 sz:    int):
+                 sz:    int,
+                 window_function = Window.Function.HANN):
         """
         shape : fixed.SQ
             Shape of the fixed-point samples used for inputs and outputs.
         sz : int
             Size of the frequency-domain blocks used internally and exposed for frequency
-            domain processing. 
+            domain processing.
+        window : Window.Function
+            Window function applied to time-domain blocks after the IFFT, but before overlap-add.
         """
 
         self.sz        = sz
         self.shape     = shape
 
         self.ifft             = FFT(sz=sz, shape=shape, default_ifft=True)
-        self.window_synthesis = Window(sz=sz, shape=shape)
+        self.window_synthesis = Window(sz=sz, shape=shape, window_function=window_function)
         self.overlap_add      = OverlapAddBlocks(sz=sz, shape=shape, n_overlap=sz//2)
 
         super().__init__({
@@ -1079,8 +1020,9 @@ class STFTProcessorPipelined(wiring.Component):
         self.sz        = sz
         self.shape     = shape
 
-        self.analyzer    = STFTAnalyzer(shape=shape, sz=sz)
-        self.synthesizer = STFTSynthesizer(shape=shape, sz=sz)
+        # Symmetric sqrt(Hann) windows for resynthesis.
+        self.analyzer    = STFTAnalyzer(shape=shape, sz=sz, window_function=Window.Function.SQRT_HANN)
+        self.synthesizer = STFTSynthesizer(shape=shape, sz=sz, window_function=Window.Function.SQRT_HANN)
 
         super().__init__({
             # Time domain input and resynthesized output

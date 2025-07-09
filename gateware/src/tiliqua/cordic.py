@@ -7,23 +7,7 @@ from amaranth_future import fixed
 
 from math import atan, pi
 
-from tiliqua.fft import CQ, Block
-
-class Polar(data.StructLayout):
-    def __init__(self, shape: fixed.SQ):
-        super().__init__({
-            "magnitude": shape,
-            "phase": shape,
-        })
-
-def connect_magnitude_to_sq(m, stream_o, stream_i):
-    m.d.comb += [
-        stream_i.valid.eq(stream_o.valid),
-        stream_o.ready.eq(stream_i.ready),
-        stream_i.payload.sample.eq(stream_o.payload.sample.magnitude),
-    ]
-    if hasattr(stream_o.payload, 'first') or hasattr(stream_i.payload, 'first'):
-        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first),
+from tiliqua.complex import CQ
 
 class RectToPolarCordic(wiring.Component):
 
@@ -37,6 +21,8 @@ class RectToPolarCordic(wiring.Component):
         self.internal_shape = fixed.SQ(self.shape.i_bits + 2, self.shape.f_bits)
         self.magnitude_correction = magnitude_correction
         super().__init__({
+            # TODO: Block wrapper should be lifted into dedicated component, as this
+            # core doesn't really need to care about block positions!
             "i": In(stream.Signature(Block(CQ(shape)))),
             "o": Out(stream.Signature(Block(Polar(self.internal_shape)))),
         })

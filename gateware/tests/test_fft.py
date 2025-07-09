@@ -136,74 +136,27 @@ class FFTTests(unittest.TestCase):
         with sim.write_vcd(vcd_file=open(f"test_fft_{name}.vcd", "w")):
             sim.run()
 
-    '''
     @parameterized.expand([
-        ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/17) + 0.2*cos(2*pi*n/10)],
+        # 'Small' version of the STFT, with TDM-multiplexed FFT and Window blocks
+        ["dual_cosine_small", 128, fft.STFTProcessor, fixed.SQ(2, 30),
+         lambda n: 0.7*cos(2*pi*n/100) + 0.2*cos(2*pi*n/5)],
+        # 'Large' version of the STFT, independent FFT/IFFT and Windowing blocks
+        ["dual_cosine_pipelined", 128, fft.STFTProcessorPipelined, fixed.SQ(2, 30),
+         lambda n: 0.7*cos(2*pi*n/100) + 0.2*cos(2*pi*n/5)],
     ])
-    def test_fft_window(self, name, sz, shape, stimulus_function):
+    def test_stft(self, name, sz, cls, shape, stimulus_function):
+
+        """
+        Pass a time-domain test waveform through an STFT for resynthesis, connecting
+        the frequency domain output directly to the input.
+
+        The result should be a perfectly reconstructed time-domain signal, despite
+        it having made the round trip through all our components (2x windowing,
+        overlapping, overlap-add blocks, fft and ifft).
+        """
 
         m = Module()
-
-        window = fft.Window(sz=sz, shape=shape)
-        ffft = fft.FFT(sz=sz, shape=shape)
-        wiring.connect(m, window.o, ffft.i)
-        m.d.comb += ffft.o.ready.eq(1)
-        m.submodules.ffft = ffft
-        m.submodules.window = window
-
-        def stimulus_values():
-            for n in range(0, sys.maxsize):
-                yield fixed.Const(stimulus_function(n), shape=shape)
-
-        async def stimulus_i(ctx):
-            s = stimulus_values()
-            ctx.set(window.i.payload.first, 1)
-            while True:
-                await ctx.tick().until(window.i.ready)
-                ctx.set(window.i.valid, 1)
-                ctx.set(window.i.payload.sample, next(s))
-                await ctx.tick()
-                ctx.set(window.i.valid, 0)
-                ctx.set(window.i.payload.first, 0)
-                await ctx.tick()
-
-        async def testbench(ctx):
-            samples_i = []
-            samples_fr = []
-            samples_fi = []
-            while True:
-                if ctx.get(ffft.i.valid & ffft.i.ready):
-                    # forward FFT inputs
-                    samples_i.append(ctx.get(ffft.i.payload.sample.real).as_float())
-                if ctx.get(ffft.o.valid & ffft.o.ready):
-                    # forward FFT outputs (frequency domain)
-                    samples_fr.append(ctx.get(ffft.o.payload.sample.real).as_float())
-                    samples_fi.append(ctx.get(ffft.o.payload.sample.imag).as_float())
-                    if len(samples_fr) == sz:
-                        break
-                await ctx.tick()
-
-            s_i = np.array(samples_i[:sz], dtype=float)
-            s_f = (np.array(samples_fr[:sz], dtype=float) +
-                   1j * np.array(samples_fi[:sz], dtype=float))
-            s_i_fft = scipy.fft.fft(s_i, norm="forward")
-            s_freq_delta = np.abs(s_f - s_i_fft)
-            print(max(s_freq_delta))
-
-        sim = Simulator(m)
-        sim.add_clock(1e-6)
-        sim.add_process(stimulus_i)
-        sim.add_testbench(testbench)
-        with sim.write_vcd(vcd_file=open(f"test_fft_window_{name}.vcd", "w")):
-            sim.run()
-
-    @parameterized.expand([
-        ["dual_cosine", 256, fixed.SQ(1, 15), lambda n: 0.7*cos(2*pi*n/200) + 0.2*cos(2*pi*n/10)],
-    ])
-    def test_stft(self, name, sz, shape, stimulus_function):
-
-        m = Module()
-        m.submodules.dut = dut = fft.STFTProcessorSmall(sz=sz, shape=shape)
+        m.submodules.dut = dut = cls(sz=sz, shape=shape)
         # Passthrough (resynthesize) in frequency domain.
         wiring.connect(m, dut.o_freq, dut.i_freq)
         m.d.comb += dut.o.ready.eq(1)
@@ -231,19 +184,26 @@ class FFTTests(unittest.TestCase):
                     samples_i.append(ctx.get(dut.i.payload).as_float())
                 if ctx.get(dut.o.valid & dut.o.ready):
                     samples_o.append(ctx.get(dut.o.payload).as_float())
-                    if len(samples_o) == N:
+                    if len(samples_o) == 2*N:
                         break
                 await ctx.tick()
-            s_i = np.array(samples_i[:N], dtype=float)
-            s_o = np.array(samples_o[:N], dtype=float)
+            # After 1 block of 'ramp-up' (zero-padded samples coming
+            # from overlap-add reconstruction), verify the output perfectly
+            # matches the input time-domain signal.
+            s_i = np.array(samples_i[N:2*N], dtype=float)
+            s_o = np.array(samples_o[N:2*N], dtype=float)
             s_io_delta = np.abs(s_o - s_i)
-            print(max(s_io_delta))
-            #assert np.all(s_io_delta < 2e-4)
+            print("Maximum difference between in/out samples:", max(s_io_delta))
+            assert np.all(s_io_delta < 1e-7)
+            """
+            # Uncomment to see the input and output waveforms plotted. it's fun to
+            # slice from 0 rather than N in samples_i/o, to see the ramp-up.
             import matplotlib.pyplot as plt
             plt.plot(s_i)
             plt.plot(s_o)
             plt.plot(s_o-s_i)
             plt.show()
+            """
 
         sim = Simulator(m)
         sim.add_clock(1.667e-8)
@@ -251,4 +211,3 @@ class FFTTests(unittest.TestCase):
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open(f"test_stft_{name}.vcd", "w")):
             sim.run()
-    '''
