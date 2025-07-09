@@ -831,6 +831,12 @@ class TripleMirror(wiring.Component):
 
 class STFTMirror(wiring.Component):
 
+    """
+    Simple test of the ``STFTProcessor`` component. Take channel 0,
+    convert blocks into frequency-domain spectra and back again, and
+    then emit the same time-domain signal out channel 0.
+    """
+
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
@@ -857,6 +863,18 @@ class STFTMirror(wiring.Component):
 
 class Vocoder(wiring.Component):
 
+    """
+    STFT-based spectral cross-synthesis (vocoder-like)
+
+    Channel 0 is the 'carrier', channel 1 is the 'modulator'.
+    The spectral envelope of the modulator is applied to the
+    carrier in the frequency domain, the result of which is
+    emitted out channel 0.
+
+    Use relatively high levels and some compression on the
+    modulator to get decent intelligibility.
+    """
+
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
@@ -868,7 +886,7 @@ class Vocoder(wiring.Component):
         wiring.connect(m, wiring.flipped(self.i), split4.i)
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
-        fftsz = 256
+        fftsz = 256 # FFT block size
         m.submodules.stft0 = stft0 = fft.STFTProcessor(shape=ASQ, sz=fftsz)
         m.submodules.analyzer1 = analyzer1 = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
         m.submodules.vocoder0 = vocoder0 = spectral.SpectralCrossSynthesis(shape=ASQ, sz=fftsz)
@@ -887,6 +905,10 @@ class Vocoder(wiring.Component):
         return m
 
 class Noise(wiring.Component):
+
+    """
+    Digital white noise, output on channel 0.
+    """
 
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
@@ -970,8 +992,8 @@ CORES = {
     "multi_diffuser": (False, PSRAMMultiDiffuser),
     "resampler":      (False, Resampler),
     "triple_mirror":  (False, TripleMirror),
-    "vocoder":        (False, Vocoder),
     "stft_mirror":    (False, STFTMirror),
+    "vocoder":        (False, Vocoder),
     "noise":          (False, Noise),
 }
 
