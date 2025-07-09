@@ -16,18 +16,14 @@ class Polar(data.StructLayout):
             "phase": shape,
         })
 
-def polar_magnitude(s):
-    """Stream adapter: take the 'magnitude' component of a Polar stream."""
-    a = stream.Signature(Block(s.payload.sample.magnitude.shape()))
-    if isinstance(s.signature, wiring.FlippedSignature):
-        a = a.flip()
-    o = a.create()
-    o.payload.sample = s.payload.sample.magnitude
-    o.valid = s.valid
-    o.ready = s.ready
-    if hasattr(o.payload, 'first') or hasattr(s.payload, 'first'):
-        o.payload.first = s.payload.first
-    return o
+def connect_magnitude_to_sq(m, stream_o, stream_i):
+    m.d.comb += [
+        stream_i.valid.eq(stream_o.valid),
+        stream_o.ready.eq(stream_i.ready),
+        stream_i.payload.sample.eq(stream_o.payload.sample.magnitude),
+    ]
+    if hasattr(stream_o.payload, 'first') or hasattr(stream_i.payload, 'first'):
+        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first),
 
 class RectToPolarCordic(wiring.Component):
 
@@ -42,7 +38,7 @@ class RectToPolarCordic(wiring.Component):
         self.magnitude_correction = magnitude_correction
         super().__init__({
             "i": In(stream.Signature(Block(CQ(shape)))),
-            "o": Out(stream.Signature(Block(Polar(shape)))),
+            "o": Out(stream.Signature(Block(Polar(self.internal_shape)))),
         })
 
     def elaborate(self, platform) -> Module:
