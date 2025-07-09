@@ -404,6 +404,7 @@ class Window(wiring.Component):
     """Pointwise window function.
 
     Apply a real window function of size ``sz`` to blocks of ``shape``.
+    The window function is synchronized to the block ``payload.first``.
 
     Design
     ------

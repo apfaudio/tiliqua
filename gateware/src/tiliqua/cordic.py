@@ -14,7 +14,8 @@ from amaranth_future import fixed
 
 from math import atan, pi
 
-from tiliqua.complex import CQ
+from tiliqua.complex import CQ, Polar
+from tiliqua.block import Block
 
 class RectToPolarCordic(wiring.Component):
 
@@ -93,39 +94,34 @@ class RectToPolarCordic(wiring.Component):
         #
         # State and iteration registers
         #
+
+        in_latch = Signal.like(self.i.payload)
         x = Signal(self.internal_shape)
         y = Signal(self.internal_shape)
         z = Signal(self.internal_shape)
         iteration = Signal(range(self.iterations + 1))
 
-        # Shifted versions for current iteration
+        #
+        # Combinatorial
+        #
+
         x_shift = Signal(self.internal_shape)
         y_shift = Signal(self.internal_shape)
-
-        # Direction of rotation (sign of y)
         d = Signal()
-
         m.d.comb += [
-            # ROM addressing
             atan_rd.addr.eq(iteration),
-            # Shifted values
+            # Shifted values for current iteration
             x_shift.eq(x >> iteration),
             y_shift.eq(y >> iteration),
             # Direction
             d.eq((x<0)^(y<0)),
         ]
 
-        # Input handling - convert to internal representation
-        in_latch = Signal.like(self.i.payload)
-
-        # Handle input quadrant adjustment
-        quadrant = Signal(2)
-        x_abs = Signal(self.internal_shape)
-        y_abs = Signal(self.internal_shape)
+        #
+        # Output assignments
+        #
 
         quadrant_adjust = Signal(self.internal_shape)
-
-        # Output assignments
         m.d.comb += self.o.payload.sample.phase.eq(z + quadrant_adjust),
         m.d.comb += self.o.payload.first.eq(in_latch.first),
         if self.magnitude_correction:
@@ -141,6 +137,10 @@ class RectToPolarCordic(wiring.Component):
                 with m.If(self.i.valid):
                     m.d.sync += in_latch.eq(self.i.payload)
                     m.next = "QUADRANT"
+
+            #
+            # Determine which of 4 quadrants this sample is in
+            #
 
             with m.State("QUADRANT"):
                 m.d.sync += [
@@ -163,6 +163,10 @@ class RectToPolarCordic(wiring.Component):
                     with m.Else():
                         m.d.sync += quadrant_adjust.eq(fixed.Const(-1.0)) # Q3
                 m.next = "ITERATE"
+
+            #
+            # CORDIC rotation for self.iterations
+            #
 
             with m.State("ITERATE"):
                 with m.If(iteration < self.iterations):

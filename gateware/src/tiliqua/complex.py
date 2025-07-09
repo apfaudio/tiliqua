@@ -74,7 +74,7 @@ def connect_magnitude_to_sq(m, stream_o, stream_i):
     """Adapter: connect a polar ``stream_o`` to a real ``stream_i``, forwarding
     only the magnitude component.
     """
-    connect_without_payload(m, stream_o, stream_i)
+    block.connect_without_payload(m, stream_o, stream_i)
     m.d.comb += [
         stream_i.payload.sample.eq(stream_o.payload.sample.magnitude),
     ]

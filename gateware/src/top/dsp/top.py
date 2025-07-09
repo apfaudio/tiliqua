@@ -837,7 +837,7 @@ class STFTMirror(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.stft = stft = fft.STFTProcessorSmall(
+        m.submodules.stft = stft = fft.STFTProcessor(
             sz=256, shape=ASQ)
         # Passthrough (resynthesize) in frequency domain.
         wiring.connect(m, stft.o_freq, stft.i_freq)
@@ -869,7 +869,7 @@ class Vocoder(wiring.Component):
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
         fftsz = 256
-        m.submodules.stft0 = stft0 = fft.STFTProcessorSmall(shape=ASQ, sz=fftsz)
+        m.submodules.stft0 = stft0 = fft.STFTProcessor(shape=ASQ, sz=fftsz)
         m.submodules.analyzer1 = analyzer1 = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
         m.submodules.vocoder0 = vocoder0 = spectral.SpectralCrossSynthesis(shape=ASQ, sz=fftsz)
 
