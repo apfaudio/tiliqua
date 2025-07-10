@@ -24,6 +24,9 @@ DSP Components
    vca
    mix
    resample
+   fft
+   cordic
    oneshot
    stream
    misc
+   types
