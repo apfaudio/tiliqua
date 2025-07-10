@@ -824,11 +824,19 @@ class STFTProcessor(wiring.Component):
         m.submodules.fft              = self.fft
         m.submodules.overlap_add      = self.overlap_add
 
+
+        m.submodules.ififo = ififo = fifo.SyncFIFOBuffered(
+            width=self.shape.as_shape().width, depth=self.sz//4)
+        wiring.connect(m, wiring.flipped(self.i), ififo.w_stream)
+        wiring.connect(m, ififo.r_stream, self.overlap_blocks.i)
+
+        m.submodules.ofifo = ofifo = fifo.SyncFIFOBuffered(
+            width=self.shape.as_shape().width, depth=self.sz)
+        wiring.connect(m, self.overlap_add.o, ofifo.w_stream)
+        wiring.connect(m, ofifo.r_stream, wiring.flipped(self.o))
+
         m.submodules.pfifo = pfifo = fifo.SyncFIFOBuffered(
             width=self.i_freq.payload.shape().size, depth=self.sz)
-
-        wiring.connect(m, wiring.flipped(self.i), self.overlap_blocks.i)
-        wiring.connect(m, self.overlap_add.o, wiring.flipped(self.o))
 
         n_samples = Signal(range(self.sz+1), init=0)
 
