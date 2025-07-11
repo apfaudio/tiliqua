@@ -6,13 +6,13 @@
 """Spectral processing components."""
 
 from amaranth import *
-from amaranth.lib import wiring, data, stream, memory
+from amaranth.lib import wiring, data, stream, memory, fifo
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
 
-from math import atan, pi
+from math import atan, pi, log2
 
 from tiliqua import dsp, mac, cordic
 from tiliqua.complex import CQ, connect_magnitude_to_sq
@@ -137,6 +137,75 @@ class BlockLPF(wiring.Component):
 
         return m
 
+class WaveShaperBlock(wiring.Component):
+    """
+    Block-based adapter for WaveShaper.
+    
+    Processes blocks of samples through a waveshaping function, preserving
+    the block structure (first signal) while applying the waveshaper to each sample.
+    
+    Members
+    -------
+    i : :py:`In(stream.Signature(Block(shape)))`
+        Input stream with Block payload (first + sample).
+    o : :py:`Out(stream.Signature(Block(shape)))`
+        Output stream with Block payload (first + sample).
+    """
+    
+    def __init__(self, shape, lut_function=None, lut_size=512, 
+                 continuous=False, macp=None):
+        self.shape = shape
+        self.lut_function = lut_function
+        self.lut_size = lut_size
+        self.continuous = continuous
+        self.macp = macp
+        
+        super().__init__({
+            "i": In(stream.Signature(Block(shape))),
+            "o": Out(stream.Signature(Block(shape))),
+        })
+    
+    def elaborate(self, platform):
+        m = Module()
+        
+        # Instantiate the streaming WaveShaper
+        m.submodules.waveshaper = waveshaper = dsp.WaveShaper(
+            lut_function=self.lut_function,
+            lut_size=self.lut_size,
+            continuous=self.continuous,
+            macp=self.macp
+        )
+        
+        # FIFO to preserve the 'first' signal timing
+        # Depth matches WaveShaper latency (approximately 7-8 cycles)
+        m.submodules.first_fifo = first_fifo = fifo.SyncFIFOBuffered(
+            width=1, depth=16
+        )
+        
+        # Connect input to waveshaper (sample only)
+        m.d.comb += [
+            waveshaper.i.valid.eq(self.i.valid),
+            waveshaper.i.payload.eq(self.i.payload.sample),
+            self.i.ready.eq(waveshaper.i.ready & first_fifo.w_rdy),
+        ]
+        
+        # Store 'first' signal in FIFO when input is transferred
+        m.d.comb += [
+            first_fifo.w_en.eq(self.i.valid & self.i.ready),
+            first_fifo.w_data.eq(self.i.payload.first),
+        ]
+        
+        # Connect waveshaper output with preserved 'first' signal
+        m.d.comb += [
+            self.o.valid.eq(waveshaper.o.valid & first_fifo.r_rdy),
+            self.o.payload.sample.eq(waveshaper.o.payload),
+            self.o.payload.first.eq(first_fifo.r_data),
+            waveshaper.o.ready.eq(self.o.ready & first_fifo.r_rdy),
+            first_fifo.r_en.eq(self.o.valid & self.o.ready),
+        ]
+        
+        return m
+
 class SpectralEnvelope(wiring.Component):
 
     """Compute a smoothed, real spectral envelope.
@@ -180,10 +249,16 @@ class SpectralEnvelope(wiring.Component):
                 self.shape, magnitude_correction=False)
         m.submodules.block_lpf = block_lpf = BlockLPF(
                 self.shape, self.sz)
+        def log_lut(x):
+            return max(0, log2(max(1, 1024*x))/40.0)
+        m.submodules.log = log = WaveShaperBlock(
+                self.shape, lut_function=log_lut, lut_size=128, continuous=False)
         wiring.connect(m, wiring.flipped(self.i), rect_to_polar.i)
         connect_magnitude_to_sq(m, rect_to_polar.o, block_lpf.i)
-        wiring.connect(m, block_lpf.o, wiring.flipped(self.o))
+        wiring.connect(m, block_lpf.o, log.i)
+        wiring.connect(m, log.o, wiring.flipped(self.o))
         return m
+
 
 class SpectralCrossSynthesis(wiring.Component):
 
