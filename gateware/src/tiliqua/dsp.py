@@ -1322,28 +1322,23 @@ class Duplicate(wiring.Component):
 
     def elaborate(self, platform):
         m = Module()
+
         if self.n == 1:
             wiring.connect(m, wiring.flipped(self.i), self.o)
         else:
-            dup_counter = Signal(range(self.n))
+            output_count = Signal(range(self.n + 1), init=0)
             current_sample = Signal(ASQ)
-            sample_valid = Signal()
-            m.d.comb += self.i.ready.eq(dup_counter == 0)
+            m.d.comb += self.i.ready.eq(output_count == 0)
+            m.d.comb += self.o.valid.eq(output_count > 0)
+            m.d.comb += self.o.payload.eq(current_sample)
             with m.If(self.i.valid & self.i.ready):
                 m.d.sync += [
                     current_sample.eq(self.i.payload),
-                    sample_valid.eq(1),
-                    dup_counter.eq(self.n - 1),
+                    output_count.eq(self.n),
                 ]
-            with m.If(self.o.ready & sample_valid):
-                with m.If(dup_counter > 0):
-                    m.d.sync += dup_counter.eq(dup_counter - 1)
-                with m.Else():
-                    m.d.sync += sample_valid.eq(0)
-            m.d.comb += [
-                self.o.valid.eq(sample_valid),
-                self.o.payload.eq(current_sample),
-            ]
+            with m.If(self.o.valid & self.o.ready):
+                m.d.sync += output_count.eq(output_count - 1)
+
         return m
 
 class WhiteNoise(wiring.Component):
