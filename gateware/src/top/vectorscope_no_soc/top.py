@@ -30,14 +30,14 @@ from amaranth.lib             import wiring, data, stream
 from amaranth.lib.wiring      import In, Out
 from amaranth.lib.fifo        import AsyncFIFO, SyncFIFO
 from amaranth.lib.cdc         import FFSynchronizer
-from amaranth.utils           import log2_int
+from amaranth.utils           import exact_log2
 from amaranth.back            import verilog
 
 from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer, palette
+from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer, palette, fft, spectral
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
@@ -46,6 +46,58 @@ from tiliqua.raster_persist   import Persistance
 from tiliqua.raster_stroke    import Stroke
 
 from vendor.ila               import AsyncSerialILA
+
+class Spectro(wiring.Component):
+
+    def __init__(self):
+        super().__init__({
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            "o": Out(stream.Signature(data.ArrayLayout(ASQ, 4))),
+        })
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.split4 = split4 = dsp.Split(4)
+        m.submodules.merge4 = merge4 = dsp.Merge(4)
+        wiring.connect(m, wiring.flipped(self.i), split4.i)
+        wiring.connect(m, merge4.o, wiring.flipped(self.o))
+
+        fftsz=512
+        m.submodules.analyzer = analyzer = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
+        m.submodules.envelope = envelope = spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
+
+        wiring.connect(m, split4.o[0], analyzer.i)
+        wiring.connect(m, analyzer.o, envelope.i)
+
+
+        f_axis = Signal(ASQ)
+        with m.If(envelope.o.valid & envelope.o.ready):
+            with m.If(envelope.o.payload.first):
+                m.d.sync += f_axis.eq(fixed.Const(-0.5))
+            with m.Else():
+                m.d.sync += f_axis.eq(f_axis+(fixed.Const(1)>>exact_log2(fftsz)))
+
+        m.d.comb += [
+            merge4.i[0].payload.eq((envelope.o.payload.sample<<2) - fixed.Const(0.25)),
+            merge4.i[0].valid.eq(envelope.o.valid),
+            envelope.o.ready.eq(merge4.i[0].ready),
+
+            merge4.i[1].valid.eq(1),
+            merge4.i[1].payload.eq((f_axis<<1) - fixed.Const(0.5)),
+
+            merge4.i[2].valid.eq(1),
+        ]
+
+        with m.If(f_axis < fixed.Const(0)):
+            m.d.comb += merge4.i[2].payload.eq(ASQ.max())
+        with m.Else():
+            m.d.comb += merge4.i[2].payload.eq(0)
+
+        split4.wire_ready(m, [1, 2, 3])
+        merge4.wire_valid(m, [3])
+
+        return m
 
 class VectorScopeTop(Elaboratable):
 
@@ -59,7 +111,6 @@ class VectorScopeTop(Elaboratable):
 
         # One PSRAM with an internal arbiter to support multiple DMA masters.
         self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
-
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
@@ -79,6 +130,8 @@ class VectorScopeTop(Elaboratable):
         self.plotter_cache = cache.PlotterCache(fb=self.fb)
         self.psram_periph.add_master(self.plotter_cache.bus)
         self.plotter_cache.add(self.stroke.bus)
+
+        self.spectro = Spectro()
 
         super().__init__()
 
@@ -106,8 +159,10 @@ class VectorScopeTop(Elaboratable):
         m.submodules.fb = self.fb
         m.submodules.persist = self.persist
         m.submodules.stroke = self.stroke
+        m.submodules.spectro = self.spectro
 
-        wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
+        wiring.connect(m, self.pmod0.o_cal, self.spectro.i)
+        wiring.connect(m, self.spectro.o, self.stroke.i)
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
