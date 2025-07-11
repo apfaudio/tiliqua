@@ -64,10 +64,13 @@ class Spectro(wiring.Component):
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
         fftsz=512
+
+        m.submodules.resample = resample = dsp.Resample(fs_in=192000, n_up=1, m_down=8)
         m.submodules.analyzer = analyzer = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
         m.submodules.envelope = envelope = spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
 
-        wiring.connect(m, split4.o[0], analyzer.i)
+        wiring.connect(m, split4.o[0], resample.i)
+        wiring.connect(m, resample.o, analyzer.i)
         wiring.connect(m, analyzer.o, envelope.i)
 
 
@@ -126,7 +129,7 @@ class VectorScopeTop(Elaboratable):
         self.persist = Persistance(fb=self.fb)
         self.psram_periph.add_master(self.persist.bus)
 
-        self.stroke = Stroke(fb=self.fb, n_upsample=8, fs=clock_settings.audio_clock.fs())
+        self.stroke = Stroke(fb=self.fb, n_upsample=32, fs=clock_settings.audio_clock.fs())
         self.plotter_cache = cache.PlotterCache(fb=self.fb)
         self.psram_periph.add_master(self.plotter_cache.bus)
         self.plotter_cache.add(self.stroke.bus)
