@@ -181,9 +181,13 @@ class SpectralEnvelope(wiring.Component):
         m.submodules.block_lpf = block_lpf = BlockLPF(
                 self.shape, self.sz)
         def log_lut(x):
-            return max(0, log2(max(1, 1024*x))/40.0)
+            # map 0 - 1 (linear) to 0 - 1 (log representing -X dBr to 0dBr)
+            # where -X (smallest value) represents 1 LSB of the fixed.SQ.
+            max_v = 1 << self.shape.f_bits
+            r = max(0, log2(max(1, x*max_v))/log2(max_v))
+            return r
         m.submodules.log = log = block.WrapCore(dsp.WaveShaper(
-                lut_function=log_lut, lut_size=128, continuous=False))
+                lut_function=log_lut, lut_size=512, continuous=False))
         wiring.connect(m, wiring.flipped(self.i), rect_to_polar.i)
         connect_magnitude_to_sq(m, rect_to_polar.o, block_lpf.i)
         wiring.connect(m, block_lpf.o, log.i)

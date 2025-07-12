@@ -82,7 +82,7 @@ class Spectro(wiring.Component):
                 m.d.sync += f_axis.eq(f_axis+(fixed.Const(1)>>exact_log2(fftsz)))
 
         m.d.comb += [
-            merge4.i[0].payload.eq((envelope.o.payload.sample<<2) - fixed.Const(0.25)),
+            merge4.i[0].payload.eq(envelope.o.payload.sample - fixed.Const(0.25)),
             merge4.i[0].valid.eq(envelope.o.valid),
             envelope.o.ready.eq(merge4.i[0].ready),
 
