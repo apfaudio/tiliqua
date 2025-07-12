@@ -176,8 +176,8 @@ class SpectralEnvelope(wiring.Component):
 
     def elaborate(self, platform) -> Module:
         m = Module()
-        m.submodules.rect_to_polar = rect_to_polar = cordic.RectToPolarCordic(
-                self.shape, magnitude_correction=False)
+        m.submodules.rect_to_polar = rect_to_polar = block.WrapCore(cordic.RectToPolarCordic(
+                self.shape, magnitude_correction=False))
         m.submodules.block_lpf = block_lpf = BlockLPF(
                 self.shape, self.sz)
         def log_lut(x):

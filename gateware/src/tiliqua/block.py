@@ -60,7 +60,7 @@ class WrapCore(wiring.Component):
 
     """
     Promote any DSP component with simple i/o streams into supporting
-    :class:`Block` streams (tracking 'first' across i/o samples).
+    :class:`Block` streams (which track 'first' across i/o samples).
 
     This only supports simple cores that have:
     - An input stream 'i' with signature stream.Signature(shape)
@@ -69,11 +69,12 @@ class WrapCore(wiring.Component):
 
     def __init__(self, core, max_latency=16):
         self.core = core
-        self.shape = core.i.payload.shape()
+        self.shape_i = core.i.payload.shape()
+        self.shape_o = core.o.payload.shape()
         self.max_latency = max_latency
         super().__init__({
-            "i": In(stream.Signature(Block(self.shape))),
-            "o": Out(stream.Signature(Block(self.shape))),
+            "i": In(stream.Signature(Block(self.shape_i))),
+            "o": Out(stream.Signature(Block(self.shape_o))),
         })
 
     def elaborate(self, platform):
@@ -86,7 +87,7 @@ class WrapCore(wiring.Component):
             width=1, depth=self.max_latency
         )
 
-        sample_in = stream.Signature(self.shape).create()
+        sample_in = stream.Signature(self.shape_i).create()
         m.d.comb += [
             sample_in.valid.eq(self.i.valid),
             sample_in.payload.eq(self.i.payload.sample),
@@ -100,7 +101,7 @@ class WrapCore(wiring.Component):
             first_fifo.w_data.eq(self.i.payload.first),
         ]
 
-        sample_out = stream.Signature(self.shape).flip().create()
+        sample_out = stream.Signature(self.shape_o).flip().create()
         wiring.connect(m, dsp_core.o, sample_out)
 
         m.d.comb += [
