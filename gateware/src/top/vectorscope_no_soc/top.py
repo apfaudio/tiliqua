@@ -10,6 +10,9 @@ CRT display, with intensity gradient and afterglow effects.
 Simple gateware-only version, this is mostly useful for debugging the
 memory and video subsystems with an ILA or simulation, as it's smaller.
 
+Passing the ``--spectrogram`` passes frequency and magnitude information
+to the plotter (from channel 0) instead of just passing through X and Y.
+
 See 'xbeam' for SoC version of the scope with a menu system.
 
 .. code-block:: bash
@@ -30,14 +33,14 @@ from amaranth.lib             import wiring, data, stream
 from amaranth.lib.wiring      import In, Out
 from amaranth.lib.fifo        import AsyncFIFO, SyncFIFO
 from amaranth.lib.cdc         import FFSynchronizer
-from amaranth.utils           import log2_int
+from amaranth.utils           import exact_log2
 from amaranth.back            import verilog
 
 from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer, palette
+from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer, palette, fft, spectral, block
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
@@ -47,19 +50,102 @@ from tiliqua.raster_stroke    import Stroke
 
 from vendor.ila               import AsyncSerialILA
 
+class Spectro(wiring.Component):
+
+    """
+    Simple spectrogram drawing logic.
+
+    Take input channel 0, run an FFT/STFT on it, take the logarithm and
+    emit the log-magnitude on X (0), frequency index on Y (1), and a
+    pen-lift on 2 (to avoid interpolation artifacts).
+
+    Designed to connect to Stroke - that is, use a vectorscope as
+    a spectrum analyzer visualization.
+    """
+
+    def __init__(self, fs):
+        self.fs = fs
+        super().__init__({
+            # In on channel 0
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            # Out on channels 0 (y), 1 (x), 2 (intensity)
+            "o": Out(stream.Signature(data.ArrayLayout(ASQ, 4))),
+        })
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.split4 = split4 = dsp.Split(4)
+        m.submodules.merge4 = merge4 = dsp.Merge(4)
+        wiring.connect(m, wiring.flipped(self.i), split4.i)
+        wiring.connect(m, merge4.o, wiring.flipped(self.o))
+
+        fftsz=512
+
+        # Resample input down, so visible area is a fraction of the nyquist (e.g. 192khz/8 = 24kHz visual bandwidth)
+        m.submodules.resample = resample = dsp.Resample(fs_in=self.fs, n_up=1, m_down=8 if self.fs > 48000 else 2)
+        m.submodules.analyzer = analyzer = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
+        m.submodules.envelope = envelope = spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
+        def log_lut(x):
+            # map 0 - 1 (linear) to 0 - 1 (log representing -X dBr to 0dBr)
+            # where -X (smallest value) represents 1 LSB of the fixed.SQ.
+            max_v = 1 << ASQ.f_bits
+            r = max(0, math.log2(max(1, x*max_v))/math.log2(max_v))
+            return r
+        m.submodules.log = log = block.WrapCore(dsp.WaveShaper(
+                lut_function=log_lut, lut_size=512, continuous=False))
+
+        wiring.connect(m, split4.o[0], resample.i)
+        wiring.connect(m, resample.o, analyzer.i)
+        wiring.connect(m, analyzer.o, envelope.i)
+        wiring.connect(m, envelope.o, log.i)
+
+        # Increasing X axis counter for frequency bins
+        f_axis = Signal(ASQ)
+        with m.If(log.o.valid & log.o.ready):
+            with m.If(log.o.payload.first):
+                m.d.sync += f_axis.eq(fixed.Const(-0.5))
+            with m.Else():
+                m.d.sync += f_axis.eq(f_axis+(fixed.Const(1)>>exact_log2(fftsz)))
+
+        # Pen lift when we get to the mirrored half of the spectrum.
+        with m.If(f_axis < fixed.Const(0)):
+            m.d.comb += merge4.i[2].payload.eq(ASQ.max())
+        with m.Else():
+            m.d.comb += merge4.i[2].payload.eq(0)
+
+        m.d.comb += [
+            # Connect log magnitude to ch0 output (offset to center)
+            merge4.i[0].payload.eq(log.o.payload.sample - fixed.Const(0.25)),
+            merge4.i[0].valid.eq(log.o.valid),
+            log.o.ready.eq(merge4.i[0].ready),
+
+            # Connect frequency bin / index to ch1 output (offset to center)
+            merge4.i[1].valid.eq(1),
+            merge4.i[1].payload.eq((f_axis<<1) - fixed.Const(0.5)),
+
+            # Pen lift always valid
+            merge4.i[2].valid.eq(1),
+        ]
+
+        # Unused channels
+        split4.wire_ready(m, [1, 2, 3])
+        merge4.wire_valid(m, [3])
+
+        return m
+
 class VectorScopeTop(Elaboratable):
 
     """
     Top-level Vectorscope design.
     """
 
-    def __init__(self, *, clock_settings):
+    def __init__(self, *, clock_settings, spectrogram):
 
         self.clock_settings = clock_settings
 
         # One PSRAM with an internal arbiter to support multiple DMA masters.
         self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
-
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
@@ -75,10 +161,14 @@ class VectorScopeTop(Elaboratable):
         self.persist = Persistance(fb=self.fb)
         self.psram_periph.add_master(self.persist.bus)
 
-        self.stroke = Stroke(fb=self.fb, n_upsample=8, fs=clock_settings.audio_clock.fs())
+        self.spectrogram = spectrogram
+        self.stroke = Stroke(fb=self.fb, n_upsample=32 if self.spectrogram else 8, fs=clock_settings.audio_clock.fs())
         self.plotter_cache = cache.PlotterCache(fb=self.fb)
         self.psram_periph.add_master(self.plotter_cache.bus)
         self.plotter_cache.add(self.stroke.bus)
+
+        if self.spectrogram:
+            self.spectro = Spectro(fs=clock_settings.audio_clock.fs())
 
         super().__init__()
 
@@ -107,7 +197,12 @@ class VectorScopeTop(Elaboratable):
         m.submodules.persist = self.persist
         m.submodules.stroke = self.stroke
 
-        wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
+        if self.spectrogram:
+            m.submodules.spectro = self.spectro
+            wiring.connect(m, self.pmod0.o_cal, self.spectro.i)
+            wiring.connect(m, self.spectro.o, self.stroke.i)
+        else:
+            wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
@@ -208,6 +303,15 @@ def simulation_ports(fragment):
         "dvi_b":          (fragment.fb.simif.b,                     None),
     }
 
+def argparse_callback(parser):
+    parser.add_argument('--spectrogram', action='store_true',
+                        help=f"Display a spectrogram instead of vectorscope")
+
+def argparse_fragment(args):
+    return {
+        "spectrogram": args.spectrogram,
+    }
+
 if __name__ == "__main__":
     this_path = os.path.dirname(os.path.realpath(__file__))
     top_level_cli(
@@ -215,4 +319,6 @@ if __name__ == "__main__":
         ila_supported=True,
         sim_ports=simulation_ports,
         sim_harness="../../src/top/vectorscope_no_soc/sim/sim.cpp",
+        argparse_callback=argparse_callback,
+        argparse_fragment=argparse_fragment,
     )
