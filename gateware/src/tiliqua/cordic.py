@@ -36,9 +36,9 @@ class RectToPolarCordic(wiring.Component):
 
     Members
     -------
-    i : :py:`In(stream.Signature(Block(CQ(shape))))`
+    i : :py:`In(stream.Signature(CQ(shape)))`
         Stream of incoming complex numbers in rectangular coordinates.
-    o : :py:`Out(stream.Signature(Block(Polar(self.internal_shape))))`
+    o : :py:`Out(stream.Signature(Polar(self.internal_shape)))`
         Stream of outgoing complex numbers in polar coordinates.
     """
 

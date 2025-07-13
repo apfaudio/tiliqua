@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     tfp->open("simx.fst");
 #endif
 
-    uint64_t sim_time =  275e9; // 75msec is ~ 4 frames
+    uint64_t sim_time =  75e9; // 75msec is ~ 4 frames
 
     uint64_t ns_in_s = 1e9;
     uint64_t ns_in_sync_cycle   = ns_in_s /  SYNC_CLK_HZ;

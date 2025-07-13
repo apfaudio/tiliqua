@@ -45,29 +45,37 @@ class Block(data.StructLayout):
             "sample": shape
         })
 
-def connect_without_payload(m, stream_o, stream_i):
-    m.d.comb += [
-        stream_i.valid.eq(stream_o.valid),
-        stream_o.ready.eq(stream_i.ready),
-    ]
-    shape_o = stream_o.payload.shape()
-    shape_i = stream_i.payload.shape()
-    if isinstance(shape_o, Block) or isinstance(shape_i, Block):
-        assert isinstance(shape_o, Block) and isinstance(shape_i, Block)
-        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first)
-
 class WrapCore(wiring.Component):
 
     """
-    Promote any DSP component with simple i/o streams into supporting
-    :class:`Block` streams (which track 'first' across i/o samples).
+    Wrap a streaming component with simple ``i``, ``o`` streams such that
+    it takes/emits :class:`Block` streams (where ``payload.first`` is tracked).
 
     This only supports simple cores that have:
-    - An input stream 'i' with signature stream.Signature(shape)
-    - An output stream 'o' with signature stream.Signature(shape)
+
+    - An input stream ``i`` of type ``stream.Signature(shape)``
+    - An output stream ``o`` of type ``stream.Signature(shape)``
+
+    A FIFO of size ``max_latency`` is used to track and propagate ``payload.first`` from
+    the input to the output of the wrapped core. The wrapped core must never store more
+    than ``max_latency`` elements in flight for this to work correctly.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(Block(self.shape_i)))`
+        Incoming blocks, where shape of block payload is inherited from the wrapped core.
+    o : :py:`In(stream.Signature(Block(self.shape_o)))`
+        Outgoing blocks, where shape of block payload is inherited from the wrapped core.
     """
 
     def __init__(self, core, max_latency=16):
+        """
+        core : wiring.Component
+            DSP core to be wrapped. ``shape_i`` and ``shape_o`` come from
+            ``i.payload.shape()`` and ``o.payload.shape()``.
+        max_latency : int
+            Maximum amount of elements that may be in-flight inside the wrapped core.
+        """
         self.core = core
         self.shape_i = core.i.payload.shape()
         self.shape_o = core.o.payload.shape()
@@ -113,3 +121,20 @@ class WrapCore(wiring.Component):
         ]
 
         return m
+
+def connect_without_payload(m, stream_o, stream_i):
+    """
+    Connect 2 :class:`Block` streams *without* connecting the payload.
+    This is a useful building block for building custom connectors that
+    bridge block streams encapsulating different types.
+    """
+    m.d.comb += [
+        stream_i.valid.eq(stream_o.valid),
+        stream_o.ready.eq(stream_i.ready),
+    ]
+    shape_o = stream_o.payload.shape()
+    shape_i = stream_i.payload.shape()
+    if isinstance(shape_o, Block) or isinstance(shape_i, Block):
+        assert isinstance(shape_o, Block) and isinstance(shape_i, Block)
+        m.d.comb += stream_i.payload.first.eq(stream_o.payload.first)
+
