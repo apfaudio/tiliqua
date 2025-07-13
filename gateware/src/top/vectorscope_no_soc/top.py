@@ -37,7 +37,7 @@ from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer, palette, fft, spectral
+from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer, palette, fft, spectral, block
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
@@ -63,28 +63,38 @@ class Spectro(wiring.Component):
         wiring.connect(m, wiring.flipped(self.i), split4.i)
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
+        def log_lut(x):
+            # map 0 - 1 (linear) to 0 - 1 (log representing -X dBr to 0dBr)
+            # where -X (smallest value) represents 1 LSB of the fixed.SQ.
+            max_v = 1 << ASQ.f_bits
+            r = max(0, math.log2(max(1, x*max_v))/math.log2(max_v))
+            return r
+
         fftsz=512
 
         m.submodules.resample = resample = dsp.Resample(fs_in=192000, n_up=1, m_down=8)
         m.submodules.analyzer = analyzer = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
         m.submodules.envelope = envelope = spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
+        m.submodules.log = log = block.WrapCore(dsp.WaveShaper(
+                lut_function=log_lut, lut_size=512, continuous=False))
 
         wiring.connect(m, split4.o[0], resample.i)
         wiring.connect(m, resample.o, analyzer.i)
         wiring.connect(m, analyzer.o, envelope.i)
+        wiring.connect(m, envelope.o, log.i)
 
 
         f_axis = Signal(ASQ)
-        with m.If(envelope.o.valid & envelope.o.ready):
-            with m.If(envelope.o.payload.first):
+        with m.If(log.o.valid & log.o.ready):
+            with m.If(log.o.payload.first):
                 m.d.sync += f_axis.eq(fixed.Const(-0.5))
             with m.Else():
                 m.d.sync += f_axis.eq(f_axis+(fixed.Const(1)>>exact_log2(fftsz)))
 
         m.d.comb += [
-            merge4.i[0].payload.eq(envelope.o.payload.sample - fixed.Const(0.25)),
-            merge4.i[0].valid.eq(envelope.o.valid),
-            envelope.o.ready.eq(merge4.i[0].ready),
+            merge4.i[0].payload.eq(log.o.payload.sample - fixed.Const(0.25)),
+            merge4.i[0].valid.eq(log.o.valid),
+            log.o.ready.eq(merge4.i[0].ready),
 
             merge4.i[1].valid.eq(1),
             merge4.i[1].payload.eq((f_axis<<1) - fixed.Const(0.5)),
