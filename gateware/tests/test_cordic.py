@@ -21,8 +21,8 @@ class CordicTests(unittest.TestCase):
         dut = cordic.RectToPolarCordic(self.SHAPE)
 
         async def send_complex(ctx, real, imag):
-            ctx.set(dut.i.payload.sample.real, fixed.Const(real, shape=self.SHAPE, clamp=True))
-            ctx.set(dut.i.payload.sample.imag, fixed.Const(imag, shape=self.SHAPE, clamp=True))
+            ctx.set(dut.i.payload.real, fixed.Const(real, shape=self.SHAPE, clamp=True))
+            ctx.set(dut.i.payload.imag, fixed.Const(imag, shape=self.SHAPE, clamp=True))
             ctx.set(dut.i.valid, 1)
             while not ctx.get(dut.i.ready):
                 await ctx.tick()
@@ -32,8 +32,8 @@ class CordicTests(unittest.TestCase):
         async def receive_result(ctx):
             while not ctx.get(dut.o.valid):
                 await ctx.tick()
-            mag = ctx.get(dut.o.payload.sample.magnitude).as_float()
-            phase = ctx.get(dut.o.payload.sample.phase).as_float()
+            mag = ctx.get(dut.o.payload.magnitude).as_float()
+            phase = ctx.get(dut.o.payload.phase).as_float()
             ctx.set(dut.o.ready, 1)
             await ctx.tick()
             ctx.set(dut.o.ready, 0)
