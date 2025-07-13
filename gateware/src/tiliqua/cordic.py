@@ -15,7 +15,6 @@ from amaranth_future import fixed
 from math import atan, pi
 
 from tiliqua.complex import CQ, Polar
-from tiliqua.block import Block
 
 class RectToPolarCordic(wiring.Component):
 
@@ -37,9 +36,9 @@ class RectToPolarCordic(wiring.Component):
 
     Members
     -------
-    i : :py:`In(stream.Signature(Block(CQ(shape))))`
+    i : :py:`In(stream.Signature(CQ(shape)))`
         Stream of incoming complex numbers in rectangular coordinates.
-    o : :py:`Out(stream.Signature(Block(Polar(self.internal_shape))))`
+    o : :py:`Out(stream.Signature(Polar(self.internal_shape)))`
         Stream of outgoing complex numbers in polar coordinates.
     """
 
@@ -67,10 +66,8 @@ class RectToPolarCordic(wiring.Component):
         self.magnitude_correction = magnitude_correction
 
         super().__init__({
-            # TODO: Block wrapper should be lifted into dedicated component, as this
-            # core doesn't really need to care about block positions!
-            "i": In(stream.Signature(Block(CQ(shape)))),
-            "o": Out(stream.Signature(Block(Polar(self.internal_shape)))),
+            "i": In(stream.Signature(CQ(shape))),
+            "o": Out(stream.Signature(Polar(self.internal_shape))),
         })
 
     def elaborate(self, platform) -> Module:
@@ -122,14 +119,13 @@ class RectToPolarCordic(wiring.Component):
         #
 
         quadrant_adjust = Signal(self.internal_shape)
-        m.d.comb += self.o.payload.sample.phase.eq(z + quadrant_adjust),
-        m.d.comb += self.o.payload.first.eq(in_latch.first),
+        m.d.comb += self.o.payload.phase.eq(z + quadrant_adjust),
         if self.magnitude_correction:
             # Scale magnitude by 1/K to compensate for CORDIC gain
-            m.d.comb += self.o.payload.sample.magnitude.eq(
+            m.d.comb += self.o.payload.magnitude.eq(
                 x * fixed.Const(1.0/self.K, self.internal_shape))
         else:
-            m.d.comb += self.o.payload.sample.magnitude.eq(x)
+            m.d.comb += self.o.payload.magnitude.eq(x)
 
         with m.FSM():
             with m.State("IDLE"):
@@ -139,7 +135,7 @@ class RectToPolarCordic(wiring.Component):
                     m.next = "QUADRANT"
 
             #
-            # Determine which of 4 quadrants this sample is in
+            # Determine which of 4 quadrants this is in
             #
 
             with m.State("QUADRANT"):
@@ -148,17 +144,17 @@ class RectToPolarCordic(wiring.Component):
                     iteration.eq(0),
                     quadrant_adjust.eq(0)
                 ]
-                with m.If((in_latch.sample.real >= 0)):  # Q1, Q4
+                with m.If((in_latch.real >= 0)):  # Q1, Q4
                     m.d.sync += [
-                        x.eq(in_latch.sample.real),
-                        y.eq(in_latch.sample.imag),
+                        x.eq(in_latch.real),
+                        y.eq(in_latch.imag),
                     ]
                 with m.Else():
                     m.d.sync += [
-                        x.eq(-in_latch.sample.real),
-                        y.eq(-in_latch.sample.imag),
+                        x.eq(-in_latch.real),
+                        y.eq(-in_latch.imag),
                     ]
-                    with m.If(in_latch.sample.imag >= 0):
+                    with m.If(in_latch.imag >= 0):
                         m.d.sync += quadrant_adjust.eq(fixed.Const(1.0))  # Q2
                     with m.Else():
                         m.d.sync += quadrant_adjust.eq(fixed.Const(-1.0)) # Q3

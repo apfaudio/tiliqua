@@ -6,15 +6,15 @@
 """Spectral processing components."""
 
 from amaranth import *
-from amaranth.lib import wiring, data, stream, memory
+from amaranth.lib import wiring, data, stream, memory, fifo
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
 
-from math import atan, pi
+from math import atan, pi, log2
 
-from tiliqua import dsp, mac, cordic
+from tiliqua import dsp, mac, cordic, block
 from tiliqua.complex import CQ, connect_magnitude_to_sq
 from tiliqua.block import Block
 
@@ -176,14 +176,15 @@ class SpectralEnvelope(wiring.Component):
 
     def elaborate(self, platform) -> Module:
         m = Module()
-        m.submodules.rect_to_polar = rect_to_polar = cordic.RectToPolarCordic(
-                self.shape, magnitude_correction=False)
+        m.submodules.rect_to_polar = rect_to_polar = block.WrapCore(cordic.RectToPolarCordic(
+                self.shape, magnitude_correction=False))
         m.submodules.block_lpf = block_lpf = BlockLPF(
                 self.shape, self.sz)
         wiring.connect(m, wiring.flipped(self.i), rect_to_polar.i)
         connect_magnitude_to_sq(m, rect_to_polar.o, block_lpf.i)
         wiring.connect(m, block_lpf.o, wiring.flipped(self.o))
         return m
+
 
 class SpectralCrossSynthesis(wiring.Component):
 
