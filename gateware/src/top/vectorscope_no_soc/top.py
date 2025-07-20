@@ -108,6 +108,13 @@ class Spectro(wiring.Component):
             with m.Else():
                 m.d.sync += f_axis.eq(f_axis+(fixed.Const(1)>>exact_log2(fftsz)))
 
+        t_axis = Signal(ASQ, init=fixed.Const(-0.5, shape=ASQ))
+        with m.If(log.o.valid & log.o.ready):
+            with m.If(t_axis > fixed.Const(0.5)):
+                m.d.sync += t_axis.eq(fixed.Const(-0.5))
+            with m.Elif(log.o.payload.first):
+                m.d.sync += t_axis.eq(t_axis+fixed.Const(0.0125))
+
         # Pen lift when we get to the mirrored half of the spectrum.
         with m.If(f_axis < fixed.Const(0)):
             m.d.comb += merge4.i[2].payload.eq(ASQ.max())
@@ -115,10 +122,9 @@ class Spectro(wiring.Component):
             m.d.comb += merge4.i[2].payload.eq(0)
 
         m.d.comb += [
-            # Connect log magnitude to ch0 output (offset to center)
-            merge4.i[0].payload.eq(log.o.payload.sample - fixed.Const(0.25)),
-            merge4.i[0].valid.eq(log.o.valid),
-            log.o.ready.eq(merge4.i[0].ready),
+            # Connect frequency bin / index to ch1 output (offset to center)
+            merge4.i[0].valid.eq(1),
+            merge4.i[0].payload.eq(t_axis),
 
             # Connect frequency bin / index to ch1 output (offset to center)
             merge4.i[1].valid.eq(1),
@@ -126,11 +132,15 @@ class Spectro(wiring.Component):
 
             # Pen lift always valid
             merge4.i[2].valid.eq(1),
+
+            # Connect log magnitude to ch3 output (offset to center)
+            merge4.i[3].payload.eq((log.o.payload.sample - fixed.Const(0.25))>>1),
+            merge4.i[3].valid.eq(log.o.valid),
+            log.o.ready.eq(merge4.i[3].ready),
         ]
 
         # Unused channels
         split4.wire_ready(m, [1, 2, 3])
-        merge4.wire_valid(m, [3])
 
         return m
 

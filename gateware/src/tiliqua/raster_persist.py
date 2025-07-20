@@ -33,7 +33,7 @@ class Persistance(wiring.Component):
     """
 
     def __init__(self, *, fb: DMAFramebuffer,
-                 fifo_depth=32, holdoff_default=256):
+                 fifo_depth=32, holdoff_default=1024):
 
         self.fb = fb
         self.fifo_depth = fifo_depth
