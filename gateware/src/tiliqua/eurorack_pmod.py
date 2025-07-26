@@ -939,18 +939,18 @@ class EurorackPmod(wiring.Component):
             # soft reset: if flip-flop output was 1, it stays 1
             #
 
-             # soft reset by default
-             pdn_cnt = Signal(unsigned(32), init=(1<<20))
-             m.d.comb += [
-                 self.pins.pdn_clk.eq(pdn_cnt[19]),
-                 self.pins.pdn_d  .eq(pdn_cnt[20]), # 2b11 @ ~35msec
-             ]
-             with m.If(~(self.pins.pdn_d & self.pins.pdn_clk)):
-                 m.d.sync += pdn_cnt.eq(pdn_cnt+1)
-             with m.Elif(self.hard_reset):
-                 # hard reset only if requested
-                 m.d.sync += pdn_cnt.eq(0)
-                 m.d.comb += reset_i2c_master.eq(1)
+            # soft reset by default
+            pdn_cnt = Signal(unsigned(32), init=(1<<20))
+            m.d.comb += [
+                self.pins.pdn_clk.eq(pdn_cnt[19]),
+                self.pins.pdn_d  .eq(pdn_cnt[20]), # 2b11 @ ~35msec
+            ]
+            with m.If(~(self.pins.pdn_d & self.pins.pdn_clk)):
+                m.d.sync += pdn_cnt.eq(pdn_cnt+1)
+            with m.Elif(self.hard_reset):
+                # hard reset only if requested
+                m.d.sync += pdn_cnt.eq(0)
+                m.d.comb += reset_i2c_master.eq(1)
         elif pmod_rev == EurorackPmodRevision.R35:
             # HW R5 / PMOD R3.5 mute / clocking.
             #
