@@ -415,7 +415,8 @@ fn main() -> ! {
 
     let mut opts = Opts::default();
 
-    let cal_default = DefaultCalibrationConstants::from_array(&PMOD_DEFAULT_CAL);
+    let cal_default = DefaultCalibrationConstants::from_array(
+        &PMOD_DEFAULT_CAL, PMOD_FRACTIONAL_BITS);
     if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
         push_to_opts(&cal_constants, &mut opts, &cal_default);
         write!(startup_report, "PASS: load calibration from EEPROM").ok();
