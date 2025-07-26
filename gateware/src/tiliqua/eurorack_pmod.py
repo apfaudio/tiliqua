@@ -628,7 +628,8 @@ class I2CMaster(wiring.Component):
         # mapping from sensor index (IC pin) to logical index (top to bottom
         # on the physical jacks in order).
         touch_order = Signal(data.ArrayLayout(unsigned(4), self.N_SENSORS))
-        sensor_order = TiliquaRevision.from_platform(platform).pmod_rev().touch_order()
+        pmod_rev = TiliquaRevision.from_platform(platform).pmod_rev()
+        sensor_order = pmod_rev.touch_order()
         for n in range(self.N_SENSORS):
             m.d.comb += touch_order[n].eq(sensor_order[n])
 
@@ -648,7 +649,7 @@ class I2CMaster(wiring.Component):
         codec_reg00 = Signal(8)
         codec_reg14 = Signal(8)
 
-        if EurorackPmodRevision.R33 == TiliquaRevision.from_platform(platform).pmod_rev():
+        if pmod_rev == EurorackPmodRevision.R33:
             # R3.3 frontend soft mute sequencing
             # CODEC DAC soft mute sequencing
             with m.If(self.codec_mute):
@@ -663,10 +664,12 @@ class I2CMaster(wiring.Component):
                 m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] & 0b11111110)
             with m.Else():
                 m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
-        else:
+        elif pmod_rev == EurorackPmodRevision.R35:
             # Pmod R3.5 has an external post-mute so doesn't need to toggle these registers.
             m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] & 0b11001111)
             m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
+        else:
+            raise ValueError(f"Unsupported pmod_rev: {pmod_rev}")
 
         startup_delay = Signal(32)
 
@@ -907,7 +910,8 @@ class EurorackPmod(wiring.Component):
                 m.d.sync += i2c_master.led[n].eq(self.led[n]),
 
 
-        if EurorackPmodRevision.R33 == TiliquaRevision.from_platform(platform).pmod_rev():
+        pmod_rev = TiliquaRevision.from_platform(platform).pmod_rev()
+        if pmod_rev == EurorackPmodRevision.R33:
             #
             # HW R4 / PMOD R3.3: CODEC PDN / FLIP-FLOP CLOCKING (HW R5 is different!)
             #
@@ -947,11 +951,7 @@ class EurorackPmod(wiring.Component):
                  # hard reset only if requested
                  m.d.sync += pdn_cnt.eq(0)
                  m.d.comb += reset_i2c_master.eq(1)
-             with m.If(self.codec_mute):
-                 m.d.comb += self.pins.pdn_d.eq(0)
-             with m.Else():
-                 m.d.comb += self.pins.pdn_d.eq(1)
-        else:
+        elif pmod_rev == EurorackPmodRevision.R35:
             # HW R5 / PMOD R3.5 mute / clocking.
             #
             # Latest output stage has a hardware soft mute that is always
@@ -971,5 +971,8 @@ class EurorackPmod(wiring.Component):
                 m.d.comb += self.pins.pdn_d.eq(0)
             with m.Else():
                 m.d.comb += self.pins.pdn_d.eq(1)
+        else:
+            raise ValueError(f"Unsupported pmod_rev: {pmod_rev}")
+
 
         return m
