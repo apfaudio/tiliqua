@@ -18,7 +18,7 @@ from amaranth.utils             import exact_log2
 from amaranth_soc               import gpio
 
 from tiliqua                    import i2c
-from tiliqua.tiliqua_platform   import TiliquaRevision
+from tiliqua.tiliqua_platform   import TiliquaRevision, EurorackPmodRevision
 from vendor                     import i2c as vendor_i2c
 
 from amaranth_future            import fixed
@@ -644,13 +644,29 @@ class I2CMaster(wiring.Component):
         #
         mute_count  = Signal(8)
 
-        # CODEC DAC soft mute sequencing
-        codec_reg14 = Signal(8)
-        m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] & 0b11001111)
-
-        # CODEC RSTN sequencing
+        # CODEC soft mute registers
         codec_reg00 = Signal(8)
-        m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
+        codec_reg14 = Signal(8)
+
+        if EurorackPmodRevision.R33 == TiliquaRevision.from_platform(platform).pmod_rev():
+            # R3.3 frontend soft mute sequencing
+            # CODEC DAC soft mute sequencing
+            with m.If(self.codec_mute):
+                # DA1MUTE / DA2MUTE soft mute ON
+                m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] | 0b00110000)
+            with m.Else():
+                # DA1MUTE / DA2MUTE soft mute OFF
+                m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] & 0b11001111)
+            # CODEC RSTN sequencing
+            # Only assert if we know soft mute has been asserted for a while.
+            with m.If(mute_count == 0xff):
+                m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] & 0b11111110)
+            with m.Else():
+                m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
+        else:
+            # Pmod R3.5 has an external post-mute so doesn't need to toggle these registers.
+            m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] & 0b11001111)
+            m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
 
         startup_delay = Signal(32)
 
@@ -890,42 +906,70 @@ class EurorackPmod(wiring.Component):
             with m.Else():
                 m.d.sync += i2c_master.led[n].eq(self.led[n]),
 
-        #
-        # CODEC PDN / FLIP-FLOP CLOCKING
-        #
-        # `eurorack-pmod` PCBA has a 'PDN' pin, which drives the CODEC PDN
-        # pin. Between the ECP5 and the PDN pin is a flip-flop, such that
-        # FPGA bitstream reconfiguration does not imply PDN toggling
-        # (which causes a CODEC hard reset). Instead, for pop-free bitstream
-        # switching (only on mobo R3+), we can sequence the flip-flop inputs
-        # as needed.
-        #
-        # Note: CODEC RSTN must be asserted (held in reset) across the
-        # FPGA reconfiguration. This is performed by `self.codec_mute`.
-        #
-        # TIMING
-        # ------
-        #
-        # PDN_D   : ____________------------
-        # PDN_CLK : ______------______------
-        #           |           |
-        #           ^ hard reset|
-        #                       |
-        #                       ^ soft reset
-        #
-        # hard reset: ensures flip-flop output is driven 0->1
-        # soft reset: if flip-flop output was 1, it stays 1
-        #
 
-        # soft reset by default
-        pdn_cnt = Signal(unsigned(32), init=(1<<20))
-        m.d.sync += pdn_cnt.eq(pdn_cnt+1)
-        m.d.comb += [
-            self.pins.pdn_clk.eq(pdn_cnt[5]),
-        ]
-        with m.If(self.codec_mute):
-            m.d.comb += self.pins.pdn_d.eq(0)
-        with m.Else():
-            m.d.comb += self.pins.pdn_d.eq(1)
+        if EurorackPmodRevision.R33 == TiliquaRevision.from_platform(platform).pmod_rev():
+            #
+            # HW R4 / PMOD R3.3: CODEC PDN / FLIP-FLOP CLOCKING (HW R5 is different!)
+            #
+            # `eurorack-pmod` PCBA has a 'PDN' pin, which drives the CODEC PDN
+            # pin. Between the ECP5 and the PDN pin is a flip-flop, such that
+            # FPGA bitstream reconfiguration does not imply PDN toggling
+            # (which causes a CODEC hard reset). Instead, for pop-free bitstream
+            # switching (only on mobo R3+), we can sequence the flip-flop inputs
+            # as needed.
+            #
+            # Note: CODEC RSTN must be asserted (held in reset) across the
+            # FPGA reconfiguration. This is performed by `self.codec_mute`.
+            #
+            # TIMING
+            # ------
+            #
+            # PDN_D   : ____________------------
+            # PDN_CLK : ______------______------
+            #           |           |
+            #           ^ hard reset|
+            #                       |
+            #                       ^ soft reset
+            #
+            # hard reset: ensures flip-flop output is driven 0->1
+            # soft reset: if flip-flop output was 1, it stays 1
+            #
+
+             # soft reset by default
+             pdn_cnt = Signal(unsigned(32), init=(1<<20))
+             m.d.comb += [
+                 self.pins.pdn_clk.eq(pdn_cnt[19]),
+                 self.pins.pdn_d  .eq(pdn_cnt[20]), # 2b11 @ ~35msec
+             ]
+             with m.If(~(self.pins.pdn_d & self.pins.pdn_clk)):
+                 m.d.sync += pdn_cnt.eq(pdn_cnt+1)
+             with m.Elif(self.hard_reset):
+                 # hard reset only if requested
+                 m.d.sync += pdn_cnt.eq(0)
+                 m.d.comb += reset_i2c_master.eq(1)
+             with m.If(self.codec_mute):
+                 m.d.comb += self.pins.pdn_d.eq(0)
+             with m.Else():
+                 m.d.comb += self.pins.pdn_d.eq(1)
+        else:
+            # HW R5 / PMOD R3.5 mute / clocking.
+            #
+            # Latest output stage has a hardware soft mute that is always
+            # enabled by default, so we can simply just pass through
+            # codec_mute to this and don't have to worry about special
+            # flip-flop clocking.
+            #
+            # Here we just toggle the flip flop CLK so that pdn_d is always
+            # ~ equal to codec_mute, delayed a bit.
+            #
+            pdn_cnt = Signal(unsigned(32), init=(1<<20))
+            m.d.sync += pdn_cnt.eq(pdn_cnt+1)
+            m.d.comb += [
+                self.pins.pdn_clk.eq(pdn_cnt[5]), # constant toggling
+            ]
+            with m.If(self.codec_mute):
+                m.d.comb += self.pins.pdn_d.eq(0)
+            with m.Else():
+                m.d.comb += self.pins.pdn_d.eq(1)
 
         return m
