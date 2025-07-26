@@ -227,8 +227,6 @@ fn edid_test(s: &mut ReportString, i2cdev: &mut I2c0) {
         i2cdev.transaction(EDID_ADDR, &mut [Operation::Write(&[(i*8) as u8]),
                                             Operation::Read(&mut edid[i*8..i*8+8])]).ok();
     }
-
-    i2cdev.transaction(0x17, &mut [Operation::Write(&[1u8, 2u8, 3u8, 4u8, 5u8])]).ok();
     let edid_parsed = edid::Edid::parse(&edid);
     match edid_parsed {
         Ok(edid::Edid { header, descriptors, .. }) => {
