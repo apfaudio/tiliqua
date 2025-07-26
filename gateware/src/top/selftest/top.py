@@ -17,8 +17,6 @@ from amaranth.lib                import wiring
 from tiliqua.tiliqua_soc         import TiliquaSoc
 from tiliqua.cli                 import top_level_cli
 
-from luna.gateware.applets.speed_test import USBSpeedTestDevice, VENDOR_ID, PRODUCT_ID
-
 class SelftestSoc(TiliquaSoc):
     brief = "Test & calibration utilities"
 
@@ -71,11 +69,6 @@ class SelftestSoc(TiliquaSoc):
         m.submodules += [self.gpio0, self.gpio1]
 
         m.submodules += super().elaborate(platform)
-
-        m.submodules += USBSpeedTestDevice(generate_clocks=False,
-                                           phy_name=platform.default_usb_connection,
-                                           vid=VENDOR_ID,
-                                           pid=PRODUCT_ID)
 
         return m
 
