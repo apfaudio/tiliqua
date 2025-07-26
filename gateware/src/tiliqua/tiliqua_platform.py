@@ -540,7 +540,7 @@ class EurorackPmodRevision(str, enum.Enum):
 
     def touch_order(self):
         return {
-            self.R33: [0, 1, 2, 3, 4, 5, 6, 7],
+            self.R33: [0, 1, 2, 3, 7, 6, 5, 4],
             self.R35: [5, 7, 8, 9, 10, 11, 12, 13]
         }[self]
 
@@ -572,6 +572,15 @@ class EurorackPmodRevision(str, enum.Enum):
             self.R33:    default_cal_r33,
             self.R35:    default_cal_r35,
         }[self]
+
+    def default_calibration_rs(self):
+        cal = self.default_calibration()
+        return "[{}, {}, {}, {}]".format(
+            cal[0][0],
+            cal[0][1],
+            cal[4][0],
+            cal[4][1],
+        )
 
 class TiliquaRevision(str, enum.Enum):
     R2    = "r2"

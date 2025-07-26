@@ -423,8 +423,9 @@ class TiliquaSoc(Component):
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")
             f.write(f"pub const BOOTINFO_SZ_BYTES: usize = 4096;\n")
             f.write(f"pub const BOOTINFO_BASE: usize     = PSRAM_BASE + PSRAM_SZ_BYTES - BOOTINFO_SZ_BYTES;\n")
-            sensor_order = TiliquaRevision.from_platform(self.platform_class).pmod_rev().touch_order()
-            f.write(f"pub const TOUCH_SENSOR_ORDER: [u8; 8] = {sensor_order};\n")
+            pmod_rev = TiliquaRevision.from_platform(self.platform_class).pmod_rev()
+            f.write(f"pub const TOUCH_SENSOR_ORDER: [u8; 8] = {pmod_rev.touch_order()};\n")
+            f.write(f"pub const PMOD_DEFAULT_CAL: [f32; 4] = {pmod_rev.default_calibration_rs()};\n")
             f.write("// Extra constants specified by an SoC subclass:\n")
             for l in self.extra_rust_constants:
                 f.write(l)

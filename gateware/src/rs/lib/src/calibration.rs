@@ -9,6 +9,14 @@ use heapless::String;
 use core::fmt::Write;
 
 #[derive(Debug, PartialEq)]
+pub struct DefaultCalibrationConstants {
+    pub adc_scale: f32,
+    pub adc_zero:  f32,
+    pub dac_scale: f32,
+    pub dac_zero:  f32,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct CalibrationConstants {
     pub adc_scale: [i32; 4],
     pub adc_zero:  [i32; 4],
@@ -49,17 +57,24 @@ pub fn f32tofx18(x: f32) -> i32 {
     (x * 32768.0f32) as i32
 }
 
+impl DefaultCalibrationConstants {
+    pub fn from_array(c: &[f32; 4]) -> Self {
+        DefaultCalibrationConstants {
+            adc_scale: c[0],
+            adc_zero:  c[1],
+            dac_scale: c[2],
+            dac_zero:  c[3],
+        }
+    }
+}
+
 impl CalibrationConstants {
-    pub fn default() -> Self {
-        let adc_dscale = -40894i32;
-        let adc_dzero  = 0i32;
-        let dac_dscale = 29491i32;
-        let dac_dzero  = 0i32;
+    pub fn from_defaults(d: &DefaultCalibrationConstants) -> Self {
         let mut result = Self {
-            adc_scale: [adc_dscale; 4],
-            adc_zero:  [adc_dzero;  4],
-            dac_scale: [dac_dscale; 4],
-            dac_zero:  [dac_dzero;  4],
+            adc_scale: [f32tofx18(d.adc_scale); 4],
+            adc_zero:  [f32tofx18(d.adc_zero);  4],
+            dac_scale: [f32tofx18(d.dac_scale); 4],
+            dac_zero:  [f32tofx18(d.dac_zero);  4],
             checksum:  0i32,
         };
         result.checksum = result.compute_checksum();
@@ -135,11 +150,11 @@ impl CalibrationConstants {
         Pmod: EurorackPmod
     {
         if let Some(cal_constants) = Self::from_eeprom(i2cdev) {
-            info!("calibration: looks good!");
+            info!("audio/calibration: looks good! switch to it.");
             cal_constants.write_to_pmod(pmod);
         } else {
-            info!("calibration: invalid! falling back to default");
-            CalibrationConstants::default().write_to_pmod(pmod);
+            info!("audio/calibration: invalid! using default.");
+            // Defaults assumed already programmed in by gateware.
         }
     }
 
@@ -187,23 +202,21 @@ impl CalibrationConstants {
     }
 
     // See comment on 'TweakableConstants' for the purpose of this.
-    fn adc_default_gamma_delta() -> (f32, f32) {
-        let defaults = Self::default();
-        let adc_gamma_default  = 1.0f32/fx18tof32(defaults.adc_scale[0]);
-        let adc_delta_default  = -fx18tof32(defaults.adc_zero[0])*adc_gamma_default;
+    fn adc_default_gamma_delta(d: &DefaultCalibrationConstants) -> (f32, f32) {
+        let adc_gamma_default  = 1.0f32/d.adc_scale;
+        let adc_delta_default  = -d.adc_zero*adc_gamma_default;
         (adc_gamma_default, adc_delta_default)
     }
 
-    pub fn from_tweakable(c: TweakableConstants) -> Self {
-        let defaults   = Self::default();
-        let mut result = Self::default();
+    pub fn from_tweakable(c: TweakableConstants, d: &DefaultCalibrationConstants) -> Self {
+        let mut result = Self::from_defaults(d);
         // DAC
         for ch in 0..4usize {
-            result.dac_scale[ch] = defaults.dac_scale[0] + 4*c.dac_scale[ch] as i32;
-            result.dac_zero[ch]  = defaults.dac_zero[0]  + 2*c.dac_zero[ch] as i32; // FIXME 2x/4x
+            result.dac_scale[ch] = f32tofx18(d.dac_scale) + 4*c.dac_scale[ch] as i32;
+            result.dac_zero[ch]  = f32tofx18(d.dac_zero)  + 2*c.dac_zero[ch] as i32; // FIXME 2x/4x
         }
         // ADC
-        let (adc_gd, adc_dd) = CalibrationConstants::adc_default_gamma_delta();
+        let (adc_gd, adc_dd) = CalibrationConstants::adc_default_gamma_delta(d);
         for ch in 0..4usize {
             let adc_gamma      = adc_gd + 0.00010*(c.adc_scale[ch] as f32);
             let adc_delta      = adc_dd + 0.00005*(c.adc_zero[ch] as f32);
@@ -213,20 +226,19 @@ impl CalibrationConstants {
         result
     }
 
-    pub fn to_tweakable(&self) -> TweakableConstants {
+    pub fn to_tweakable(&self, d: &DefaultCalibrationConstants) -> TweakableConstants {
         let mut adc_scale = [0i16; 4];
         let mut adc_zero  = [0i16; 4];
         let mut dac_scale = [0i16; 4];
         let mut dac_zero  = [0i16; 4];
-        let defaults = Self::default();
-        let (adc_gd, adc_dd) = CalibrationConstants::adc_default_gamma_delta();
+        let (adc_gd, adc_dd) = CalibrationConstants::adc_default_gamma_delta(d);
         for ch in 0..4usize {
             let adc_gamma = 1.0f32/fx18tof32(self.adc_scale[ch]);
             adc_scale[ch] = ((adc_gamma - adc_gd) / 0.00010) as i16;
             let adc_delta = -fx18tof32(self.adc_zero[ch])*adc_gamma;
             adc_zero[ch]  = ((adc_delta - adc_dd) / 0.00005) as i16;
-            dac_scale[ch] = ((self.dac_scale[ch] - defaults.dac_scale[0]) / 4) as i16;
-            dac_zero[ch]  = ((self.dac_zero[ch]  -  defaults.dac_zero[0]) / 2) as i16;
+            dac_scale[ch] = ((self.dac_scale[ch] - f32tofx18(d.dac_scale)) / 4) as i16;
+            dac_zero[ch]  = ((self.dac_zero[ch]  - f32tofx18(d.dac_zero)) / 2) as i16;
         }
         TweakableConstants {
             adc_scale,
@@ -244,18 +256,25 @@ mod tests {
     #[test]
     pub fn tweakable_conversion() {
         // Verify TweakableConstants transformation reverses correctly.
-        let mut defaults = CalibrationConstants::default();
-        defaults.adc_scale[0] += 500;
-        defaults.adc_zero[0]  += 250;
-        defaults.dac_scale[0] -= 100;
-        defaults.dac_zero[0]  += 50;
-        let converted = CalibrationConstants::from_tweakable(defaults.to_tweakable());
+        let defaults_r33 = DefaultCalibrationConstants {
+            adc_scale: -1.158,
+            adc_zero:  0.008,
+            dac_scale: 0.97,
+            dac_zero:  0.03,
+        };
+        let mut test = CalibrationConstants::from_defaults(&defaults_r33);
+        test.adc_scale[0] += 500;
+        test.adc_zero[0]  += 250;
+        test.dac_scale[0] -= 100;
+        test.dac_zero[0]  += 50;
+        let twk = test.to_tweakable(&defaults_r33);
+        let converted = CalibrationConstants::from_tweakable(twk, &defaults_r33);
         let tol = |x: i32, y: i32, t: i32| (x-y).abs() <= t;
         for ch in 0..4 {
-            assert!(tol(defaults.adc_scale[ch], converted.adc_scale[ch], 1));
-            assert!(tol(defaults.adc_zero[ch], converted.adc_zero[ch], 1));
-            assert!(tol(defaults.dac_scale[ch], converted.dac_scale[ch], 1));
-            assert!(tol(defaults.dac_zero[ch], converted.dac_zero[ch], 1));
+            assert!(tol(test.adc_scale[ch], converted.adc_scale[ch], 1));
+            assert!(tol(test.adc_zero[ch], converted.adc_zero[ch], 1));
+            assert!(tol(test.dac_scale[ch], converted.dac_scale[ch], 1));
+            assert!(tol(test.dac_zero[ch], converted.dac_zero[ch], 1));
         }
     }
 }
