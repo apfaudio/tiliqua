@@ -10,6 +10,7 @@ pub trait EurorackPmod {
     fn write_calibration_constant(&mut self, ch: u8, a: i32, b: i32);
     fn mute(&mut self, mute: bool);
     fn hard_reset(&mut self);
+    fn f_bits(&self) -> u8;
 }
 
 #[macro_export]
@@ -116,6 +117,10 @@ macro_rules! impl_eurorack_pmod {
 
                 fn hard_reset(&mut self) {
                     self.registers.flags().write(|w| w.hard_reset().bit(true) );
+                }
+
+                fn f_bits(&self) -> u8 {
+                    self.registers.info().read().f_bits().bits()
                 }
             }
         )+

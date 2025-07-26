@@ -37,6 +37,9 @@ class Peripheral(wiring.Component):
     class JackReg(csr.Register, access="r"):
         jack: csr.Field(csr.action.R, unsigned(8))
 
+    class InfoReg(csr.Register, access="r"):
+        f_bits: csr.Field(csr.action.R, unsigned(8))
+
     class FlagsReg(csr.Register, access="w"):
         mute: csr.Field(csr.action.W, unsigned(1))
         hard_reset: csr.Field(csr.action.W, unsigned(1))
@@ -76,6 +79,7 @@ class Peripheral(wiring.Component):
 
         # I2C peripheral data
         self._jack = regs.add("jack", self.JackReg())
+        self._info = regs.add("info", self.InfoReg())
 
         self._flags = regs.add("flags", self.FlagsReg())
 
@@ -96,6 +100,7 @@ class Peripheral(wiring.Component):
         m.d.comb += [
             self._touch_err.f.value.r_data.eq(self.pmod.touch_err),
             self._jack.f.jack.r_data.eq(self.pmod.jack),
+            self._info.f.f_bits.r_data.eq(self.pmod.i_cal.payload[0].shape().f_bits),
         ]
 
         mute_reg = Signal(init=1)
