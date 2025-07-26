@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        hw_rev: ["r2", "r3", "r4"]
+        hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        hw_rev: ["r2", "r3", "r4"]
+        hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
@@ -89,7 +89,7 @@ jobs:
             cmd: dsp sim --dsp-core psram_diffuser
           - name: vectorscope-sim
             cmd: vectorscope_no_soc sim --fs-192khz
-        hw_rev: ["r2", "r3", "r4"]
+        hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4

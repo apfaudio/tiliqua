@@ -1,12 +1,33 @@
 Changelist
 ##########
 
-There were some Tiliqua hardware released before the production R4 version. This page serves as a brief history of the differences between these versions, as well as any changes in post-production batches.
+There were some Tiliqua hardware released before the production R5 version. This page serves as a brief history of the differences between these versions, as well as any changes in post-production batches.
+
+Tiliqua R5.1
+============
+
+First production hardware release.
+
+    - **SoldierCrab R3** FPGA SoM (LFE5U-25F, 1.8V 32MByte oSPIRAM)
+    - **Tiliqua R5** motherboard and front panel.
+    - **eurorack-pmod R3.5** audio interface.
+
+R5.1 changes (compared to R4)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+    - Add DVI redriver IC between ECP5 and video port (PI3HDX511) - improves signal integrity with longer cables, improves EMC performance.
+    - Add extra I2C switch between GPDI and internal I2C bus, so the GPDI level shifter can be decoupled from the internal I2C bus. Remove ``MOBO_LED_EN`` and re-use the pin for this switch:``GPDI_DDC_EN``.
+    - Bump +12V ingress fuse from 350mA to 500mA to support the extra redriver current draw.
+    - Swap +3V3 supply from an LDO to an SMPS to reduce power dissipation.
+    - Update audio board from R3.3 to R3.5, which has improve DC tracking, noise, and soft-mute performance.
+    - Add 33R series resistors on all expansion header pins.
+    - Add more ESD protection to USB1/USB2 pins.
+    - Pinswaps: see ``tiliqua_platform.py`` in the main repository.
 
 Tiliqua R4
 ==========
 
-First production hardware release.
+Production prototype that some beta testers have. Only 15 were produced.
 
     - **SoldierCrab R3** FPGA SoM (LFE5U-25F, 1.8V 32MByte oSPIRAM)
     - **Tiliqua R4** motherboard and front panel.
