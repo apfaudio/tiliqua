@@ -533,6 +533,46 @@ class TiliquaR5SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
         *_TiliquaR5Mobo.connectors
     ]
 
+
+class EurorackPmodRevision(str, enum.Enum):
+    R33    = "r3.3"
+    R35    = "r3.5"
+
+    def touch_order(self):
+        return {
+            self.R33: [0, 1, 2, 3, 4, 5, 6, 7],
+            self.R35: [5, 7, 8, 9, 10, 11, 12, 13]
+        }[self]
+
+    def default_calibration(self):
+        # default calibration constants based on averaging some R3.3 units
+        # These should be accurate to +/- 100mV or so on a fresh unit without
+        # requiring any initial calibration.
+        default_cal_r33 = [
+            [-1.158, 0.008], # in (mul, add)
+            [-1.158, 0.008],
+            [-1.158, 0.008],
+            [-1.158, 0.008],
+            [ 0.97,  0.03 ], # out (mul, add)
+            [ 0.97,  0.03 ],
+            [ 0.97,  0.03 ],
+            [ 0.97,  0.03 ],
+        ]
+        default_cal_r35 = [
+            [-1.248, 0.0], # in (mul, add)
+            [-1.248, 0.0],
+            [-1.248, 0.0],
+            [-1.248, 0.0],
+            [ 0.90,  0.0], # out (mul, add)
+            [ 0.90,  0.0],
+            [ 0.90,  0.0],
+            [ 0.90,  0.0],
+        ]
+        return {
+            self.R33:    default_cal_r33,
+            self.R35:    default_cal_r35,
+        }[self]
+
 class TiliquaRevision(str, enum.Enum):
     R2    = "r2"
     R2SC3 = "r2sc3"
@@ -573,15 +613,13 @@ class TiliquaRevision(str, enum.Enum):
             TiliquaRevision.R5:    TiliquaR5SC3Platform,
         }[self]
 
-    def touch_sensor_order(self):
-        order_eurorack_pmod_r33 = [0, 1, 2, 3, 4, 5, 6, 7]
-        order_eurorack_pmod_r35 = [5, 7, 8, 9, 10, 11, 12, 13]
+    def pmod_rev(self):
         return {
-            TiliquaRevision.R2:    order_eurorack_pmod_r33,
-            TiliquaRevision.R2SC3: order_eurorack_pmod_r33,
-            TiliquaRevision.R3:    order_eurorack_pmod_r33,
-            TiliquaRevision.R4:    order_eurorack_pmod_r33,
-            TiliquaRevision.R5:    order_eurorack_pmod_r35,
+            TiliquaRevision.R2:    EurorackPmodRevision.R33,
+            TiliquaRevision.R2SC3: EurorackPmodRevision.R33,
+            TiliquaRevision.R3:    EurorackPmodRevision.R33,
+            TiliquaRevision.R4:    EurorackPmodRevision.R33,
+            TiliquaRevision.R5:    EurorackPmodRevision.R35,
         }[self]
 
 class RebootProvider(wiring.Component):

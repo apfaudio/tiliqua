@@ -285,20 +285,6 @@ class I2SCalibrator(wiring.Component):
         "channel": unsigned(exact_log2(I2STDM.N_CHANNELS*2))
         })))
 
-    # default calibration constants based on averaging some R3.3 units
-    # These should be accurate to +/- 100mV or so on a fresh unit without
-    # requiring any initial calibration.
-    DEFAULT_CALIBRATION_R33 = [
-        [-1.248, 0.0], # in (mul, add)
-        [-1.248, 0.0],
-        [-1.248, 0.0],
-        [-1.248, 0.0],
-        [ 0.90,  0.0], # out (mul, add)
-        [ 0.90,  0.0],
-        [ 0.90,  0.0],
-        [ 0.90,  0.0],
-    ]
-
     def __init__(self, stream_domain="sync", fifo_depth=4):
         self.stream_domain = stream_domain
         self.fifo_depth = fifo_depth
@@ -313,11 +299,12 @@ class I2SCalibrator(wiring.Component):
         #
 
         self.ctype = fixed.SQ(3, ASQ.f_bits)
+        default_cal = TiliquaRevision.from_platform(platform).pmod_rev().default_calibration()
         cal_mem = Memory(shape=data.ArrayLayout(self.ctype, 2),
                          depth=I2STDM.N_CHANNELS*2,
                          init=[
                             [fixed.Const(mul, shape=self.ctype), fixed.Const(add, shape=self.ctype)]
-                            for mul, add in self.DEFAULT_CALIBRATION_R33
+                            for mul, add in default_cal
                          ])
         m.submodules.cal_mem = cal_mem # WARN: accessed in 'audio' domain
         cal_read = cal_mem.read_port(domain="comb")
@@ -641,7 +628,7 @@ class I2CMaster(wiring.Component):
         # mapping from sensor index (IC pin) to logical index (top to bottom
         # on the physical jacks in order).
         touch_order = Signal(data.ArrayLayout(unsigned(4), self.N_SENSORS))
-        sensor_order = TiliquaRevision.from_platform(platform).touch_sensor_order()
+        sensor_order = TiliquaRevision.from_platform(platform).pmod_rev().touch_order()
         for n in range(self.N_SENSORS):
             m.d.comb += touch_order[n].eq(sensor_order[n])
 
