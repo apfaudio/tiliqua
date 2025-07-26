@@ -552,6 +552,18 @@ class TiliquaRevision(str, enum.Enum):
             TiliquaRevision.R5,
         ]
 
+    def from_platform(platform: Platform):
+        # e.g. simulation platform
+        if not hasattr(platform, 'version_major'):
+            return TiliquaRevision.default()
+        # real platforms
+        return {
+            2: TiliquaRevision.R2,
+            3: TiliquaRevision.R3,
+            4: TiliquaRevision.R4,
+            5: TiliquaRevision.R5,
+        }[platform.version_major]
+
     def platform_class(self):
         return {
             TiliquaRevision.R2:    TiliquaR2SC2Platform,
@@ -559,6 +571,17 @@ class TiliquaRevision(str, enum.Enum):
             TiliquaRevision.R3:    TiliquaR3SC3Platform,
             TiliquaRevision.R4:    TiliquaR4SC3Platform,
             TiliquaRevision.R5:    TiliquaR5SC3Platform,
+        }[self]
+
+    def touch_sensor_order(self):
+        order_eurorack_pmod_r33 = [0, 1, 2, 3, 4, 5, 6, 7]
+        order_eurorack_pmod_r35 = [5, 7, 8, 9, 10, 11, 12, 13]
+        return {
+            TiliquaRevision.R2:    order_eurorack_pmod_r33,
+            TiliquaRevision.R2SC3: order_eurorack_pmod_r33,
+            TiliquaRevision.R3:    order_eurorack_pmod_r33,
+            TiliquaRevision.R4:    order_eurorack_pmod_r33,
+            TiliquaRevision.R5:    order_eurorack_pmod_r35,
         }[self]
 
 class RebootProvider(wiring.Component):

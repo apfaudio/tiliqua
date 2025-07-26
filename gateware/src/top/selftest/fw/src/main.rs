@@ -441,12 +441,12 @@ fn main() -> ! {
 
     use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
     let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
-    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8);
+    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
 
     let mut last_jack = pmod.jack();
 
-    let mut gpio0 = peripherals.GPIO0;
-    let mut gpio1 = peripherals.GPIO1;
+    let gpio0 = peripherals.GPIO0;
+    let gpio1 = peripherals.GPIO1;
 
     irq::scope(|s| {
 
@@ -471,7 +471,7 @@ fn main() -> ! {
             }
 
             if pmod.jack() != last_jack {
-                cy8.reset();
+                let _ = cy8.reset();
             }
             last_jack = pmod.jack();
 

@@ -582,7 +582,7 @@ fn main() -> ! {
     {
         // TODO more sensible bus sharing
         let i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
-        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1);
+        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1, &TOUCH_SENSOR_ORDER);
         if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
             let s: &'static str = e.into();
             write!(startup_report, "{}\r\n", s).ok();

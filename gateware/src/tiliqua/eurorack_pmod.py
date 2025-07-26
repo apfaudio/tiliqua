@@ -18,6 +18,7 @@ from amaranth.utils             import exact_log2
 from amaranth_soc               import gpio
 
 from tiliqua                    import i2c
+from tiliqua.tiliqua_platform   import TiliquaRevision
 from vendor                     import i2c as vendor_i2c
 
 from amaranth_future            import fixed
@@ -462,8 +463,6 @@ class I2CMaster(wiring.Component):
     N_LEDS    = N_JACKS * 2
     N_SENSORS = 8
 
-    SENSOR_ORDER = [5, 7, 8, 9, 10, 11, 12, 13]
-
     AK4619VN_CFG_48KHZ = [
         0x00, # Register address to start at.
         0x36, # 0x00 Power Management (RSTN asserted!)
@@ -639,9 +638,12 @@ class I2CMaster(wiring.Component):
 
         # current touch sensor to poll, incremented once per loop
         touch_nsensor = Signal(range(self.N_SENSORS))
+        # mapping from sensor index (IC pin) to logical index (top to bottom
+        # on the physical jacks in order).
         touch_order = Signal(data.ArrayLayout(unsigned(4), self.N_SENSORS))
+        sensor_order = TiliquaRevision.from_platform(platform).touch_sensor_order()
         for n in range(self.N_SENSORS):
-            m.d.comb += touch_order[n].eq(self.SENSOR_ORDER[n])
+            m.d.comb += touch_order[n].eq(sensor_order[n])
 
         #
         # Compute codec power management register contents,

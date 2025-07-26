@@ -19,11 +19,11 @@ const REG_TOTAL_WORKING_SNS: u8 = 0x97;
 const CMD_SAVE_CHECK_CRC: u8    = 0x02;
 const CMD_WRITE_RESET: u8       = 0xFF;
 
-/// Default configuration for the CY8CMBR3108
+/// Default configuration for the CY8CMBR3108/CY8CMBR3116
 /// Hand-picked after a lot of fiddling, for Tiliqua.
-pub const DEFAULT_CONFIG_R5: [u8; CY8CMBR3XXX_CONFIG_DATA_LENGTH] = [
-    0xa0,
-    0x3f, // SENSOR_EN
+const DEFAULT_CONFIG: [u8; CY8CMBR3XXX_CONFIG_DATA_LENGTH] = [
+    0x00,
+    0x00, // SENSOR_EN (all disabled by default)
     0x00, // FSS_EN
     0x00,
     0x00, // TOGGLE_EN
@@ -157,9 +157,17 @@ pub struct Cy8cmbr3108Driver<I2C> {
 
 impl<I2C: I2c> Cy8cmbr3108Driver<I2C> {
 
-    pub fn new(i2c: I2C) -> Self {
-        // TODO HACK
-        Self { i2c, config: DEFAULT_CONFIG_R5.clone() }
+    pub fn new(i2c: I2C, sensors_en: &[u8]) -> Self {
+        let mut config = DEFAULT_CONFIG;
+        // Set enabled sensor bits by index.
+        for n_sensor in sensors_en.iter() {
+            if *n_sensor < 8 {
+                config[0] |= 1<<*n_sensor;
+            } else {
+                config[1] |= 1<<(*n_sensor-8);
+            }
+        }
+        Self { i2c, config }
     }
 
     pub fn calculate_crc(&self) -> u16 {
@@ -266,16 +274,18 @@ mod tests {
     #[test]
     fn test_crc_calculation() {
         setup_logger();
-        let mut cy8 = Cy8cmbr3108Driver::new(MockI2c);
+        let mut cy8 = Cy8cmbr3108Driver::new(MockI2c, &[5, 7, 8, 9, 10, 11, 12, 13]);
+        log::info!("sensor_en0 = {:#x}", cy8.config[0]);
+        log::info!("sensor_en1 = {:#x}", cy8.config[1]);
         log::info!("default_crc = {:#x}", cy8.calculate_crc());
-        assert_eq!(cy8.calculate_crc(), 0xc186);
+        assert_eq!(cy8.calculate_crc(), 0x5fd7);
         cy8.commit_config_to_nvm();
     }
 
     #[test]
     fn test_write_config_to_sram() {
         setup_logger();
-        let mut cy8 = Cy8cmbr3108Driver::new(MockI2c);
+        let mut cy8 = Cy8cmbr3108Driver::new(MockI2c, &[]);
         cy8.write_config_to_sram();
     }
 }
