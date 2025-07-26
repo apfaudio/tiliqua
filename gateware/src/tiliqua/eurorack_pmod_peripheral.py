@@ -103,7 +103,7 @@ class Peripheral(wiring.Component):
             self._info.f.f_bits.r_data.eq(self.pmod.i_cal.payload[0].shape().f_bits),
         ]
 
-        mute_reg = Signal(init=1)
+        mute_reg = Signal(init=0)
         m.d.comb += self.pmod.codec_mute.eq(mute_reg | self.mute)
         with m.If(self._flags.f.mute.w_stb):
             m.d.sync += mute_reg.eq(self._flags.f.mute.w_data)

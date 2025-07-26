@@ -640,16 +640,26 @@ class RebootProvider(wiring.Component):
     """
 
     button: wiring.In(unsigned(1))
-    mute:   wiring.Out(unsigned(1))
+    mute:   wiring.Out(unsigned(1), init=1)
 
-    def __init__(self, clock_sync_hz, reboot_seconds=3, mute_seconds=2.5):
+    def __init__(self, clock_sync_hz, reboot_seconds=3, mute_seconds=2.5, unmute_seconds=0.25):
         self.reboot_seconds = reboot_seconds
         self.mute_seconds   = mute_seconds
+        self.unmute_seconds = unmute_seconds
         self.clock_sync_hz  = clock_sync_hz
         super().__init__()
 
     def elaborate(self, platform):
         m = Module()
+
+        timeout_unmute   = int(self.unmute_seconds*self.clock_sync_hz)
+        unmute_counter = Signal(range(timeout_unmute+1))
+        with m.If(unmute_counter < timeout_unmute):
+            m.d.sync += self.mute.eq(1)
+            m.d.sync += unmute_counter.eq(unmute_counter + 1)
+        with m.Else():
+            m.d.sync += self.mute.eq(0)
+
         timeout_reboot = self.reboot_seconds*self.clock_sync_hz
         timeout_mute   = int(self.mute_seconds*self.clock_sync_hz)
         assert(timeout_reboot > (timeout_mute - 0.25))
@@ -664,6 +674,7 @@ class RebootProvider(wiring.Component):
                 m.d.sync += button_counter.eq(button_counter + 1)
             with m.Else():
                 m.d.sync += button_counter.eq(0)
+
 
         m.d.comb += platform.request("pseudo_vccio").o.eq(-1)
         m.d.comb += platform.request("pseudo_vccram").o.eq(-1)

@@ -463,8 +463,6 @@ fn main() -> ! {
         let h_active = display.size().width;
         let v_active = display.size().height;
 
-        pmod.mute(false);
-
         loop {
             let dvi_hpd = display.get_hpd();
             if last_hpd != dvi_hpd {

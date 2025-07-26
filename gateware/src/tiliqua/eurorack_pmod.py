@@ -643,33 +643,28 @@ class I2CMaster(wiring.Component):
         # Clocks - assert RSTN (0) to mute, after MCLK is stable.
         # deassert RSTN (1) to unmute, after MCLK is stable.
         #
+        # On PMOD R3.5+, there is also a soft mute on the audio
+        # output path, which is controlled by `pdn_d` further down.
+        #
         mute_count  = Signal(8)
 
-        # CODEC soft mute registers
-        codec_reg00 = Signal(8)
+        # R3.3 frontend soft mute sequencing
+        # CODEC DAC soft mute sequencing
         codec_reg14 = Signal(8)
-
-        if pmod_rev == EurorackPmodRevision.R33:
-            # R3.3 frontend soft mute sequencing
-            # CODEC DAC soft mute sequencing
-            with m.If(self.codec_mute):
-                # DA1MUTE / DA2MUTE soft mute ON
-                m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] | 0b00110000)
-            with m.Else():
-                # DA1MUTE / DA2MUTE soft mute OFF
-                m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] & 0b11001111)
-            # CODEC RSTN sequencing
-            # Only assert if we know soft mute has been asserted for a while.
-            with m.If(mute_count == 0xff):
-                m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] & 0b11111110)
-            with m.Else():
-                m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
-        elif pmod_rev == EurorackPmodRevision.R35:
-            # Pmod R3.5 has an external post-mute so doesn't need to toggle these registers.
+        with m.If(self.codec_mute):
+            # DA1MUTE / DA2MUTE soft mute ON
+            m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] | 0b00110000)
+        with m.Else():
+            # DA1MUTE / DA2MUTE soft mute OFF
             m.d.comb += codec_reg14.eq(self.ak4619vn_cfg[0x15] & 0b11001111)
+
+        # CODEC RSTN sequencing
+        # Only assert if we know soft mute has been asserted for a while.
+        codec_reg00 = Signal(8)
+        with m.If(mute_count == 0xff):
+            m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] & 0b11111110)
+        with m.Else():
             m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
-        else:
-            raise ValueError(f"Unsupported pmod_rev: {pmod_rev}")
 
         startup_delay = Signal(32)
 

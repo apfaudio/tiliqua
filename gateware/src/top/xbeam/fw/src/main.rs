@@ -97,7 +97,6 @@ fn main() -> ! {
         let v_active = display.size().height;
 
         use tiliqua_hal::pmod::EurorackPmod;
-        pmod.mute(false);
 
         loop {
 

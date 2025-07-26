@@ -195,8 +195,6 @@ fn main() -> ! {
         let h_active = display.size().width;
         let v_active = display.size().height;
 
-        pmod.mute(false);
-
         let mut last_jack = pmod.jack();
 
         loop {
