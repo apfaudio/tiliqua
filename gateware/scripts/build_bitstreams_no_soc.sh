@@ -24,7 +24,7 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm dsp build --dsp-core=stft_mirror" \
   "pdm dsp build --dsp-core=vocoder" \
   "pdm vectorscope_no_soc build --fs-192khz" \
-  "pdm vectorscope_no_soc build --fs-192khz --spectrogram" \
+  "pdm vectorscope_no_soc build --fs-192khz --spectrogram --name=spectrogram" \
   "pdm bootstub build" \
   "pdm usb_audio build" \
   "pdm usb_host build --midi-device=yamaha-cp73"
