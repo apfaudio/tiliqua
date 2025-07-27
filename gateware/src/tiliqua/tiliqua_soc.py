@@ -45,7 +45,7 @@ from amaranth.hdl.rec                            import Record
 from amaranth.lib                                import wiring, data, cdc
 from amaranth.lib.wiring                         import Component, In, Out, flipped, connect
 
-from amaranth_soc                                import csr, gpio, wishbone
+from amaranth_soc                                import csr, wishbone
 from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
 
 from luna_soc.gateware.core                      import blockram, timer, uart, spiflash
@@ -349,8 +349,13 @@ class TiliquaSoc(Component):
             # generate our domain clocks/resets
             m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
 
-            # Enable LED driver on motherboard
-            m.d.comb += platform.request("mobo_leds_oe").o.eq(1),
+            if platform.version_major >= 5:
+                # LED driver outputs wired ON on R5+
+                # Instead we have an extra I2C switch for EDID.
+                m.d.comb += platform.request("gpdi_ddc_en").o.eq(1),
+            else:
+                # Enable LED driver on motherboard
+                m.d.comb += platform.request("mobo_leds_oe").o.eq(1),
 
             # Connect encoder button to RebootProvider
             m.submodules.reboot = reboot = RebootProvider(self.clock_settings.frequencies.sync)
@@ -418,6 +423,9 @@ class TiliquaSoc(Component):
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")
             f.write(f"pub const BOOTINFO_SZ_BYTES: usize = 4096;\n")
             f.write(f"pub const BOOTINFO_BASE: usize     = PSRAM_BASE + PSRAM_SZ_BYTES - BOOTINFO_SZ_BYTES;\n")
+            pmod_rev = TiliquaRevision.from_platform(self.platform_class).pmod_rev()
+            f.write(f"pub const TOUCH_SENSOR_ORDER: [u8; 8] = {pmod_rev.touch_order()};\n")
+            f.write(f"pub const PMOD_DEFAULT_CAL: [f32; 4] = {pmod_rev.default_calibration_rs()};\n")
             f.write("// Extra constants specified by an SoC subclass:\n")
             for l in self.extra_rust_constants:
                 f.write(l)

@@ -87,6 +87,24 @@ class _SoldierCrabPlatform(LatticeECP5Platform):
             Subsignal("cs",  PinsN("N8", dir="o")),
             Attrs(IO_TYPE="LVCMOS33")
         ),
+
+        # Pseudo-supply pins - connected to supply voltage or GND for routing reasons.
+        Resource("pseudo_vccio", 0,
+                 Pins("E6 E7 D10 E10 E11 F12 J12 K12 L12 N13 P13 M11 P11 P12 R6", dir="o"),
+                 Attrs(IO_TYPE="LVCMOS33")),
+
+        Resource("pseudo_gnd", 0,
+                 Pins("E5 E8 E9 E12 F13 M13 M12 N12 N11", dir="o"),
+                 Attrs(IO_TYPE="LVCMOS33")),
+
+        Resource("pseudo_vccram", 0,
+                 Pins("L4 M4 R5 N5 P4 M6 F5 G5 H5 H4 J4 J5 J3 J1 J2", dir="o"),
+                 Attrs(IO_TYPE=bank_6_7_iotype)),
+
+        Resource("pseudo_gndram", 0,
+                 Pins("L5 L3 M3 N6 P5 P6 F4 G2 G3 H3 H2", dir="o"),
+                 Attrs(IO_TYPE=bank_6_7_iotype)),
+
     ]
 
 class SoldierCrabR2Platform(_SoldierCrabPlatform):
@@ -294,7 +312,7 @@ class _TiliquaR3Mobo:
         Connector("pmod", 1, "59 63 14 20 - - 61 15 13 22 - -", conn=("m2", 0)),
     ]
 
-class _TiliquaR4Mobo:
+class _TiliquaR4R5Mobo:
     resources   = [
         # External PLL (SI5351A) clock inputs. Clock frequencies are dynamic. The constraints
         # are overwritten in `cli.py` based on the project configuration.
@@ -316,9 +334,6 @@ class _TiliquaR4Mobo:
         # USB: Interrupt line from TUSB322I
         Resource("usb_int", 0, PinsN("47", dir="i", conn=("m2", 0)),
                  Attrs(IO_TYPE="LVCMOS33")),
-
-        # Output enable for LEDs driven by PCA9635 on motherboard PCBA
-        Resource("mobo_leds_oe", 0, PinsN("11", dir="o", conn=("m2", 0))),
 
         # DVI: Hotplug Detect
         Resource("dvi_hpd", 0, Pins("37", dir="i", conn=("m2", 0)),
@@ -354,6 +369,7 @@ class _TiliquaR4Mobo:
         Resource("i2c", 0,
             Subsignal("sda", Pins("51", dir="io", conn=("m2", 0))),
             Subsignal("scl", Pins("53", dir="io", conn=("m2", 0))),
+            Attrs(IO_TYPE="LVCMOS33")
         ),
 
         # RP2040 UART bridge
@@ -380,10 +396,15 @@ class _TiliquaR4Mobo:
             Subsignal("i2c_scl", Pins("69", dir="io", conn=("m2", 0))),
             Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
         ),
+    ]
 
-        # DVI
-        # Note: technically DVI outputs are supposed to be open-drain, but
-        # compatibility with cheap AliExpress screens seems better with push/pull outputs.
+
+class _TiliquaR4Mobo:
+    resources  = _TiliquaR4R5Mobo.resources + [
+        # Output enable for LEDs driven by PCA9635 on motherboard PCBA
+        Resource("mobo_leds_oe", 0, PinsN("11", dir="o", conn=("m2", 0))),
+
+        # Diffpairs routed directly to video output through termination resistors.
         Resource("dvi", 0,
             Subsignal("d0", Pins("60", dir="o", conn=("m2", 0))),
             Subsignal("d1", Pins("62", dir="o", conn=("m2", 0))),
@@ -396,6 +417,29 @@ class _TiliquaR4Mobo:
     # Expansion connectors ex0 and ex1
     connectors  = [
         Connector("pmod", 0, "55 38 66 41 - - 57 35 34 73 - -", conn=("m2", 0)),
+        Connector("pmod", 1, "59 63 14 20 - - 61 15 13 22 - -", conn=("m2", 0)),
+    ]
+
+class _TiliquaR5Mobo:
+    resources  = _TiliquaR4R5Mobo.resources + [
+        # Enable motherboard I2C passthrough to DVI port. Normally, this
+        # should probably be disabled (unless we are reading the EDID) as
+        # we don't want to accidentally address some random I2C devices in
+        # the display!
+        Resource("gpdi_ddc_en", 0, Pins("11", dir="o", conn=("m2", 0))),
+
+        # Diffpairs routed to video output, AC-coupled through a DVI redriver IC.
+        Resource("dvi", 0,
+            Subsignal("d0", Pins("68", dir="o", conn=("m2", 0))),
+            Subsignal("d1", Pins("52", dir="o", conn=("m2", 0))),
+            Subsignal("d2", Pins("60", dir="o", conn=("m2", 0))),
+            Subsignal("ck", Pins("62", dir="o", conn=("m2", 0))),
+            Attrs(IO_TYPE="LVCMOS33D", DRIVE="4", SLEWRATE="FAST")
+         ),
+    ]
+
+    connectors  = [
+        Connector("pmod", 0, "38 35 66 41 - - 57 55 34 73 - -", conn=("m2", 0)),
         Connector("pmod", 1, "59 63 14 20 - - 61 15 13 22 - -", conn=("m2", 0)),
     ]
 
@@ -471,11 +515,79 @@ class TiliquaR4SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
         *_TiliquaR4Mobo.connectors
     ]
 
+class TiliquaR5SC3Platform(SoldierCrabR3Platform, LUNAPlatform):
+    name                   = ("Tiliqua R5 / SoldierCrab R3 "
+                              f"({SoldierCrabR3Platform.device}/{SoldierCrabR3Platform.psram_id})")
+    version_major          = 5
+    clock_domain_generator = tiliqua_pll.TiliquaDomainGeneratorPLLExternal
+    default_audio_clock    = AudioClock.FINE_48KHZ
+    default_usb_connection = "ulpi"
+
+    resources = [
+        *SoldierCrabR3Platform.resources,
+        *_TiliquaR5Mobo.resources
+    ]
+
+    connectors = [
+        *SoldierCrabR3Platform.connectors,
+        *_TiliquaR5Mobo.connectors
+    ]
+
+
+class EurorackPmodRevision(str, enum.Enum):
+    R33    = "r3.3"
+    R35    = "r3.5"
+
+    def touch_order(self):
+        return {
+            self.R33: [0, 1, 2, 3, 7, 6, 5, 4],
+            self.R35: [5, 7, 8, 9, 10, 11, 12, 13]
+        }[self]
+
+    def default_calibration(self):
+        # default calibration constants based on averaging some R3.3 units
+        # These should be accurate to +/- 100mV or so on a fresh unit without
+        # requiring any initial calibration.
+        default_cal_r33 = [
+            [-1.158, 0.008], # in (mul, add)
+            [-1.158, 0.008],
+            [-1.158, 0.008],
+            [-1.158, 0.008],
+            [ 0.97,  0.03 ], # out (mul, add)
+            [ 0.97,  0.03 ],
+            [ 0.97,  0.03 ],
+            [ 0.97,  0.03 ],
+        ]
+        default_cal_r35 = [
+            [-1.248, -0.03], # in (mul, add)
+            [-1.248, -0.03],
+            [-1.248, -0.03],
+            [-1.248, -0.03],
+            [ 0.90,  0.0], # out (mul, add)
+            [ 0.90,  0.0],
+            [ 0.90,  0.0],
+            [ 0.90,  0.0],
+        ]
+        return {
+            self.R33:    default_cal_r33,
+            self.R35:    default_cal_r35,
+        }[self]
+
+    def default_calibration_rs(self):
+        cal = self.default_calibration()
+        return "[{}, {}, {}, {}]".format(
+            cal[0][0],
+            cal[0][1],
+            cal[4][0],
+            cal[4][1],
+        )
+
 class TiliquaRevision(str, enum.Enum):
     R2    = "r2"
     R2SC3 = "r2sc3"
     R3    = "r3"
     R4    = "r4"
+    R5    = "r5"
 
     def default():
         return TiliquaRevision.R4
@@ -486,7 +598,20 @@ class TiliquaRevision(str, enum.Enum):
             TiliquaRevision.R2SC3,
             TiliquaRevision.R3,
             TiliquaRevision.R4,
+            TiliquaRevision.R5,
         ]
+
+    def from_platform(platform: Platform):
+        # e.g. simulation platform
+        if not hasattr(platform, 'version_major'):
+            return TiliquaRevision.default()
+        # real platforms
+        return {
+            2: TiliquaRevision.R2,
+            3: TiliquaRevision.R3,
+            4: TiliquaRevision.R4,
+            5: TiliquaRevision.R5,
+        }[platform.version_major]
 
     def platform_class(self):
         return {
@@ -494,6 +619,16 @@ class TiliquaRevision(str, enum.Enum):
             TiliquaRevision.R2SC3: TiliquaR2SC3Platform,
             TiliquaRevision.R3:    TiliquaR3SC3Platform,
             TiliquaRevision.R4:    TiliquaR4SC3Platform,
+            TiliquaRevision.R5:    TiliquaR5SC3Platform,
+        }[self]
+
+    def pmod_rev(self):
+        return {
+            TiliquaRevision.R2:    EurorackPmodRevision.R33,
+            TiliquaRevision.R2SC3: EurorackPmodRevision.R33,
+            TiliquaRevision.R3:    EurorackPmodRevision.R33,
+            TiliquaRevision.R4:    EurorackPmodRevision.R33,
+            TiliquaRevision.R5:    EurorackPmodRevision.R35,
         }[self]
 
 class RebootProvider(wiring.Component):
@@ -505,16 +640,26 @@ class RebootProvider(wiring.Component):
     """
 
     button: wiring.In(unsigned(1))
-    mute:   wiring.Out(unsigned(1))
+    mute:   wiring.Out(unsigned(1), init=1)
 
-    def __init__(self, clock_sync_hz, reboot_seconds=3, mute_seconds=2.5):
+    def __init__(self, clock_sync_hz, reboot_seconds=3, mute_seconds=2.5, unmute_seconds=0.25):
         self.reboot_seconds = reboot_seconds
         self.mute_seconds   = mute_seconds
+        self.unmute_seconds = unmute_seconds
         self.clock_sync_hz  = clock_sync_hz
         super().__init__()
 
     def elaborate(self, platform):
         m = Module()
+
+        timeout_unmute   = int(self.unmute_seconds*self.clock_sync_hz)
+        unmute_counter = Signal(range(timeout_unmute+1))
+        with m.If(unmute_counter < timeout_unmute):
+            m.d.sync += self.mute.eq(1)
+            m.d.sync += unmute_counter.eq(unmute_counter + 1)
+        with m.Else():
+            m.d.sync += self.mute.eq(0)
+
         timeout_reboot = self.reboot_seconds*self.clock_sync_hz
         timeout_mute   = int(self.mute_seconds*self.clock_sync_hz)
         assert(timeout_reboot > (timeout_mute - 0.25))
@@ -529,4 +674,11 @@ class RebootProvider(wiring.Component):
                 m.d.sync += button_counter.eq(button_counter + 1)
             with m.Else():
                 m.d.sync += button_counter.eq(0)
+
+
+        m.d.comb += platform.request("pseudo_vccio").o.eq(-1)
+        m.d.comb += platform.request("pseudo_vccram").o.eq(-1)
+        m.d.comb += platform.request("pseudo_gnd").o.eq(0)
+        m.d.comb += platform.request("pseudo_gndram").o.eq(0)
+
         return m

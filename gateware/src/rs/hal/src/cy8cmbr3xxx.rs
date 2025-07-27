@@ -19,19 +19,19 @@ const REG_TOTAL_WORKING_SNS: u8 = 0x97;
 const CMD_SAVE_CHECK_CRC: u8    = 0x02;
 const CMD_WRITE_RESET: u8       = 0xFF;
 
-/// Default configuration for the CY8CMBR3108
+/// Default configuration for the CY8CMBR3108/CY8CMBR3116
 /// Hand-picked after a lot of fiddling, for Tiliqua.
-pub const DEFAULT_CONFIG: [u8; CY8CMBR3XXX_CONFIG_DATA_LENGTH] = [
-    0xff, // SENSOR_EN
+const DEFAULT_CONFIG: [u8; CY8CMBR3XXX_CONFIG_DATA_LENGTH] = [
     0x00,
+    0x00, // SENSOR_EN (all disabled by default)
     0x00, // FSS_EN
     0x00,
     0x00, // TOGGLE_EN
     0x00,
     0x00, // LED_ON_EN
     0x00,
-    0xff, // SENSITIVITY0
-    0xff, // SENSITIVITY1
+    0x00, // SENSITIVITY0
+    0x00, // SENSITIVITY1
     0x00, // SENSITIVITY2
     0x00, // SENSITIVITY3
     0x80, // BASE_THRESHOLD0
@@ -42,14 +42,14 @@ pub const DEFAULT_CONFIG: [u8; CY8CMBR3XXX_CONFIG_DATA_LENGTH] = [
     0x80, // FINGER_THRESHOLD5
     0x80, // FINGER_THRESHOLD6
     0x80, // FINGER_THRESHOLD7
-    0x00, // FINGER_THRESHOLD8
-    0x00, // FINGER_THRESHOLD9
-    0x00, // FINGER_THRESHOLD10
-    0x00, // FINGER_THRESHOLD11
-    0x00, // FINGER_THRESHOLD12
-    0x00, // FINGER_THRESHOLD13
-    0x00, // FINGER_THRESHOLD14
-    0x00, // FINGER_THRESHOLD15
+    0x80, // FINGER_THRESHOLD8
+    0x80, // FINGER_THRESHOLD9
+    0x80, // FINGER_THRESHOLD10
+    0x80, // FINGER_THRESHOLD11
+    0x80, // FINGER_THRESHOLD12
+    0x80, // FINGER_THRESHOLD13
+    0x80, // FINGER_THRESHOLD14
+    0x80, // FINGER_THRESHOLD15
     0x04, // SENSOR_DEBOUNCE
     0x9f, // BUTTON_HYS
     0x00,
@@ -157,8 +157,17 @@ pub struct Cy8cmbr3108Driver<I2C> {
 
 impl<I2C: I2c> Cy8cmbr3108Driver<I2C> {
 
-    pub fn new(i2c: I2C) -> Self {
-        Self { i2c, config: DEFAULT_CONFIG.clone() }
+    pub fn new(i2c: I2C, sensors_en: &[u8]) -> Self {
+        let mut config = DEFAULT_CONFIG;
+        // Set enabled sensor bits by index.
+        for n_sensor in sensors_en.iter() {
+            if *n_sensor < 8 {
+                config[0] |= 1<<*n_sensor;
+            } else {
+                config[1] |= 1<<(*n_sensor-8);
+            }
+        }
+        Self { i2c, config }
     }
 
     pub fn calculate_crc(&self) -> u16 {
@@ -252,7 +261,7 @@ impl<I2C: I2c> Cy8cmbr3108Driver<I2C> {
         Ok(())
     }
 
-    fn reset(&mut self) -> Result<(), I2C::Error> {
+    pub fn reset(&mut self) -> Result<(), I2C::Error> {
         self.write_register(REG_COMMAND, CMD_WRITE_RESET)
     }
 }
@@ -265,16 +274,18 @@ mod tests {
     #[test]
     fn test_crc_calculation() {
         setup_logger();
-        let mut cy8 = Cy8cmbr3108Driver::new(MockI2c);
+        let mut cy8 = Cy8cmbr3108Driver::new(MockI2c, &[5, 7, 8, 9, 10, 11, 12, 13]);
+        log::info!("sensor_en0 = {:#x}", cy8.config[0]);
+        log::info!("sensor_en1 = {:#x}", cy8.config[1]);
         log::info!("default_crc = {:#x}", cy8.calculate_crc());
-        assert_eq!(cy8.calculate_crc(), 0xc186);
+        assert_eq!(cy8.calculate_crc(), 0x5fd7);
         cy8.commit_config_to_nvm();
     }
 
     #[test]
     fn test_write_config_to_sram() {
         setup_logger();
-        let mut cy8 = Cy8cmbr3108Driver::new(MockI2c);
+        let mut cy8 = Cy8cmbr3108Driver::new(MockI2c, &[]);
         cy8.write_config_to_sram();
     }
 }

@@ -34,6 +34,7 @@ pub type ReportString = String<512>;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 
+
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
     critical_section::with(|cs| {
@@ -358,8 +359,8 @@ impl App {
     }
 }
 
-fn push_to_opts(constants: &CalibrationConstants, options: &mut Opts) {
-    let c = constants.to_tweakable();
+fn push_to_opts(constants: &CalibrationConstants, options: &mut Opts, d: &DefaultCalibrationConstants) {
+    let c = constants.to_tweakable(d);
     options.caladc.scale0.value = c.adc_scale[0];
     options.caladc.scale1.value = c.adc_scale[1];
     options.caladc.scale2.value = c.adc_scale[2];
@@ -414,11 +415,12 @@ fn main() -> ! {
 
     let mut opts = Opts::default();
 
+    let cal_default = DefaultCalibrationConstants::from_array(
+        &PMOD_DEFAULT_CAL, pmod.f_bits());
     if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
-        push_to_opts(&cal_constants, &mut opts);
+        push_to_opts(&cal_constants, &mut opts, &cal_default);
         write!(startup_report, "PASS: load calibration from EEPROM").ok();
     } else {
-        push_to_opts(&CalibrationConstants::default(), &mut opts);
         write!(startup_report, "FAIL: load calibration from EEPROM").ok();
     }
     info!("STARTUP REPORT: {}", startup_report);
@@ -439,6 +441,15 @@ fn main() -> ! {
 
     let mut last_hpd = display.get_hpd();
 
+    use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
+    let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
+    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
+
+    let mut last_jack = pmod.jack();
+
+    let gpio0 = peripherals.GPIO0;
+    let gpio1 = peripherals.GPIO1;
+
     irq::scope(|s| {
 
         palette::ColorPalette::default().write_to_hardware(&mut display);
@@ -458,6 +469,11 @@ fn main() -> ! {
                 info!("dvi_hpd: display hotplug! new state: {}", dvi_hpd);
                 last_hpd = dvi_hpd;
             }
+
+            if pmod.jack() != last_jack {
+                let _ = cy8.reset();
+            }
+            last_jack = pmod.jack();
 
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
@@ -488,6 +504,9 @@ fn main() -> ! {
                         print_die_temperature(&mut status_report, &dtr);
                         print_psram_stats(&mut status_report, &psram);
                         write!(&mut status_report, "dvi_hpd [active={}]\r\n", dvi_hpd).ok();
+                        write!(&mut status_report, "ex0={:08b} ex1={:08b}\r\n",
+                               gpio0.input().read().bits(),
+                               gpio1.input().read().bits()).ok();
                         ("[status report]", &status_report)
                     }
                 };
@@ -552,7 +571,8 @@ fn main() -> ! {
                         opts.caldac.zero2.value,
                         opts.caldac.zero3.value,
                     ],
-                }
+                },
+                &cal_default
             );
             constants.write_to_pmod(&mut pmod);
 

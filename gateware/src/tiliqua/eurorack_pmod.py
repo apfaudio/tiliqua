@@ -18,9 +18,14 @@ from amaranth.utils             import exact_log2
 from amaranth_soc               import gpio
 
 from tiliqua                    import i2c
+from tiliqua.tiliqua_platform   import TiliquaRevision, EurorackPmodRevision
 from vendor                     import i2c as vendor_i2c
 
 from amaranth_future            import fixed
+
+# Native 'Audio sample SQ': shape of audio samples from CODEC.
+# Signed fixed point, where -1 to +1 represents -8.192V to +8.192V.
+ASQ = fixed.SQ(1, 15)
 
 class I2SSignature(wiring.Signature):
     """
@@ -143,13 +148,13 @@ class PMODProvider(wiring.Component):
                 Subsignal("lrck",    Pins("3", dir="o",  conn=("pmod", self.pmod_index))),
                 Subsignal("bick",    Pins("4", dir="o",  conn=("pmod", self.pmod_index))),
                 Subsignal("mclk",    Pins("10", dir="o", conn=("pmod", self.pmod_index))),
-                Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
+                Attrs(IO_TYPE="LVCMOS33", DRIVE="8")
             ),
             Resource("audio_pmod_aux", self.pmod_index,
                 Subsignal("pdn_d",   Pins("9", dir="o",  conn=("pmod", self.pmod_index))),
                 Subsignal("i2c_sda", Pins("8", dir="io", conn=("pmod", self.pmod_index))),
                 Subsignal("i2c_scl", Pins("7", dir="io", conn=("pmod", self.pmod_index))),
-                Attrs(IO_TYPE="LVCMOS33", DRIVE="4", SLEWRATE="SLOW")
+                Attrs(IO_TYPE="LVCMOS33", DRIVE="8")
             ),
         ]
         platform.add_resources(pmod_resources)
@@ -184,7 +189,7 @@ class I2STDM(wiring.Component):
     """
 
     N_CHANNELS = 4
-    S_WIDTH    = 16
+    S_WIDTH    = ASQ.width
     SLOT_WIDTH = 32
 
     def __init__(self, audio_192=False):
@@ -240,9 +245,6 @@ class I2STDM(wiring.Component):
                 m.d.audio += self.i2s.sdin1.eq(0)
         return m
 
-# Native 'Audio sample SQ', shape of audio samples from CODEC.
-ASQ = fixed.SQ(1, I2STDM.S_WIDTH-1)
-
 class I2SCalibrator(wiring.Component):
 
     """
@@ -279,24 +281,10 @@ class I2SCalibrator(wiring.Component):
     # Set values and assert `valid` until `ready` is strobed by this core, which
     # indicates the calibration memory write has been committed.
     cal_mem_write: In(stream.Signature(data.StructLayout({
-        "a": signed(18),
-        "b": signed(18),
+        "a": signed(2 + ASQ.width),
+        "b": signed(2 + ASQ.width),
         "channel": unsigned(exact_log2(I2STDM.N_CHANNELS*2))
         })))
-
-    # default calibration constants based on averaging some R3.3 units
-    # These should be accurate to +/- 100mV or so on a fresh unit without
-    # requiring any initial calibration.
-    DEFAULT_CALIBRATION_R33 = [
-        [-1.158, 0.008], # in (mul, add)
-        [-1.158, 0.008],
-        [-1.158, 0.008],
-        [-1.158, 0.008],
-        [ 0.97,  0.03 ], # out (mul, add)
-        [ 0.97,  0.03 ],
-        [ 0.97,  0.03 ],
-        [ 0.97,  0.03 ],
-    ]
 
     def __init__(self, stream_domain="sync", fifo_depth=4):
         self.stream_domain = stream_domain
@@ -312,11 +300,12 @@ class I2SCalibrator(wiring.Component):
         #
 
         self.ctype = fixed.SQ(3, ASQ.f_bits)
+        default_cal = TiliquaRevision.from_platform(platform).pmod_rev().default_calibration()
         cal_mem = Memory(shape=data.ArrayLayout(self.ctype, 2),
                          depth=I2STDM.N_CHANNELS*2,
                          init=[
                             [fixed.Const(mul, shape=self.ctype), fixed.Const(add, shape=self.ctype)]
-                            for mul, add in self.DEFAULT_CALIBRATION_R33
+                            for mul, add in default_cal
                          ])
         m.submodules.cal_mem = cal_mem # WARN: accessed in 'audio' domain
         cal_read = cal_mem.read_port(domain="comb")
@@ -533,7 +522,7 @@ class I2CMaster(wiring.Component):
             # should be close to 0 if touch sense is OK.
             "touch_err":      Out(unsigned(8)),
             # assert for at least 100msec for complete muting sequence.
-            "codec_mute":     In(1),
+            "codec_mute":     In(1, init=1),
             # I2C override from SoC, not used unless written to.
             "i2c_override":  In(i2c.I2CStreamerControl()),
         })
@@ -637,6 +626,13 @@ class I2CMaster(wiring.Component):
 
         # current touch sensor to poll, incremented once per loop
         touch_nsensor = Signal(range(self.N_SENSORS))
+        # mapping from sensor index (IC pin) to logical index (top to bottom
+        # on the physical jacks in order).
+        touch_order = Signal(data.ArrayLayout(unsigned(4), self.N_SENSORS))
+        pmod_rev = TiliquaRevision.from_platform(platform).pmod_rev()
+        sensor_order = pmod_rev.touch_order()
+        for n in range(self.N_SENSORS):
+            m.d.comb += touch_order[n].eq(sensor_order[n])
 
         #
         # Compute codec power management register contents,
@@ -648,8 +644,12 @@ class I2CMaster(wiring.Component):
         # Clocks - assert RSTN (0) to mute, after MCLK is stable.
         # deassert RSTN (1) to unmute, after MCLK is stable.
         #
+        # On PMOD R3.5+, there is also a soft mute on the audio
+        # output path, which is controlled by `pdn_d` further down.
+        #
         mute_count  = Signal(8)
 
+        # R3.3 frontend soft mute sequencing
         # CODEC DAC soft mute sequencing
         codec_reg14 = Signal(8)
         with m.If(self.codec_mute):
@@ -727,7 +727,7 @@ class I2CMaster(wiring.Component):
             #
 
             _,   _,   ix  = i2c_addr (m, ix, self.CY8CMBR3108_ADDR)
-            _,   _,   ix  = i2c_write(m, ix, 0xBA + (touch_nsensor<<1))
+            _,   _,   ix  = i2c_write(m, ix, 0xBA + (touch_order[touch_nsensor]<<1))
             _,   _,   ix  = i2c_read (m, ix, last=True)
             _,   _,   ix  = i2c_wait (m, ix)
 
@@ -739,14 +739,9 @@ class I2CMaster(wiring.Component):
                     with m.If(self.touch_err > 0):
                         m.d.sync += self.touch_err.eq(self.touch_err - 1)
                     with m.Switch(touch_nsensor):
-                        for n in range(8):
-                            if n > 3:
-                                # R3.3 hw swaps last four vs R3.2 to improve PCB routing
-                                with m.Case(n):
-                                    m.d.sync += self.touch[4+(7-n)].eq(i2c.o.payload)
-                            else:
-                                with m.Case(n):
-                                    m.d.sync += self.touch[n].eq(i2c.o.payload)
+                        for n in range(self.N_SENSORS):
+                            with m.Case(n):
+                                m.d.sync += self.touch[n].eq(i2c.o.payload)
                     m.d.comb += i2c.o.ready.eq(1)
                 with m.Else():
                     with m.If(self.touch_err != 0xff):
@@ -910,44 +905,70 @@ class EurorackPmod(wiring.Component):
             with m.Else():
                 m.d.sync += i2c_master.led[n].eq(self.led[n]),
 
-        #
-        # CODEC PDN / FLIP-FLOP CLOCKING
-        #
-        # `eurorack-pmod` PCBA has a 'PDN' pin, which drives the CODEC PDN
-        # pin. Between the ECP5 and the PDN pin is a flip-flop, such that
-        # FPGA bitstream reconfiguration does not imply PDN toggling
-        # (which causes a CODEC hard reset). Instead, for pop-free bitstream
-        # switching (only on mobo R3+), we can sequence the flip-flop inputs
-        # as needed.
-        #
-        # Note: CODEC RSTN must be asserted (held in reset) across the
-        # FPGA reconfiguration. This is performed by `self.codec_mute`.
-        #
-        # TIMING
-        # ------
-        #
-        # PDN_D   : ____________------------
-        # PDN_CLK : ______------______------
-        #           |           |
-        #           ^ hard reset|
-        #                       |
-        #                       ^ soft reset
-        #
-        # hard reset: ensures flip-flop output is driven 0->1
-        # soft reset: if flip-flop output was 1, it stays 1
-        #
 
-        # soft reset by default
-        pdn_cnt = Signal(unsigned(32), init=(1<<20))
-        m.d.comb += [
-            self.pins.pdn_clk.eq(pdn_cnt[19]),
-            self.pins.pdn_d  .eq(pdn_cnt[20]), # 2b11 @ ~35msec
-        ]
-        with m.If(~(self.pins.pdn_d & self.pins.pdn_clk)):
+        pmod_rev = TiliquaRevision.from_platform(platform).pmod_rev()
+        if pmod_rev == EurorackPmodRevision.R33:
+            #
+            # HW R4 / PMOD R3.3: CODEC PDN / FLIP-FLOP CLOCKING (HW R5 is different!)
+            #
+            # `eurorack-pmod` PCBA has a 'PDN' pin, which drives the CODEC PDN
+            # pin. Between the ECP5 and the PDN pin is a flip-flop, such that
+            # FPGA bitstream reconfiguration does not imply PDN toggling
+            # (which causes a CODEC hard reset). Instead, for pop-free bitstream
+            # switching (only on mobo R3+), we can sequence the flip-flop inputs
+            # as needed.
+            #
+            # Note: CODEC RSTN must be asserted (held in reset) across the
+            # FPGA reconfiguration. This is performed by `self.codec_mute`.
+            #
+            # TIMING
+            # ------
+            #
+            # PDN_D   : ____________------------
+            # PDN_CLK : ______------______------
+            #           |           |
+            #           ^ hard reset|
+            #                       |
+            #                       ^ soft reset
+            #
+            # hard reset: ensures flip-flop output is driven 0->1
+            # soft reset: if flip-flop output was 1, it stays 1
+            #
+
+            # soft reset by default
+            pdn_cnt = Signal(unsigned(32), init=(1<<20))
+            m.d.comb += [
+                self.pins.pdn_clk.eq(pdn_cnt[19]),
+                self.pins.pdn_d  .eq(pdn_cnt[20]), # 2b11 @ ~35msec
+            ]
+            with m.If(~(self.pins.pdn_d & self.pins.pdn_clk)):
+                m.d.sync += pdn_cnt.eq(pdn_cnt+1)
+            with m.Elif(self.hard_reset):
+                # hard reset only if requested
+                m.d.sync += pdn_cnt.eq(0)
+                m.d.comb += reset_i2c_master.eq(1)
+        elif pmod_rev == EurorackPmodRevision.R35:
+            # HW R5 / PMOD R3.5 mute / clocking.
+            #
+            # Latest output stage has a hardware soft mute that is always
+            # enabled by default, so we can simply just pass through
+            # codec_mute to this and don't have to worry about special
+            # flip-flop clocking.
+            #
+            # Here we just toggle the flip flop CLK so that pdn_d is always
+            # ~ equal to codec_mute, delayed a bit.
+            #
+            pdn_cnt = Signal(unsigned(32), init=(1<<20))
             m.d.sync += pdn_cnt.eq(pdn_cnt+1)
-        with m.Elif(self.hard_reset):
-            # hard reset only if requested
-            m.d.sync += pdn_cnt.eq(0)
-            m.d.comb += reset_i2c_master.eq(1)
+            m.d.comb += [
+                self.pins.pdn_clk.eq(pdn_cnt[5]), # constant toggling
+            ]
+            with m.If(self.codec_mute):
+                m.d.comb += self.pins.pdn_d.eq(0)
+            with m.Else():
+                m.d.comb += self.pins.pdn_d.eq(1)
+        else:
+            raise ValueError(f"Unsupported pmod_rev: {pmod_rev}")
+
 
         return m

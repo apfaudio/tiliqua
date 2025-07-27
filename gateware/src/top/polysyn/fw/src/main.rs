@@ -172,6 +172,10 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
+    use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
+    let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
+    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
+
     let opts = Opts::default();
     let mut last_palette = opts.beam.palette.value.clone();
     let app = Mutex::new(RefCell::new(App::new(opts)));
@@ -191,10 +195,18 @@ fn main() -> ! {
         let h_active = display.size().width;
         let v_active = display.size().height;
 
+        let mut last_jack = pmod.jack();
+
         loop {
+
 
             let (opts, notes, cutoffs, draw_options) = critical_section::with(|cs| {
                 let app = app.borrow_ref(cs);
+                if pmod.jack() != last_jack {
+                    // Re-calibrate touch sensing on jack swaps.
+                    let _ = cy8.reset();
+                }
+                last_jack = pmod.jack();
                 (app.ui.opts.clone(),
                  app.synth.voice_notes().clone(),
                  app.synth.voice_cutoffs().clone(),

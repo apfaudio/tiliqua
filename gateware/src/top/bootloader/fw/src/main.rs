@@ -570,6 +570,7 @@ fn main() -> ! {
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
+    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
 
     crate::handlers::logger_init(serial);
 
@@ -580,9 +581,15 @@ fn main() -> ! {
     // Verify/reprogram touch sensing NVM
 
     {
+        if HW_REV_MAJOR >= 5 {
+            // Rev5+, resetting CODEC is always allowed without popping.
+            // So let's just do it to bring the CODEC into a consistent state.
+            timer.delay_ms(200); // Wait for POR on eurorack-pmod
+            pmod.hard_reset();
+        }
         // TODO more sensible bus sharing
         let i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
-        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1);
+        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1, &TOUCH_SENSOR_ORDER);
         if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
             let s: &'static str = e.into();
             write!(startup_report, "{}\r\n", s).ok();
@@ -614,7 +621,6 @@ fn main() -> ! {
     // Setup CODEC and load audio calibration.
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
-    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     if let Err(e) = maybe_restart_codec(&mut i2cdev1, &mut pmod) {
         let s: &'static str = e.into();
         write!(startup_report, "{}\r\n", s).ok();
