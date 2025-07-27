@@ -23,6 +23,10 @@ from vendor                     import i2c as vendor_i2c
 
 from amaranth_future            import fixed
 
+# Native 'Audio sample SQ': shape of audio samples from CODEC.
+# Signed fixed point, where -1 to +1 represents -8.192V to +8.192V.
+ASQ = fixed.SQ(1, 15)
+
 class I2SSignature(wiring.Signature):
     """
     Standard I2S inter-chip audio bus.
@@ -185,7 +189,7 @@ class I2STDM(wiring.Component):
     """
 
     N_CHANNELS = 4
-    S_WIDTH    = 16
+    S_WIDTH    = ASQ.width
     SLOT_WIDTH = 32
 
     def __init__(self, audio_192=False):
@@ -241,9 +245,6 @@ class I2STDM(wiring.Component):
                 m.d.audio += self.i2s.sdin1.eq(0)
         return m
 
-# Native 'Audio sample SQ', shape of audio samples from CODEC.
-ASQ = fixed.SQ(1, I2STDM.S_WIDTH-1)
-
 class I2SCalibrator(wiring.Component):
 
     """
@@ -280,8 +281,8 @@ class I2SCalibrator(wiring.Component):
     # Set values and assert `valid` until `ready` is strobed by this core, which
     # indicates the calibration memory write has been committed.
     cal_mem_write: In(stream.Signature(data.StructLayout({
-        "a": signed(18),
-        "b": signed(18),
+        "a": signed(2 + ASQ.width),
+        "b": signed(2 + ASQ.width),
         "channel": unsigned(exact_log2(I2STDM.N_CHANNELS*2))
         })))
 

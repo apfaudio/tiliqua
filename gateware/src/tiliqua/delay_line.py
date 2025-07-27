@@ -129,7 +129,7 @@ class DelayLine(wiring.Component):
         *Only present for PSRAM-backed delay lines.*
     """
 
-    INTERNAL_BUS_DATA_WIDTH  = 16
+    INTERNAL_BUS_DATA_WIDTH  = 16 if (ASQ.width <= 16) else 32
     INTERNAL_BUS_GRANULARITY = 8
 
     def __init__(self, max_delay, psram_backed=False, addr_width_o=None, base=None,
@@ -210,7 +210,8 @@ class DelayLine(wiring.Component):
             self._adapter = WishboneAdapter(
                 addr_width_i=self.address_width,
                 addr_width_o=addr_width_o,
-                base=base
+                base=base,
+                data_width_internal=data_width
             )
 
             if cache_kwargs is None:
@@ -310,7 +311,7 @@ class DelayLine(wiring.Component):
                     m.d.sync += [
                         bus.adr.eq(self._wrpointer),
                         bus.dat_w.eq(0),
-                        bus.sel.eq(0b11),
+                        bus.sel.eq(-1),
                     ]
                     with m.If(bus.ack):
                         with m.If(self._wrpointer != (self.max_delay - 1)):
@@ -326,7 +327,7 @@ class DelayLine(wiring.Component):
                     m.d.sync += [
                         bus.adr  .eq(self._wrpointer),
                         bus.dat_w.eq(istream.payload),
-                        bus.sel  .eq(0b11),
+                        bus.sel  .eq(-1),
                     ]
                     m.next = 'WRITE'
 
@@ -406,7 +407,7 @@ class DelayLineTap(wiring.Component):
                     bus.stb.eq(1),
                     bus.cyc.eq(1),
                     bus.we.eq(0),
-                    bus.sel.eq(0b11),
+                    bus.sel.eq(-1),
                 ]
                 with m.If(bus.ack):
                     m.d.sync += self.o.payload.eq(bus.dat_r)
@@ -420,17 +421,18 @@ class DelayLineTap(wiring.Component):
 
 class WishboneAdapter(wiring.Component):
     """
-    Adapter between external (dw=32) and internal (dw=16) buses of DelayLine.
+    Adapter between external (dw=32) and internal (dw=ASQ.width) buses of DelayLine.
     Used to adapt the internal bus to the correct size for external memory.
-
-    TODO: this should really be parameterized beyond 16-bit samples...
     """
 
-    def __init__(self, addr_width_i, addr_width_o, base):
+    def __init__(self, addr_width_i, addr_width_o, base, data_width_internal):
         self.base = base
+        # FIXME: this component should be parameterizable beyond 16-bit samples.
+        # 16-bit samples are nice because 2 evenly fit in a 32-bit WB bus.
+        assert data_width_internal == 16
         super().__init__({
             "i": In(wishbone.Signature(addr_width=addr_width_i,
-                                       data_width=16,
+                                       data_width=data_width_internal,
                                        granularity=8)),
             "o": Out(wishbone.Signature(addr_width=addr_width_o,
                                         data_width=32,

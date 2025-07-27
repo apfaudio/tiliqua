@@ -44,6 +44,10 @@ class Shape(hdl.ShapeCastable):
     def as_shape(self):
         return self._storage_shape
 
+    @property
+    def width(self):
+        return self.as_shape().width
+
     def __call__(self, target):
         return Value(self, target)
 
