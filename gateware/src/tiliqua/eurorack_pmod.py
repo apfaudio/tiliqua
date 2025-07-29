@@ -25,7 +25,7 @@ from amaranth_future            import fixed
 
 # Native 'Audio sample SQ': shape of audio samples from CODEC.
 # Signed fixed point, where -1 to +1 represents -8.192V to +8.192V.
-ASQ = fixed.SQ(1, 15)
+ASQ = fixed.SQ(1, int(os.environ.get('TILIQUA_ASQ_WIDTH', '16')) - 1)
 
 class I2SSignature(wiring.Signature):
     """
