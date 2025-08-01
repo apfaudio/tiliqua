@@ -151,7 +151,12 @@ class Stroke(wiring.Component):
 
         # Overall x / y scale depends on ASQ fractional bits as we often take raw counts.
         # This ensures this component still works as expected with 10/16/24-bit samples.
-        asq_extra_bits = ASQ.f_bits - 15
+        def normalize_scale_down(sq: fixed.Value, scale: Signal(unsigned(4))):
+            asq_extra_bits = ASQ.f_bits - 15
+            if asq_extra_bits >= 0:
+                return (sq.as_value() >> scale) >> asq_extra_bits
+            else:
+                return (sq.as_value() >> scale) << -asq_extra_bits
 
         with m.FSM() as fsm:
 
@@ -165,11 +170,11 @@ class Stroke(wiring.Component):
                 # Fired on every audio sample fs_strobe
                 with m.If(self.point_stream.valid):
                     m.d.sync += [
-                        sample_x.eq((self.point_stream.payload[0].as_value()>>(self.scale_x+asq_extra_bits)) + self.x_offset),
+                        sample_x.eq(normalize_scale_down(self.point_stream.payload[0], self.scale_x) + self.x_offset),
                         # invert sample_y for positive scope -> up
-                        sample_y.eq((-self.point_stream.payload[1].as_value()>>(self.scale_y+asq_extra_bits)) + self.y_offset),
-                        sample_p.eq(Mux(self.scale_p != 0xf, self.point_stream.payload[2].as_value()>>(self.scale_p+asq_extra_bits), 0)),
-                        sample_c.eq(Mux(self.scale_c != 0xf, self.point_stream.payload[3].as_value()>>(self.scale_c+asq_extra_bits), 0)),
+                        sample_y.eq(normalize_scale_down(-self.point_stream.payload[1], self.scale_y) + self.y_offset),
+                        sample_p.eq(Mux(self.scale_p != 0xf, normalize_scale_down(self.point_stream.payload[2], self.scale_p), 0)),
+                        sample_c.eq(Mux(self.scale_c != 0xf, normalize_scale_down(self.point_stream.payload[3], self.scale_c), 0)),
                     ]
                     m.next = 'LATCH1'
 
