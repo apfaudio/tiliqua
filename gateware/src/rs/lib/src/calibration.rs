@@ -111,23 +111,38 @@ impl CalibrationConstants {
         let shift = if self.fractional_bits != pmod.f_bits() {
             info!("audio/calibration: calibration (f_bits={}) != hardware (f_bits={}), scaling to match...",
                  self.fractional_bits, pmod.f_bits());
-            pmod.f_bits() - self.fractional_bits
+            pmod.f_bits() as i8 - self.fractional_bits as i8
         } else {
             // Calibration matches hardware, no shift needed.
             0
         };
 
-        for ch in 0..4usize {
-            pmod.write_calibration_constant(
-                ch as u8,
-                self.adc_scale[ch]<<shift,
-                self.adc_zero[ch]<<shift,
-            );
-            pmod.write_calibration_constant(
-                (ch+4) as u8,
-                self.dac_scale[ch]<<shift,
-                self.dac_zero[ch]<<shift,
-            );
+        if shift >= 0 {
+            for ch in 0..4usize {
+                pmod.write_calibration_constant(
+                    ch as u8,
+                    self.adc_scale[ch]<<shift,
+                    self.adc_zero[ch]<<shift,
+                );
+                pmod.write_calibration_constant(
+                    (ch+4) as u8,
+                    self.dac_scale[ch]<<shift,
+                    self.dac_zero[ch]<<shift,
+                );
+            }
+        } else {
+            for ch in 0..4usize {
+                pmod.write_calibration_constant(
+                    ch as u8,
+                    self.adc_scale[ch]>>-shift,
+                    self.adc_zero[ch]>>-shift,
+                );
+                pmod.write_calibration_constant(
+                    (ch+4) as u8,
+                    self.dac_scale[ch]>>-shift,
+                    self.dac_zero[ch]>>-shift,
+                );
+            }
         }
     }
 

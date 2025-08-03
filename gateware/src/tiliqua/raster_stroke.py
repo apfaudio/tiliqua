@@ -156,7 +156,7 @@ class Stroke(wiring.Component):
             if asq_extra_bits >= 0:
                 return (sq.as_value() >> scale) >> asq_extra_bits
             else:
-                return (sq.as_value() >> scale) << -asq_extra_bits
+                return (sq.as_value() << -asq_extra_bits) >> scale
 
         with m.FSM() as fsm:
 
