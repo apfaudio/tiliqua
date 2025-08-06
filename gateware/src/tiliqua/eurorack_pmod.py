@@ -24,8 +24,9 @@ from vendor                     import i2c as vendor_i2c
 from amaranth_future            import fixed
 
 # Native 'Audio sample SQ': shape of audio samples from CODEC.
-# Signed fixed point, where -1 to +1 represents -8.192V to +8.192V.
-ASQ = fixed.SQ(1, int(os.environ.get('TILIQUA_ASQ_WIDTH', '16')) - 1)
+# Default: 16-bit signed fixed point, where -1 to +1 represents -8.192V to +8.192V.
+ASQ = fixed.SQ(int(os.environ.get('TILIQUA_ASQ_I_BITS', '1')),
+               int(os.environ.get('TILIQUA_ASQ_F_BITS', '15')))
 
 class I2SSignature(wiring.Signature):
     """
@@ -356,7 +357,7 @@ class I2SCalibrator(wiring.Component):
                 with m.If(self.strobe):
                     m.d.audio += [
                         cal_read.addr.eq(self.channel),
-                        in_sample.as_value().eq(self.i_uncal)
+                        in_sample.as_value().eq(self.i_uncal >> (ASQ.i_bits-1))
                     ]
                     with m.If(dac_fifo.r_rdy):
                         with m.If(self.channel == (I2STDM.N_CHANNELS - 1)):
