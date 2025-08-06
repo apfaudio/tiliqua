@@ -4,7 +4,7 @@
 # if any of them fail. Extra arguments to this script are
 # forwarded to every command (e.g. --hw or --skip-build flags)
 
-parallel --halt now,fail=1 --jobs 8 --ungroup "{} $@" ::: \
+parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm dsp build --dsp-core=mirror" \
   "pdm dsp build --dsp-core=nco" \
   "pdm dsp build --dsp-core=svf" \
