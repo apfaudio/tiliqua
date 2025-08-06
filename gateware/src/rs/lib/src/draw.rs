@@ -233,7 +233,7 @@ where
     Ok(())
 }
 
-pub fn draw_cal<D>(d: &mut D, x: u32, y: u32, hue: u8, dac: &[i16; 4], adc: &[i16; 4]) -> Result<(), D::Error>
+pub fn draw_cal<D>(d: &mut D, x: u32, y: u32, hue: u8, dac: &[i16; 4], adc: &[i16; 4], counts_per_mv: i16) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = Gray8>,
 {
@@ -264,14 +264,14 @@ where
         line(d, 0, ch*spacing+s_y/2, 0, s_y+ch*spacing, false);
         line(d, width, ch*spacing+s_y/2, width, s_y+ch*spacing, false);
         line(d, width/2, ch*spacing+s_y-spacing/2, width/2, s_y+ch*spacing, false);
-        let delta = (adc[ch as usize] - dac[ch as usize]) / 4;
+        let delta = (adc[ch as usize] - dac[ch as usize]) / counts_per_mv;
         if delta.abs() < (width/2) as i16 {
             let pos = (delta + (width/2) as i16) as u32;
             line(d, pos, ch*spacing+s_y-spacing/4, pos, s_y+ch*spacing, true);
         }
 
         let mut adc_text: String<8> = String::new();
-        write!(adc_text, "{}", adc[ch as usize]/4).ok();
+        write!(adc_text, "{}", adc[ch as usize]/counts_per_mv).ok();
         Text::with_alignment(
             &adc_text,
             Point::new((x-10) as i32, (y+(ch+1)*spacing-3) as i32),
@@ -280,7 +280,7 @@ where
         ).draw(d)?;
 
         let mut dac_text: String<8> = String::new();
-        write!(dac_text, "{}", dac[ch as usize]/4).ok();
+        write!(dac_text, "{}", dac[ch as usize]/counts_per_mv).ok();
         Text::with_alignment(
             &dac_text,
             Point::new((x+width+10) as i32, (y+(ch+1)*spacing-3) as i32),

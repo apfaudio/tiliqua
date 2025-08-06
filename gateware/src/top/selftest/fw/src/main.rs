@@ -487,7 +487,8 @@ fn main() -> ! {
                 (app.ui.opts.clone(), commit_to_eeprom)
             });
 
-            let stimulus_raw = 4000 * opts.autocal.volts.value as i16;
+            let counts_per_mv = 4 >> (15 - pmod.f_bits());
+            let stimulus_raw = 1000 * counts_per_mv * opts.autocal.volts.value as i16;
 
             draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                hue).ok();
@@ -579,7 +580,7 @@ fn main() -> ! {
             if opts.tracker.page.value != Page::Report {
                 draw::draw_cal(&mut display, h_active/2-128, v_active/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
-                               &pmod.sample_i()).ok();
+                               &pmod.sample_i(), counts_per_mv).ok();
                 draw::draw_cal_constants(
                     &mut display, h_active/2-128, v_active/2+64, hue,
                     &constants.adc_scale, &constants.adc_zero, &constants.dac_scale, &constants.dac_zero,
