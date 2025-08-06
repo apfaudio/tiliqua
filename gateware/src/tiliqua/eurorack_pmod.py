@@ -382,7 +382,7 @@ class I2SCalibrator(wiring.Component):
                 ]
                 m.next = "PROCESS_DAC"
             with m.State("PROCESS_DAC"):
-                m.d.audio += self.o_uncal.eq(out_sample.as_value())
+                m.d.audio += self.o_uncal.eq(out_sample.as_value() << (ASQ.i_bits-1))
                 m.next = "IDLE"
 
         #
