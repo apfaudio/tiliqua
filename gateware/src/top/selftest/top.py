@@ -14,6 +14,7 @@ from amaranth.build              import *
 from amaranth_soc                import csr, gpio, wishbone
 from amaranth.lib                import wiring
 
+from tiliqua                     import sim
 from tiliqua.tiliqua_soc         import TiliquaSoc
 from tiliqua.cli                 import top_level_cli
 
@@ -43,38 +44,39 @@ class SelftestSoc(TiliquaSoc):
 
         m = Module()
 
-        def pmod_gpio(platform, ix):
-            pmod_gpio = [
-                Resource(f"pmod_gpio", ix,
-                    Subsignal("gpio0", Pins("1",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio1", Pins("2",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio2", Pins("3",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio3", Pins("4",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio4", Pins("7",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio5", Pins("8",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio6", Pins("9",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio7", Pins("10", conn=("pmod", ix), dir='io')),
-                    Attrs(IO_TYPE="LVCMOS33", PULLMODE="DOWN"),
-                )
-            ]
-            platform.add_resources(pmod_gpio)
-            return platform.request(f"pmod_gpio", ix)
+        if sim.is_hw(platform):
 
-        pmod_gpio0 = pmod_gpio(platform, 0)
-        for n in range(8):
-            wiring.connect(m, self.gpio0.pins[n], getattr(pmod_gpio0, f"gpio{n}"))
+            def pmod_gpio(platform, ix):
+                pmod_gpio = [
+                    Resource(f"pmod_gpio", ix,
+                        Subsignal("gpio0", Pins("1",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio1", Pins("2",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio2", Pins("3",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio3", Pins("4",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio4", Pins("7",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio5", Pins("8",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio6", Pins("9",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio7", Pins("10", conn=("pmod", ix), dir='io')),
+                        Attrs(IO_TYPE="LVCMOS33", PULLMODE="DOWN"),
+                    )
+                ]
+                platform.add_resources(pmod_gpio)
+                return platform.request(f"pmod_gpio", ix)
 
-        pmod_gpio1 = pmod_gpio(platform, 1)
-        for n in range(8):
-            wiring.connect(m, self.gpio1.pins[n], getattr(pmod_gpio1, f"gpio{n}"))
+            pmod_gpio0 = pmod_gpio(platform, 0)
+            for n in range(8):
+                wiring.connect(m, self.gpio0.pins[n], getattr(pmod_gpio0, f"gpio{n}"))
+
+            pmod_gpio1 = pmod_gpio(platform, 1)
+            for n in range(8):
+                wiring.connect(m, self.gpio1.pins[n], getattr(pmod_gpio1, f"gpio{n}"))
+
+            m.submodules += USBSpeedTestDevice(generate_clocks=False,
+                                               phy_name=platform.default_usb_connection,
+                                               vid=VENDOR_ID,
+                                               pid=PRODUCT_ID)
 
         m.submodules += [self.gpio0, self.gpio1]
-
-
-        m.submodules += USBSpeedTestDevice(generate_clocks=False,
-                                           phy_name=platform.default_usb_connection,
-                                           vid=VENDOR_ID,
-                                           pid=PRODUCT_ID)
 
         m.submodules += super().elaborate(platform)
 
