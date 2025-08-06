@@ -46,7 +46,7 @@ pub enum EnWrite {
     WriteU,
 }
 
-int_params!(RefVoltageParams<i8>     { step: 1, min: -8, max: 8 });
+int_params!(RefVoltageParams<i8>     { step: 1, min: -12, max: 12 });
 int_params!(CalTweakerParams<i16>    { step: 1, min: -256, max: 256 });
 
 #[derive(OptionPage, Clone)]
