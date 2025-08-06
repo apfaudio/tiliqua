@@ -311,7 +311,8 @@ pub fn draw_cal_constants<D>(
     adc_scale: &[i32; 4],
     adc_zero:  &[i32; 4],
     dac_scale: &[i32; 4],
-    dac_zero:  &[i32; 4]
+    dac_zero:  &[i32; 4],
+    denominator: i32
     ) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = Gray8>,
@@ -325,9 +326,9 @@ where
         let mut s: String<32> = String::new();
         write!(s, "O{} = {:.4} * o{} + {:.4}",
               ch,
-              dac_scale[ch as usize] as f32 / 32768f32,
+              dac_scale[ch as usize] as f32 / denominator as f32,
               ch,
-              dac_zero[ch as usize] as f32 / 32768f32).ok();
+              dac_zero[ch as usize] as f32 / denominator as f32).ok();
         Text::with_alignment(
             &s,
             Point::new((x+width/2+20) as i32, (y+(ch+1)*spacing-3) as i32),
@@ -340,9 +341,9 @@ where
         let mut s: String<32> = String::new();
         write!(s, "i{} = {:.4} * I{} + {:.4}",
               ch,
-              adc_scale[ch as usize] as f32 / 32768f32,
+              adc_scale[ch as usize] as f32 / denominator as f32,
               ch,
-              adc_zero[ch as usize] as f32 / 32768f32).ok();
+              adc_zero[ch as usize] as f32 / denominator as f32).ok();
         Text::with_alignment(
             &s,
             Point::new((x+width/2-20) as i32, (y+(ch+1)*spacing-3) as i32),
