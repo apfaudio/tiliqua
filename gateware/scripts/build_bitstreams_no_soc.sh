@@ -25,8 +25,6 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm dsp build --dsp-core=vocoder" \
   "pdm vectorscope_no_soc build --fs-192khz" \
   "pdm vectorscope_no_soc build --fs-192khz --spectrogram --name=spectro" \
-  "TILIQUA_ASQ_WIDTH=8 pdm vectorscope_no_soc build --fs-192khz --name=vscope-8bit" \
-  "TILIQUA_ASQ_WIDTH=24 pdm vectorscope_no_soc build --fs-192khz --name=vscope-24bit" \
   "pdm bootstub build" \
   "pdm usb_audio build" \
   "pdm usb_host build --midi-device=yamaha-cp73"
