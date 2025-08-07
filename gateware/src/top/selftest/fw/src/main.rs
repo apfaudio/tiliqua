@@ -27,6 +27,7 @@ use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pca9635::Pca9635Driver;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
+use tiliqua_hal::spiflash::SpiFlash;
 
 const TUSB322I_ADDR:  u8 = 0x47;
 
@@ -341,70 +342,6 @@ fn print_psram_stats(s: &mut ReportString, psram: &pac::PSRAM_CSR)
            sysclk / (cycles_elapsed+1)).ok();
 }
 
-fn spi_ready(f: &dyn Fn() -> bool) -> bool {
-    let mut timeout = 0;
-    while !f() {
-        timeout += 1;
-        if timeout > 1000 {
-            return false;
-        }
-    }
-    return true;
-}
-
-fn read_flash_uuid(spi0: &pac::SPIFLASH_CTRL) {
-
-    spi0.phy()
-        .write(|w| unsafe { w.length().bits(8).width().bits(1).mask().bits(1) });
-
-    if !spi_ready(&|| spi0.status().read().tx_ready().bit()) {
-        error!("spi write timeout");
-        return;
-    }
-
-    spi0.cs().write(|w| w.select().bit(true));
-
-    let command: [u8; 5] = [0x4b, 0, 0, 0, 0];
-    for byte in command {
-        spi0.data()
-            .write(|w| unsafe { w.tx().bits(u32::from(byte)) });
-    }
-
-    spi0.phy()
-        .write(|w| unsafe { w.length().bits(8).width().bits(1).mask().bits(0) });
-
-    let response: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
-    for byte in response {
-        spi0.data()
-            .write(|w| unsafe { w.tx().bits(u32::from(byte)) });
-    }
-
-    if !spi_ready(&|| spi0.status().read().rx_ready().bit()) {
-        error!("spi read timeout");
-        return;
-    }
-
-    let mut response = [0_u8; 32];
-    let mut n = 0;
-    while spi0.status().read().rx_ready().bit() {
-        response[n] = spi0.data().read().rx().bits() as u8;
-        n = n + 1;
-        if n >= response.len() {
-            error!("read overflow");
-            return;
-        }
-    }
-
-    spi0.cs().write(|w| w.select().bit(false));
-
-    if n != 13 {
-        error!("invalid response length: {} - {:02x?}", n, &response[..n]);
-        return;
-    }
-
-    info!("flash uuid: {:02x?}", &response);
-}
-
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
@@ -459,6 +396,8 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua selftest!");
 
+
+    let mut spiflash = SPIFlash0::new(peripherals.SPIFLASH_CTRL);
     loop {
         let mut buffer = [0_u8; READ_LENGTH];
         for offset in 0..READ_LENGTH {
@@ -467,7 +406,7 @@ fn main() -> ! {
             buffer[offset] = byte;
         }
         info!("Read flash memory: {:02x?}", buffer);
-        read_flash_uuid(&peripherals.SPIFLASH_CTRL);
+        info!("Read flash UUID: {:?}", spiflash.uuid());
         timer.disable();
         timer.delay_ns(1_000_000_000);
     }

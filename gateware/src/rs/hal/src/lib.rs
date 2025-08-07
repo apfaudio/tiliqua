@@ -18,6 +18,7 @@ pub mod si5351;
 pub mod timer;
 pub mod persist;
 pub mod cy8cmbr3xxx;
+pub mod spiflash;
 
 pub use embedded_hal as hal;
 pub use embedded_hal_nb as hal_nb;
@@ -62,6 +63,10 @@ macro_rules! impl_tiliqua_soc_pac {
         tiliqua_hal::impl_dma_framebuffer! {
             DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
             Palette0: tiliqua_pac::PALETTE_PERIPH,
+        }
+
+        tiliqua_hal::impl_spiflash! {
+            SPIFlash0: tiliqua_pac::SPIFLASH_CTRL,
         }
     };
 }
