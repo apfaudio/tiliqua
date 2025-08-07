@@ -82,6 +82,16 @@ macro_rules! impl_serial {
                     }
                 }
             }
+
+            impl $crate::hal_nb::serial::Read for $SERIALX {
+                fn read(&mut self) -> $crate::nb::Result<u8, Self::Error> {
+                    if self.registers.rx_avail().read().rxe().bit() {
+                        Ok(self.registers.rx_data().read().data().bits())
+                    } else {
+                        Err($crate::nb::Error::WouldBlock)
+                    }
+                }
+            }
         )+
     }
 }
