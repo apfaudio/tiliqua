@@ -1,14 +1,13 @@
-use core::fmt;
-
 #[derive(Debug)]
 pub enum Error {
     TxTimeout,
     RxTimeout,
-    InvalidRead,
+    InvalidReadSize,
 }
 
 pub trait SpiFlash {
     type Error;
+    fn read_transaction(&mut self, prefix: &[u8], data: &mut [u8]) -> Result<(), Self::Error>;
     fn uuid(&mut self) -> Result<[u8; 8], Error>;
 }
 
@@ -62,7 +61,8 @@ macro_rules! impl_spiflash {
 
                 type Error = $crate::spiflash::Error;
 
-                fn uuid(&mut self) -> Result<[u8; 8], Self::Error> {
+                fn read_transaction(&mut self, prefix: &[u8], data: &mut [u8]) -> Result<(), Self::Error> {
+
                     self.registers
                         .phy()
                         .write(|w| unsafe { w.length().bits(8).width().bits(1).mask().bits(1) });
@@ -73,47 +73,47 @@ macro_rules! impl_spiflash {
 
                     self.registers.cs().write(|w| w.select().bit(true));
 
-                    let command: [u8; 5] = [SPIFLASH_CMD_UUID, 0, 0, 0, 0];
-                    for byte in command {
+                    for byte in prefix {
                         self.registers
                             .data()
-                            .write(|w| unsafe { w.tx().bits(u32::from(byte)) });
+                            .write(|w| unsafe { w.tx().bits(*byte as u32) });
                     }
 
                     self.registers
                         .phy()
                         .write(|w| unsafe { w.length().bits(8).width().bits(1).mask().bits(0) });
 
-                    let response: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
-                    for byte in response {
+                    for _ in 0..data.len() {
                         self.registers
                             .data()
-                            .write(|w| unsafe { w.tx().bits(u32::from(byte)) });
+                            .write(|w| unsafe { w.tx().bits(0x0) });
                     }
 
                     if !spi_ready(&|| self.registers.status().read().rx_ready().bit()) {
                         return Err(Self::Error::RxTimeout);
                     }
 
-                    let mut response = [0_u8; 32];
                     let mut n = 0;
                     while self.registers.status().read().rx_ready().bit() {
-                        response[n] = self.registers.data().read().rx().bits() as u8;
-                        n = n + 1;
-                        if n >= response.len() {
-                            return Err(Self::Error::InvalidRead);
+                        if n > prefix.len() {
+                            data[n] = self.registers.data().read().rx().bits() as u8;
+                            if n > prefix.len() + data.len() {
+                                return Err(Self::Error::InvalidReadSize);
+                            }
                         }
+                        n = n + 1;
                     }
 
                     self.registers.cs().write(|w| w.select().bit(false));
 
-                    if n != 13 {
-                        return Err(Self::Error::InvalidRead);
-                    }
+                    Ok(())
+                }
 
-                    let mut result: [u8; 8] = [0u8; 8];
-                    result.copy_from_slice(&response[5..13]);
-                    Ok(result)
+                fn uuid(&mut self) -> Result<[u8; 8], Self::Error> {
+                    let command: [u8; 5] = [SPIFLASH_CMD_UUID, 0, 0, 0, 0];
+                    let mut response: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+                    self.read_transaction(&command, &mut response)?;
+                    Ok(response)
                 }
             }
         )+
