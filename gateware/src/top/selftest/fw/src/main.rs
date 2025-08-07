@@ -397,7 +397,12 @@ fn main() -> ! {
     info!("Hello from Tiliqua selftest!");
 
 
-    let mut spiflash = SPIFlash0::new(peripherals.SPIFLASH_CTRL);
+    let mut spiflash = SPIFlash0::new(
+        peripherals.SPIFLASH_CTRL,
+        SPIFLASH_BASE,
+        SPIFLASH_SZ_BYTES
+    );
+
     loop {
         let mut buffer = [0_u8; READ_LENGTH];
         for offset in 0..READ_LENGTH {

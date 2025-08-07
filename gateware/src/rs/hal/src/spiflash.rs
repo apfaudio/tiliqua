@@ -1,8 +1,16 @@
+use crate::nor_flash::*;
+
 #[derive(Debug)]
 pub enum Error {
     TxTimeout,
     RxTimeout,
     InvalidReadSize,
+}
+
+impl NorFlashError for Error {
+    fn kind(&self) -> NorFlashErrorKind {
+        NorFlashErrorKind::Other
+    }
 }
 
 pub trait SpiFlash {
@@ -35,27 +43,17 @@ macro_rules! impl_spiflash {
             #[derive(Debug)]
             pub struct $SPIFLASHX {
                 registers: $PACSPIX,
+                base: usize,
+                size: usize,
             }
 
             impl $SPIFLASHX {
-                pub fn new(registers: $PACSPIX) -> Self {
-                    Self { registers }
+                pub fn new(registers: $PACSPIX, base: usize, size: usize) -> Self {
+                    Self { registers, base, size }
                 }
 
                 pub fn free(self) -> $PACSPIX {
                     self.registers
-                }
-
-                pub unsafe fn summon() -> Self {
-                    Self {
-                        registers: <$PACSPIX>::steal(),
-                    }
-                }
-            }
-
-            impl From<$PACSPIX> for $SPIFLASHX {
-                fn from(registers: $PACSPIX) -> $SPIFLASHX {
-                    $SPIFLASHX::new(registers)
                 }
             }
 
@@ -222,6 +220,63 @@ macro_rules! impl_spiflash {
 
                     self.registers.cs().write(|w| w.select().bit(false));
 
+                    Ok(())
+                }
+            }
+
+            impl $crate::nor_flash::ErrorType for $SPIFLASHX {
+                type Error = $crate::spiflash::Error;
+            }
+
+            impl $crate::nor_flash::ReadNorFlash for $SPIFLASHX {
+                const READ_SIZE: usize = 1;
+                fn read(&mut self, offset: u32, bytes: &mut [u8]) ->
+                    Result<(), Self::Error> {
+                    for n in 0..bytes.len() {
+                        let addr = self.base + (offset as usize);
+                        bytes[n] = unsafe { core::ptr::read_volatile(addr as *mut u8) };
+                    }
+                    Ok(())
+                }
+                fn capacity(&self) -> usize {
+                    self.size
+                }
+            }
+
+            impl $crate::nor_flash::NorFlash for $SPIFLASHX {
+                const WRITE_SIZE: usize = 1;
+                const ERASE_SIZE: usize = 4096;
+                fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
+                    use $crate::spiflash::SpiFlash;
+                    // TODO $crate::nor_flash::check_erase(self, from, to)?;
+                    let mut addr = from;
+                    self.write_enable()?;
+                    while addr < to {
+                        self.sector_erase(addr)?;
+                        while self.busy()? { } // TODO timeout
+                        addr += Self::ERASE_SIZE as u32;
+                    }
+                    self.write_disable()?;
+                    Ok(())
+                }
+                fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+                    use $crate::spiflash::SpiFlash;
+                    const PAGE_SIZE: usize = 256;
+                    let mut written = 0;
+                    let mut current_offset = offset;
+                    self.write_enable()?;
+                    while written < bytes.len() {
+                        let page_offset = (current_offset as usize) % PAGE_SIZE;
+                        let bytes_to_write = core::cmp::min(
+                                PAGE_SIZE - page_offset,
+                                bytes.len() - written
+                        );
+                        self.page_program(current_offset, &bytes[written..written + bytes_to_write]);
+                        while self.busy()? { } // TODO timeout
+                        written += bytes_to_write;
+                        current_offset += bytes_to_write as u32;
+                    }
+                    self.write_disable()?;
                     Ok(())
                 }
             }

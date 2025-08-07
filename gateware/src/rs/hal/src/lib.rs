@@ -22,6 +22,7 @@ pub mod spiflash;
 
 pub use embedded_hal as hal;
 pub use embedded_hal_nb as hal_nb;
+pub use embedded_storage::nor_flash;
 
 #[macro_use]
 extern crate bitflags;

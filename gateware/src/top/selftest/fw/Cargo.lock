@@ -94,6 +94,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-storage"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a21dea9854beb860f3062d10228ce9b976da520a73474aed3171ec276bc0c032"
+
+[[package]]
 name = "fastrand"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -404,6 +410,7 @@ dependencies = [
  "embedded-graphics",
  "embedded-hal",
  "embedded-hal-nb",
+ "embedded-storage",
  "micromath",
  "nb",
  "riscv",
