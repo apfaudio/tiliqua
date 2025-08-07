@@ -1,0 +1,10 @@
+diff -r .venv/lib/python3.13/site-packages/luna_soc/gateware/core/spiflash/controller.py /home/seb/dev/luna-soc/luna_soc/gateware/core/spiflash/controller.py
+115,118d114
+>         cs_wr = Signal()
+>         with m.If(self._cs.f.select.w_stb):
+>             m.d.sync += cs_wr.eq(self._cs.f.select.w_data)
+> 
+128c124
+>                 m.d.comb += cs.eq(cs_wr | tx_fifo.r_rdy)
+---
+<                 m.d.comb += cs.eq(self._cs.f.select.w_data | tx_fifo.r_rdy)

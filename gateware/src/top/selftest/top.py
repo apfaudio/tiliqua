@@ -16,6 +16,7 @@ from amaranth.lib                import wiring
 
 from tiliqua.tiliqua_soc         import TiliquaSoc
 from tiliqua.cli                 import top_level_cli
+from tiliqua                     import sim
 
 from luna.gateware.applets.speed_test import USBSpeedTestDevice, VENDOR_ID, PRODUCT_ID
 
@@ -43,38 +44,62 @@ class SelftestSoc(TiliquaSoc):
 
         m = Module()
 
-        def pmod_gpio(platform, ix):
-            pmod_gpio = [
-                Resource(f"pmod_gpio", ix,
-                    Subsignal("gpio0", Pins("1",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio1", Pins("2",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio2", Pins("3",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio3", Pins("4",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio4", Pins("7",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio5", Pins("8",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio6", Pins("9",  conn=("pmod", ix), dir='io')),
-                    Subsignal("gpio7", Pins("10", conn=("pmod", ix), dir='io')),
-                    Attrs(IO_TYPE="LVCMOS33", PULLMODE="DOWN"),
-                )
+        if sim.is_hw(platform):
+
+            def pmod_gpio(platform, ix):
+                pmod_gpio = [
+                    Resource(f"pmod_gpio", ix,
+                        Subsignal("gpio0", Pins("1",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio1", Pins("2",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio2", Pins("3",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio3", Pins("4",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio4", Pins("7",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio5", Pins("8",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio6", Pins("9",  conn=("pmod", ix), dir='io')),
+                        Subsignal("gpio7", Pins("10", conn=("pmod", ix), dir='io')),
+                        Attrs(IO_TYPE="LVCMOS33", PULLMODE="DOWN"),
+                    )
+                ]
+                platform.add_resources(pmod_gpio)
+                return platform.request(f"pmod_gpio", ix)
+
+            pmod_gpio0 = pmod_gpio(platform, 0)
+            m.d.comb += [
+                pmod_gpio0.gpio0.o.eq(self.spi0_phy.pins.cs.o),
+                pmod_gpio0.gpio1.o.eq(self.spi0_phy.pins.sck.o),
             ]
-            platform.add_resources(pmod_gpio)
-            return platform.request(f"pmod_gpio", ix)
+            with m.If(self.spi0_phy.pins.dq.oe):
+                m.d.comb += [
+                    pmod_gpio0.gpio2.o.eq(self.spi0_phy.pins.dq.o[0]),
+                    pmod_gpio0.gpio3.o.eq(self.spi0_phy.pins.dq.o[1]),
+                    pmod_gpio0.gpio4.o.eq(self.spi0_phy.pins.dq.o[2]),
+                    pmod_gpio0.gpio5.o.eq(self.spi0_phy.pins.dq.o[3]),
+                ]
+            with m.Else():
+                m.d.comb += [
+                    pmod_gpio0.gpio2.o.eq(self.spi0_phy.pins.dq.i[0]),
+                    pmod_gpio0.gpio3.o.eq(self.spi0_phy.pins.dq.i[1]),
+                    pmod_gpio0.gpio4.o.eq(self.spi0_phy.pins.dq.i[2]),
+                    pmod_gpio0.gpio5.o.eq(self.spi0_phy.pins.dq.i[3]),
+                ]
 
-        pmod_gpio0 = pmod_gpio(platform, 0)
-        for n in range(8):
-            wiring.connect(m, self.gpio0.pins[n], getattr(pmod_gpio0, f"gpio{n}"))
+            """
+            pmod_gpio0 = pmod_gpio(platform, 0)
+            for n in range(8):
+                wiring.connect(m, self.gpio0.pins[n], getattr(pmod_gpio0, f"gpio{n}"))
 
-        pmod_gpio1 = pmod_gpio(platform, 1)
-        for n in range(8):
-            wiring.connect(m, self.gpio1.pins[n], getattr(pmod_gpio1, f"gpio{n}"))
+            pmod_gpio1 = pmod_gpio(platform, 1)
+            for n in range(8):
+                wiring.connect(m, self.gpio1.pins[n], getattr(pmod_gpio1, f"gpio{n}"))
+            """
+
+            m.submodules += USBSpeedTestDevice(generate_clocks=False,
+                                               phy_name=platform.default_usb_connection,
+                                               vid=VENDOR_ID,
+                                               pid=PRODUCT_ID)
 
         m.submodules += [self.gpio0, self.gpio1]
 
-
-        m.submodules += USBSpeedTestDevice(generate_clocks=False,
-                                           phy_name=platform.default_usb_connection,
-                                           vid=VENDOR_ID,
-                                           pid=PRODUCT_ID)
 
         m.submodules += super().elaborate(platform)
 

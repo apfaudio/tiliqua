@@ -357,15 +357,24 @@ fn read_flash_uuid(spi0: &pac::SPIFLASH_CTRL) {
     spi0.phy()
         .write(|w| unsafe { w.length().bits(8).width().bits(1).mask().bits(1) });
 
-    spi0.cs().write(|w| w.select().bit(false));
-
     if !spi_ready(&|| spi0.status().read().tx_ready().bit()) {
         error!("spi write timeout");
         return;
     }
 
-    let command: [u8; 13] = [0x4b, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    spi0.cs().write(|w| w.select().bit(true));
+
+    let command: [u8; 5] = [0x4b, 0, 0, 0, 0];
     for byte in command {
+        spi0.data()
+            .write(|w| unsafe { w.tx().bits(u32::from(byte)) });
+    }
+
+    spi0.phy()
+        .write(|w| unsafe { w.length().bits(8).width().bits(1).mask().bits(0) });
+
+    let response: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+    for byte in response {
         spi0.data()
             .write(|w| unsafe { w.tx().bits(u32::from(byte)) });
     }
@@ -386,12 +395,14 @@ fn read_flash_uuid(spi0: &pac::SPIFLASH_CTRL) {
         }
     }
 
+    spi0.cs().write(|w| w.select().bit(false));
+
     if n != 13 {
         error!("invalid response length: {} - {:02x?}", n, &response[..n]);
         return;
     }
 
-    info!("flash uuid: {:02x?}", &response[5..n]);
+    info!("flash uuid: {:02x?}", &response);
 }
 
 struct App {
@@ -432,6 +443,8 @@ fn push_to_opts(constants: &CalibrationConstants, options: &mut Opts, d: &Defaul
     options.caldac.zero3.value  = c.dac_zero[3];
 }
 
+const READ_LENGTH: usize = 32;
+
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -446,6 +459,19 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua selftest!");
 
+    loop {
+        let mut buffer = [0_u8; READ_LENGTH];
+        for offset in 0..READ_LENGTH {
+            let addr = SPIFLASH_BASE + offset;
+            let byte = unsafe { core::ptr::read_volatile(addr as *mut u8) };
+            buffer[offset] = byte;
+        }
+        info!("Read flash memory: {:02x?}", buffer);
+        read_flash_uuid(&peripherals.SPIFLASH_CTRL);
+        timer.disable();
+        timer.delay_ns(1_000_000_000);
+    }
+
     let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
@@ -456,7 +482,6 @@ fn main() -> ! {
     let dtr = peripherals.DTR0;
 
     let mut startup_report = ReportString::new();
-    read_flash_uuid(&peripherals.SPIFLASH_CTRL);
     psram_memtest(&mut startup_report, &mut timer);
     //spiflash_memtest(&mut startup_report, &mut timer);
     tusb322i_id_test(&mut startup_report, &mut i2cdev);
