@@ -173,8 +173,8 @@ class TiliquaSoc(Component):
         # spiflash peripheral
         self.spi0_phy        = spiflash.SPIPHYController(domain="sync", divisor=0)
         self.spiflash_periph = spiflash.Peripheral(phy=self.spi0_phy, mmap_size=self.spiflash_size,
-                                                   mmap_name="spiflash", with_controller=True, with_mmap=False)
-        # self.wb_decoder.add(self.spiflash_periph.bus, addr=self.spiflash_base, name="spiflash")
+                                                   mmap_name="spiflash")
+        self.wb_decoder.add(self.spiflash_periph.bus, addr=self.spiflash_base, name="spiflash")
         self.csr_decoder.add(self.spiflash_periph.csr, addr=self.spiflash_ctrl_base, name="spiflash_ctrl")
 
         # psram peripheral
