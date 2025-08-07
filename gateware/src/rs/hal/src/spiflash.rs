@@ -233,7 +233,7 @@ macro_rules! impl_spiflash {
                 fn read(&mut self, offset: u32, bytes: &mut [u8]) ->
                     Result<(), Self::Error> {
                     for n in 0..bytes.len() {
-                        let addr = self.base + (offset as usize);
+                        let addr = self.base + (offset as usize) + n;
                         bytes[n] = unsafe { core::ptr::read_volatile(addr as *mut u8) };
                     }
                     Ok(())
@@ -271,7 +271,7 @@ macro_rules! impl_spiflash {
                                 PAGE_SIZE - page_offset,
                                 bytes.len() - written
                         );
-                        self.page_program(current_offset, &bytes[written..written + bytes_to_write]);
+                        self.page_program(current_offset, &bytes[written..written + bytes_to_write])?;
                         while self.busy()? { } // TODO timeout
                         written += bytes_to_write;
                         current_offset += bytes_to_write as u32;

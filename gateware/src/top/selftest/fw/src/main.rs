@@ -404,15 +404,15 @@ fn main() -> ! {
     );
 
     loop {
-        let mut buffer = [0_u8; READ_LENGTH];
-        for offset in 0..READ_LENGTH {
-            let addr = SPIFLASH_BASE + offset;
-            let byte = unsafe { core::ptr::read_volatile(addr as *mut u8) };
-            buffer[offset] = byte;
-        }
-        info!("Read flash memory: {:02x?}", buffer);
         info!("Read flash UUID: {:?}", spiflash.uuid());
         info!("Read flash JEDEC: {:?}", spiflash.jedec());
+        use tiliqua_hal::nor_flash::{ReadNorFlash, NorFlash};
+        let mut buffer = [0_u8; 64];
+        spiflash.read(0x1B0000, &mut buffer);
+        info!("Read flash0:  {:02x?}", buffer);
+        spiflash.erase(0x1B0000, 0x1B1000);
+        spiflash.read(0x1B0000, &mut buffer);
+        info!("Read flash2:  {:02x?}", buffer);
         timer.disable();
         timer.delay_ns(1_000_000_000);
     }
