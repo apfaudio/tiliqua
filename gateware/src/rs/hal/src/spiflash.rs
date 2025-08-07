@@ -7,9 +7,15 @@ pub enum Error {
 
 pub trait SpiFlash {
     type Error;
-    fn read_transaction(&mut self, prefix: &[u8], data: &mut [u8]) -> Result<(), Self::Error>;
+    fn write_transaction(&mut self, cmd: &[u8]) -> Result<(), Error>;
+    fn read_transaction(&mut self, prefix: &[u8], data: &mut [u8]) -> Result<(), Error>;
     fn uuid(&mut self) -> Result<[u8; 8], Error>;
     fn jedec(&mut self) -> Result<[u8; 3], Error>;
+    fn busy(&mut self) -> Result<bool, Error>;
+    fn sector_erase(&mut self, addr: u32) -> Result<(), Error>;
+    fn page_program(&mut self, addr: u32, data: &[u8]) -> Result<(), Error>;
+    fn write_enable(&mut self) -> Result<(), Error>;
+    fn write_disable(&mut self) -> Result<(), Error>;
 }
 
 #[macro_export]
@@ -20,6 +26,11 @@ macro_rules! impl_spiflash {
         $(
             pub const SPIFLASH_CMD_UUID: u8 = 0x4b;
             pub const SPIFLASH_CMD_JEDEC: u8 = 0x9f;
+            pub const SPIFLASH_CMD_STATUS1: u8 = 0x05;
+            pub const SPIFLASH_CMD_WRITE_ENABLE: u8 = 0x06;
+            pub const SPIFLASH_CMD_WRITE_DISABLE: u8 = 0x04;
+            pub const SPIFLASH_CMD_SECTOR_ERASE: u8 = 0x20;
+            pub const SPIFLASH_CMD_PAGE_PROGRAM: u8 = 0x02;
 
             #[derive(Debug)]
             pub struct $SPIFLASHX {
@@ -62,6 +73,29 @@ macro_rules! impl_spiflash {
             impl hal::spiflash::SpiFlash for $SPIFLASHX {
 
                 type Error = $crate::spiflash::Error;
+
+                fn write_transaction(&mut self, cmd: &[u8]) -> Result<(), Self::Error> {
+
+                    self.registers
+                        .phy()
+                        .write(|w| unsafe { w.length().bits(8).width().bits(1).mask().bits(1) });
+
+                    if !spi_ready(&|| self.registers.status().read().tx_ready().bit()) {
+                        return Err(Self::Error::TxTimeout);
+                    }
+
+                    self.registers.cs().write(|w| w.select().bit(true));
+
+                    for byte in cmd {
+                        self.registers
+                            .data()
+                            .write(|w| unsafe { w.tx().bits(*byte as u32) });
+                    }
+
+                    self.registers.cs().write(|w| w.select().bit(false));
+
+                    Ok(())
+                }
 
                 fn read_transaction(&mut self, prefix: &[u8], data: &mut [u8]) -> Result<(), Self::Error> {
 
@@ -124,6 +158,71 @@ macro_rules! impl_spiflash {
                     let mut response: [u8; 3] = [0, 0, 0];
                     self.read_transaction(&command, &mut response)?;
                     Ok(response)
+                }
+
+                fn busy(&mut self) -> Result<bool, Self::Error> {
+                    let command: [u8; 1] = [SPIFLASH_CMD_STATUS1];
+                    let mut response: [u8; 1] = [0];
+                    self.read_transaction(&command, &mut response)?;
+                    Ok(response[0] & 0b0000_0001 != 0)
+                }
+
+                fn write_enable(&mut self) -> Result<(), Self::Error> {
+                    let command: [u8; 1] = [SPIFLASH_CMD_WRITE_ENABLE];
+                    self.write_transaction(&command)
+                }
+
+                fn write_disable(&mut self) -> Result<(), Self::Error> {
+                    let command: [u8; 1] = [SPIFLASH_CMD_WRITE_DISABLE];
+                    self.write_transaction(&command)
+                }
+
+                fn sector_erase(&mut self, addr: u32) -> Result<(), Self::Error> {
+                    let command: [u8; 4] = [
+                        SPIFLASH_CMD_SECTOR_ERASE,
+                        ((addr >> 16) & 0xff) as u8,
+                        ((addr >> 8) & 0xff) as u8,
+                        (addr & 0xff) as u8,
+                    ];
+                    self.write_transaction(&command)
+                }
+
+                fn page_program(&mut self, addr: u32, data: &[u8]) -> Result<(), Self::Error> {
+
+                    let command: [u8; 4] = [
+                        SPIFLASH_CMD_PAGE_PROGRAM,
+                        ((addr >> 16) & 0xff) as u8,
+                        ((addr >> 8) & 0xff) as u8,
+                        (addr & 0xff) as u8,
+                    ];
+
+                    self.registers
+                        .phy()
+                        .write(|w| unsafe { w.length().bits(8).width().bits(1).mask().bits(1) });
+
+                    if !spi_ready(&|| self.registers.status().read().tx_ready().bit()) {
+                        return Err(Self::Error::TxTimeout);
+                    }
+
+                    self.registers.cs().write(|w| w.select().bit(true));
+
+                    for byte in command {
+                        self.registers
+                            .data()
+                            .write(|w| unsafe { w.tx().bits(byte as u32) });
+                    }
+
+                    for byte in data {
+                        if self.registers.status().read().tx_ready().bit() {
+                            self.registers
+                                .data()
+                                .write(|w| unsafe { w.tx().bits(*byte as u32) });
+                        }
+                    }
+
+                    self.registers.cs().write(|w| w.select().bit(false));
+
+                    Ok(())
                 }
             }
         )+
