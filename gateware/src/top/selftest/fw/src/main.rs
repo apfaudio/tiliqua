@@ -407,6 +407,7 @@ fn main() -> ! {
         }
         info!("Read flash memory: {:02x?}", buffer);
         info!("Read flash UUID: {:?}", spiflash.uuid());
+        info!("Read flash JEDEC: {:?}", spiflash.jedec());
         timer.disable();
         timer.delay_ns(1_000_000_000);
     }

@@ -9,6 +9,7 @@ pub trait SpiFlash {
     type Error;
     fn read_transaction(&mut self, prefix: &[u8], data: &mut [u8]) -> Result<(), Self::Error>;
     fn uuid(&mut self) -> Result<[u8; 8], Error>;
+    fn jedec(&mut self) -> Result<[u8; 3], Error>;
 }
 
 #[macro_export]
@@ -18,6 +19,7 @@ macro_rules! impl_spiflash {
     )+) => {
         $(
             pub const SPIFLASH_CMD_UUID: u8 = 0x4b;
+            pub const SPIFLASH_CMD_JEDEC: u8 = 0x9f;
 
             #[derive(Debug)]
             pub struct $SPIFLASHX {
@@ -95,9 +97,10 @@ macro_rules! impl_spiflash {
 
                     let mut n = 0;
                     while self.registers.status().read().rx_ready().bit() {
-                        if n > prefix.len() {
-                            data[n] = self.registers.data().read().rx().bits() as u8;
-                            if n > prefix.len() + data.len() {
+                        let byte = self.registers.data().read().rx().bits() as u8;
+                        if n >= prefix.len() {
+                            data[n-prefix.len()] = byte;
+                            if n >= prefix.len() + data.len() {
                                 return Err(Self::Error::InvalidReadSize);
                             }
                         }
@@ -112,6 +115,13 @@ macro_rules! impl_spiflash {
                 fn uuid(&mut self) -> Result<[u8; 8], Self::Error> {
                     let command: [u8; 5] = [SPIFLASH_CMD_UUID, 0, 0, 0, 0];
                     let mut response: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+                    self.read_transaction(&command, &mut response)?;
+                    Ok(response)
+                }
+
+                fn jedec(&mut self) -> Result<[u8; 3], Self::Error> {
+                    let command: [u8; 1] = [SPIFLASH_CMD_JEDEC];
+                    let mut response: [u8; 3] = [0, 0, 0];
                     self.read_transaction(&command, &mut response)?;
                     Ok(response)
                 }
