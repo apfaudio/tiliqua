@@ -380,8 +380,6 @@ fn push_to_opts(constants: &CalibrationConstants, options: &mut Opts, d: &Defaul
     options.caldac.zero3.value  = c.dac_zero[3];
 }
 
-const READ_LENGTH: usize = 32;
-
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().unwrap();
@@ -396,26 +394,29 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua selftest!");
 
-
-    let mut spiflash = SPIFlash0::new(
+    use embassy_embedded_hal::adapter::BlockingAsync;
+    let mut spiflash = BlockingAsync::new(SPIFlash0::new(
         peripherals.SPIFLASH_CTRL,
         SPIFLASH_BASE,
         SPIFLASH_SZ_BYTES
-    );
+    ));
 
     let mut n: u8 = 0;
     loop {
-        info!("Read flash UUID: {:?}", spiflash.uuid());
-        info!("Read flash JEDEC: {:?}", spiflash.jedec());
-        use tiliqua_hal::nor_flash::{ReadNorFlash, NorFlash};
+        /*
+        info!("Read flash UUID: {:?}", spiflash.wrapped.uuid());
+        info!("Read flash JEDEC: {:?}", spiflash.wrapped.jedec());
+        */
+        use embedded_storage_async::nor_flash::{ReadNorFlash, NorFlash};
+        use embassy_futures::block_on;
         let mut buffer = [0_u8; 64];
-        spiflash.read(0x1B0000, &mut buffer);
+        block_on(spiflash.read(0x1B0000, &mut buffer)).unwrap();
         info!("Read flash0:  {:02x?}", buffer);
-        spiflash.erase(0x1B0000, 0x1B1000);
-        spiflash.read(0x1B0000, &mut buffer);
+        block_on(spiflash.erase(0x1B0000, 0x1B1000)).unwrap();
+        block_on(spiflash.read(0x1B0000, &mut buffer)).unwrap();
         info!("Read flash2:  {:02x?}", buffer);
-        spiflash.write(0x1B0000, &[n, n+1, n+2, n+3]);
-        spiflash.read(0x1B0000, &mut buffer);
+        block_on(spiflash.write(0x1B0000, &[n, n+1, n+2, n+3])).unwrap();
+        block_on(spiflash.read(0x1B0000, &mut buffer)).unwrap();
         info!("Read flash3:  {:02x?}", buffer);
         timer.disable();
         timer.delay_ns(1_000_000_000);
