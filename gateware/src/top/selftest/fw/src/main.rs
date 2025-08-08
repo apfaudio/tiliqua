@@ -403,6 +403,7 @@ fn main() -> ! {
         SPIFLASH_SZ_BYTES
     );
 
+    let mut n: u8 = 0;
     loop {
         info!("Read flash UUID: {:?}", spiflash.uuid());
         info!("Read flash JEDEC: {:?}", spiflash.jedec());
@@ -413,8 +414,12 @@ fn main() -> ! {
         spiflash.erase(0x1B0000, 0x1B1000);
         spiflash.read(0x1B0000, &mut buffer);
         info!("Read flash2:  {:02x?}", buffer);
+        spiflash.write(0x1B0000, &[n, n+1, n+2, n+3]);
+        spiflash.read(0x1B0000, &mut buffer);
+        info!("Read flash3:  {:02x?}", buffer);
         timer.disable();
         timer.delay_ns(1_000_000_000);
+        n = n + 4;
     }
 
     let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };

@@ -90,6 +90,11 @@ macro_rules! impl_spiflash {
                             .write(|w| unsafe { w.tx().bits(*byte as u32) });
                     }
 
+                    for n in 0..cmd.len() {
+                        while !self.registers.status().read().rx_ready().bit() { }
+                        let _ = self.registers.data().read().rx().bits() as u8;
+                    }
+
                     self.registers.cs().write(|w| w.select().bit(false));
 
                     Ok(())
@@ -123,20 +128,12 @@ macro_rules! impl_spiflash {
                             .write(|w| unsafe { w.tx().bits(0x0) });
                     }
 
-                    if !spi_ready(&|| self.registers.status().read().rx_ready().bit()) {
-                        return Err(Self::Error::RxTimeout);
-                    }
-
-                    let mut n = 0;
-                    while self.registers.status().read().rx_ready().bit() {
+                    for n in 0..(prefix.len() + data.len()) {
+                        while !self.registers.status().read().rx_ready().bit() { }
                         let byte = self.registers.data().read().rx().bits() as u8;
                         if n >= prefix.len() {
                             data[n-prefix.len()] = byte;
-                            if n >= prefix.len() + data.len() {
-                                return Err(Self::Error::InvalidReadSize);
-                            }
                         }
-                        n = n + 1;
                     }
 
                     self.registers.cs().write(|w| w.select().bit(false));
@@ -160,7 +157,7 @@ macro_rules! impl_spiflash {
 
                 fn busy(&mut self) -> Result<bool, Self::Error> {
                     let command: [u8; 1] = [SPIFLASH_CMD_STATUS1];
-                    let mut response: [u8; 1] = [0];
+                    let mut response: [u8; 1] = [0u8; 1];
                     self.read_transaction(&command, &mut response)?;
                     Ok(response[0] & 0b0000_0001 != 0)
                 }
@@ -218,6 +215,11 @@ macro_rules! impl_spiflash {
                         }
                     }
 
+                    for n in 0..(command.len() + data.len()) {
+                        while !self.registers.status().read().rx_ready().bit() { }
+                        let _ = self.registers.data().read().rx().bits() as u8;
+                    }
+
                     self.registers.cs().write(|w| w.select().bit(false));
 
                     Ok(())
@@ -246,6 +248,7 @@ macro_rules! impl_spiflash {
             impl $crate::nor_flash::NorFlash for $SPIFLASHX {
                 const WRITE_SIZE: usize = 1;
                 const ERASE_SIZE: usize = 4096;
+
                 fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
                     use $crate::spiflash::SpiFlash;
                     // TODO $crate::nor_flash::check_erase(self, from, to)?;
