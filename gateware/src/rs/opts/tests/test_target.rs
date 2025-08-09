@@ -62,6 +62,7 @@ mod tests {
     #[test]
     fn test_opts() {
         env_logger::init();
+
         let mut opts = Opts::default();
         for opt in opts.all_mut() {
             let mut buf: [u8; 8] = [0u8; 8];
@@ -76,7 +77,14 @@ mod tests {
         opts.toggle_modify(); // Modify this one
         opts.tick_down();     // Tick down twice
         opts.tick_down();
+        opts.toggle_modify();
+        opts.tick_up();
+        opts.tick_up();
+        opts.tick_up();
+        opts.toggle_modify();
+        opts.tick_down();
 
+        let mut opts2 = Opts::default();
         for opt in opts.all_mut() {
             let mut buf: [u8; 8] = [0u8; 8];
             let n = opt.encode(&mut buf);
@@ -84,7 +92,20 @@ mod tests {
                   opt.name(), opt.value());
             info!("\t\t(key={}, n={:?}, buf={:?})",
                   opt.key(), n, buf);
+            if let Some(ix) = n {
+                // Simulate flash lookup (second loop is not needed by the flash
+                // lookup cache, but its a simple way of checking the behavior).
+                info!("\t\t\t** modified option, push to opts2");
+                for opt2 in opts2.all_mut() {
+                    if opt2.key() == opt.key() {
+                        assert!(opt2.decode(&buf[..ix]));
+                        info!("\t\t\t** opt2 [n={}, v={}]",
+                              opt2.name(), opt2.value());
+                    }
+                }
+            }
         }
+
     }
 
 }
