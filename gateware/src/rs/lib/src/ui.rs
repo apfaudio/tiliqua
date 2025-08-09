@@ -87,6 +87,17 @@ impl<EncoderT: Encoder,
             self.time_since_encoder_touched = 0;
         }
 
+        if self.encoder.poke_btn_held() {
+            for opt in self.opts.all_mut() {
+                let mut buf: [u8; 8] = [0u8; 8];
+                let n = opt.encode(&mut buf);
+                use log::info;
+                if let Some(ix) = n {
+                    info!("{} {} --- {} {:?}", opt.name(), opt.value(), opt.key(), &buf[..ix]);
+                }
+            }
+        }
+
         //
         // Update LEDs
         //
