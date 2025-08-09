@@ -22,8 +22,8 @@ pub trait OptionTrait {
 }
 
 pub trait OptionPage {
-    fn options(&self) -> OptionVec;
-    fn options_mut(&mut self) -> OptionVecMut;
+    fn options(&self) -> OptionVec<'_>;
+    fn options_mut(&mut self) -> OptionVecMut<'_>;
 }
 
 pub trait Options {
@@ -36,6 +36,7 @@ pub trait Options {
     fn modify_mut(&mut self, modify: bool);
     fn view_mut(&mut self) -> &mut dyn OptionPage;
     fn page_mut(&mut self) -> &mut dyn OptionTrait;
+    fn all_mut(&mut self) -> impl Iterator<Item = &mut dyn OptionTrait>;
 }
 
 pub trait OptionsEncoderInterface {

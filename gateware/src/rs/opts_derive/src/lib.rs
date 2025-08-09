@@ -164,6 +164,8 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
         }
     });
 
+    let page_field_names: Vec<_> = page_fields.iter().map(|(field_name, _)| field_name).collect();
+
     let expanded = quote! {
         impl Options for #name {
             fn selected(&self) -> Option<usize> {
@@ -200,6 +202,12 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
                 match self.tracker.page.value {
                     #(#view_mut_match_arms)*
                 }
+            }
+
+            fn all_mut(&mut self) -> impl Iterator<Item = &mut dyn OptionTrait> {
+                [
+                    #(self.#page_field_names.options_mut()),*
+                ].into_iter().flatten()
             }
         }
     };
