@@ -360,7 +360,9 @@ dependencies = [
 name = "opts"
 version = "0.1.0"
 dependencies = [
+ "embassy-embedded-hal",
  "embassy-futures",
+ "embedded-storage",
  "embedded-storage-async",
  "fixed",
  "hash32 1.0.0",
@@ -604,11 +606,8 @@ dependencies = [
  "amaranth-soc-isr",
  "colorsys",
  "critical-section",
- "embassy-embedded-hal",
- "embassy-futures",
  "embedded-graphics",
  "embedded-hal 1.0.0",
- "embedded-storage-async",
  "fastrand",
  "heapless",
  "irq",
@@ -618,7 +617,6 @@ dependencies = [
  "panic-halt",
  "riscv",
  "riscv-rt",
- "sequential-storage",
  "serde",
  "serde_derive",
  "strum",

@@ -1,7 +1,7 @@
 use sequential_storage::map::{fetch_item, store_item};
 use sequential_storage::cache::NoCache;
-use embedded_storage_async::nor_flash::NorFlash;
 use embassy_futures::block_on;
+use embassy_embedded_hal::adapter::BlockingAsync;
 
 use crate::traits::Options;
 
@@ -22,7 +22,7 @@ pub trait OptionsPersistence {
 }
 
 pub struct FlashOptionsPersistence<F> {
-    flash: F,
+    flash: BlockingAsync<F>,
     flash_range: core::ops::Range<u32>,
     data_buffer: [u8; 128],
 }
@@ -30,7 +30,7 @@ pub struct FlashOptionsPersistence<F> {
 impl<F> FlashOptionsPersistence<F> {
     pub fn new(flash: F, flash_range: core::ops::Range<u32>) -> Self {
         Self {
-            flash,
+            flash: BlockingAsync::new(flash),
             flash_range,
             data_buffer: [0u8; 128],
         }
@@ -39,7 +39,7 @@ impl<F> FlashOptionsPersistence<F> {
 
 impl<F> OptionsPersistence for FlashOptionsPersistence<F>
 where
-    F: NorFlash,
+    F: embedded_storage::nor_flash::NorFlash,
 {
     type Error = PersistenceError;
 

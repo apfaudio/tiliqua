@@ -74,12 +74,11 @@ fn main() -> ! {
     CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     /* SPI FLASH */
-    use embassy_embedded_hal::adapter::BlockingAsync;
-    let spiflash = BlockingAsync::new(SPIFlash0::new(
+    let spiflash = SPIFlash0::new(
         peripherals.SPIFLASH_CTRL,
         SPIFLASH_BASE,
         SPIFLASH_SZ_BYTES
-    ));
+    );
     let flash_range = 0x1b0000u32..0x1b2000u32;
     use opts::persistence::{FlashOptionsPersistence, OptionsPersistence};
 
