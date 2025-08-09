@@ -1,4 +1,5 @@
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
+use serde_derive::{Serialize, Deserialize};
 
 use strum_macros::{EnumIter, IntoStaticStr};
 
@@ -8,7 +9,7 @@ use micromath::F32Ext;
 pub const PX_HUE_MAX: i32 = 16;
 pub const PX_INTENSITY_MAX: i32 = 16;
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ColorPalette {
     Exp,

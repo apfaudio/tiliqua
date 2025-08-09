@@ -74,6 +74,14 @@ fn main() -> ! {
     CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     let opts = Opts::default();
+
+    use opts::Options;
+    for opt in opts.view().options() {
+        let mut buf: [u8; 8] = [0u8; 8];
+        let n = opt.encode(&mut buf);
+        info!("\t{}: {:?}", opt.key(), &buf[..n]);
+    }
+
     let mut last_palette = opts.beam.palette.value;
     let app = Mutex::new(RefCell::new(App::new(opts)));
 

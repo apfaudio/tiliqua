@@ -43,6 +43,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "cobs"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "colorsys"
 version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -100,6 +109,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-storage"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a21dea9854beb860f3062d10228ce9b976da520a73474aed3171ec276bc0c032"
+
+[[package]]
 name = "fastrand"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -146,12 +161,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hash32"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e4e11d13d42fc8d55326b323c63978c75721fbbb695a6e6686765bcb8b33917"
+
+[[package]]
 name = "heapless"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad"
 dependencies = [
- "hash32",
+ "hash32 0.3.1",
  "serde",
  "stable_deref_trait",
 ]
@@ -212,10 +233,14 @@ name = "opts"
 version = "0.1.0"
 dependencies = [
  "fixed",
+ "hash32 1.0.0",
  "heapless",
  "log",
  "micromath",
  "opts-derive",
+ "postcard",
+ "serde",
+ "serde_derive",
  "strum",
  "strum_macros 0.26.4",
 ]
@@ -224,6 +249,7 @@ dependencies = [
 name = "opts-derive"
 version = "0.1.0"
 dependencies = [
+ "hash32 1.0.0",
  "quote",
  "syn 2.0.98",
 ]
@@ -233,6 +259,16 @@ name = "panic-halt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de96540e0ebde571dc55c73d60ef407c653844e6f9a1e2fdbd40c07b9252d812"
+
+[[package]]
+name = "postcard"
+version = "1.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6764c3b5dd454e283a30e6dfe78e9b31096d9e32036b5d1eaac7a6119ccb9a24"
+dependencies = [
+ "cobs",
+ "serde",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -390,6 +426,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "thiserror"
+version = "2.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "567b8a2dae586314f7be2a752ec7474332959c6460e02bde30d702a66d488708"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f7cf42b4507d8ea322120659672cf1b9dbb93f8f2d4ecfd6e51350ff5b17a1d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
+]
+
+[[package]]
 name = "tiliqua-fw"
 version = "0.1.0"
 dependencies = [
@@ -407,6 +463,8 @@ dependencies = [
  "panic-halt",
  "riscv",
  "riscv-rt",
+ "serde",
+ "serde_derive",
  "strum",
  "strum_macros 0.26.4",
  "tiliqua-hal",
@@ -422,6 +480,7 @@ dependencies = [
  "embedded-graphics",
  "embedded-hal",
  "embedded-hal-nb",
+ "embedded-storage",
  "micromath",
  "nb",
  "riscv",
@@ -439,6 +498,8 @@ dependencies = [
  "micromath",
  "midi-types",
  "opts",
+ "serde",
+ "serde_derive",
  "strum",
  "strum_macros 0.26.4",
  "tiliqua-hal",
