@@ -91,7 +91,6 @@ fn main() -> ! {
     let mut opts = Opts::default();
     use opts::Options;
     for opt in opts.all_mut() {
-        info!("check {}", opt.name());
         if let Ok(item) = block_on(fetch_item::<u32, &[u8], _>(
             &mut spiflash,
             flash_range.clone(),
@@ -101,7 +100,7 @@ fn main() -> ! {
         )) {
             if let Some(data) = item {
                 opt.decode(data);
-                info!("LOAD {} {} --- {} {:?}", opt.name(), opt.value(), opt.key(), data);
+                info!("load option: {}={} (from key={} data={:?})", opt.name(), opt.value(), opt.key(), data);
             }
         }
     }
@@ -124,7 +123,6 @@ fn main() -> ! {
 
     let mut delay_smoothers = [OnePoleSmoother::new(0.05f32); 4];
 
-
     irq::scope(|s| {
 
         s.register(handlers::Interrupt::TIMER0, timer0);
@@ -139,8 +137,6 @@ fn main() -> ! {
 
         let h_active = display.size().width;
         let v_active = display.size().height;
-
-        info!("before loop");
 
         loop {
 

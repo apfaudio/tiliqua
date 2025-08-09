@@ -117,6 +117,7 @@ where
         use postcard::from_bytes;
         if let Ok(v) = from_bytes::<T::Value>(buf) {
             self.value = v;
+            self.init = v;
             true
         } else {
             false
