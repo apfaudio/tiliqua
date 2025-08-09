@@ -204,6 +204,12 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
                 }
             }
 
+            fn all(&self) -> impl Iterator<Item = &dyn OptionTrait> {
+                [
+                    #(self.#page_field_names.options()),*
+                ].into_iter().flatten()
+            }
+
             fn all_mut(&mut self) -> impl Iterator<Item = &mut dyn OptionTrait> {
                 [
                     #(self.#page_field_names.options_mut()),*

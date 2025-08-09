@@ -32,6 +32,7 @@ pub trait Options {
     fn modify(&self) -> bool;
     fn page(&self) -> &dyn OptionTrait;
     fn view(&self) -> &dyn OptionPage;
+    fn all(&self) -> impl Iterator<Item = &dyn OptionTrait>;
 
     fn modify_mut(&mut self, modify: bool);
     fn view_mut(&mut self) -> &mut dyn OptionPage;

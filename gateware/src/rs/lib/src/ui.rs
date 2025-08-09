@@ -29,6 +29,7 @@ where
     encoder_fade_ms: u32,
     touch_led_mask: u8,
     draw: bool,
+    commit_options: bool,
 }
 
 impl<EncoderT: Encoder,
@@ -50,7 +51,8 @@ impl<EncoderT: Encoder,
             period_ms,
             encoder_fade_ms: 1000u32,
             touch_led_mask: 0u8,
-            draw: true
+            draw: true,
+            commit_options: false,
         }
     }
 
@@ -64,6 +66,15 @@ impl<EncoderT: Encoder,
 
     pub fn draw(&self) -> bool {
         self.draw
+    }
+
+    pub fn commit_options(&mut self) -> bool {
+        if self.commit_options {
+            self.commit_options = false;
+            true
+        } else {
+            false
+        }
     }
 
     pub fn update(&mut self) {
@@ -88,14 +99,7 @@ impl<EncoderT: Encoder,
         }
 
         if self.encoder.poke_btn_held() {
-            for opt in self.opts.all_mut() {
-                let mut buf: [u8; 8] = [0u8; 8];
-                let n = opt.encode(&mut buf);
-                use log::info;
-                if let Some(ix) = n {
-                    info!("{} {} --- {} {:?}", opt.name(), opt.value(), opt.key(), &buf[..ix]);
-                }
-            }
+            self.commit_options = true;
         }
 
         //

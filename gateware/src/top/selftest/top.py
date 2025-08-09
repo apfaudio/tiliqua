@@ -111,5 +111,4 @@ if __name__ == "__main__":
                   argparse_fragment=lambda _: {
                       # direct codec output registers
                       "poke_outputs": True,
-                      "mainram_size": 0x4000,
                   })

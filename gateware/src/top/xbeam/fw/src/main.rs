@@ -73,7 +73,49 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = Opts::default();
+    /* SPI FLASH */
+    use embassy_embedded_hal::adapter::BlockingAsync;
+    let mut spiflash = BlockingAsync::new(SPIFlash0::new(
+        peripherals.SPIFLASH_CTRL,
+        SPIFLASH_BASE,
+        SPIFLASH_SZ_BYTES
+    ));
+    let flash_range = 0x1b0000..0x1b2000;
+    let mut data_buffer = [0u8; 128];
+    const PAGE_KEY: u32 =0xdeadbeef;
+    use sequential_storage::map::{fetch_item, store_item};
+    use sequential_storage::cache::NoCache;
+    use embassy_futures::block_on;
+
+    /* LOAD OPTIONS */
+    let mut opts = Opts::default();
+    use opts::Options;
+    for opt in opts.all_mut() {
+        info!("check {}", opt.name());
+        if let Ok(item) = block_on(fetch_item::<u32, &[u8], _>(
+            &mut spiflash,
+            flash_range.clone(),
+            &mut NoCache::new(),
+            &mut data_buffer,
+            &opt.key(),
+        )) {
+            if let Some(data) = item {
+                opt.decode(data);
+                info!("LOAD {} {} --- {} {:?}", opt.name(), opt.value(), opt.key(), data);
+            }
+        }
+    }
+    if let Ok(item) = block_on(fetch_item::<u32, &[u8], _>(
+        &mut spiflash,
+        flash_range.clone(),
+        &mut NoCache::new(),
+        &mut data_buffer,
+        &PAGE_KEY,
+    )) {
+        if let Some(data) = item {
+            opts.page_mut().decode(data);
+        }
+    }
 
     let mut last_palette = opts.beam.palette.value;
     let app = Mutex::new(RefCell::new(App::new(opts)));
@@ -81,6 +123,7 @@ fn main() -> ! {
     handler!(timer0 = || timer0_handler(&app));
 
     let mut delay_smoothers = [OnePoleSmoother::new(0.05f32); 4];
+
 
     irq::scope(|s| {
 
@@ -97,12 +140,46 @@ fn main() -> ! {
         let h_active = display.size().width;
         let v_active = display.size().height;
 
+        info!("before loop");
+
         loop {
 
-            let (opts, draw_options) = critical_section::with(|cs| {
-                let ui = &app.borrow_ref(cs).ui;
-                (ui.opts.clone(), ui.draw()) 
+            let (opts, draw_options, commit_options) = critical_section::with(|cs| {
+                let mut app = app.borrow_ref_mut(cs);
+                (app.ui.opts.clone(), app.ui.draw(), app.ui.commit_options()) 
             });
+
+            if commit_options {
+                use opts::Options;
+                for opt in opts.all() {
+                    let mut buf: [u8; 8] = [0u8; 8];
+                    let n = opt.encode(&mut buf);
+                    use log::info;
+                    if let Some(ix) = n {
+                        info!("{} {} --- {} {:?}", opt.name(), opt.value(), opt.key(), &buf[..ix]);
+                        block_on(store_item::<u32, &[u8], _>(
+                            &mut spiflash,
+                            flash_range.clone(),
+                            &mut NoCache::new(),
+                            &mut data_buffer,
+                            &opt.key(),
+                            &&buf[..ix],
+                        )).unwrap();
+                    }
+                }
+                let mut buf: [u8; 8] = [0u8; 8];
+                let n = opts.page().encode(&mut buf);
+                if let Some(ix) = n {
+                    block_on(store_item::<u32, &[u8], _>(
+                        &mut spiflash,
+                        flash_range.clone(),
+                        &mut NoCache::new(),
+                        &mut data_buffer,
+                        &PAGE_KEY,
+                        &&buf[..ix],
+                    )).unwrap();
+                }
+            }
 
             if opts.beam.palette.value != last_palette || first {
                 opts.beam.palette.value.write_to_hardware(&mut display);
