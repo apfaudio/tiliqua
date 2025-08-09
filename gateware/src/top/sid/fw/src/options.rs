@@ -1,7 +1,8 @@
 use opts::*;
 use strum_macros::{EnumIter, IntoStaticStr};
+use serde_derive::{Serialize, Deserialize};
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     Modulate,
@@ -13,7 +14,7 @@ pub enum Page {
     Scope,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TriggerMode {
     Always,
@@ -21,7 +22,7 @@ pub enum TriggerMode {
     Rising,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Wave {
     #[default]
@@ -31,7 +32,7 @@ pub enum Wave {
     Noise,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ModulationTarget {
     #[default]
