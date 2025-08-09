@@ -76,8 +76,10 @@ fn main() -> ! {
     let opts = Opts::default();
 
     use opts::Options;
+    let mut buf: [u8; 8] = [0u8; 8];
+    let n = opts.page().encode(&mut buf);
+    info!("\tpage: {}: {:?}", opts.page().key(), &buf[..n]);
     for opt in opts.view().options() {
-        let mut buf: [u8; 8] = [0u8; 8];
         let n = opt.encode(&mut buf);
         info!("\t{}: {:?}", opt.key(), &buf[..n]);
     }
