@@ -98,10 +98,13 @@ where
         f32::from(steps) as usize + 1
     }
 
-    fn encode(&self, buf: &mut [u8]) -> usize {
+    fn encode(&self, buf: &mut [u8]) -> Option<usize> {
         use postcard::to_slice;
-        let used = to_slice(&self.value, buf).unwrap();
-        used.len()
+        if let Ok(used) = to_slice(&self.value, buf) {
+            Some(used.len())
+        } else {
+            None
+        }
     }
 
     fn decode(&mut self, buf: &[u8]) -> bool {

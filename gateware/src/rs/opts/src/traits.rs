@@ -17,7 +17,7 @@ pub trait OptionTrait {
     fn n_unique_values(&self) -> usize;
 
     fn key(&self) -> u32;
-    fn encode(&self, buf: &mut [u8]) -> usize;
+    fn encode(&self, buf: &mut [u8]) -> Option<usize>;
     fn decode(&mut self, buf: &[u8]) -> bool;
 }
 

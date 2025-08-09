@@ -57,7 +57,7 @@ mod tests {
             info!("\t{}: {}", opt.name(), opt.value());
             let mut buf: [u8; 8] = [0u8; 8];
             let n = opt.encode(&mut buf);
-            info!("\t{}: {:?}", opt.key(), &buf[..n]);
+            info!("\t{} - {:?} - {:?}", opt.key(), n, buf);
         }
     }
 

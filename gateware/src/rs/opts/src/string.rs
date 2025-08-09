@@ -50,8 +50,8 @@ impl OptionTrait for StringOption {
         1usize
     }
 
-    fn encode(&self, buf: &mut [u8]) -> usize {
-        0
+    fn encode(&self, buf: &mut [u8]) -> Option<usize> {
+        None
     }
 
     fn decode(&mut self, buf: &[u8]) -> bool {
