@@ -81,12 +81,11 @@ fn main() -> ! {
         SPIFLASH_SZ_BYTES
     ));
     let flash_range = 0x1b0000u32..0x1b2000u32;
-    const PAGE_KEY: u32 = 0xdeadbeef;
     use opts::persistence::{FlashOptionsPersistence, OptionsPersistence};
 
     /* LOAD OPTIONS */
     let mut opts = Opts::default();
-    let mut flash_persist = FlashOptionsPersistence::new(spiflash, flash_range, PAGE_KEY);
+    let mut flash_persist = FlashOptionsPersistence::new(spiflash, flash_range);
     
     flash_persist.load_options(&mut opts).ok();
 

@@ -5,6 +5,8 @@ use embassy_futures::block_on;
 
 use crate::traits::Options;
 
+const DEFAULT_PAGE_KEY: u32 = 0xdeadbeef;
+
 #[derive(Debug)]
 pub enum PersistenceError {
     StorageError,
@@ -23,16 +25,14 @@ pub struct FlashOptionsPersistence<F> {
     flash: F,
     flash_range: core::ops::Range<u32>,
     data_buffer: [u8; 128],
-    page_key: u32,
 }
 
 impl<F> FlashOptionsPersistence<F> {
-    pub fn new(flash: F, flash_range: core::ops::Range<u32>, page_key: u32) -> Self {
+    pub fn new(flash: F, flash_range: core::ops::Range<u32>) -> Self {
         Self {
             flash,
             flash_range,
             data_buffer: [0u8; 128],
-            page_key,
         }
     }
 }
@@ -67,7 +67,7 @@ where
             self.flash_range.clone(),
             &mut NoCache::new(),
             &mut self.data_buffer,
-            &self.page_key,
+            &DEFAULT_PAGE_KEY,
         )) {
             if let Some(data) = item {
                 opts.page_mut().decode(data);
@@ -103,7 +103,7 @@ where
                 self.flash_range.clone(),
                 &mut NoCache::new(),
                 &mut self.data_buffer,
-                &self.page_key,
+                &DEFAULT_PAGE_KEY,
                 &&buf[..encoded_len],
             )).map_err(|_| PersistenceError::StorageError)?;
         }
