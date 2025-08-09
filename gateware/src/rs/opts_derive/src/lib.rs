@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Data, Fields, Type, Expr, Meta};
+use hash32::{FnvHasher, Hasher as _};
+use core::hash::Hash;
 
 #[proc_macro_derive(OptionPage, attributes(option))]
 pub fn derive_option(input: TokenStream) -> TokenStream {
@@ -43,9 +45,19 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
             panic!("Unsupported field type for OptionPage")
         };
 
-        let field_name_str = field_name.as_ref().unwrap().to_string().replace("_","-");
+        let page_str: &str = &input.ident.to_string();
+        let field_name_str: &str = &field_name.as_ref().unwrap().to_string().replace("_","-");
+        let type_name_str: &str = &quote!(#field_type).to_string();
+
+        // Generate a unique key used for identifying the option when it is stored.
+        let mut fnv: FnvHasher = Default::default();
+        page_str.hash(&mut fnv);
+        field_name_str.hash(&mut fnv);
+        type_name_str.hash(&mut fnv);
+        let field_key = fnv.finish32();
+
         quote! {
-            #field_name: #constructor(#field_name_str, #default_value)
+            #field_name: #constructor(#field_name_str, #default_value, #field_key)
         }
     });
 

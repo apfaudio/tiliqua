@@ -8,6 +8,7 @@ use crate::traits::*;
 pub struct IntOption<T: IntOptionParams> {
     name: &'static str,
     pub value: T::Value,
+    key: u32,
 }
 
 pub trait IntOptionParams {
@@ -18,10 +19,11 @@ pub trait IntOptionParams {
 }
 
 impl<T: IntOptionParams> IntOption<T> {
-    pub fn new(name: &'static str, value: T::Value) -> Self {
+    pub fn new(name: &'static str, value: T::Value, key: u32) -> Self {
         Self {
             name,
             value,
+            key
         }
     }
 }
@@ -48,6 +50,10 @@ where
         s
     }
 
+    fn key(&self) -> u32 {
+        self.key
+    }
+
     fn tick_up(&mut self) {
         let new_value = self.value + T::STEP;
         // Tolerate unsigned overflow.
@@ -72,10 +78,6 @@ where
     fn n_unique_values(&self) -> usize {
         // TODO
         0
-    }
-
-    fn typeid(&self) -> &'static str {
-        core::any::type_name::<T::Value>()
     }
 
     fn encode(&self, buf: &mut [u8]) -> usize {

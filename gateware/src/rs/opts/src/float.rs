@@ -14,6 +14,7 @@ pub enum FloatFormat {
 pub struct FloatOption<T: FloatOptionParams> {
     name: &'static str,
     pub value: T::Value,
+    key: u32,
 }
 
 pub trait FloatOptionParams {
@@ -25,10 +26,11 @@ pub trait FloatOptionParams {
 }
 
 impl<T: FloatOptionParams> FloatOption<T> {
-    pub fn new(name: &'static str, value: T::Value) -> Self {
+    pub fn new(name: &'static str, value: T::Value, key: u32) -> Self {
         Self {
             name,
             value,
+            key
         }
     }
 }
@@ -66,6 +68,10 @@ where
         s
     }
 
+    fn key(&self) -> u32 {
+        self.key
+    }
+
     fn tick_up(&mut self) {
         let new_value = self.value + T::STEP;
         if new_value <= T::MAX {
@@ -90,10 +96,6 @@ where
         let range = T::MAX - T::MIN;
         let steps = range / T::STEP;
         f32::from(steps) as usize + 1
-    }
-
-    fn typeid(&self) -> &'static str {
-        core::any::type_name::<T::Value>()
     }
 
     fn encode(&self, buf: &mut [u8]) -> usize {

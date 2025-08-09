@@ -294,6 +294,7 @@ dependencies = [
 name = "opts-derive"
 version = "0.1.0"
 dependencies = [
+ "hash32 1.0.0",
  "quote",
  "syn",
 ]

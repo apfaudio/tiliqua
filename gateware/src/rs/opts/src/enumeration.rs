@@ -9,13 +9,15 @@ use crate::traits::*;
 pub struct EnumOption<T: Copy + IntoEnumIterator + Default> {
     pub name: &'static str,
     pub value: T,
+    key: u32,
 }
 
 impl<T: Copy + IntoEnumIterator + Default> EnumOption<T> {
-    pub fn new(name: &'static str, value: T) -> Self {
+    pub fn new(name: &'static str, value: T, key: u32) -> Self {
         Self {
             name,
             value,
+            key
         }
     }
 }
@@ -37,6 +39,10 @@ where
 
     fn value(&self) -> OptionString {
         String::from_str(self.value.into()).unwrap()
+    }
+
+    fn key(&self) -> u32 {
+        self.key
     }
 
     fn tick_up(&mut self) {
@@ -79,10 +85,6 @@ where
 
     fn n_unique_values(&self) -> usize {
         T::iter().count()
-    }
-
-    fn typeid(&self) -> &'static str {
-        core::any::type_name::<T>()
     }
 
     fn encode(&self, buf: &mut [u8]) -> usize {

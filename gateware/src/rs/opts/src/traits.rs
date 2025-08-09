@@ -16,7 +16,7 @@ pub trait OptionTrait {
     fn percent(&self) -> f32;
     fn n_unique_values(&self) -> usize;
 
-    fn typeid(&self) -> &'static str;
+    fn key(&self) -> u32;
     fn encode(&self, buf: &mut [u8]) -> usize;
     fn decode(&mut self, buf: &[u8]) -> bool;
 }
