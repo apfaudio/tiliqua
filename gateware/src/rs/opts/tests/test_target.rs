@@ -66,8 +66,10 @@ mod tests {
         for opt in opts.all_mut() {
             let mut buf: [u8; 8] = [0u8; 8];
             let n = opt.encode(&mut buf);
-            info!("\t[n={}, v={}]\t(key={}, n={:?}, buf={:?})",
-                  opt.name(), opt.value(), opt.key(), n, buf);
+            info!("[n={}, v={}]",
+                  opt.name(), opt.value());
+            info!("\t\t(key={}, n={:?}, buf={:?})",
+                  opt.key(), n, buf);
         }
 
         opts.tick_up();       // First option on page
@@ -78,8 +80,10 @@ mod tests {
         for opt in opts.all_mut() {
             let mut buf: [u8; 8] = [0u8; 8];
             let n = opt.encode(&mut buf);
-            info!("\t[n={}, v={}]\t(key={}, n={:?}, buf={:?})",
-                  opt.name(), opt.value(), opt.key(), n, buf);
+            info!("[n={}, v={}]",
+                  opt.name(), opt.value());
+            info!("\t\t(key={}, n={:?}, buf={:?})",
+                  opt.key(), n, buf);
         }
     }
 

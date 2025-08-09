@@ -8,6 +8,7 @@ use crate::traits::*;
 pub struct IntOption<T: IntOptionParams> {
     name: &'static str,
     pub value: T::Value,
+    init: T::Value,
     key: u32,
 }
 
@@ -23,6 +24,7 @@ impl<T: IntOptionParams> IntOption<T> {
         Self {
             name,
             value,
+            init: value,
             key
         }
     }
@@ -81,9 +83,13 @@ where
     }
 
     fn encode(&self, buf: &mut [u8]) -> Option<usize> {
-        use postcard::to_slice;
-        if let Ok(used) = to_slice(&self.value, buf) {
-            Some(used.len())
+        if self.value != self.init {
+            use postcard::to_slice;
+            if let Ok(used) = to_slice(&self.value, buf) {
+                Some(used.len())
+            } else {
+                None
+            }
         } else {
             None
         }

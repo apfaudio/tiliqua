@@ -9,6 +9,7 @@ use crate::traits::*;
 pub struct EnumOption<T: Copy + IntoEnumIterator + Default> {
     pub name: &'static str,
     pub value: T,
+    init: T,
     key: u32,
 }
 
@@ -17,6 +18,7 @@ impl<T: Copy + IntoEnumIterator + Default> EnumOption<T> {
         Self {
             name,
             value,
+            init: value,
             key
         }
     }
@@ -89,8 +91,12 @@ where
 
     fn encode(&self, buf: &mut [u8]) -> Option<usize> {
         use postcard::to_slice;
-        if let Ok(used) = to_slice(&self.value, buf) {
-            Some(used.len())
+        if self.value != self.init {
+            if let Ok(used) = to_slice(&self.value, buf) {
+                Some(used.len())
+            } else {
+                None
+            }
         } else {
             None
         }
