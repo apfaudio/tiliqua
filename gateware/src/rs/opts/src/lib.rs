@@ -3,18 +3,23 @@
 use strum::IntoEnumIterator;
 
 pub use opts_derive::{OptionPage, Options};
+use serde_derive::{Serialize, Deserialize};
 
 mod traits;
 mod integer;
 mod enumeration;
 mod float;
+/*
 mod string;
+*/
 
 pub use crate::traits::*;
 pub use crate::integer::*;
 pub use crate::enumeration::*;
 pub use crate::float::*;
+/*
 pub use crate::string::*;
+*/
 
 #[derive(Clone, Default)]
 pub struct ScreenTracker<ScreenT: Copy + IntoEnumIterator + Default> {
@@ -29,14 +34,14 @@ mod tests {
     use super::*;
     use strum::{EnumIter, IntoStaticStr};
 
-    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
     #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
     pub enum Page {
         #[default]
         Scope,
     }
 
-    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
     #[strum(serialize_all = "kebab-case")]
     pub enum TestEnum {
         EnumValue1,
@@ -57,8 +62,10 @@ mod tests {
         pub xscale: IntOption<ScaleParams>,
         #[option]
         pub enumo: EnumOption<TestEnum>,
+        /*
         #[option("hello")]
         pub stro: StringOption,
+        */
     }
 
     #[derive(Options, Clone, Default)]
@@ -81,8 +88,11 @@ mod tests {
             let mut fnv: FnvHasher = Default::default();
             opts.page().value().hash(&mut fnv);
             opt.name().hash(&mut fnv);
+            opt.typeid().hash(&mut fnv);
             let hash = fnv.finish32();
-            info!("\t{}: {}: {}", hash, opt.value(), opt.typeid());
+            let mut buf: [u8; 8] = [0u8; 8];
+            let n = opt.encode(&mut buf);
+            info!("\t{}: {}: {}, {:?}", hash, opt.value(), opt.typeid(), &buf[..n]);
         }
     }
 

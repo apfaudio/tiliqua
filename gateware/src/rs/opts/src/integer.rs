@@ -1,5 +1,6 @@
 use heapless::String;
 use core::fmt::Write;
+use serde::{Serialize, Deserialize};
 
 use crate::traits::*;
 
@@ -32,7 +33,9 @@ where
         + core::ops::Add<Output = T::Value>
         + core::ops::Sub<Output = T::Value>
         + core::cmp::Ord
-        + core::fmt::Display,
+        + core::fmt::Display
+        + Serialize
+        + for<'de> Deserialize<'de>,
     f32: From<T::Value>,
 {
     fn name(&self) -> &'static str {
@@ -69,6 +72,26 @@ where
     fn n_unique_values(&self) -> usize {
         // TODO
         0
+    }
+
+    fn typeid(&self) -> &'static str {
+        core::any::type_name::<T::Value>()
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> usize {
+        use postcard::to_slice;
+        let used = to_slice(&self.value, buf).unwrap();
+        used.len()
+    }
+
+    fn decode(&mut self, buf: &[u8]) -> bool {
+        use postcard::from_bytes;
+        if let Ok(v) = from_bytes::<T::Value>(buf) {
+            self.value = v;
+            true
+        } else {
+            false
+        }
     }
 }
 

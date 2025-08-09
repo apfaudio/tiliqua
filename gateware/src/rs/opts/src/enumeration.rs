@@ -1,6 +1,7 @@
 use heapless::String;
 use strum::IntoEnumIterator;
 use core::str::FromStr;
+use serde::{Serialize, Deserialize};
 
 use crate::traits::*;
 
@@ -26,6 +27,8 @@ where
         + PartialEq
         + Into<&'static str>
         + Default
+        + Serialize
+        + for<'de> Deserialize<'de>
     {
 
     fn name(&self) -> &'static str {
@@ -76,5 +79,25 @@ where
 
     fn n_unique_values(&self) -> usize {
         T::iter().count()
+    }
+
+    fn typeid(&self) -> &'static str {
+        core::any::type_name::<T>()
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> usize {
+        use postcard::to_slice;
+        let used = to_slice(&self.value, buf).unwrap();
+        used.len()
+    }
+
+    fn decode(&mut self, buf: &[u8]) -> bool {
+        use postcard::from_bytes;
+        if let Ok(v) = from_bytes::<T>(buf) {
+            self.value = v;
+            true
+        } else {
+            false
+        }
     }
 }
