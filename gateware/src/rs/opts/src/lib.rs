@@ -68,6 +68,9 @@ mod tests {
         pub scope: ScopeOpts,
     }
 
+    use hash32::{FnvHasher, Hasher as _};
+    use core::hash::Hash;
+
     #[test]
     fn test_opts() {
         env_logger::init();
@@ -75,6 +78,11 @@ mod tests {
         info!("page: {}", opts.page().value());
         for opt in opts.view().options() {
             info!("\t{}: {}", opt.name(), opt.value());
+            let mut fnv: FnvHasher = Default::default();
+            opts.page().value().hash(&mut fnv);
+            opt.name().hash(&mut fnv);
+            let hash = fnv.finish32();
+            info!("\t{}: {}: {}", hash, opt.value(), opt.typeid());
         }
     }
 
