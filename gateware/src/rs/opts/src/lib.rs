@@ -9,6 +9,7 @@ mod integer;
 mod enumeration;
 mod float;
 mod string;
+pub mod persistence;
 
 pub use crate::traits::*;
 pub use crate::integer::*;

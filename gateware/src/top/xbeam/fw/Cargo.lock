@@ -360,6 +360,8 @@ dependencies = [
 name = "opts"
 version = "0.1.0"
 dependencies = [
+ "embassy-futures",
+ "embedded-storage-async",
  "fixed",
  "hash32 1.0.0",
  "heapless",
@@ -367,6 +369,7 @@ dependencies = [
  "micromath",
  "opts-derive",
  "postcard",
+ "sequential-storage",
  "serde",
  "serde_derive",
  "strum",
