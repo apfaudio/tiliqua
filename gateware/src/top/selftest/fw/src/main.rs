@@ -9,8 +9,7 @@ use critical_section::Mutex;
 use core::cell::RefCell;
 use core::fmt::Write;
 
-use embedded_hal::i2c::Operation;
-use embedded_hal::i2c::I2c;
+use embedded_hal::i2c::{I2c, Operation};
 use embedded_hal::delay::DelayNs;
 use embedded_graphics::prelude::*;
 
@@ -27,7 +26,7 @@ use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pca9635::Pca9635Driver;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
-use tiliqua_hal::spiflash::SpiFlash;
+use tiliqua_hal::eeprom::EepromDriver;
 
 const TUSB322I_ADDR:  u8 = 0x47;
 
@@ -203,19 +202,22 @@ fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
 
 fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
     let mut ok = false;
-    let mut eeprom_id: [u8; 6] = [0; 6];
-    let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0xFAu8]),
-                                                    Operation::Read(&mut eeprom_id)]);
-    if !err.is_ok() {
-        write!(s, "FAIL: eeprom_id (nak?) ").ok();
-    } else if eeprom_id[0] == 0x29 {
-        ok = true;
-        write!(s, "PASS: eeprom_id ").ok();
-    } else {
-        write!(s, "FAIL: eeprom_id ").ok();
-    }
-    for byte in eeprom_id {
-        write!(s, "{:x} ", byte).ok();
+    let mut eeprom = EepromDriver::new(i2cdev);
+    match eeprom.read_id() {
+        Ok(eeprom_id) => {
+            if eeprom_id[0] == 0x29 {
+                ok = true;
+                write!(s, "PASS: eeprom_id ").ok();
+            } else {
+                write!(s, "FAIL: eeprom_id ").ok();
+            }
+            for byte in eeprom_id {
+                write!(s, "{:x} ", byte).ok();
+            }
+        },
+        Err(_) => {
+            write!(s, "FAIL: eeprom_id (nak?) ").ok();
+        }
     }
     write!(s, "\r\n").ok();
     ok
@@ -406,7 +408,7 @@ fn main() -> ! {
 
     let mut startup_report = ReportString::new();
     psram_memtest(&mut startup_report, &mut timer);
-    //spiflash_memtest(&mut startup_report, &mut timer);
+    spiflash_memtest(&mut startup_report, &mut timer);
     tusb322i_id_test(&mut startup_report, &mut i2cdev);
     print_touch_err(&mut startup_report, &pmod);
     eeprom_id_test(&mut startup_report, &mut i2cdev1);

@@ -1,9 +1,7 @@
 use log::info;
 use embedded_hal::i2c::I2c;
-use embedded_hal::i2c::Operation;
 use tiliqua_hal::pmod::EurorackPmod;
-
-pub const EEPROM_ADDR: u8 = 0x52;
+use tiliqua_hal::eeprom::EepromDriver;
 
 use heapless::String;
 use core::fmt::Write;
@@ -135,12 +133,16 @@ impl CalibrationConstants {
     where
         EepromI2c: I2c
     {
+        let mut eeprom = EepromDriver::new(i2cdev);
+        let mut buffer = [0u8; (8*2+2) * 4];  // Total size: 18 constants * 4 bytes each
+        eeprom.read_bytes(0, &mut buffer).ok();
+        
         let mut constants = [0i32; 8*2+2];  // +2 for fractional_bits and checksum
-        for n in 0..constants.len() {
-            let mut rx_bytes = [0u8; 4];
-            i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[(n*4) as u8]),
-                                                  Operation::Read(&mut rx_bytes)]).ok();
-            constants[n] = i32::from_le_bytes(rx_bytes);
+        for (n, constant) in constants.iter_mut().enumerate() {
+            let start = n * 4;
+            *constant = i32::from_le_bytes([
+                buffer[start], buffer[start+1], buffer[start+2], buffer[start+3]
+            ]);
         }
 
         let mut result = Self {
@@ -202,6 +204,7 @@ impl CalibrationConstants {
         write!(s, "]\n\r").ok();
         info!("[write to eeprom] cal_constants = {}", s);
         // Commit to eeprom
+        let mut eeprom = EepromDriver::new(i2cdev);
         let mut constants = [0i32; 8*2+2];  // +2 for fractional_bits and checksum
         for ch in 0..4usize {
             constants[2*ch+0]   = self.adc_scale[ch];
@@ -211,18 +214,16 @@ impl CalibrationConstants {
         }
         constants[constants.len()-2] = self.fractional_bits as i32;
         constants[constants.len()-1] = self.compute_checksum();
-        for n in 0..constants.len() {
-            let mut tx_bytes = [0u8; 5];
-            tx_bytes[0] = (4*n) as u8; // 4 bytes storage per constant
-            tx_bytes[1..5].clone_from_slice(&constants[n].to_le_bytes());
-            loop {
-                // TODO: add timeouts!
-                match i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&tx_bytes)]) {
-                    Ok(_) => break,
-                    _ => {}
-                }
-            }
+        
+        let mut buffer = [0u8; (8*2+2) * 4];  // Total size: 18 constants * 4 bytes each
+        for (n, &constant) in constants.iter().enumerate() {
+            let bytes = constant.to_le_bytes();
+            let start = n * 4;
+            buffer[start..start+4].copy_from_slice(&bytes);
         }
+        
+        // Single write operation instead of loop
+        eeprom.write_bytes(0, &buffer).unwrap();
         info!("[write to eeprom] complete");
     }
 

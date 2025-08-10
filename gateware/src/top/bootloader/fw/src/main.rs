@@ -22,6 +22,7 @@ use tiliqua_hal::persist::Persist;
 use tiliqua_hal::si5351::*;
 use tiliqua_hal::cy8cmbr3xxx::*;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
+use tiliqua_hal::eeprom::EepromDriver;
 use tiliqua_hal::hal_nb::serial::Read;
 use tiliqua_manifest::*;
 use opts::OptionString;
@@ -321,7 +322,6 @@ fn copy_spiflash_region_to_psram(region: &MemoryRegion) -> Result<(), BitstreamE
     }
 }
 
-pub const EEPROM_ADDR: u8 = 0x52;
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
@@ -418,12 +418,8 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         }
                         // Save this bitstream as the last loaded
                         let mut eeprom_i2c = unsafe { I2c1::summon() };
-                        loop {
-                            match eeprom_i2c.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x40, (n+1) as u8])]) {
-                                Ok(_) => break,
-                                _ => {}
-                            }
-                        }
+                        let mut eeprom = EepromDriver::new(eeprom_i2c);
+                        eeprom.write_bytes(0x40, &[(n+1) as u8]).ok();
                         riscv::asm::fence();
                         riscv::asm::fence_i();
                         Ok(())
@@ -461,7 +457,7 @@ pub enum StartupWarning {
     TouchNak,
 }
 
-use embedded_hal::i2c::{I2c, Operation};
+use embedded_hal::i2c::I2c;
 
 // Mitigation for https://github.com/apfaudio/tiliqua/issues/81
 pub fn maybe_restart_codec<CodecI2c, Pmod>(i2cdev: &mut CodecI2c, pmod: &mut Pmod) -> Result<(), StartupWarning>
@@ -651,18 +647,13 @@ fn main() -> ! {
         }
         // TODO more sensible bus sharing
         let mut i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
+        let mut eeprom = EepromDriver::new(&mut i2cdev1);
         use tiliqua_hal::encoder::Encoder;
         if unsafe { Encoder0::summon() }.btn() {
-            loop {
-                match i2cdev1.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x40, 0u8])]) {
-                    Ok(_) => break,
-                    _ => {}
-                }
-            }
+            eeprom.write_bytes(0x40, &[0u8]).ok();
         } else { 
             let mut rx_bytes = [0u8; 1];
-            i2cdev1.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x40u8]),
-                                                  Operation::Read(&mut rx_bytes)]).unwrap();
+            eeprom.read_bytes(0x40, &mut rx_bytes).unwrap();
             log::info!("rx_bytes {:?}", rx_bytes);
             if rx_bytes[0] > 0 && rx_bytes[0] < 9 {
                 preboot = Some((rx_bytes[0]-1) as usize);
