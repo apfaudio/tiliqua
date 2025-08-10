@@ -18,6 +18,9 @@ pub enum PersistenceError {
 pub trait OptionsPersistence {
     type Error;
 
+    fn save_key(&mut self, key: u32, value: &[u8]) -> Result<(), Self::Error>;
+    fn load_key(&mut self, key: u32, buffer: &mut [u8]) -> Result<Option<usize>, Self::Error>;
+
     fn load_options<O: Options>(&mut self, opts: &mut O) -> Result<(), Self::Error>;
     fn save_options<O: Options>(&mut self, opts: &O) -> Result<(), Self::Error>;
 }
@@ -44,71 +47,67 @@ where
 {
     type Error = PersistenceError;
 
-    fn load_options<O: Options>(&mut self, opts: &mut O) -> Result<(), Self::Error> {
-        // Load individual options
-        for opt in opts.all_mut() {
-            if let Ok(item) = block_on(fetch_item::<u32, &[u8], _>(
-                &mut self.flash,
-                self.flash_range.clone(),
-                &mut NoCache::new(),
-                &mut self.data_buffer,
-                &opt.key(),
-            )) {
-                if let Some(data) = item {
-                    opt.decode(data);
-                    log::info!("load option: {}={} (from key={} data={:?})", 
-                              opt.name(), opt.value(), opt.key(), data);
-                }
-            }
-        }
-
-        // Load page selection
-        if let Ok(item) = block_on(fetch_item::<u32, &[u8], _>(
+    fn save_key(&mut self, key: u32, value: &[u8]) -> Result<(), Self::Error> {
+        block_on(store_item::<u32, &[u8], _>(
             &mut self.flash,
             self.flash_range.clone(),
             &mut NoCache::new(),
             &mut self.data_buffer,
-            &DEFAULT_PAGE_KEY,
-        )) {
-            if let Some(data) = item {
-                opts.page_mut().decode(data);
-            }
-        }
+            &key,
+            &value,
+        )).map_err(|_| PersistenceError::StorageError)
+    }
 
-        Ok(())
+    fn load_key(&mut self, key: u32, buffer: &mut [u8]) -> Result<Option<usize>, Self::Error> {
+        let item = block_on(fetch_item::<u32, &[u8], _>(
+            &mut self.flash,
+            self.flash_range.clone(),
+            &mut NoCache::new(),
+            &mut self.data_buffer,
+            &key,
+        )).map_err(|_| PersistenceError::StorageError)?;
+        if let Some(data) = item {
+            let len = data.len().min(buffer.len());
+            buffer[..len].copy_from_slice(&data[..len]);
+            Ok(Some(len))
+        } else {
+            Ok(None)
+        }
     }
 
     fn save_options<O: Options>(&mut self, opts: &O) -> Result<(), Self::Error> {
-        // Save individual options
+        // Individual options
         for opt in opts.all() {
             let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
             if let Some(encoded_len) = opt.encode(&mut buf) {
-                log::info!("{} {} --- {} {:?}", opt.name(), opt.value(), opt.key(), &buf[..encoded_len]);
-                
-                block_on(store_item::<u32, &[u8], _>(
-                    &mut self.flash,
-                    self.flash_range.clone(),
-                    &mut NoCache::new(),
-                    &mut self.data_buffer,
-                    &opt.key(),
-                    &&buf[..encoded_len],
-                )).map_err(|_| PersistenceError::StorageError)?;
+                log::info!("opts/save: {}={} ({:x}={:?})", 
+                          opt.name(), opt.value(), opt.key(), &buf[..encoded_len]);
+                self.save_key(opt.key(), &buf[..encoded_len])?;
             }
         }
-
-        // Save page selection
+        // Current page
         let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
         if let Some(encoded_len) = opts.page().encode(&mut buf) {
-            block_on(store_item::<u32, &[u8], _>(
-                &mut self.flash,
-                self.flash_range.clone(),
-                &mut NoCache::new(),
-                &mut self.data_buffer,
-                &DEFAULT_PAGE_KEY,
-                &&buf[..encoded_len],
-            )).map_err(|_| PersistenceError::StorageError)?;
+            self.save_key(DEFAULT_PAGE_KEY, &buf[..encoded_len])?;
         }
+        Ok(())
+    }
 
+    fn load_options<O: Options>(&mut self, opts: &mut O) -> Result<(), Self::Error> {
+        // Individual options
+        for opt in opts.all_mut() {
+            let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
+            if let Some(len) = self.load_key(opt.key(), &mut buf)? {
+                opt.decode(&buf[..len]);
+                log::info!("opts/load: {}={} ({:x}={:?})", 
+                          opt.name(), opt.value(), opt.key(), &buf[..len]);
+            }
+        }
+        // Current page
+        let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
+        if let Some(len) = self.load_key(DEFAULT_PAGE_KEY, &mut buf)? {
+            opts.page_mut().decode(&buf[..len]);
+        }
         Ok(())
     }
 }

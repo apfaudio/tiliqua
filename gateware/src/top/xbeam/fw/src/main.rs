@@ -85,8 +85,8 @@ fn main() -> ! {
     /* LOAD OPTIONS */
     let mut opts = Opts::default();
     let mut flash_persist = FlashOptionsPersistence::new(spiflash, flash_range);
-    
-    flash_persist.load_options(&mut opts).ok();
+
+    flash_persist.load_options(&mut opts).unwrap();
 
     let mut last_palette = opts.beam.palette.value;
     let app = Mutex::new(RefCell::new(App::new(opts)));
@@ -118,7 +118,7 @@ fn main() -> ! {
             });
 
             if commit_options {
-                flash_persist.save_options(&opts).ok();
+                flash_persist.save_options(&opts).unwrap();
             }
 
             if opts.beam.palette.value != last_palette || first {
