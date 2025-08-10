@@ -61,6 +61,7 @@ pub enum BitstreamError {
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
     pll: Option<Si5351Device<I2c0>>,
+    eeprom_manager: EepromManager<I2c1>,
     reboot_n: Option<usize>,
     error_n: [Option<String<32>>; N_MANIFESTS],
     time_since_reboot_requested: u32,
@@ -74,7 +75,8 @@ struct App {
 
 impl App {
     pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
-               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline, preboot_slot: Option<usize>) -> Self {
+               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline, preboot_slot: Option<usize>, 
+               eeprom_manager: EepromManager<I2c1>) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -84,6 +86,7 @@ impl App {
             ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
                             encoder, pca9635, pmod),
             pll,
+            eeprom_manager,
             reboot_n: None,
             error_n: [const { None }; N_MANIFESTS],
             time_since_reboot_requested: 0u32,
@@ -345,6 +348,8 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                 if app.ui.encoder_recently_touched(TIMER0_ISR_PERIOD_MS*2) {
                     app.preboot_cancelled = true;
                     app.preboot_countdown_ms = 0;
+                    let config = EepromConfig { last_boot_slot: None };
+                    app.eeprom_manager.write_config(&config).ok();
                 } else if app.preboot_countdown_ms > 0 {
                     // Continue countdown
                     app.preboot_countdown_ms = app.preboot_countdown_ms.saturating_sub(TIMER0_ISR_PERIOD_MS);
@@ -418,10 +423,8 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             copy_spiflash_region_to_psram(region)?;
                         }
                         // Save this bitstream as the last loaded
-                        let eeprom_i2c = unsafe { I2c1::summon() };
-                        let mut eeprom_manager = EepromManager::new(eeprom_i2c);
                         let config = EepromConfig { last_boot_slot: Some(n as u8) };
-                        eeprom_manager.write_config(&config).ok();
+                        app.eeprom_manager.write_config(&config).ok();
                         riscv::asm::fence();
                         riscv::asm::fence_i();
                         Ok(())
@@ -749,7 +752,7 @@ fn main() -> ! {
     }
 
     let app = Mutex::new(RefCell::new(
-            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone(), autoboot_to)));
+            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone(), autoboot_to, eeprom_manager)));
 
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
