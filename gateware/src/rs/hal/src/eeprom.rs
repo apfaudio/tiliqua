@@ -1,7 +1,7 @@
 use embedded_hal::i2c::{I2c, Operation};
 
 pub const EEPROM_ADDR: u8 = 0x52;
-pub const EEPROM_MAX_TRANSACTION_SIZE: usize = 16;
+pub const EEPROM_MAX_TRANSACTION_SIZE: usize = 5;
 
 #[derive(Debug)]
 pub enum EepromError<I2cError> {
@@ -30,12 +30,10 @@ where
         if buffer.len() > (EEPROM_MAX_TRANSACTION_SIZE - 1) {
             return Err(EepromError::InvalidSize);
         }
-        let result = self.i2c.transaction(self.address, &mut [
+        self.i2c.transaction(self.address, &mut [
             Operation::Write(&[addr]),
             Operation::Read(buffer)
-        ]).map_err(EepromError::I2c);
-        log::info!("read {:?}", buffer);
-        result
+        ]).map_err(EepromError::I2c)
     }
 
     fn write_bytes_bounded(&mut self, addr: u8, data: &[u8]) -> Result<(), EepromError<I2C::Error>> {
@@ -50,10 +48,7 @@ where
             match self.i2c.transaction(self.address, &mut [
                 Operation::Write(&write_buffer[..data.len() + 1])
             ]) {
-                Ok(_) => {
-                    log::info!("wrote {:?}", &write_buffer[..data.len() + 1]);
-                    break;
-                }
+                Ok(_) => break,
                 Err(e) => {
                     attempts += 1;
                     if attempts >= 10 {
@@ -75,12 +70,10 @@ where
             )?;
             offset += chunk_size;
         }
-        log::info!("got read {:?}", buffer);
         Ok(())
     }
 
     pub fn write_bytes(&mut self, addr: u8, data: &[u8]) -> Result<(), EepromError<I2C::Error>> {
-        log::info!("try write {:?}", data);
         let mut offset = 0;
         while offset < data.len() {
             let chunk_size = (data.len() - offset).min(EEPROM_MAX_TRANSACTION_SIZE - 1);
