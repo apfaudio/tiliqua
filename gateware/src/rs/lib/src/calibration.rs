@@ -120,7 +120,10 @@ impl CalibrationConstants {
         let mut eeprom_manager = EepromManager::new(i2cdev);
         match eeprom_manager.read_calibration() {
             Ok(cal) => Some(Self { cal }),
-            Err(_) => None,
+            Err(e) => {
+                info!("read_calibration failed {:?}", e);
+                None
+            }
         }
     }
 
@@ -157,7 +160,6 @@ impl CalibrationConstants {
         }
         write!(s, "]\n\r").ok();
         info!("[write to eeprom] cal_constants = {}", s);
-        
         // Commit to eeprom using EepromManager
         let mut eeprom_manager = EepromManager::new(i2cdev);
         match eeprom_manager.write_calibration(&self.cal) {

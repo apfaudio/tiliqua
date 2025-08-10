@@ -27,13 +27,15 @@ where
     }
 
     fn read_bytes_bounded(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), EepromError<I2C::Error>> {
-        if buffer.len() > EEPROM_MAX_TRANSACTION_SIZE {
+        if buffer.len() > (EEPROM_MAX_TRANSACTION_SIZE - 1) {
             return Err(EepromError::InvalidSize);
         }
-        self.i2c.transaction(self.address, &mut [
+        let result = self.i2c.transaction(self.address, &mut [
             Operation::Write(&[addr]),
             Operation::Read(buffer)
-        ]).map_err(EepromError::I2c)
+        ]).map_err(EepromError::I2c);
+        log::info!("read {:?}", buffer);
+        result
     }
 
     fn write_bytes_bounded(&mut self, addr: u8, data: &[u8]) -> Result<(), EepromError<I2C::Error>> {
@@ -48,7 +50,10 @@ where
             match self.i2c.transaction(self.address, &mut [
                 Operation::Write(&write_buffer[..data.len() + 1])
             ]) {
-                Ok(_) => break,
+                Ok(_) => {
+                    log::info!("wrote {:?}", &write_buffer[..data.len() + 1]);
+                    break;
+                }
                 Err(e) => {
                     attempts += 1;
                     if attempts >= 10 {
@@ -63,17 +68,19 @@ where
     pub fn read_bytes(&mut self, addr: u8, buffer: &mut [u8]) -> Result<(), EepromError<I2C::Error>> {
         let mut offset = 0;
         while offset < buffer.len() {
-            let chunk_size = (buffer.len() - offset).min(EEPROM_MAX_TRANSACTION_SIZE);
+            let chunk_size = (buffer.len() - offset).min(EEPROM_MAX_TRANSACTION_SIZE - 1);
             self.read_bytes_bounded(
                 addr + offset as u8, 
                 &mut buffer[offset..offset + chunk_size]
             )?;
             offset += chunk_size;
         }
+        log::info!("got read {:?}", buffer);
         Ok(())
     }
 
     pub fn write_bytes(&mut self, addr: u8, data: &[u8]) -> Result<(), EepromError<I2C::Error>> {
+        log::info!("try write {:?}", data);
         let mut offset = 0;
         while offset < data.len() {
             let chunk_size = (data.len() - offset).min(EEPROM_MAX_TRANSACTION_SIZE - 1);
