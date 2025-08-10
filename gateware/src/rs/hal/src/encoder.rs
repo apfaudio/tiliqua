@@ -1,4 +1,5 @@
 pub trait Encoder {
+    fn btn(&self) -> bool;
     fn poke_ticks(&mut self) -> i8;
     fn poke_btn(&mut self) -> bool;
     fn poke_btn_held(&mut self) -> bool;
@@ -40,6 +41,9 @@ macro_rules! impl_encoder {
                     }
                 }
 
+                pub unsafe fn summon() -> Self {
+                    Self::new(<$PACENCODERX>::steal())
+                }
             }
 
             impl hal::encoder::Encoder for $ENCODERX {
@@ -58,6 +62,10 @@ macro_rules! impl_encoder {
                         self.pending_release = false;
                     }
                     btn
+                }
+
+                fn btn(&self) -> bool {
+                    self.registers.button().read().bits() != 0
                 }
 
                 fn poke_btn_held(&mut self) -> bool {

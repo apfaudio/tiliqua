@@ -295,6 +295,8 @@ fn copy_spiflash_region_to_psram(region: &MemoryRegion) -> Result<(), BitstreamE
     }
 }
 
+pub const EEPROM_ADDR: u8 = 0x52;
+
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
     critical_section::with(|cs| {
@@ -370,6 +372,14 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         unsafe { bootinfo.to_addr(BOOTINFO_BASE) };
                         for region in &manifest.regions {
                             copy_spiflash_region_to_psram(region)?;
+                        }
+                        // Save this bitstream as the last loaded
+                        let mut eeprom_i2c = unsafe { I2c1::summon() };
+                        loop {
+                            match eeprom_i2c.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x40, (n+1) as u8])]) {
+                                Ok(_) => break,
+                                _ => {}
+                            }
                         }
                         riscv::asm::fence();
                         riscv::asm::fence_i();
@@ -587,6 +597,8 @@ fn main() -> ! {
 
     // Verify/reprogram touch sensing NVM
 
+    let mut preboot: Option<usize> = None;
+
     {
         if HW_REV_MAJOR >= 5 {
             // Rev5+, resetting CODEC is always allowed without popping.
@@ -595,7 +607,24 @@ fn main() -> ! {
             pmod.hard_reset();
         }
         // TODO more sensible bus sharing
-        let i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
+        let mut i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
+        use tiliqua_hal::encoder::Encoder;
+        if unsafe { Encoder0::summon() }.btn() {
+            loop {
+                match i2cdev1.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x40, 0u8])]) {
+                    Ok(_) => break,
+                    _ => {}
+                }
+            }
+        } else { 
+            let mut rx_bytes = [0u8; 1];
+            i2cdev1.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0x40u8]),
+                                                  Operation::Read(&mut rx_bytes)]).unwrap();
+            log::info!("rx_bytes {:?}", rx_bytes);
+            if rx_bytes[0] > 0 && rx_bytes[0] < 9 {
+                preboot = Some((rx_bytes[0]-1) as usize);
+            }
+        }
         let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1, &TOUCH_SENSOR_ORDER);
         if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
             let s: &'static str = e.into();
@@ -707,6 +736,11 @@ fn main() -> ! {
             let (opts, reboot_n, error_n, final_modeline) = critical_section::with(|cs| {
 
                 let mut app = app.borrow_ref_mut(cs);
+
+                if let Some(n) = preboot {
+                    app.reboot_n = preboot;
+                    preboot = None;
+                }
 
                 //
                 // Dynamic modeline switching.
