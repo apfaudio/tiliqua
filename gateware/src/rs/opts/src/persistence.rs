@@ -5,6 +5,7 @@ use embassy_embedded_hal::adapter::BlockingAsync;
 
 use crate::traits::Options;
 
+const DATA_BUFFER_SZ: usize = 32;
 const DEFAULT_PAGE_KEY: u32 = 0xdeadbeef;
 
 #[derive(Debug)]
@@ -24,7 +25,7 @@ pub trait OptionsPersistence {
 pub struct FlashOptionsPersistence<F> {
     flash: BlockingAsync<F>,
     flash_range: core::ops::Range<u32>,
-    data_buffer: [u8; 128],
+    data_buffer: [u8; DATA_BUFFER_SZ],
 }
 
 impl<F> FlashOptionsPersistence<F> {
@@ -32,7 +33,7 @@ impl<F> FlashOptionsPersistence<F> {
         Self {
             flash: BlockingAsync::new(flash),
             flash_range,
-            data_buffer: [0u8; 128],
+            data_buffer: [0u8; DATA_BUFFER_SZ],
         }
     }
 }
@@ -80,7 +81,7 @@ where
     fn save_options<O: Options>(&mut self, opts: &O) -> Result<(), Self::Error> {
         // Save individual options
         for opt in opts.all() {
-            let mut buf: [u8; 8] = [0u8; 8];
+            let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
             if let Some(encoded_len) = opt.encode(&mut buf) {
                 log::info!("{} {} --- {} {:?}", opt.name(), opt.value(), opt.key(), &buf[..encoded_len]);
                 
@@ -96,7 +97,7 @@ where
         }
 
         // Save page selection
-        let mut buf: [u8; 8] = [0u8; 8];
+        let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
         if let Some(encoded_len) = opts.page().encode(&mut buf) {
             block_on(store_item::<u32, &[u8], _>(
                 &mut self.flash,
