@@ -68,14 +68,13 @@ struct App {
     manifests: [Option<BitstreamManifest>; N_MANIFESTS],
     animation_elapsed_ms: u32,
     modeline: DVIModeline,
-    preboot_slot: Option<usize>,
-    preboot_countdown_ms: u32,
-    preboot_cancelled: bool,
+    autoboot_slot: Option<usize>,
+    autoboot_countdown_ms: u32,
 }
 
 impl App {
     pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
-               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline, preboot_slot: Option<usize>, 
+               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline, autoboot_slot: Option<usize>, 
                eeprom_manager: EepromManager<I2c1>) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
@@ -93,9 +92,8 @@ impl App {
             manifests,
             animation_elapsed_ms: 0u32,
             modeline,
-            preboot_slot,
-            preboot_countdown_ms: if preboot_slot.is_some() { 5000 } else { 0 },
-            preboot_cancelled: false,
+            autoboot_slot,
+            autoboot_countdown_ms: if autoboot_slot.is_some() { 5000 } else { 0 },
         }
     }
 
@@ -341,22 +339,20 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             app.ui.update();
         }
 
-        // Handle preboot countdown
-        if let Some(slot) = app.preboot_slot {
-            if !app.preboot_cancelled {
-                // Check if encoder was touched during countdown
-                if app.ui.encoder_recently_touched(TIMER0_ISR_PERIOD_MS*2) {
-                    app.preboot_cancelled = true;
-                    app.preboot_countdown_ms = 0;
-                    let config = EepromConfig { last_boot_slot: None };
-                    app.eeprom_manager.write_config(&config).ok();
-                } else if app.preboot_countdown_ms > 0 {
-                    // Continue countdown
-                    app.preboot_countdown_ms = app.preboot_countdown_ms.saturating_sub(TIMER0_ISR_PERIOD_MS);
-                } else {
-                    // Countdown finished, trigger reboot
-                    app.reboot_n = Some(slot);
-                }
+        // Handle autoboot countdown
+        if let Some(slot) = app.autoboot_slot {
+            if app.ui.encoder_recently_touched(TIMER0_ISR_PERIOD_MS*2) {
+                // Encoder was touched during countdown, cancel autoboot, clear flag for next boot.
+                app.autoboot_slot = None;
+                app.autoboot_countdown_ms = 0;
+                let config = EepromConfig { last_boot_slot: None };
+                app.eeprom_manager.write_config(&config).ok();
+            } else if app.autoboot_countdown_ms > 0 {
+                // Autoboot is configured, continue countdown
+                app.autoboot_countdown_ms = app.autoboot_countdown_ms.saturating_sub(TIMER0_ISR_PERIOD_MS);
+            } else {
+                // Countdown finished, trigger autoboot into selected bitstream
+                app.reboot_n = Some(slot);
             }
         }
 
@@ -794,7 +790,7 @@ fn main() -> ! {
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
 
-            let (opts, reboot_n, error_n, final_modeline, autoboot_to_countdown_ms) = critical_section::with(|cs| {
+            let (opts, reboot_n, error_n, final_modeline, autoboot_countdown_ms) = critical_section::with(|cs| {
 
                 let mut app = app.borrow_ref_mut(cs);
 
@@ -856,7 +852,7 @@ fn main() -> ! {
                  app.reboot_n.clone(),
                  app.error_n.clone(),
                  app.modeline.clone(),
-                 app.preboot_countdown_ms)
+                 app.autoboot_countdown_ms)
             });
 
             modeline = final_modeline;
@@ -887,8 +883,8 @@ fn main() -> ! {
             }
 
             if let Some(n) = autoboot_to {
-                if autoboot_to_countdown_ms > 0 {
-                    print_autoboot_countdown(&mut display, autoboot_to_countdown_ms, n, &names[n]);
+                if autoboot_countdown_ms > 0 {
+                    print_autoboot_countdown(&mut display, autoboot_countdown_ms, n, &names[n]);
                 }
             }
         }
