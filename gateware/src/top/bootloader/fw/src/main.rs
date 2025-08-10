@@ -386,6 +386,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             manifest: manifest.clone(),
                             modeline: app.modeline.clone(),
                         };
+                        for region in &manifest.regions {
+                            copy_spiflash_region_to_psram(region)?;
+                        }
                         if let Some(mut pll_config) = manifest.external_pll_config.clone() {
                             if pll_config.clk1_inherit {
                                 info!("video/pll: inherit pixel clock from bootloader modeline.");
@@ -415,9 +418,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         }
                         // Place BootInfo at the end of PSRAM
                         unsafe { bootinfo.to_addr(BOOTINFO_BASE).expect("Failed to serialize BootInfo") };
-                        for region in &manifest.regions {
-                            copy_spiflash_region_to_psram(region)?;
-                        }
                         // Save this bitstream as the last loaded
                         let config = EepromConfig { last_boot_slot: Some(n as u8) };
                         app.eeprom_manager.write_config(&config).ok();
