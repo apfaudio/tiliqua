@@ -65,11 +65,14 @@ struct App {
     manifests: [Option<BitstreamManifest>; N_MANIFESTS],
     animation_elapsed_ms: u32,
     modeline: DVIModeline,
+    preboot_slot: Option<usize>,
+    preboot_countdown_ms: u32,
+    preboot_cancelled: bool,
 }
 
 impl App {
     pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
-               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline) -> Self {
+               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline, preboot_slot: Option<usize>) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -85,6 +88,9 @@ impl App {
             manifests,
             animation_elapsed_ms: 0u32,
             modeline,
+            preboot_slot,
+            preboot_countdown_ms: if preboot_slot.is_some() { 5000 } else { 0 },
+            preboot_cancelled: false,
         }
     }
 
@@ -125,6 +131,26 @@ where
     Text::with_alignment(
         "REBOOTING",
         Point::new(rng.i32(0..h_active), rng.i32(0..v_active)),
+        style,
+        Alignment::Center,
+    )
+    .draw(d).ok();
+}
+
+fn print_preboot_countdown<D>(d: &mut D, countdown_ms: u32, slot: usize, target: &OptionString)
+where
+    D: DrawTarget<Color = Gray8> + OriginDimensions,
+{
+    let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
+    let h_active = d.size().width as i32;
+    let v_active = d.size().height as i32;
+
+    let countdown_sec = (countdown_ms + 999) / 1000; // Round up
+    let mut countdown_text: String<64> = String::new();
+    write!(countdown_text, "Autoboot {} (slot {}) in {}sec", target, slot, countdown_sec).ok();
+    Text::with_alignment(
+        &countdown_text,
+        Point::new(h_active/2, v_active/2 - 125),
         style,
         Alignment::Center,
     )
@@ -309,6 +335,23 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         if !app.startup_animation() {
             app.ui.update();
+        }
+
+        // Handle preboot countdown
+        if let Some(slot) = app.preboot_slot {
+            if !app.preboot_cancelled {
+                // Check if encoder was touched during countdown
+                if app.ui.encoder_recently_touched(TIMER0_ISR_PERIOD_MS*2) {
+                    app.preboot_cancelled = true;
+                    app.preboot_countdown_ms = 0;
+                } else if app.preboot_countdown_ms > 0 {
+                    // Continue countdown
+                    app.preboot_countdown_ms = app.preboot_countdown_ms.saturating_sub(TIMER0_ISR_PERIOD_MS);
+                } else {
+                    // Countdown finished, trigger reboot
+                    app.reboot_n = Some(slot);
+                }
+            }
         }
 
         if app.ui.opts.tracker.modify {
@@ -689,9 +732,12 @@ fn main() -> ! {
     opts.boot.slot6.value = names[6].clone();
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
+    if let Some(n) = preboot {
+        opts.tracker.selected = Some(n);
+    }
 
     let app = Mutex::new(RefCell::new(
-            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone())));
+            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone(), preboot)));
 
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
@@ -733,14 +779,9 @@ fn main() -> ! {
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
 
-            let (opts, reboot_n, error_n, final_modeline) = critical_section::with(|cs| {
+            let (opts, reboot_n, error_n, final_modeline, preboot_countdown_ms) = critical_section::with(|cs| {
 
                 let mut app = app.borrow_ref_mut(cs);
-
-                if let Some(n) = preboot {
-                    app.reboot_n = preboot;
-                    preboot = None;
-                }
 
                 //
                 // Dynamic modeline switching.
@@ -799,7 +840,8 @@ fn main() -> ! {
                 (app.ui.opts.clone(),
                  app.reboot_n.clone(),
                  app.error_n.clone(),
-                 app.modeline.clone())
+                 app.modeline.clone(),
+                 app.preboot_countdown_ms)
             });
 
             modeline = final_modeline;
@@ -827,6 +869,12 @@ fn main() -> ! {
 
             if let Some(_) = reboot_n {
                 print_rebooting(&mut display, &mut rng);
+            }
+
+            if let Some(n) = preboot {
+                if preboot_countdown_ms > 0 {
+                    print_preboot_countdown(&mut display, preboot_countdown_ms, n, &names[n]);
+                }
             }
         }
     })
