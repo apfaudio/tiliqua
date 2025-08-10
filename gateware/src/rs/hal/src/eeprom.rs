@@ -7,6 +7,7 @@ pub const EEPROM_MAX_TRANSACTION_SIZE: usize = 16;
 pub enum EepromError<I2cError> {
     I2c(I2cError),
     InvalidSize,
+    InvalidData,
 }
 
 pub struct EepromDriver<I2C> {
@@ -29,7 +30,6 @@ where
         if buffer.len() > EEPROM_MAX_TRANSACTION_SIZE {
             return Err(EepromError::InvalidSize);
         }
-        
         self.i2c.transaction(self.address, &mut [
             Operation::Write(&[addr]),
             Operation::Read(buffer)
@@ -40,11 +40,9 @@ where
         if data.len() > EEPROM_MAX_TRANSACTION_SIZE - 1 {
             return Err(EepromError::InvalidSize);
         }
-        
         let mut write_buffer = [0u8; EEPROM_MAX_TRANSACTION_SIZE];
         write_buffer[0] = addr;
         write_buffer[1..data.len() + 1].copy_from_slice(data);
-        
         let mut attempts = 0;
         loop {
             match self.i2c.transaction(self.address, &mut [

@@ -586,7 +586,7 @@ fn main() -> ! {
                                &pmod.sample_i()).ok();
                 draw::draw_cal_constants(
                     &mut display, h_active/2-128, v_active/2+64, hue,
-                    &constants.adc_scale, &constants.adc_zero, &constants.dac_scale, &constants.dac_zero).ok();
+                    &constants.cal.adc_scale, &constants.cal.adc_zero, &constants.cal.dac_scale, &constants.cal.dac_zero).ok();
 
                 if commit_to_eeprom {
                     constants.write_to_eeprom(&mut i2cdev1);

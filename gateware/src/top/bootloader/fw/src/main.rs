@@ -10,11 +10,13 @@ use heapless::String;
 use micromath::{F32Ext};
 use strum_macros::{EnumIter, IntoStaticStr};
 use embedded_hal::delay::DelayNs;
+use embedded_hal::i2c::Operation;
 
 use core::str::FromStr;
 use core::fmt::Write;
 
 use tiliqua_lib::*;
+use tiliqua_lib::eeprominfo::{EepromConfig, EepromManager};
 use pac::constants::*;
 use tiliqua_fw::*;
 use tiliqua_hal::pmod::EurorackPmod;
@@ -22,7 +24,6 @@ use tiliqua_hal::persist::Persist;
 use tiliqua_hal::si5351::*;
 use tiliqua_hal::cy8cmbr3xxx::*;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
-use tiliqua_hal::eeprom::EepromDriver;
 use tiliqua_hal::hal_nb::serial::Read;
 use tiliqua_manifest::*;
 use opts::OptionString;
@@ -417,9 +418,10 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             copy_spiflash_region_to_psram(region)?;
                         }
                         // Save this bitstream as the last loaded
-                        let mut eeprom_i2c = unsafe { I2c1::summon() };
-                        let mut eeprom = EepromDriver::new(eeprom_i2c);
-                        eeprom.write_bytes(0x40, &[(n+1) as u8]).ok();
+                        let eeprom_i2c = unsafe { I2c1::summon() };
+                        let mut eeprom_manager = EepromManager::new(eeprom_i2c);
+                        let config = EepromConfig { last_boot_slot: Some(n as u8) };
+                        eeprom_manager.write_config(&config).ok();
                         riscv::asm::fence();
                         riscv::asm::fence_i();
                         Ok(())
@@ -646,20 +648,27 @@ fn main() -> ! {
             pmod.hard_reset();
         }
         // TODO more sensible bus sharing
-        let mut i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
-        let mut eeprom = EepromDriver::new(&mut i2cdev1);
+        let mut eeprom_manager = EepromManager::new(unsafe{I2c1::summon()});
         use tiliqua_hal::encoder::Encoder;
         if unsafe { Encoder0::summon() }.btn() {
-            eeprom.write_bytes(0x40, &[0u8]).ok();
+            let config = EepromConfig { last_boot_slot: None };
+            eeprom_manager.write_config(&config).ok();
         } else { 
-            let mut rx_bytes = [0u8; 1];
-            eeprom.read_bytes(0x40, &mut rx_bytes).unwrap();
-            log::info!("rx_bytes {:?}", rx_bytes);
-            if rx_bytes[0] > 0 && rx_bytes[0] < 9 {
-                preboot = Some((rx_bytes[0]-1) as usize);
+            match eeprom_manager.read_config() {
+                Ok(config) => {
+                    log::info!("EepromConfig: {:?}", config);
+                    if let Some(slot) = config.last_boot_slot {
+                        if slot < 8 {
+                            preboot = Some(slot as usize);
+                        }
+                    }
+                },
+                Err(e) => {
+                    log::info!("Failed to read config: {:?}", e);
+                }
             }
         }
-        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1, &TOUCH_SENSOR_ORDER);
+        let mut cy8 = Cy8cmbr3108Driver::new(unsafe{I2c1::summon()}, &TOUCH_SENSOR_ORDER);
         if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
             let s: &'static str = e.into();
             write!(startup_report, "{}\r\n", s).ok();
