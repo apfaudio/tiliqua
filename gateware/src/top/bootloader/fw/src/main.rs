@@ -412,7 +412,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             }
                         }
                         // Place BootInfo at the end of PSRAM
-                        unsafe { bootinfo.to_addr(BOOTINFO_BASE) };
+                        unsafe { bootinfo.to_addr(BOOTINFO_BASE).expect("Failed to serialize BootInfo") };
                         for region in &manifest.regions {
                             copy_spiflash_region_to_psram(region)?;
                         }

@@ -1,10 +1,12 @@
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+use serde_derive::{Serialize, Deserialize};
+
+#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum Rotate {
     Normal,
     Left,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct DVIModeline {
    pub h_active:      u16,
    pub h_sync_start:  u16,

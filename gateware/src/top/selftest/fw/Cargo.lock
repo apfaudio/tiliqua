@@ -620,6 +620,8 @@ dependencies = [
  "micromath",
  "nb 1.1.0",
  "riscv",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -634,6 +636,7 @@ dependencies = [
  "micromath",
  "midi-types",
  "opts",
+ "postcard",
  "serde",
  "serde_derive",
  "strum",

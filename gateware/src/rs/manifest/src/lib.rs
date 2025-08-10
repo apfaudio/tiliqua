@@ -13,7 +13,7 @@
 // This representation is used manifest parsing in the bootloader.
 
 use heapless::{String, Vec};
-use serde::{Deserialize};
+use serde::{Deserialize, Serialize};
 use log::info;
 
 pub const MANIFEST_MAGIC: u32        = 0xFEEDBEEF;
@@ -23,7 +23,7 @@ pub const SLOT_SIZE: usize           = 0x100000; // Spacing between user slots
 pub const MANIFEST_SIZE: usize       = 1024;     // Each manifest starts at:
                                                  // SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct MemoryRegion {
     pub filename: String<32>,
     pub spiflash_src: u32,
@@ -32,7 +32,7 @@ pub struct MemoryRegion {
     pub crc: u32,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct ExternalPLLConfig {
     pub clk0_hz: u32,
     pub clk1_hz: Option<u32>,
@@ -40,7 +40,7 @@ pub struct ExternalPLLConfig {
     pub spread_spectrum: Option<f32>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct BitstreamManifest {
     pub hw_rev: u32,
     pub name: String<32>,

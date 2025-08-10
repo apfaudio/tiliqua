@@ -22,6 +22,7 @@ opts = { path="../opts" }
 embedded-hal = "=1.0.0"
 serde = { version="1.0.219", default-features=false }
 serde_derive = "1.0.219"
+postcard = { version="1.1.3", default-features=false }
 
 [dev-dependencies]
 critical-section = { version = "1.1.2", features = ["std"] }

@@ -26,6 +26,8 @@ embedded-graphics = "0.8.1"
 bitflags = "2.6.0"
 micromath = "2.1.0"
 embedded-storage = "0.3.1"
+serde = { version="1.0.219", default-features=false }
+serde_derive = "1.0.219"
 
 [dev-dependencies]
 critical-section = { version = "1.1.2", features = ["std"] }
