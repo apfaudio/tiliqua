@@ -139,7 +139,7 @@ where
     .draw(d).ok();
 }
 
-fn print_preboot_countdown<D>(d: &mut D, countdown_ms: u32, slot: usize, target: &OptionString)
+fn print_autoboot_countdown<D>(d: &mut D, countdown_ms: u32, slot: usize, target: &OptionString)
 where
     D: DrawTarget<Color = Gray8> + OriginDimensions,
 {
@@ -636,9 +636,38 @@ fn main() -> ! {
 
     let mut startup_report: String<256> = Default::default();
 
-    // Verify/reprogram touch sensing NVM
+    // Check if we already started any bitstreams by checking if we already wrote
+    // something to the PSRAM for client bitstreams. Warm/Cold boots have different
+    // autoboot behavior, this is used to distinguish between them.
 
-    let mut preboot: Option<usize> = None;
+    let cold_boot = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.is_none();
+    info!("cold_boot: {}", cold_boot);
+
+    // Read autoboot flag and maybe configure us to start an autoboot countdown by
+    // setting 'autoboot_to'.
+
+    let mut autoboot_to: Option<usize> = None;
+    let mut eeprom_manager = EepromManager::new(unsafe{I2c1::summon()});
+    if !cold_boot {
+        // Warm boot: Clear the autoboot flag.
+        let config = EepromConfig { last_boot_slot: None };
+        eeprom_manager.write_config(&config).ok();
+    } else {
+        // Cold boot: Check the autoboot flag and boot
+        match eeprom_manager.read_config() {
+            Ok(config) => {
+                log::info!("EepromConfig.read_config() wants: {:?}", config);
+                if let Some(slot) = config.last_boot_slot {
+                    autoboot_to = Some(slot as usize);
+                }
+            },
+            Err(e) => {
+                log::warn!("EepromConfig.read_config() failed: {:?}", e);
+            }
+        }
+    }
+
+    // Verify/reprogram touch sensing NVM
 
     {
         if HW_REV_MAJOR >= 5 {
@@ -646,27 +675,6 @@ fn main() -> ! {
             // So let's just do it to bring the CODEC into a consistent state.
             timer.delay_ms(200); // Wait for POR on eurorack-pmod
             pmod.hard_reset();
-        }
-        // TODO more sensible bus sharing
-        let mut eeprom_manager = EepromManager::new(unsafe{I2c1::summon()});
-        use tiliqua_hal::encoder::Encoder;
-        if unsafe { Encoder0::summon() }.btn() {
-            let config = EepromConfig { last_boot_slot: None };
-            eeprom_manager.write_config(&config).ok();
-        } else { 
-            match eeprom_manager.read_config() {
-                Ok(config) => {
-                    log::info!("EepromConfig: {:?}", config);
-                    if let Some(slot) = config.last_boot_slot {
-                        if slot < 8 {
-                            preboot = Some(slot as usize);
-                        }
-                    }
-                },
-                Err(e) => {
-                    log::info!("Failed to read config: {:?}", e);
-                }
-            }
         }
         let mut cy8 = Cy8cmbr3108Driver::new(unsafe{I2c1::summon()}, &TOUCH_SENSOR_ORDER);
         if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
@@ -706,6 +714,8 @@ fn main() -> ! {
     }
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
+    // Load serialized JSON manifests from spiflash
+
     let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
     for n in 0usize..N_MANIFESTS {
         let size: usize = MANIFEST_SIZE;
@@ -716,7 +726,9 @@ fn main() -> ! {
     }
 
     let mut opts = Opts::default();
+
     // Populate option string values with bitstream names from manifest.
+
     let mut names: [OptionString; 8] = [const { OptionString::new() }; 8];
     for n in 0..manifests.len() {
         if let Some(manifest) = &manifests[n] {
@@ -732,12 +744,12 @@ fn main() -> ! {
     opts.boot.slot6.value = names[6].clone();
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
-    if let Some(n) = preboot {
+    if let Some(n) = autoboot_to {
         opts.tracker.selected = Some(n);
     }
 
     let app = Mutex::new(RefCell::new(
-            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone(), preboot)));
+            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone(), autoboot_to)));
 
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
@@ -779,7 +791,7 @@ fn main() -> ! {
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
 
-            let (opts, reboot_n, error_n, final_modeline, preboot_countdown_ms) = critical_section::with(|cs| {
+            let (opts, reboot_n, error_n, final_modeline, autoboot_to_countdown_ms) = critical_section::with(|cs| {
 
                 let mut app = app.borrow_ref_mut(cs);
 
@@ -871,9 +883,9 @@ fn main() -> ! {
                 print_rebooting(&mut display, &mut rng);
             }
 
-            if let Some(n) = preboot {
-                if preboot_countdown_ms > 0 {
-                    print_preboot_countdown(&mut display, preboot_countdown_ms, n, &names[n]);
+            if let Some(n) = autoboot_to {
+                if autoboot_to_countdown_ms > 0 {
+                    print_autoboot_countdown(&mut display, autoboot_to_countdown_ms, n, &names[n]);
                 }
             }
         }
