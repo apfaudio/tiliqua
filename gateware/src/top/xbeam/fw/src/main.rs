@@ -112,21 +112,13 @@ fn main() -> ! {
 
         loop {
 
-            let (opts, draw_options, commit_options, test_action_pressed) = critical_section::with(|cs| {
+            let (opts, draw_options, save_opts, wipe_opts) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
                 let opts_poll = app.ui.opts.clone();
-                let test_action_pressed = app.ui.opts.usb.test_action.poll();
-                (opts_poll, app.ui.draw(), app.ui.commit_options(), test_action_pressed) 
+                let save_opts = app.ui.opts.misc.save_opts.poll();
+                let wipe_opts = app.ui.opts.misc.wipe_opts.poll();
+                (opts_poll, app.ui.draw(), save_opts, wipe_opts)
             });
-
-            info!("Debug toggle: {}", opts.usb.debug_toggle.value);
-            if test_action_pressed {
-                info!("Test action button pressed!");
-            }
-
-            if commit_options {
-                flash_persist.save_options(&opts).unwrap();
-            }
 
             if opts.beam.palette.value != last_palette || first {
                 opts.beam.palette.value.write_to_hardware(&mut display);
@@ -137,6 +129,18 @@ fn main() -> ! {
                 draw::draw_options(&mut display, &opts, h_active-200, v_active/2, opts.beam.ui_hue.value).ok();
                 draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.ui_hue.value, UI_NAME, UI_SHA,
                                 &modeline).ok();
+            }
+
+            if save_opts {
+                flash_persist.save_options(&opts).unwrap();
+            }
+
+            if wipe_opts {
+                critical_section::with(|cs| {
+                    let mut app = app.borrow_ref_mut(cs);
+                    app.ui.opts = Opts::default();
+                    flash_persist.erase_all().unwrap();
+                });
             }
 
             persist.set_persist(opts.beam.persist.value);
@@ -177,8 +181,8 @@ fn main() -> ! {
             scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope2.ypos3.value as u16) } );
 
             xbeam_mux.flags().write(
-                |w| { w.usb_en().bit(opts.usb.mode.value == USBMode::Enable);
-                      w.show_outputs().bit(opts.usb.show.value == Show::Outputs)
+                |w| { w.usb_en().bit(opts.misc.usb_mode.value == USBMode::Enable);
+                      w.show_outputs().bit(opts.misc.plot_src.value == PlotSrc::Outputs)
                 } );
 
             xbeam_mux.delay0().write(|w| unsafe { w.value().bits(
@@ -190,18 +194,14 @@ fn main() -> ! {
             xbeam_mux.delay3().write(|w| unsafe { w.value().bits(
                     delay_smoothers[3].proc_u16(opts.delay.delay_c.value)) });
 
-            if opts.tracker.page.value == Page::Vector {
+            if opts.misc.plot_type.value == PlotType::Vector {
                 scope.flags().write(
                     |w| w.enable().bit(false) );
                 vscope.flags().write(
                     |w| { w.enable().bit(true);
                           w.rotate_left().bit(modeline.rotate == Rotate::Left)
                     } );
-            }
-
-            if opts.tracker.page.value == Page::Scope1 ||
-               opts.tracker.page.value == Page::Scope2 ||
-               first {
+            } else {
                 scope.flags().write(
                     |w| { w.enable().bit(true);
                           w.rotate_left().bit(modeline.rotate == Rotate::Left);

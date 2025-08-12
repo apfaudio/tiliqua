@@ -240,6 +240,8 @@ macro_rules! impl_spiflash {
                 type Error = $crate::spiflash::Error;
             }
 
+            impl $crate::nor_flash::MultiwriteNorFlash for $SPIFLASHX { }
+
             impl $crate::nor_flash::ReadNorFlash for $SPIFLASHX {
                 const READ_SIZE: usize = 1;
                 fn read(&mut self, offset: u32, bytes: &mut [u8]) ->

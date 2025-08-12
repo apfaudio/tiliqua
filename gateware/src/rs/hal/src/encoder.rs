@@ -1,8 +1,6 @@
 pub trait Encoder {
-    fn btn(&self) -> bool;
     fn poke_ticks(&mut self) -> i8;
     fn poke_btn(&mut self) -> bool;
-    fn poke_btn_held(&mut self) -> bool;
     fn update(&mut self);
 }
 
@@ -62,19 +60,6 @@ macro_rules! impl_encoder {
                         self.pending_release = false;
                     }
                     btn
-                }
-
-                fn btn(&self) -> bool {
-                    self.registers.button().read().bits() != 0
-                }
-
-                fn poke_btn_held(&mut self) -> bool {
-                    if self.btn_held > 150 {
-                        self.btn_held = 0;
-                        true
-                    } else {
-                        false
-                    }
                 }
 
                 fn update(&mut self) {

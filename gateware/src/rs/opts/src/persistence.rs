@@ -1,4 +1,4 @@
-use sequential_storage::map::{fetch_item, store_item};
+use sequential_storage::map::{fetch_item, store_item, remove_all_items};
 use sequential_storage::cache::NoCache;
 use embassy_futures::block_on;
 use embassy_embedded_hal::adapter::BlockingAsync;
@@ -21,6 +21,7 @@ pub trait OptionsPersistence {
     fn save_key(&mut self, key: u32, value: &[u8]) -> Result<(), Self::Error>;
     fn load_key(&mut self, key: u32, buffer: &mut [u8]) -> Result<Option<usize>, Self::Error>;
 
+    fn erase_all(&mut self) -> Result<(), Self::Error>;
     fn load_options<O: Options>(&mut self, opts: &mut O) -> Result<(), Self::Error>;
     fn save_options<O: Options>(&mut self, opts: &O) -> Result<(), Self::Error>;
 }
@@ -43,7 +44,7 @@ impl<F> FlashOptionsPersistence<F> {
 
 impl<F> OptionsPersistence for FlashOptionsPersistence<F>
 where
-    F: embedded_storage::nor_flash::NorFlash,
+    F: embedded_storage::nor_flash::NorFlash + embedded_storage::nor_flash::MultiwriteNorFlash,
 {
     type Error = PersistenceError;
 
@@ -75,8 +76,16 @@ where
         }
     }
 
+    fn erase_all(&mut self) -> Result<(), Self::Error> {
+        block_on(remove_all_items::<u32, _>(
+            &mut self.flash,
+            self.flash_range.clone(),
+            &mut NoCache::new(),
+            &mut self.data_buffer,
+        )).map_err(|_| PersistenceError::StorageError)
+    }
+
     fn save_options<O: Options>(&mut self, opts: &O) -> Result<(), Self::Error> {
-        // Individual options
         for opt in opts.all() {
             let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
             if let Some(encoded_len) = opt.encode(&mut buf) {
@@ -85,7 +94,6 @@ where
                 self.save_key(opt.key(), &buf[..encoded_len])?;
             }
         }
-        // Current page
         let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
         if let Some(encoded_len) = opts.page().encode(&mut buf) {
             self.save_key(DEFAULT_PAGE_KEY, &buf[..encoded_len])?;
@@ -94,7 +102,6 @@ where
     }
 
     fn load_options<O: Options>(&mut self, opts: &mut O) -> Result<(), Self::Error> {
-        // Individual options
         for opt in opts.all_mut() {
             let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
             if let Some(len) = self.load_key(opt.key(), &mut buf)? {
@@ -103,7 +110,6 @@ where
                           opt.name(), opt.value(), opt.key(), &buf[..len]);
             }
         }
-        // Current page
         let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
         if let Some(len) = self.load_key(DEFAULT_PAGE_KEY, &mut buf)? {
             opts.page_mut().decode(&buf[..len]);
