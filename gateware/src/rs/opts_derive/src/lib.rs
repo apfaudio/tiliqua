@@ -41,6 +41,8 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
             quote! { FloatOption::new }
         } else if is_string_option(field_type) {
             quote! { StringOption::new }
+        } else if is_button_option(field_type) {
+            quote! { ButtonOption::new }
         } else {
             panic!("Unsupported field type for OptionPage")
         };
@@ -118,8 +120,14 @@ fn is_string_option(ty: &Type) -> bool {
         .unwrap_or(false))
 }
 
+fn is_button_option(ty: &Type) -> bool {
+    matches!(ty, Type::Path(path) if path.path.segments.first()
+        .map(|seg| seg.ident == "ButtonOption")
+        .unwrap_or(false))
+}
+
 fn is_option_type(ty: &Type) -> bool {
-    is_int_option(ty) || is_enum_option(ty) || is_float_option(ty) || is_string_option(ty)
+    is_int_option(ty) || is_enum_option(ty) || is_float_option(ty) || is_string_option(ty) || is_button_option(ty)
 }
 
 #[proc_macro_derive(Options, attributes(page))]

@@ -75,6 +75,9 @@ int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
 int_params!(TriggerLvlParams<i16> { step: 512, min: -16384, max: 16384 });
 int_params!(PosParams<i16>       { step: 25, min: -500, max: 500 });
 
+button_params!(ToggleTestParams { mode: ButtonMode::Toggle });
+button_params!(ActionTestParams { mode: ButtonMode::OneShot });
+
 #[derive(OptionPage, Clone)]
 pub struct VectorOpts {
     #[option(0)]
@@ -125,6 +128,10 @@ pub struct UsbOpts {
     pub mode: EnumOption<USBMode>,
     #[option]
     pub show: EnumOption<Show>,
+    #[option(false)]
+    pub debug_toggle: ButtonOption<ToggleTestParams>,
+    #[option(false)]
+    pub test_action: ButtonOption<ActionTestParams>,
 }
 
 #[derive(OptionPage, Clone)]

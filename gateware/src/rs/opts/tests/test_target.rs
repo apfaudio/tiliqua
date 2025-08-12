@@ -27,6 +27,9 @@ mod tests {
 
     int_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
     int_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
+    
+    button_params!(ToggleParams { mode: ButtonMode::Toggle });
+    button_params!(OneShotParams { mode: ButtonMode::OneShot });
 
     #[derive(OptionPage, Clone)]
     pub struct ScopeOpts {
@@ -40,6 +43,10 @@ mod tests {
         pub enumo: EnumOption<TestEnum>,
         #[option("hello")]
         pub stro: StringOption,
+        #[option]
+        pub toggle_btn: ButtonOption<ToggleParams>,
+        #[option]
+        pub action_btn: ButtonOption<OneShotParams>,
     }
 
     #[derive(OptionPage, Clone)]

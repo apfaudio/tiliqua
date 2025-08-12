@@ -9,6 +9,7 @@ mod integer;
 mod enumeration;
 mod float;
 mod string;
+mod button;
 pub mod persistence;
 
 pub use crate::traits::*;
@@ -16,6 +17,7 @@ pub use crate::integer::*;
 pub use crate::enumeration::*;
 pub use crate::float::*;
 pub use crate::string::*;
+pub use crate::button::*;
 
 #[derive(Clone, Default)]
 pub struct ScreenTracker<ScreenT: Copy + IntoEnumIterator + Default> {

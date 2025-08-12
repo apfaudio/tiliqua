@@ -112,10 +112,17 @@ fn main() -> ! {
 
         loop {
 
-            let (opts, draw_options, commit_options) = critical_section::with(|cs| {
+            let (opts, draw_options, commit_options, test_action_pressed) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
-                (app.ui.opts.clone(), app.ui.draw(), app.ui.commit_options()) 
+                let opts_poll = app.ui.opts.clone();
+                let test_action_pressed = app.ui.opts.usb.test_action.poll();
+                (opts_poll, app.ui.draw(), app.ui.commit_options(), test_action_pressed) 
             });
+
+            info!("Debug toggle: {}", opts.usb.debug_toggle.value);
+            if test_action_pressed {
+                info!("Test action button pressed!");
+            }
 
             if commit_options {
                 flash_persist.save_options(&opts).unwrap();

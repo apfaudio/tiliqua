@@ -19,6 +19,9 @@ pub trait OptionTrait {
     fn key(&self) -> u32;
     fn encode(&self, buf: &mut [u8]) -> Option<usize>;
     fn decode(&mut self, buf: &[u8]) -> bool;
+    
+    /// Handle button press (toggle_modify). Returns true if handled, false otherwise.
+    fn button_press(&mut self) -> bool { false }
 }
 
 pub trait OptionPage {
@@ -52,7 +55,15 @@ where
     T: Options,
 {
     fn toggle_modify(&mut self) {
-        self.modify_mut(!self.modify());
+        let handled = if let Some(n_selected) = self.selected() {
+            self.view_mut().options_mut()[n_selected].button_press()
+        } else {
+            false
+        };
+        
+        if !handled {
+            self.modify_mut(!self.modify());
+        }
     }
 
     fn tick_up(&mut self) {
