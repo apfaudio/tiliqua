@@ -481,13 +481,7 @@ fn main() -> ! {
 
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
-                // Single-shot commit: when 'write' is selected and the encoder
-                // is turned, write once and change the enum back.
-                let mut commit_to_eeprom = false;
-                if app.ui.opts.autocal.write.value != EnWrite::Turn {
-                    commit_to_eeprom = true;
-                    app.ui.opts.autocal.write.value = EnWrite::Turn;
-                }
+                let commit_to_eeprom = app.ui.opts.autocal.write.poll();
                 (app.ui.opts.clone(), commit_to_eeprom)
             });
 
@@ -580,6 +574,12 @@ fn main() -> ! {
             );
             constants.write_to_pmod(&mut pmod);
 
+            if commit_to_eeprom {
+                critical_section::with(|_| {
+                    constants.write_to_eeprom(&mut i2cdev1);
+                });
+            }
+
             if opts.tracker.page.value != Page::Report {
                 draw::draw_cal(&mut display, h_active/2-128, v_active/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
@@ -588,10 +588,6 @@ fn main() -> ! {
                     &mut display, h_active/2-128, v_active/2+64, hue,
                     &constants.cal.adc_scale, &constants.cal.adc_zero, &constants.cal.dac_scale, &constants.cal.dac_zero).ok();
 
-                if commit_to_eeprom {
-                    constants.write_to_eeprom(&mut i2cdev1);
-                    //draw::draw_name(&mut display, h_active/2, v_active/2+64, hue, &"SAVED", &"").ok();
-                }
             }
 
         }
