@@ -37,9 +37,77 @@ from rs.manifest.src.lib import (
     RegionType,
     BitstreamManifest,
     MemoryRegion,
-    SlotLayout,
+    MANIFEST_SIZE,
+    N_MANIFESTS,
+    SLOT_BITSTREAM_BASE,
+    SLOT_SIZE,
 )
 from tiliqua.archive import ArchiveLoader
+
+
+class SlotLayout:
+    """Flash addressing of overall SPI flash, for bootloader and user slots."""
+
+    def __init__(self, slot_number: Optional[int] = None, 
+                 bootloader_bitstream_addr: int = 0x000000,
+                 firmware_base_slot0: int = 0x1B0000,
+                 options_base_addr: int = 0xFD000):
+        self.slot_number = slot_number  # None = bootloader, int = user slot
+        self.bootloader_bitstream_addr = bootloader_bitstream_addr
+        self.firmware_base_slot0 = firmware_base_slot0
+        self.options_base_addr = options_base_addr
+
+    @classmethod
+    def for_bootloader(cls) -> 'SlotLayout':
+        return cls(slot_number=None)
+
+    @classmethod
+    def for_user_slot(cls, slot: int) -> 'SlotLayout':
+        return cls(slot_number=slot)
+
+    @property
+    def is_bootloader(self) -> bool:
+        return self.slot_number is None
+
+    @property
+    def bitstream_addr(self) -> int:
+        if self.is_bootloader:
+            return self.bootloader_bitstream_addr
+        else:
+            return SLOT_BITSTREAM_BASE + (self.slot_number * SLOT_SIZE)
+
+    @property
+    def manifest_addr(self) -> int:
+        if self.is_bootloader:
+            return SLOT_BITSTREAM_BASE - MANIFEST_SIZE
+        else:
+            return self.bitstream_addr + SLOT_SIZE - MANIFEST_SIZE
+
+    @property
+    def firmware_base(self) -> int:
+        if self.is_bootloader:
+            raise ValueError("Bootloader doesn't have firmware base (uses XiP)")
+        return self.firmware_base_slot0 + (self.slot_number * SLOT_SIZE)
+
+    @property
+    def options_base(self) -> int:
+        if self.is_bootloader:
+            return self.options_base_addr
+        else:
+            return self.options_base_addr + ((1+self.slot_number) * SLOT_SIZE)
+
+    @staticmethod
+    def slot_start_addr(slot: int) -> int:
+        return SLOT_BITSTREAM_BASE + (slot * SLOT_SIZE)
+
+    @staticmethod
+    def slot_end_addr(slot: int) -> int:
+        return SlotLayout.slot_start_addr(slot) + SLOT_SIZE
+
+    @staticmethod
+    def slot_from_addr(addr: int) -> int:
+        return (addr - SLOT_BITSTREAM_BASE) // SLOT_SIZE
+
 
 class FlashableRegion:
     """Flash memory region descriptor containing a MemoryRegion with finalized addresses."""
@@ -81,7 +149,6 @@ class FlashableRegion:
                   f"    start: 0x{self.addr:x}\n"
                   f"    end:   0x{self.addr + self.aligned_size - 1:x}")
         return result
-
 
 
 class FlashCommandGenerator:
@@ -210,10 +277,9 @@ def check_region_overlaps(flashable_regions: List[FlashableRegion], slot: Option
     """
     # For non-XIP firmware, check if any region exceeds its slot
     if slot is not None:
-        layout = SlotLayout()
         for region in flashable_regions:
-            region_slot = layout.slot_from_addr(region.addr)
-            slot_end = layout.slot_end_addr(region_slot)
+            region_slot = SlotLayout.slot_from_addr(region.addr)
+            slot_end = SlotLayout.slot_end_addr(region_slot)
             if region.end_addr > slot_end:
                 return (True, f"Region {region.name} exceeds slot boundary: "
                              f"ends at 0x{region.end_addr:x}, slot ends at 0x{slot_end:x}")
@@ -405,17 +471,16 @@ def flash_status() -> None:
     """Display the status of flashed bitstreams in each manifest slot."""
     print("Reading manifests from flash...")
     manifest_data = []
-    layout = SlotLayout()
 
     # Read all manifests
-    for slot in range(layout.n_manifests):
+    for slot in range(N_MANIFESTS):
         slot_layout = SlotLayout.for_user_slot(slot)
         offset = slot_layout.manifest_addr
-        is_last = (slot == layout.n_manifests - 1)
+        is_last = (slot == N_MANIFESTS - 1)
 
         print(f"\nReading Slot {slot} manifest at {hex(offset)}:")
         try:
-            data = read_flash_segment(offset, layout.manifest_size, reset=is_last)
+            data = read_flash_segment(offset, MANIFEST_SIZE, reset=is_last)
             manifest_data.append((slot, offset, data))
         except subprocess.CalledProcessError as e:
             print(f"  Error reading flash: {e}")
@@ -474,9 +539,8 @@ def main():
             if not os.path.exists(args.archive_path):
                 print(f"Error: Archive not found: {args.archive_path}")
                 sys.exit(1)
-            layout = SlotLayout()
-            if args.slot is not None and not 0 <= args.slot < layout.n_manifests:
-                print(f"Error: Slot must be between 0 and {layout.n_manifests-1}")
+            if args.slot is not None and not 0 <= args.slot < N_MANIFESTS:
+                print(f"Error: Slot must be between 0 and {N_MANIFESTS-1}")
                 sys.exit(1)
             flash_archive(args.archive_path, hw_rev_major, args.slot, args.noconfirm)
         case 'status':
