@@ -19,7 +19,7 @@ from tiliqua                     import sim, dvi_modeline, tiliqua_pll
 from tiliqua.types               import *
 from tiliqua.tiliqua_platform    import *
 from tiliqua.tiliqua_soc         import TiliquaSoc
-from tiliqua.archive             import BitstreamArchiver
+from tiliqua.archive             import ArchiveBuilder
 from vendor.ila                  import AsyncSerialILAFrontend
 
 class CliAction(str, enum.Enum):
@@ -202,7 +202,7 @@ def top_level_cli(
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
 
-    archiver = BitstreamArchiver.for_project(
+    archiver = ArchiveBuilder.for_project(
         build_path=build_path,
         name=args.name,
         sha=repo_sha,

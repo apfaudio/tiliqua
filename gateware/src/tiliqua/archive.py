@@ -14,6 +14,9 @@ bootloader and hardware revisions).
 import os
 import tarfile
 import json
+import tempfile
+import sys
+from pathlib import Path
 
 from dataclasses import dataclass, field
 from fastcrc import crc32
@@ -21,10 +24,10 @@ from typing import Optional, List
 from tiliqua.types import *
 from tiliqua.tiliqua_platform import TiliquaRevision
 
-from rs.manifest.src.lib import BITSTREAM_REGION, RegionType, MANIFEST_SIZE, FLASH_PAGE_SZ
+from rs.manifest.src.lib import BITSTREAM_REGION, RegionType, MANIFEST_SIZE, FLASH_PAGE_SZ, BitstreamManifest
 
 @dataclass
-class BitstreamArchiver:
+class ArchiveBuilder:
     """Class for building and writing bitstream archives."""
 
     build_path: str
@@ -40,8 +43,8 @@ class BitstreamArchiver:
     _firmware_bin_path: Optional[str] = None
 
     @classmethod
-    def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision, brief: str = "") -> 'BitstreamArchiver':
-        """Create a BitstreamArchiver with bitstream region."""
+    def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision, brief: str = "") -> 'ArchiveBuilder':
+        """Create an ArchiveBuilder with bitstream region."""
         archiver = cls(build_path, name, sha, hw_rev, brief)
         return archiver.with_bitstream()
 
@@ -66,7 +69,7 @@ class BitstreamArchiver:
     def bitstream_path(self) -> str:
         return os.path.join(self.build_path, "top.bit")
 
-    def with_bitstream(self) -> 'BitstreamArchiver':
+    def with_bitstream(self) -> 'ArchiveBuilder':
         """Add bitstream region and return self for chaining."""
         if not os.path.exists(self.bitstream_path):
             print(f"WARNING: Bitstream file not found at {self.bitstream_path}")
@@ -89,7 +92,7 @@ class BitstreamArchiver:
         self._regions.insert(0, region)
         return self
 
-    def with_firmware(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> 'BitstreamArchiver':
+    def with_firmware(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> 'ArchiveBuilder':
         """
         Add a memory region corresponding to a firmware image and return self for chaining.
 
@@ -135,7 +138,7 @@ class BitstreamArchiver:
         
         return self
 
-    def with_option_storage(self, filename: str = "<options>", size: int = 2*FLASH_PAGE_SZ) -> 'BitstreamArchiver':
+    def with_option_storage(self, filename: str = "<options>", size: int = 2*FLASH_PAGE_SZ) -> 'ArchiveBuilder':
         """Add option storage region and return self for chaining."""
         region = MemoryRegion(
             filename=filename,
@@ -148,7 +151,7 @@ class BitstreamArchiver:
         self._regions.append(region)
         return self
 
-    def with_manifest(self) -> 'BitstreamArchiver':
+    def with_manifest(self) -> 'ArchiveBuilder':
         """Add manifest region and return self for chaining."""
         manifest_region = MemoryRegion(
             filename="manifest.json",
@@ -271,3 +274,54 @@ class BitstreamArchiver:
             return False
 
         return True
+
+
+class ArchiveLoader:
+    """Handles loading and extraction of bitstream archives."""
+    
+    def __init__(self, archive_path: str):
+        self.archive_path = archive_path
+        self.manifest: Optional[BitstreamManifest] = None
+        self.tmpdir: Optional[Path] = None
+    
+    def is_bootloader_archive(self) -> bool:
+        """Check if this is a bootloader bitstream (has XipFirmware regions)."""
+        if not self.manifest:
+            return False
+        return any(region.region_type == RegionType.XipFirmware for region in self.manifest.regions)
+    
+    def get_manifest(self) -> BitstreamManifest:
+        """Get the parsed manifest."""
+        if not self.manifest:
+            raise ValueError("Manifest not loaded - did you use the context manager?")
+        return self.manifest
+    
+    def get_tmpdir(self) -> Path:
+        """Get the temporary directory path."""
+        if not self.tmpdir:
+            raise ValueError("Archive not extracted - did you use the context manager?")
+        return self.tmpdir
+    
+    def __enter__(self):
+        """Extract archive and read manifest."""
+        # Create temporary directory and extract everything
+        self.tmpdir = Path(tempfile.mkdtemp())
+        
+        with tarfile.open(self.archive_path, "r:gz") as tar:
+            tar.extractall(self.tmpdir)
+            
+            # Read manifest
+            manifest_path = self.tmpdir / "manifest.json"
+            with open(manifest_path) as f:
+                manifest_dict = json.load(f)
+                self.manifest = BitstreamManifest.from_dict(manifest_dict)
+        
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Clean up temporary directory."""
+        if self.tmpdir and self.tmpdir.exists():
+            import shutil
+            shutil.rmtree(self.tmpdir)
+            self.tmpdir = None
+            self.manifest = None

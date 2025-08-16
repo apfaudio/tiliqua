@@ -39,11 +39,13 @@ from rs.manifest.src.lib import (
     MemoryRegion,
     SlotLayout,
 )
+from tiliqua.archive import ArchiveLoader
 
 class FlashableRegion:
     """Flash memory region descriptor containing a MemoryRegion with finalized addresses."""
-    def __init__(self, memory_region):
+    def __init__(self, memory_region, file_path: Optional[Path] = None):
         self.memory_region = memory_region
+        self.file_path = file_path
 
     @property
     def addr(self) -> int:
@@ -81,74 +83,12 @@ class FlashableRegion:
         return result
 
 
-@dataclass
-class FlashContext:
-    """Context for archive processing operations."""
-    manifest: BitstreamManifest
-    tmpdir: Path
-    slot: Optional[int] = None
-    
-    @property
-    def is_bootloader(self) -> bool:
-        """Check if this is a bootloader bitstream (has XipFirmware regions)."""
-        return any(region.region_type == RegionType.XipFirmware for region in self.manifest.regions)
-
-
-class ArchiveProcessor:
-    """Handles extraction and validation of bitstream archives."""
-    
-    def __init__(self, archive_path: str, hw_rev_major: int, slot: Optional[int]):
-        self.archive_path = archive_path
-        self.hw_rev_major = hw_rev_major
-        self.slot = slot
-        self.context: Optional[FlashContext] = None
-    
-    def extract_and_validate(self) -> FlashContext:
-        """Extract archive and validate compatibility."""
-        with tarfile.open(self.archive_path, "r:gz") as tar:
-            # Read manifest first
-            manifest_info = tar.getmember("manifest.json")
-            manifest_f = tar.extractfile(manifest_info)
-            if not manifest_f:
-                print("Error: Could not extract manifest.json from archive")
-                sys.exit(1)
-            
-            manifest_dict = json.load(manifest_f)
-            manifest = BitstreamManifest.from_dict(manifest_dict)
-            
-            # Validate hardware compatibility
-            if manifest.hw_rev != self.hw_rev_major:
-                print(f"Aborting: attached Tiliqua (hw=r{self.hw_rev_major}) does not match archive (hw=r{manifest.hw_rev}).")
-                sys.exit(1)
-            
-            # Create temp directory and extract files
-            tmpdir = tempfile.mkdtemp()
-            tar.extractall(tmpdir)
-            
-            self.context = FlashContext(manifest, Path(tmpdir), self.slot)
-            
-            # Validate slot configuration
-            self._validate_slot_configuration()
-            
-            return self.context
-    
-    def _validate_slot_configuration(self):
-        """Validate that slot configuration matches bitstream type."""
-        if self.context.is_bootloader and self.slot is not None:
-            print("Error: bootloader bitstream must be flashed to bootloader slot")
-            print(f"Remove --slot argument to flash to bootloader slot.")
-            sys.exit(1)
-        elif not self.context.is_bootloader and self.slot is None:
-            print("Error: Must specify slot for user bitstreams")
-            sys.exit(1)
-
 
 class FlashCommandGenerator:
     """Generates and executes flash commands."""
     
-    def __init__(self, flashable_regions: List[FlashableRegion], tmpdir: Path):
+    def __init__(self, flashable_regions: List[FlashableRegion]):
         self.flashable_regions = sorted(flashable_regions)
-        self.tmpdir = tmpdir
     
     def generate_commands(self) -> List[List[str]]:
         """Generate flash commands for all regions."""
@@ -159,9 +99,8 @@ class FlashCommandGenerator:
             if region.memory_region.region_type == RegionType.OptionStorage:
                 continue
                 
-            # All regions use their filename relative to tmpdir
-            region_path = self.tmpdir / region.memory_region.filename
-            commands.append(flash_file(str(region_path), region.addr, "raw"))
+            # Use the pre-calculated file path
+            commands.append(flash_file(str(region.file_path), region.addr, "raw"))
         
         # Add skip-reset flag to all but the last command
         if len(commands) > 1:
@@ -216,24 +155,29 @@ def scan_for_tiliqua():
     print("Check it is turned on, plugged in ('dbg' port), permissions correct, and RP2040 firmware is up to date.")
     sys.exit(1)
 
-def promote_to_flashable_regions(context: FlashContext) -> List[FlashableRegion]:
+def promote_to_flashable_regions(loader: ArchiveLoader, slot: Optional[int]) -> List[FlashableRegion]:
     """
     Finalize addresses and promote MemoryRegions to FlashableRegions.
     
     Args:
-        context: FlashContext containing manifest, tmpdir, and slot information
+        loader: ArchiveLoader containing extracted archive and manifest
+        slot: Slot number (None for bootloader, int for user slots)
     
     Returns:
         List of FlashableRegion objects ready for flashing
     """
     # Finalize addresses using unified function
-    finalize_addresses(context.manifest, context.tmpdir, context.slot)
+    finalize_addresses(loader, slot)
     
     # Promote regions with finalized addresses
     flashable_regions = []
-    for region in context.manifest.regions:
+    manifest = loader.get_manifest()
+    tmpdir = loader.get_tmpdir()
+    
+    for region in manifest.regions:
         if region.spiflash_src is not None:
-            flashable_regions.append(FlashableRegion(region))
+            file_path = tmpdir / region.filename
+            flashable_regions.append(FlashableRegion(region, file_path))
     
     return flashable_regions
 
@@ -296,13 +240,26 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
         slot: Slot number for bootloader-managed bitstreams
         noconfirm: Skip confirmation prompt if True
     """
-    # Extract and validate archive
-    processor = ArchiveProcessor(archive_path, hw_rev_major, slot)
-    context = processor.extract_and_validate()
-    
-    try:
+    # Load and extract archive
+    with ArchiveLoader(archive_path) as loader:
+        # Validate hardware compatibility
+        manifest = loader.get_manifest()
+        if manifest.hw_rev != hw_rev_major:
+            print(f"Aborting: attached Tiliqua (hw=r{hw_rev_major}) does not match archive (hw=r{manifest.hw_rev}).")
+            sys.exit(1)
+        
+        # Validate slot configuration
+        is_bootloader = loader.is_bootloader_archive()
+        if is_bootloader and slot is not None:
+            print("Error: bootloader bitstream must be flashed to bootloader slot")
+            print(f"Remove --slot argument to flash to bootloader slot.")
+            sys.exit(1)
+        elif not is_bootloader and slot is None:
+            print("Error: Must specify slot for user bitstreams")
+            sys.exit(1)
+        
         # Finalize addresses and promote to FlashableRegions
-        flashable_regions = promote_to_flashable_regions(context)
+        flashable_regions = promote_to_flashable_regions(loader, slot)
 
         # Print all regions
         print("\nAll spiflash regions:")
@@ -316,7 +273,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             sys.exit(1)
 
         # Generate and execute flash commands
-        command_generator = FlashCommandGenerator(flashable_regions, context.tmpdir)
+        command_generator = FlashCommandGenerator(flashable_regions)
         commands = command_generator.generate_commands()
 
         # Show all commands and get confirmation
@@ -329,22 +286,18 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             sys.exit(0)
 
         command_generator.execute_commands(commands)
-        
-    finally:
-        # Clean up temporary directory
-        import shutil
-        shutil.rmtree(context.tmpdir)
 
 
-def finalize_addresses(manifest: BitstreamManifest, tmpdir: Path, slot: Optional[int]) -> None:
+def finalize_addresses(loader: ArchiveLoader, slot: Optional[int]) -> None:
     """
     Finalize addresses for bootloader or user slot and write manifest.
     
     Args:
-        manifest: BitstreamManifest object to update
-        tmpdir: Temporary directory with extracted files (used for user slots)
+        loader: ArchiveLoader containing extracted archive and manifest
         slot: Slot number (None for bootloader, int for user slots)
     """
+    manifest = loader.get_manifest()
+    tmpdir = loader.get_tmpdir()
     layout = SlotLayout.for_bootloader() if slot is None else SlotLayout.for_user_slot(slot)
     
     if layout.is_bootloader:
