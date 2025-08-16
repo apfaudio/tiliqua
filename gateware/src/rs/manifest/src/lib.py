@@ -129,7 +129,6 @@ class SlotLayout:
     def is_bootloader(self) -> bool:
         return self.slot_number is None
 
-
     @property
     def bitstream_addr(self) -> int:
         if self.is_bootloader:

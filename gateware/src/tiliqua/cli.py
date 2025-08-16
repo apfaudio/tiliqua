@@ -36,7 +36,8 @@ def top_level_cli(
     sim_ports=None,         # project has a list of simulation port names
     sim_harness=None,       # project has a .cpp simulation harness at this path
     argparse_callback=None, # project needs extra CLI flags before argparse.parse()
-    argparse_fragment=None # project needs to check args.<custom_flag> after argparse.parse()
+    argparse_fragment=None, # project needs to check args.<custom_flag> after argparse.parse()
+    archiver_callback=None  # project can customize the archiver (called with archiver instance)
     ):
 
     # Get some repository properties
@@ -249,6 +250,12 @@ def top_level_cli(
             fw_offset=kwargs["fw_offset"]
         )
 
+    # Allow project to customize the archiver, adding any extra data
+    # or memory regions as needed.
+    if archiver_callback:
+        archiver_callback(archiver)
+
+    if isinstance(fragment, TiliquaSoc):
         # Create firmware-only archive if --fw-only specified
         if args.fw_only:
             if not archiver.validate_existing_bitstream():

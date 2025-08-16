@@ -41,10 +41,9 @@ class BitstreamArchiver:
 
     @classmethod
     def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision, brief: str = "") -> 'BitstreamArchiver':
-        """Create a BitstreamArchiver with standard regions (bitstream + manifest + options)."""
+        """Create a BitstreamArchiver with bitstream region."""
         archiver = cls(build_path, name, sha, hw_rev, brief)
-        archiver._add_standard_regions()
-        return archiver
+        return archiver.with_bitstream()
 
     def __post_init__(self):
         # Ensure build directory exists
@@ -67,19 +66,32 @@ class BitstreamArchiver:
     def bitstream_path(self) -> str:
         return os.path.join(self.build_path, "top.bit")
 
-    def _add_standard_regions(self) -> None:
-        """Add the standard regions that every bitstream needs."""
-        self.add_bitstream_region()
-        self.add_option_storage_region()
+    def with_bitstream(self) -> 'BitstreamArchiver':
+        """Add bitstream region and return self for chaining."""
+        if not os.path.exists(self.bitstream_path):
+            print(f"WARNING: Bitstream file not found at {self.bitstream_path}")
+            return self
 
-    def with_firmware(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> 'BitstreamArchiver':
-        """Add firmware region and return self for chaining."""
-        self.add_firmware_region(firmware_bin_path, fw_location, fw_offset)
+        # Calculate CRC32 of bitstream
+        bitstream_crc32 = crc32.bzip2(open(self.bitstream_path, "rb").read())
+
+        # Create a memory region for the bitstream
+        region = MemoryRegion(
+            filename=BITSTREAM_REGION,
+            region_type=RegionType.Bitstream,
+            spiflash_src=None,  # Will be set by flash.py based on slot
+            psram_dst=None,     # Bitstream is never copied to PSRAM
+            size=os.path.getsize(self.bitstream_path),
+            crc=bitstream_crc32
+        )
+
+        # Insert bitstream region at the beginning
+        self._regions.insert(0, region)
         return self
 
-    def add_firmware_region(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> None:
+    def with_firmware(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> 'BitstreamArchiver':
         """
-        Add a memory region corresponding to a firmware image.
+        Add a memory region corresponding to a firmware image and return self for chaining.
 
         Args:
             firmware_bin_path: Path to the firmware binary file
@@ -90,7 +102,7 @@ class BitstreamArchiver:
 
         if not os.path.exists(firmware_bin_path):
             print(f"WARNING: Firmware file not found at {firmware_bin_path}")
-            return
+            return self
 
         # Calculate CRC32 of firmware binary
         fw_crc32 = crc32.bzip2(open(firmware_bin_path, "rb").read())
@@ -120,8 +132,11 @@ class BitstreamArchiver:
             case FirmwareLocation.BRAM:
                 # BRAM firmware is baked into bitstream, no separate region needed
                 pass
+        
+        return self
 
-    def add_option_storage_region(self) -> None:
+    def with_option_storage_region(self) -> 'BitstreamArchiver':
+        """Add option storage region and return self for chaining."""
         region = MemoryRegion(
             filename=OPTION_STORAGE,
             region_type=RegionType.Reserved,
@@ -131,36 +146,10 @@ class BitstreamArchiver:
             crc=None
         )
         self._regions.append(region)
+        return self
 
-    def add_bitstream_region(self) -> None:
-        """
-        Add a memory region corresponding to the bitstream itself.
-        The spiflash_src will be set later by flash.py based on slot assignment.
-        """
-        if not os.path.exists(self.bitstream_path):
-            print(f"WARNING: Bitstream file not found at {self.bitstream_path}")
-            return
-
-        # Calculate CRC32 of bitstream
-        bitstream_crc32 = crc32.bzip2(open(self.bitstream_path, "rb").read())
-
-        # Create a memory region for the bitstream
-        region = MemoryRegion(
-            filename=BITSTREAM_REGION,
-            region_type=RegionType.Bitstream,
-            spiflash_src=None,  # Will be set by flash.py based on slot
-            psram_dst=None,     # Bitstream is never copied to PSRAM
-            size=os.path.getsize(self.bitstream_path),
-            crc=bitstream_crc32
-        )
-
-        # Insert bitstream region at the beginning
-        self._regions.insert(0, region)
-
-    def write_manifest(self) -> BitstreamManifest:
-        """Write serialized manifest file, return the BitstreamManifest object."""
-        # Add manifest region to the regions list (for all cases)
-        # The spiflash_src will be set by flash.py based on slot/bootloader
+    def with_manifest(self) -> 'BitstreamArchiver':
+        """Add manifest region and return self for chaining."""
         manifest_region = MemoryRegion(
             filename="manifest.json",
             size=MANIFEST_SIZE,
@@ -169,6 +158,15 @@ class BitstreamArchiver:
             psram_dst=None,
             crc=None
         )
+        self._regions.append(manifest_region)
+        return self
+
+    def write_manifest(self) -> BitstreamManifest:
+        """Write serialized manifest file, return the BitstreamManifest object."""
+        # Ensure manifest region is added if not already present
+        has_manifest = any(region.region_type == RegionType.Manifest for region in self._regions)
+        if not has_manifest:
+            self.with_manifest()
         
         self._manifest = BitstreamManifest(
             name=self.name,
@@ -177,7 +175,7 @@ class BitstreamArchiver:
             brief=self.brief,
             video=self.video if self.video else "<none>",
             external_pll_config=self.external_pll_config,
-            regions=self._regions + [manifest_region]  # Always include manifest region
+            regions=self._regions
         )
         self._manifest.write_to_path(self.manifest_path)
         return self._manifest
