@@ -44,7 +44,6 @@ RUST_CONSTANTS           = _parse_rust_constants()
 MANIFEST_MAGIC           = RUST_CONSTANTS['MANIFEST_MAGIC']
 MANIFEST_SIZE            = RUST_CONSTANTS['MANIFEST_SIZE']
 FLASH_PAGE_SZ            = 0x1000
-BITSTREAM_REGION         = "top.bit"
 
 class RegionType(StrEnum):
     """Memory region type enum matching the Rust schema"""

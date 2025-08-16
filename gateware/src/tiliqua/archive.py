@@ -24,7 +24,7 @@ from typing import Optional, List
 from tiliqua.types import *
 from tiliqua.tiliqua_platform import TiliquaRevision
 
-from rs.manifest.src.lib import BITSTREAM_REGION, RegionType, MANIFEST_SIZE, FLASH_PAGE_SZ, BitstreamManifest
+from rs.manifest.src.lib import RegionType, MANIFEST_SIZE, FLASH_PAGE_SZ, BitstreamManifest
 
 @dataclass
 class ArchiveBuilder:
@@ -69,7 +69,7 @@ class ArchiveBuilder:
     def bitstream_path(self) -> str:
         return os.path.join(self.build_path, "top.bit")
 
-    def with_bitstream(self) -> 'ArchiveBuilder':
+    def with_bitstream(self, filename: str = "top.bit") -> 'ArchiveBuilder':
         """Add bitstream region and return self for chaining."""
         if not os.path.exists(self.bitstream_path):
             print(f"WARNING: Bitstream file not found at {self.bitstream_path}")
@@ -80,7 +80,7 @@ class ArchiveBuilder:
 
         # Create a memory region for the bitstream
         region = MemoryRegion(
-            filename=BITSTREAM_REGION,
+            filename=filename,
             region_type=RegionType.Bitstream,
             spiflash_src=None,  # Will be set by flash.py based on slot
             psram_dst=None,     # Bitstream is never copied to PSRAM
