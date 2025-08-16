@@ -286,14 +286,13 @@ fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), Bitstr
     let size_words = region.size as isize / 4isize + 1;
 
     match region.region_type {
-        RegionType::Static => {
-            if region.filename.contains(BITSTREAM_REGION) {
-                info!("Validating bitstream region at {:#x} (size: {} KiB) ...", 
-                      SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
-            } else {
-                info!("Processing Static region '{}' at {:#x} (size: {} KiB) ...", 
-                      region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
-            }
+        RegionType::Bitstream => {
+            info!("Validating bitstream region at {:#x} (size: {} KiB) ...", 
+                  SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+        },
+        RegionType::XipFirmware => {
+            info!("Processing XiP firmware '{}' at {:#x} (size: {} KiB) ...", 
+                  region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
         },
         RegionType::RamLoad => {
             info!("Processing RamLoad region '{}' at {:#x} (size: {} KiB) ...", 

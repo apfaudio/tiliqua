@@ -27,8 +27,10 @@ pub const BITSTREAM_REGION: &str     = "top.bit";
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum RegionType {
-    /// Static region that executes/reads directly from SPI flash (XiP firmware, bitstreams)
-    Static,
+    /// Bitstream region that gets loaded directly by the bootloader
+    Bitstream,
+    /// XiP firmware that executes directly from SPI flash
+    XipFirmware,
     /// Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
     RamLoad,
     /// Reserved region for system use (options.storage, etc.)

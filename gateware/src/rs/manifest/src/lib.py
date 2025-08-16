@@ -32,16 +32,17 @@ BITSTREAM_REGION         = "top.bit"
 
 class RegionType(StrEnum):
     """Memory region type enum matching the Rust schema"""
-    Static = "Static"      # Static region that executes/reads directly from SPI flash (XiP firmware, bitstreams)
-    RamLoad = "RamLoad"    # Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
-    Reserved = "Reserved"  # Reserved region for system use (options.storage, etc.)
+    Bitstream = "Bitstream"        # Bitstream region that gets loaded directly by the bootloader
+    XipFirmware = "XipFirmware"    # XiP firmware that executes directly from SPI flash
+    RamLoad = "RamLoad"            # Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
+    Reserved = "Reserved"          # Reserved region for system use (options.storage, etc.)
 
 @dataclass_json
 @dataclass
 class MemoryRegion:
     filename: str
     size: int
-    region_type: RegionType = RegionType.Static
+    region_type: RegionType = RegionType.Bitstream
     spiflash_src: Optional[int] = None
     psram_dst: Optional[int] = None
     crc: Optional[int] = None

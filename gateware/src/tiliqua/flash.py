@@ -220,21 +220,16 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             sys.exit(1)
 
 
-        # Check if this is an XIP firmware (has Static firmware regions with spiflash_src already set)
+        # Check if this is a bootloader / XIP firmware region (has XipFirmware regions)
         has_xip_firmware = False
-        xip_offset = None
         for region in manifest.regions:
-            # XIP firmware has Static regions that aren't bitstreams or reserved areas
-            if (region.region_type == RegionType.Static and 
-                region.spiflash_src is not None and
-                region.filename != BITSTREAM_REGION):
+            if region.region_type == RegionType.XipFirmware:
                 has_xip_firmware = True
-                xip_offset = region.spiflash_src
                 break
 
         if has_xip_firmware and slot is not None:
             print("Error: XIP firmware bitstreams must be flashed to bootloader slot")
-            print(f"Remove --slot argument to flash at 0x0 with firmware at 0x{xip_offset:x}")
+            print(f"Remove --slot argument to flash to bootloader slot.")
             sys.exit(1)
         elif not has_xip_firmware and slot is None:
             print("Error: Must specify slot for non-XIP firmware bitstreams")
@@ -248,9 +243,9 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             # Prepare flashing commands and regions
             commands_to_run = []
             if has_xip_firmware:
-                handle_xip_firmware(tmpdir_path, manifest, commands_to_run, regions)
+                handle_firmware_flashing(tmpdir_path, manifest, None, commands_to_run, regions)
             else:
-                handle_psram_firmware(tmpdir_path, manifest, slot, commands_to_run, regions)
+                handle_firmware_flashing(tmpdir_path, manifest, slot, commands_to_run, regions)
 
             # Print all regions
             print("\nAll spiflash regions:")
@@ -286,87 +281,63 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             print("\nFlashing completed successfully")
 
 
-def handle_xip_firmware(tmpdir: Path, manifest: BitstreamManifest, commands: List, regions: List) -> None:
+def handle_firmware_flashing(tmpdir: Path, manifest: BitstreamManifest, slot: Optional[int], commands: List, regions: List) -> None:
     """
-    Handle XIP firmware bitstream flashing preparation.
+    Handle firmware bitstream flashing preparation for both XiP and PSRAM firmware.
 
     Args:
         tmpdir: Temporary directory with extracted files
         manifest: Parsed BitstreamManifest object
+        slot: Slot number for PSRAM firmware, None for XiP firmware (bootloader slot)
         commands: List to append commands to
         regions: List to append regions to
     """
-    print("\nPreparing to flash XIP firmware bitstream to bootloader slot...")
+    if slot is None:
+        # XiP firmware - flash to bootloader slot
+        print("\nPreparing to flash XiP firmware bitstream to bootloader slot...")
+        bitstream_addr = BOOTLOADER_BITSTREAM_ADDR
+        manifest_addr = None  # No manifest region for XiP
+        firmware_base = None  # XiP firmware addresses are already set
+        options_base = None   # No options for XiP
+    else:
+        # PSRAM firmware - flash to user slot
+        print(f"\nPreparing to flash bitstream to slot {slot}...")
+        slot_base = SLOT_BITSTREAM_BASE + (slot * SLOT_SIZE)
+        bitstream_addr = slot_base
+        manifest_addr = (slot_base + SLOT_SIZE) - MANIFEST_SIZE
+        firmware_base = FIRMWARE_BASE_SLOT0 + (slot * SLOT_SIZE)
+        options_base = OPTIONS_BASE_SLOT0 + (slot * SLOT_SIZE)
+        # Add manifest region for PSRAM firmware
+        regions.append(Region(manifest_addr, MANIFEST_SIZE, 'manifest'))
 
-    # Update manifest regions with proper addresses for XIP
+    # Update manifest regions with proper addresses
     for region in manifest.regions:
-        if region.filename == BITSTREAM_REGION:
-            # Set bitstream address for bootloader slot
-            region.spiflash_src = BOOTLOADER_BITSTREAM_ADDR
-
-    # Process all regions using unified approach
-    for region in manifest.regions:
-        if region.region_type == RegionType.Reserved:
-            continue
-        
-        process_region(tmpdir, region, commands, regions)
-
-
-def handle_psram_firmware(tmpdir: Path, manifest: BitstreamManifest, slot: int, commands: List, regions: List) -> None:
-    """
-    Handle psram (user) firmware bitstream flashing preparation.
-
-    Args:
-        tmpdir: Temporary directory with extracted files
-        manifest: Parsed BitstreamManifest object
-        slot: Slot number
-        commands: List to append commands to
-        regions: List to append regions to
-    """
-    print(f"\nPreparing to flash bitstream to slot {slot}...")
-
-    # Calculate addresses for this slot
-    slot_base = SLOT_BITSTREAM_BASE + (slot * SLOT_SIZE)
-    bitstream_addr = slot_base
-    manifest_addr = (slot_base + SLOT_SIZE) - MANIFEST_SIZE
-    firmware_base = FIRMWARE_BASE_SLOT0 + (slot * SLOT_SIZE)
-    options_base = OPTIONS_BASE_SLOT0 + (slot * SLOT_SIZE)
-
-    # Add manifest region
-    regions.append(Region(manifest_addr, MANIFEST_SIZE, 'manifest'))
-
-    # Update manifest regions with proper addresses for this slot
-    for region in manifest.regions:
-        if region.filename == BITSTREAM_REGION:
-            # Set bitstream address for this slot
+        if region.region_type == RegionType.Bitstream:
             region.spiflash_src = bitstream_addr
-        elif region.region_type == RegionType.Reserved:
+        elif region.region_type == RegionType.Reserved and options_base is not None:
             region.spiflash_src = options_base
-        elif region.region_type == RegionType.RamLoad:
+        elif region.region_type == RegionType.RamLoad and firmware_base is not None:
             assert region.spiflash_src is None, "RamLoad region already has spiflash_src set"
-
             region.spiflash_src = firmware_base
             print(f"manifest: region {region.filename}: spiflash_src set to 0x{firmware_base:x}")
+        elif region.region_type == RegionType.XipFirmware:
+            # XipFirmware regions already have spiflash_src set from archive creation
+            assert region.spiflash_src is not None
 
-            # Align firmware base to next 4KB boundary (0x1000)
-            firmware_base += region.size
-            firmware_base = (firmware_base + 0xFFF) & ~0xFFF
+    # Write updated manifest for PSRAM firmware
+    if slot is not None:
+        manifest_path = tmpdir / "manifest.json"
+        manifest_dict = manifest.to_dict()
+        print(f"\nFinal manifest contents:\n{json.dumps(manifest_dict, indent=2)}")
+        with open(manifest_path, "w") as f:
+            json.dump(manifest_dict, f)
+        # Add manifest flash command
+        commands.append(flash_file(str(manifest_path), manifest_addr, "raw"))
 
-    # Write updated manifest
-    manifest_path = tmpdir / "manifest.json"
-    manifest_dict = manifest.to_dict()
-    print(f"\nFinal manifest contents:\n{json.dumps(manifest_dict, indent=2)}")
-    with open(manifest_path, "w") as f:
-        json.dump(manifest_dict, f)
-
-    # Add manifest flash command
-    commands.append(flash_file(str(manifest_path), manifest_addr, "raw"))
-
-    # Process all regions using unified approach
+    # Process all regions
     for region in manifest.regions:
         if region.region_type == RegionType.Reserved:
             continue
-        
         process_region(tmpdir, region, commands, regions)
 
 

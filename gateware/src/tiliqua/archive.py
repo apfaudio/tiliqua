@@ -85,7 +85,7 @@ class BitstreamArchiver:
             case FirmwareLocation.SPIFlash:
                 region = MemoryRegion(
                     filename=os.path.basename(firmware_bin_path),
-                    region_type=RegionType.Static,
+                    region_type=RegionType.XipFirmware,
                     spiflash_src=fw_offset,
                     psram_dst=None,
                     size=os.path.getsize(firmware_bin_path),
@@ -132,7 +132,7 @@ class BitstreamArchiver:
         # Create a memory region for the bitstream
         region = MemoryRegion(
             filename=BITSTREAM_REGION,
-            region_type=RegionType.Static,
+            region_type=RegionType.Bitstream,
             spiflash_src=None,  # Will be set by flash.py based on slot
             psram_dst=None,     # Bitstream is never copied to PSRAM
             size=os.path.getsize(self.bitstream_path),
