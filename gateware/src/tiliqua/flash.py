@@ -330,13 +330,14 @@ def finalize_addresses_for_bootloader(manifest: BitstreamManifest) -> None:
     manifest_addr = bootloader_slot_end - MANIFEST_SIZE
     
     for region in manifest.regions:
-        if region.region_type == RegionType.Bitstream:
-            region.spiflash_src = BOOTLOADER_BITSTREAM_ADDR
-        elif region.region_type == RegionType.Manifest:
-            region.spiflash_src = manifest_addr
-        elif region.region_type == RegionType.XipFirmware:
-            # XipFirmware regions already have spiflash_src set from archive creation
-            assert region.spiflash_src is not None, "XipFirmware region missing spiflash_src"
+        match region.region_type:
+            case RegionType.Bitstream:
+                region.spiflash_src = BOOTLOADER_BITSTREAM_ADDR
+            case RegionType.Manifest:
+                region.spiflash_src = manifest_addr
+            case RegionType.XipFirmware:
+                # XipFirmware regions already have spiflash_src set from archive creation
+                assert region.spiflash_src is not None, "XipFirmware region missing spiflash_src"
 
 def finalize_addresses_for_user(tmpdir: Path, manifest: BitstreamManifest, slot: int) -> None:
     """
@@ -358,19 +359,20 @@ def finalize_addresses_for_user(tmpdir: Path, manifest: BitstreamManifest, slot:
     
     # Update all regions with proper addresses
     for region in manifest.regions:
-        if region.region_type == RegionType.Bitstream:
-            region.spiflash_src = bitstream_addr
-        elif region.region_type == RegionType.Manifest:
-            region.spiflash_src = manifest_addr
-        elif region.region_type == RegionType.Reserved:
-            region.spiflash_src = options_base
-        elif region.region_type == RegionType.RamLoad:
-            assert region.spiflash_src is None, "RamLoad region already has spiflash_src set"
-            region.spiflash_src = ramload_base
-            print(f"manifest: region {region.filename}: spiflash_src set to 0x{ramload_base:x}")
-            # Align firmware base to next flash page boundary
-            ramload_base += region.size
-            ramload_base = (ramload_base + FLASH_PAGE_SZ - 1) & ~(FLASH_PAGE_SZ - 1)
+        match region.region_type:
+            case RegionType.Bitstream:
+                region.spiflash_src = bitstream_addr
+            case RegionType.Manifest:
+                region.spiflash_src = manifest_addr
+            case RegionType.Reserved:
+                region.spiflash_src = options_base
+            case RegionType.RamLoad:
+                assert region.spiflash_src is None, "RamLoad region already has spiflash_src set"
+                region.spiflash_src = ramload_base
+                print(f"manifest: region {region.filename}: spiflash_src set to 0x{ramload_base:x}")
+                # Align firmware base to next flash page boundary
+                ramload_base += region.size
+                ramload_base = (ramload_base + FLASH_PAGE_SZ - 1) & ~(FLASH_PAGE_SZ - 1)
     
     # Write updated manifest
     manifest_path = tmpdir / "manifest.json"
@@ -457,7 +459,7 @@ def flash_status() -> None:
 
         print(f"\nReading Slot {slot} manifest at {hex(offset)}:")
         try:
-            data = read_flash_segment(offset, 512, reset=is_last)
+            data = read_flash_segment(offset, MANIFEST_SIZE, reset=is_last)
             manifest_data.append((slot, offset, data))
         except subprocess.CalledProcessError as e:
             print(f"  Error reading flash: {e}")
@@ -511,16 +513,17 @@ def main():
 
     hw_rev_major = scan_for_tiliqua()
 
-    if args.command == 'archive':
-        if not os.path.exists(args.archive_path):
-            print(f"Error: Archive not found: {args.archive_path}")
-            sys.exit(1)
-        if args.slot is not None and not 0 <= args.slot < N_MANIFESTS:
-            print(f"Error: Slot must be between 0 and {N_MANIFESTS-1}")
-            sys.exit(1)
-        flash_archive(args.archive_path, hw_rev_major, args.slot, args.noconfirm)
-    elif args.command == 'status':
-        flash_status()
+    match args.command:
+        case 'archive':
+            if not os.path.exists(args.archive_path):
+                print(f"Error: Archive not found: {args.archive_path}")
+                sys.exit(1)
+            if args.slot is not None and not 0 <= args.slot < N_MANIFESTS:
+                print(f"Error: Slot must be between 0 and {N_MANIFESTS-1}")
+                sys.exit(1)
+            flash_archive(args.archive_path, hw_rev_major, args.slot, args.noconfirm)
+        case 'status':
+            flash_status()
 
 
 if __name__ == "__main__":
