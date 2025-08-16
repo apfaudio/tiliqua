@@ -43,62 +43,8 @@ from rs.manifest.src.lib import (
     RegionType,
     BitstreamManifest,
     MemoryRegion,
+    SlotLayout,
 )
-
-# Where the XiP bootloader bitstream should be flashed.
-BOOTLOADER_BITSTREAM_ADDR = 0x000000
-# Used to determine where non-XiP firmware is stored
-# (it is copied from SPIFLASH -> PSRAM before the CPU is
-# reset in the new bitstream and starts executing)
-FIRMWARE_BASE_SLOT0 = 0x1B0000
-OPTIONS_BASE = 0xFD000
-
-
-@dataclass
-class SlotLayout:
-    """Manages memory layout for both bootloader and user slots."""
-    slot_number: Optional[int] = None  # None = bootloader, int = user slot
-    
-    @property
-    def is_bootloader(self) -> bool:
-        return self.slot_number is None
-    
-    @property
-    def bitstream_addr(self) -> int:
-        if self.is_bootloader:
-            return BOOTLOADER_BITSTREAM_ADDR
-        else:
-            return SLOT_BITSTREAM_BASE + (self.slot_number * SLOT_SIZE)
-    
-    @property 
-    def manifest_addr(self) -> int:
-        if self.is_bootloader:
-            return SLOT_BITSTREAM_BASE - MANIFEST_SIZE
-        else:
-            return self.bitstream_addr + SLOT_SIZE - MANIFEST_SIZE
-    
-    @property
-    def firmware_base(self) -> int:
-        if self.is_bootloader:
-            raise ValueError("Bootloader doesn't have firmware base (uses XiP)")
-        return FIRMWARE_BASE_SLOT0 + (self.slot_number * SLOT_SIZE)
-    
-    @property
-    def options_base(self) -> int:
-        if self.is_bootloader:
-            return OPTIONS_BASE
-        else:
-            return OPTIONS_BASE + ((1+self.slot_number) * SLOT_SIZE)
-    
-    @classmethod
-    def for_bootloader(cls) -> 'SlotLayout':
-        """Create layout for bootloader slot."""
-        return cls(slot_number=None)
-    
-    @classmethod
-    def for_user_slot(cls, slot: int) -> 'SlotLayout':
-        """Create layout for user slot."""
-        return cls(slot_number=slot)
 
 class FlashableRegion:
     """Flash memory region descriptor containing a MemoryRegion with finalized addresses."""

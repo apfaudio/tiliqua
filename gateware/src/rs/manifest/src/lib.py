@@ -13,6 +13,8 @@ This representation is used for manifest generation and flashing.
 """
 
 import json
+import os
+import re
 from enum import StrEnum
 
 from dataclasses import dataclass
@@ -81,3 +83,86 @@ class BitstreamManifest:
         with open(manifest_path, "w") as f:
             # Drop all keys with None values (optional fields)
             f.write(json.dumps(cleandict(self.to_dict())))
+
+
+def _parse_rust_constants():
+    """Parse constants from lib.rs using simple regex."""
+    lib_rs_path = os.path.join(os.path.dirname(__file__), 'lib.rs')
+    constants = {}
+    
+    if os.path.exists(lib_rs_path):
+        with open(lib_rs_path, 'r') as f:
+            content = f.read()
+            
+        # Match: pub const NAME = 0x123456;
+        for match in re.finditer(r'pub const (\w+).* = (0x[0-9a-fA-F]+);', content):
+            name, value = match.groups()
+            constants[name] = int(value, 16)
+            
+        # Match: pub const NAME = 123;  
+        for match in re.finditer(r'pub const (\w+).* = (\d+);', content):
+            name, value = match.groups()
+            constants[name] = int(value)
+    
+    return constants
+
+
+class SlotLayout:
+    """Manages memory layout for both bootloader and user slots."""
+    
+    def __init__(self, slot_number: Optional[int] = None):
+        self.slot_number = slot_number  # None = bootloader, int = user slot
+        
+        # Parse constants from lib.rs
+        rust_constants = _parse_rust_constants()
+        
+        # Constants from lib.rs
+        self.slot_bitstream_base = rust_constants['SLOT_BITSTREAM_BASE']
+        self.slot_size = rust_constants['SLOT_SIZE'] 
+        self.manifest_size = rust_constants['MANIFEST_SIZE']
+        
+        # SlotLayout-specific constants (not in lib.rs)
+        self.bootloader_bitstream_addr = 0x000000
+        self.firmware_base_slot0 = 0x1B0000
+        self.options_base_addr = 0xFD000
+    
+    @property
+    def is_bootloader(self) -> bool:
+        return self.slot_number is None
+    
+    @property
+    def bitstream_addr(self) -> int:
+        if self.is_bootloader:
+            return self.bootloader_bitstream_addr
+        else:
+            return self.slot_bitstream_base + (self.slot_number * self.slot_size)
+    
+    @property 
+    def manifest_addr(self) -> int:
+        if self.is_bootloader:
+            return self.slot_bitstream_base - self.manifest_size
+        else:
+            return self.bitstream_addr + self.slot_size - self.manifest_size
+    
+    @property
+    def firmware_base(self) -> int:
+        if self.is_bootloader:
+            raise ValueError("Bootloader doesn't have firmware base (uses XiP)")
+        return self.firmware_base_slot0 + (self.slot_number * self.slot_size)
+    
+    @property 
+    def options_base(self) -> int:
+        if self.is_bootloader:
+            return self.options_base_addr
+        else:
+            return self.options_base_addr + ((1+self.slot_number) * self.slot_size)
+    
+    @classmethod
+    def for_bootloader(cls) -> 'SlotLayout':
+        """Create layout for bootloader slot."""
+        return cls(slot_number=None)
+    
+    @classmethod
+    def for_user_slot(cls, slot: int) -> 'SlotLayout':
+        """Create layout for user slot."""
+        return cls(slot_number=slot)
