@@ -21,7 +21,7 @@ from typing import Optional, List
 from tiliqua.types import *
 from tiliqua.tiliqua_platform import TiliquaRevision
 
-from rs.manifest.src.lib import OPTION_STORAGE, OPTION_STORAGE_SZ, BITSTREAM_REGION, RegionType
+from rs.manifest.src.lib import OPTION_STORAGE, OPTION_STORAGE_SZ, BITSTREAM_REGION, RegionType, MANIFEST_SIZE
 
 @dataclass
 class BitstreamArchiver:
@@ -144,6 +144,17 @@ class BitstreamArchiver:
 
     def write_manifest(self) -> BitstreamManifest:
         """Write serialized manifest file, return the BitstreamManifest object."""
+        # Add manifest region to the regions list (for all cases)
+        # The spiflash_src will be set by flash.py based on slot/bootloader
+        manifest_region = MemoryRegion(
+            filename="manifest.json",
+            size=MANIFEST_SIZE,
+            region_type=RegionType.Manifest,
+            spiflash_src=None,  # Will be set by flash.py
+            psram_dst=None,
+            crc=None
+        )
+        
         self._manifest = BitstreamManifest(
             name=self.name,
             hw_rev=self.hw_rev.platform_class().version_major,
@@ -151,7 +162,7 @@ class BitstreamArchiver:
             brief=self.brief,
             video=self.video if self.video else "<none>",
             external_pll_config=self.external_pll_config,
-            regions=self._regions
+            regions=self._regions + [manifest_region]  # Always include manifest region
         )
         self._manifest.write_to_path(self.manifest_path)
         return self._manifest

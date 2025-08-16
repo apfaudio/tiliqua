@@ -41,6 +41,7 @@ from rs.manifest.src.lib import (
     BITSTREAM_REGION,
     RegionType,
     BitstreamManifest,
+    MemoryRegion,
 )
 
 # Where the XiP bootloader bitstream should be flashed.
@@ -89,12 +90,25 @@ def scan_for_tiliqua():
     print("Check it is turned on, plugged in ('dbg' port), permissions correct, and RP2040 firmware is up to date.")
     sys.exit(1)
 
-class Region:
-    """Flash memory region descriptor."""
-    def __init__(self, addr: int, size: int, name: str):
-        self.addr = addr
-        self.size = size
-        self.name = name
+class FlashableRegion:
+    """Flash memory region descriptor containing a MemoryRegion with finalized addresses."""
+    def __init__(self, memory_region):
+        self.memory_region = memory_region
+
+    @property
+    def addr(self) -> int:
+        """Flash address where this region will be written."""
+        return self.memory_region.spiflash_src
+
+    @property
+    def size(self) -> int:
+        """Size of the region in bytes."""
+        return self.memory_region.size
+
+    @property
+    def name(self) -> str:
+        """Human-readable name for the region."""
+        return f"'{self.memory_region.filename}'"
 
     @property
     def aligned_size(self) -> int:
@@ -111,41 +125,62 @@ class Region:
         return self.addr < other.addr
 
     def __str__(self) -> str:
-        return (f"{self.name}:\n"
-                f"    start: 0x{self.addr:x}\n"
-                f"    end:   0x{self.addr + self.aligned_size - 1:x}")
+        result = (f"{self.name} ({self.memory_region.region_type}):\n"
+                  f"    start: 0x{self.addr:x}\n"
+                  f"    end:   0x{self.addr + self.aligned_size - 1:x}")
+        return result
 
 
-def process_region(tmpdir: Path, region, commands: List, regions: List) -> None:
+def promote_to_flashable_regions(manifest: BitstreamManifest, tmpdir: Path = None, slot: Optional[int] = None) -> List[FlashableRegion]:
     """
-    Process a single memory region by adding flash commands and region descriptors.
+    Finalize addresses and promote MemoryRegions to FlashableRegions.
+    
+    Args:
+        manifest: BitstreamManifest object to finalize and promote
+        tmpdir: Temporary directory (required for user slots to write manifest)
+        slot: Slot number (None for bootloader, int for user slots)
+    
+    Returns:
+        List of FlashableRegion objects ready for flashing
+    """
+    # Finalize addresses based on slot type
+    if slot is None:
+        finalize_addresses_for_bootloader(manifest)
+    else:
+        finalize_addresses_for_user(tmpdir, manifest, slot)
+    
+    # Promote regions with finalized addresses
+    flashable_regions = []
+    for region in manifest.regions:
+        if region.spiflash_src is not None:
+            flashable_regions.append(FlashableRegion(region))
+    
+    return flashable_regions
+
+
+def generate_flash_commands(tmpdir: Path, flashable_regions: List) -> List:
+    """
+    Generate flash commands for flashable regions.
     
     Args:
         tmpdir: Temporary directory with extracted files
-        region: MemoryRegion object from manifest
-        commands: List to append flash commands to
-        regions: List to append Region objects to
+        flashable_regions: List of FlashableRegion objects
+    
+    Returns:
+        List of flash commands
     """
-    if region.spiflash_src is None:
-        return
-        
-    region_path = tmpdir / region.filename
-    region_addr = region.spiflash_src
+    commands = []
     
-    # Flash all regions as raw binary to avoid header injection
-    file_type = "raw"
+    for region in flashable_regions:
+        # Skip Reserved regions - they don't have actual files to flash
+        if region.memory_region.region_type == RegionType.Reserved:
+            continue
+            
+        # All regions use their filename relative to tmpdir
+        region_path = tmpdir / region.memory_region.filename
+        commands.append(flash_file(str(region_path), region.addr, "raw"))
     
-    commands.append(flash_file(
-        str(region_path),
-        region_addr,
-        file_type,
-    ))
-    
-    regions.append(Region(
-        region_addr,
-        region.size,
-        f"'{region.filename}'"
-    ))
+    return commands
 
 
 def flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str]:
@@ -161,12 +196,12 @@ def flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str
     cmd.append(file_path)
     return cmd
 
-def check_region_overlaps(regions: List[Region], slot: Optional[int] = None) -> Tuple[bool, str]:
+def check_region_overlaps(flashable_regions: List[FlashableRegion], slot: Optional[int] = None) -> Tuple[bool, str]:
     """
     Check for overlapping regions in flash commands and slot boundaries.
 
     Args:
-        regions: List of Region objects to check
+        flashable_regions: List of FlashableRegion objects to check
         slot: Slot number for checking slot boundary constraints
 
     Returns:
@@ -174,21 +209,21 @@ def check_region_overlaps(regions: List[Region], slot: Optional[int] = None) -> 
     """
     # For non-XIP firmware, check if any region exceeds its slot
     if slot is not None:
-        for region in regions:
+        for region in flashable_regions:
             slot_start = (region.addr // SLOT_SIZE) * SLOT_SIZE
             slot_end = slot_start + SLOT_SIZE
             if region.end_addr > slot_end:
-                return (True, f"Region '{region.name}' exceeds slot boundary: "
+                return (True, f"Region {region.name} exceeds slot boundary: "
                              f"ends at 0x{region.end_addr:x}, slot ends at 0x{slot_end:x}")
 
     # Sort by start address and check for overlaps
-    sorted_regions = sorted(regions)
+    sorted_regions = sorted(flashable_regions)
     for i in range(len(sorted_regions) - 1):
         curr_end = sorted_regions[i].end_addr
         next_start = sorted_regions[i + 1].addr
         if curr_end > next_start:
-            return (True, f"Overlap detected between '{sorted_regions[i].name}' (ends at 0x{curr_end:x}) "
-                          f"and '{sorted_regions[i+1].name}' (starts at 0x{next_start:x})")
+            return (True, f"Overlap detected between {sorted_regions[i].name} (ends at 0x{curr_end:x}) "
+                          f"and {sorted_regions[i+1].name} (starts at 0x{next_start:x})")
 
     return (False, "")
 
@@ -202,7 +237,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
         slot: Slot number for bootloader-managed bitstreams
         noconfirm: Skip confirmation prompt if True
     """
-    regions = []
+    flashable_regions = []
 
     # Extract archive to temporary location
     with tarfile.open(archive_path, "r:gz") as tar:
@@ -220,19 +255,19 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             sys.exit(1)
 
 
-        # Check if this is a bootloader / XIP firmware region (has XipFirmware regions)
-        has_xip_firmware = False
+        # Check if this is a bootloader (has XipFirmware regions)
+        is_bootloader = False
         for region in manifest.regions:
             if region.region_type == RegionType.XipFirmware:
-                has_xip_firmware = True
+                is_bootloader = True
                 break
 
-        if has_xip_firmware and slot is not None:
-            print("Error: XIP firmware bitstreams must be flashed to bootloader slot")
+        if is_bootloader and slot is not None:
+            print("Error: bootloader bitstream must be flashed to bootloader slot")
             print(f"Remove --slot argument to flash to bootloader slot.")
             sys.exit(1)
-        elif not has_xip_firmware and slot is None:
-            print("Error: Must specify slot for non-XIP firmware bitstreams")
+        elif not is_bootloader and slot is None:
+            print("Error: Must specify slot for user bitstreams")
             sys.exit(1)
 
         # Create temp directory for extracted files
@@ -240,23 +275,22 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             tar.extractall(tmpdir)
             tmpdir_path = Path(tmpdir)
 
-            # Prepare flashing commands and regions
-            commands_to_run = []
-            if has_xip_firmware:
-                handle_firmware_flashing(tmpdir_path, manifest, None, commands_to_run, regions)
-            else:
-                handle_firmware_flashing(tmpdir_path, manifest, slot, commands_to_run, regions)
+            # Finalize addresses and promote to FlashableRegions
+            flashable_regions = promote_to_flashable_regions(manifest, tmpdir_path, slot)
 
             # Print all regions
             print("\nAll spiflash regions:")
-            for region in sorted(regions):
+            for region in sorted(flashable_regions):
                 print(f"  {region}")
 
             # Check for overlaps before proceeding
-            has_overlap, error_msg = check_region_overlaps(regions, slot)
+            has_overlap, error_msg = check_region_overlaps(flashable_regions, slot)
             if has_overlap:
                 print(f"Error: {error_msg}")
                 sys.exit(1)
+
+            # Generate flash commands
+            commands_to_run = generate_flash_commands(tmpdir_path, flashable_regions)
 
             # Add skip-reset flag to all but the last command
             if len(commands_to_run) > 1:
@@ -281,64 +315,70 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             print("\nFlashing completed successfully")
 
 
-def handle_firmware_flashing(tmpdir: Path, manifest: BitstreamManifest, slot: Optional[int], commands: List, regions: List) -> None:
+def finalize_addresses_for_bootloader(manifest: BitstreamManifest) -> None:
     """
-    Handle firmware bitstream flashing preparation for both XiP and PSRAM firmware.
+    Finalize addresses for bootloader slot.
+    
+    Args:
+        manifest: BitstreamManifest object to update
+    """
+    print("\nPreparing to flash bitstream to bootloader slot...")
+    
+    # Calculate bootloader addresses
+    # Place manifest one page before the end of the bootloader slot
+    bootloader_slot_end = SLOT_BITSTREAM_BASE  # End of bootloader slot is start of first user slot
+    manifest_addr = bootloader_slot_end - MANIFEST_SIZE
+    
+    for region in manifest.regions:
+        if region.region_type == RegionType.Bitstream:
+            region.spiflash_src = BOOTLOADER_BITSTREAM_ADDR
+        elif region.region_type == RegionType.Manifest:
+            region.spiflash_src = manifest_addr
+        elif region.region_type == RegionType.XipFirmware:
+            # XipFirmware regions already have spiflash_src set from archive creation
+            assert region.spiflash_src is not None, "XipFirmware region missing spiflash_src"
 
+def finalize_addresses_for_user(tmpdir: Path, manifest: BitstreamManifest, slot: int) -> None:
+    """
+    Finalize addresses for user slot and write manifest.
+    
     Args:
         tmpdir: Temporary directory with extracted files
-        manifest: Parsed BitstreamManifest object
-        slot: Slot number for PSRAM firmware, None for XiP firmware (bootloader slot)
-        commands: List to append commands to
-        regions: List to append regions to
+        manifest: BitstreamManifest object to update
+        slot: Slot number
     """
-    if slot is None:
-        # XiP firmware - flash to bootloader slot
-        print("\nPreparing to flash XiP firmware bitstream to bootloader slot...")
-        bitstream_addr = BOOTLOADER_BITSTREAM_ADDR
-        manifest_addr = None  # No manifest region for XiP
-        firmware_base = None  # XiP firmware addresses are already set
-        options_base = None   # No options for XiP
-    else:
-        # PSRAM firmware - flash to user slot
-        print(f"\nPreparing to flash bitstream to slot {slot}...")
-        slot_base = SLOT_BITSTREAM_BASE + (slot * SLOT_SIZE)
-        bitstream_addr = slot_base
-        manifest_addr = (slot_base + SLOT_SIZE) - MANIFEST_SIZE
-        firmware_base = FIRMWARE_BASE_SLOT0 + (slot * SLOT_SIZE)
-        options_base = OPTIONS_BASE_SLOT0 + (slot * SLOT_SIZE)
-        # Add manifest region for PSRAM firmware
-        regions.append(Region(manifest_addr, MANIFEST_SIZE, 'manifest'))
-
-    # Update manifest regions with proper addresses
+    print(f"\nPreparing to flash bitstream to user slot {slot}...")
+    
+    # Calculate addresses for this slot
+    slot_base = SLOT_BITSTREAM_BASE + (slot * SLOT_SIZE)
+    bitstream_addr = slot_base
+    manifest_addr = (slot_base + SLOT_SIZE) - MANIFEST_SIZE
+    ramload_base = FIRMWARE_BASE_SLOT0 + (slot * SLOT_SIZE)
+    options_base = OPTIONS_BASE_SLOT0 + (slot * SLOT_SIZE)
+    
+    # Update all regions with proper addresses
     for region in manifest.regions:
         if region.region_type == RegionType.Bitstream:
             region.spiflash_src = bitstream_addr
-        elif region.region_type == RegionType.Reserved and options_base is not None:
+        elif region.region_type == RegionType.Manifest:
+            region.spiflash_src = manifest_addr
+        elif region.region_type == RegionType.Reserved:
             region.spiflash_src = options_base
-        elif region.region_type == RegionType.RamLoad and firmware_base is not None:
+        elif region.region_type == RegionType.RamLoad:
             assert region.spiflash_src is None, "RamLoad region already has spiflash_src set"
-            region.spiflash_src = firmware_base
-            print(f"manifest: region {region.filename}: spiflash_src set to 0x{firmware_base:x}")
-        elif region.region_type == RegionType.XipFirmware:
-            # XipFirmware regions already have spiflash_src set from archive creation
-            assert region.spiflash_src is not None
-
-    # Write updated manifest for PSRAM firmware
-    if slot is not None:
-        manifest_path = tmpdir / "manifest.json"
-        manifest_dict = manifest.to_dict()
-        print(f"\nFinal manifest contents:\n{json.dumps(manifest_dict, indent=2)}")
-        with open(manifest_path, "w") as f:
-            json.dump(manifest_dict, f)
-        # Add manifest flash command
-        commands.append(flash_file(str(manifest_path), manifest_addr, "raw"))
-
-    # Process all regions
-    for region in manifest.regions:
-        if region.region_type == RegionType.Reserved:
-            continue
-        process_region(tmpdir, region, commands, regions)
+            region.spiflash_src = ramload_base
+            print(f"manifest: region {region.filename}: spiflash_src set to 0x{ramload_base:x}")
+            # Align firmware base to next flash page boundary
+            ramload_base += region.size
+            ramload_base = (ramload_base + FLASH_PAGE_SZ - 1) & ~(FLASH_PAGE_SZ - 1)
+    
+    # Write updated manifest
+    manifest_path = tmpdir / "manifest.json"
+    manifest_dict = manifest.to_dict()
+    print(f"\nFinal manifest contents:\n{json.dumps(manifest_dict, indent=2)}")
+    with open(manifest_path, "w") as f:
+        json.dump(manifest_dict, f)
+    
 
 
 def read_flash_segment(offset: int, size: int, reset: bool = False) -> bytes:

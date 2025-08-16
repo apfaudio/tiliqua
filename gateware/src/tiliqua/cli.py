@@ -266,11 +266,6 @@ def top_level_cli(
             sim_ports = sim.soc_simulation_ports
             sim_harness = "src/tb_cpp/sim_soc.cpp"
 
-    # Add bitstream region (spiflash_src will be set by flash.py based on slot)
-    # This should be added for ALL projects, not just SoC ones
-    archiver.add_bitstream_region()
-
-    archiver.write_manifest()
 
     if args.action == CliAction.Simulate:
         sim.simulate(fragment, sim_ports(fragment), sim_harness,
@@ -308,6 +303,8 @@ def top_level_cli(
 
         hw_platform.build(fragment, do_build=not args.skip_build, **build_flags)
 
+        archiver.add_bitstream_region()
+        archiver.write_manifest()
         archiver.create_archive()
 
         if hw_platform.ila:

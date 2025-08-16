@@ -35,11 +35,13 @@ pub enum RegionType {
     RamLoad,
     /// Reserved region for system use (options.storage, etc.)
     Reserved,
+    /// Manifest region containing metadata about the bitstream
+    Manifest,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct MemoryRegion {
-    pub filename: String<32>,
+    pub filename: String<16>,
     pub region_type: RegionType,
     pub spiflash_src: u32,
     pub psram_dst: Option<u32>,
@@ -63,7 +65,7 @@ pub struct BitstreamManifest {
     pub brief: String<128>,
     pub video: String<64>,
     pub external_pll_config: Option<ExternalPLLConfig>,
-    pub regions: Vec<MemoryRegion, 3>,
+    pub regions: Vec<MemoryRegion, 5>,
     pub magic: u32,
 }
 
@@ -106,7 +108,6 @@ impl BitstreamManifest {
         match manifest_de {
             Ok((contents, _rest)) => {
                 info!("BitstreamManifest: parse OK");
-                BitstreamManifest::print(&contents);
                 Some(contents)
             }
             Err(err) => {

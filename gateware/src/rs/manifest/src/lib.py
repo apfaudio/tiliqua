@@ -36,6 +36,7 @@ class RegionType(StrEnum):
     XipFirmware = "XipFirmware"    # XiP firmware that executes directly from SPI flash
     RamLoad = "RamLoad"            # Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
     Reserved = "Reserved"          # Reserved region for system use (options.storage, etc.)
+    Manifest = "Manifest"          # Manifest region containing metadata about the bitstream
 
 @dataclass_json
 @dataclass
@@ -51,9 +52,9 @@ class MemoryRegion:
 @dataclass
 class ExternalPLLConfig:
     clk0_hz: int
-    clk1_hz: Optional[int]
     clk1_inherit: bool
-    spread_spectrum: Optional[float]
+    clk1_hz: Optional[int] = None
+    spread_spectrum: Optional[float] = None
 
 @dataclass_json
 @dataclass
@@ -63,8 +64,8 @@ class BitstreamManifest:
     sha: str
     brief: str
     video: str
-    external_pll_config: Optional[ExternalPLLConfig]
     regions: List[MemoryRegion]
+    external_pll_config: Optional[ExternalPLLConfig] = None
     magic: int = MANIFEST_MAGIC
 
     def write_to_path(self, manifest_path):

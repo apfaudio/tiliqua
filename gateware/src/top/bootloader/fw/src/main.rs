@@ -286,21 +286,14 @@ fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), Bitstr
     let size_words = region.size as isize / 4isize + 1;
 
     match region.region_type {
-        RegionType::Bitstream => {
-            info!("Validating bitstream region at {:#x} (size: {} KiB) ...", 
-                  SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
-        },
-        RegionType::XipFirmware => {
-            info!("Processing XiP firmware '{}' at {:#x} (size: {} KiB) ...", 
+        RegionType::Bitstream | RegionType::XipFirmware | RegionType::RamLoad => {
+            info!("Validate region '{}' at {:#x} (size: {} KiB) ...", 
                   region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
         },
-        RegionType::RamLoad => {
-            info!("Processing RamLoad region '{}' at {:#x} (size: {} KiB) ...", 
+        _ => {
+            info!("Skip region '{}' at {:#x} (size: {} KiB) ...", 
                   region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
-        },
-        RegionType::Reserved => {
-            info!("Processing Reserved region '{}' at {:#x} (size: {} KiB) ...", 
-                  region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+            return Ok(());
         }
     }
 
@@ -324,25 +317,29 @@ fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), Bitstr
             return Err(BitstreamError::SpiflashCrcError);
         }
     } else {
-        info!("no CRC check for region '{}'", region.filename);
+        warn!("Expected region.crc target for region '{}'", region.filename);
+        return Err(BitstreamError::InvalidManifest);
     }
 
     // Now copy to PSRAM if needed
-    if let Some(psram_dst) = region.psram_dst {
-        let psram_ptr = PSRAM_BASE as *mut u32;
-        let psram_offset_words = psram_dst as isize / 4isize;
-        info!("Copying to {:#x}..{:#x} (psram) ...",
-              PSRAM_BASE + psram_dst as usize,
-              PSRAM_BASE + (psram_dst + region.size) as usize);
-        for i in 0..size_words {
-            unsafe {
-                let d = spiflash_ptr.offset(spiflash_offset_words + i).read_volatile();
-                psram_ptr.offset(psram_offset_words + i).write_volatile(d);
+    if region.region_type == RegionType::RamLoad {
+        if let Some(psram_dst) = region.psram_dst {
+            let psram_ptr = PSRAM_BASE as *mut u32;
+            let psram_offset_words = psram_dst as isize / 4isize;
+            info!("Copying to {:#x}..{:#x} (psram) ...",
+                  PSRAM_BASE + psram_dst as usize,
+                  PSRAM_BASE + (psram_dst + region.size) as usize);
+            for i in 0..size_words {
+                unsafe {
+                    let d = spiflash_ptr.offset(spiflash_offset_words + i).read_volatile();
+                    psram_ptr.offset(psram_offset_words + i).write_volatile(d);
+                }
             }
+            info!("Copy completed ({} KiB)", (size_words*4) / 1024);
+        } else {
+            warn!("RamLoad region'{}' without psram_dst! marking invalid...", region.filename);
+            return Err(BitstreamError::InvalidManifest);
         }
-        info!("Copy completed ({} KiB)", (size_words*4) / 1024);
-    } else {
-        info!("Region stays in SPI flash (XiP or bitstream)");
     }
 
     Ok(())
