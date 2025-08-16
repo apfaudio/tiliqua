@@ -46,7 +46,7 @@ BOOTLOADER_BITSTREAM_ADDR = 0x000000
 # (it is copied from SPIFLASH -> PSRAM before the CPU is
 # reset in the new bitstream and starts executing)
 FIRMWARE_BASE_SLOT0 = 0x1B0000
-OPTIONS_BASE_SLOT0 = 0x1F8000
+OPTIONS_BASE_SLOT0 = 0x1FD000
 
 
 def scan_for_tiliqua():
