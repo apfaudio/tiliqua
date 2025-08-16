@@ -280,16 +280,47 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
     }
 }
 
-fn copy_spiflash_region_to_psram(region: &MemoryRegion) -> Result<(), BitstreamError> {
+fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
+    let spiflash_ptr = SPIFLASH_BASE as *mut u32;
+    let spiflash_offset_words = region.spiflash_src as isize / 4isize;
+    let size_words = region.size as isize / 4isize + 1;
+
+    if region.filename.contains(BITSTREAM_REGION) {
+        info!("Validating bitstream region at {:#x} (size: {} KiB) ...", 
+              SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+    } else {
+        info!("Processing region '{}' at {:#x} (size: {} KiB) ...", 
+              region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+    }
+
+    // Always validate CRC from SPI flash source first
+    if let Some(crc_target) = region.crc {
+        let crc_bzip2 = crc::Crc::<u32>::new(&crc::CRC_32_BZIP2);
+        let mut digest = crc_bzip2.digest();
+        for i in 0..size_words {
+            unsafe {
+                let d = spiflash_ptr.offset(spiflash_offset_words + i).read_volatile();
+                if i != (size_words - 1) {
+                    digest.update(&d.to_le_bytes());
+                } else {
+                    digest.update(&d.to_le_bytes()[0..(region.size as usize)%4usize]);
+                }
+            }
+        }
+        let crc_result = digest.finalize();
+        info!("got SPI flash crc: {:#x}, manifest wants: {:#x}", crc_result, crc_target);
+        if crc_result != crc_target {
+            return Err(BitstreamError::SpiflashCrcError);
+        }
+    } else {
+        info!("no CRC check for region '{}'", region.filename);
+    }
+
+    // Now copy to PSRAM if needed
     if let Some(psram_dst) = region.psram_dst {
         let psram_ptr = PSRAM_BASE as *mut u32;
-        let spiflash_ptr = SPIFLASH_BASE as *mut u32;
-        let spiflash_offset_words = region.spiflash_src as isize / 4isize;
         let psram_offset_words = psram_dst as isize / 4isize;
-        let size_words = region.size as isize / 4isize + 1;
-        info!("Copying {:#x}..{:#x} (spi flash) to {:#x}..{:#x} (psram) ...",
-              SPIFLASH_BASE + region.spiflash_src as usize,
-              SPIFLASH_BASE + (region.spiflash_src + region.size) as usize,
+        info!("Copying to {:#x}..{:#x} (psram) ...",
               PSRAM_BASE + psram_dst as usize,
               PSRAM_BASE + (psram_dst + region.size) as usize);
         for i in 0..size_words {
@@ -298,35 +329,12 @@ fn copy_spiflash_region_to_psram(region: &MemoryRegion) -> Result<(), BitstreamE
                 psram_ptr.offset(psram_offset_words + i).write_volatile(d);
             }
         }
-        info!("Verify {} KiB copied correctly ...", (size_words*4) / 1024);
-        let crc_bzip2 = crc::Crc::<u32>::new(&crc::CRC_32_BZIP2);
-        let mut digest = crc_bzip2.digest();
-        for i in 0..size_words {
-            unsafe {
-                let d1 = psram_ptr.offset(psram_offset_words + i).read_volatile();
-                if i != (size_words - 1) {
-                    digest.update(&d1.to_le_bytes());
-                } else {
-                    digest.update(&d1.to_le_bytes()[0..(region.size as usize)%4usize]);
-                }
-            }
-        }
-        let crc_result = digest.finalize();
-        if let Some(crc_target) = region.crc {
-            info!("got PSRAM crc: {:#x}, manifest wants: {:#x}", crc_result, crc_target);
-            if crc_result == crc_target {
-                Ok(())
-            } else {
-                Err(BitstreamError::SpiflashCrcError)
-            }
-        } else {
-            info!("got PSRAM crc: {:#x}, manifest has NO CRC check.", crc_result);
-            Ok(())
-        }
+        info!("Copy completed ({} KiB)", (size_words*4) / 1024);
     } else {
-        info!("skipping XiP memory region ...");
-        Ok(())
+        info!("Region stays in SPI flash (XiP or bitstream)");
     }
+
+    Ok(())
 }
 
 
@@ -392,7 +400,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             modeline: app.modeline.clone(),
                         };
                         for region in &manifest.regions {
-                            copy_spiflash_region_to_psram(region)?;
+                            validate_and_copy_spiflash_region(region)?;
                         }
                         if let Some(mut pll_config) = manifest.external_pll_config.clone() {
                             if pll_config.clk1_inherit {

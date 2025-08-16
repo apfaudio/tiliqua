@@ -27,6 +27,7 @@ MANIFEST_SIZE            = FLASH_PAGE_SZ  # Each manifest starts at:
                                           # SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
 OPTION_STORAGE           = "options.storage"
 OPTION_STORAGE_SZ        = 2*FLASH_PAGE_SZ
+BITSTREAM_REGION         = "top.bit"
 
 @dataclass_json
 @dataclass

@@ -21,7 +21,7 @@ from typing import Optional, List
 from tiliqua.types import *
 from tiliqua.tiliqua_platform import TiliquaRevision
 
-from rs.manifest.src.lib import OPTION_STORAGE, OPTION_STORAGE_SZ
+from rs.manifest.src.lib import OPTION_STORAGE, OPTION_STORAGE_SZ, BITSTREAM_REGION
 
 @dataclass
 class BitstreamArchiver:
@@ -110,6 +110,30 @@ class BitstreamArchiver:
             crc=None
         )
         self._regions.append(region)
+
+    def add_bitstream_region(self) -> None:
+        """
+        Add a memory region corresponding to the bitstream itself.
+        The spiflash_src will be set later by flash.py based on slot assignment.
+        """
+        if not os.path.exists(self.bitstream_path):
+            print(f"WARNING: Bitstream file not found at {self.bitstream_path}")
+            return
+
+        # Calculate CRC32 of bitstream
+        bitstream_crc32 = crc32.bzip2(open(self.bitstream_path, "rb").read())
+
+        # Create a memory region for the bitstream
+        region = MemoryRegion(
+            filename=BITSTREAM_REGION,
+            spiflash_src=None,  # Will be set by flash.py based on slot
+            psram_dst=None,     # Bitstream is never copied to PSRAM
+            size=os.path.getsize(self.bitstream_path),
+            crc=bitstream_crc32
+        )
+
+        # Insert bitstream region at the beginning
+        self._regions.insert(0, region)
 
     def write_manifest(self) -> BitstreamManifest:
         """Write serialized manifest file, return the BitstreamManifest object."""

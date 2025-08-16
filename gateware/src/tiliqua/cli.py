@@ -251,6 +251,9 @@ def top_level_cli(
 
         archiver.add_option_storage_region()
 
+        # Add bitstream region (spiflash_src will be set by flash.py based on slot)
+        archiver.add_bitstream_region()
+
         # Create firmware-only archive if --fw-only specified
         if args.fw_only:
             if not archiver.validate_existing_bitstream():

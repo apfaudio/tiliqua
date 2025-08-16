@@ -38,6 +38,7 @@ from rs.manifest.src.lib import (
     SLOT_SIZE,
     MANIFEST_SIZE,
     OPTION_STORAGE,
+    BITSTREAM_REGION,
 )
 
 # Where the XiP bootloader bitstream should be flashed.
@@ -113,6 +114,38 @@ class Region:
                 f"    end:   0x{self.addr + self.aligned_size - 1:x}")
 
 
+def process_region(tmpdir: Path, region_info: Dict, commands: List, regions: List) -> None:
+    """
+    Process a single memory region by adding flash commands and region descriptors.
+    
+    Args:
+        tmpdir: Temporary directory with extracted files
+        region_info: Region dictionary from manifest
+        commands: List to append flash commands to
+        regions: List to append Region objects to
+    """
+    if "filename" not in region_info or "spiflash_src" not in region_info:
+        return
+        
+    region_path = tmpdir / region_info["filename"]
+    region_addr = region_info["spiflash_src"]
+    
+    # Flash all regions as raw binary to avoid header injection
+    file_type = "raw"
+    
+    commands.append(flash_file(
+        str(region_path),
+        region_addr,
+        file_type,
+    ))
+    
+    regions.append(Region(
+        region_addr,
+        region_info["size"],
+        f"'{region_info['filename']}'"
+    ))
+
+
 def flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str]:
     """
     Generate an openFPGALoader command to flash a file to the specified offset.
@@ -185,11 +218,15 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             sys.exit(1)
 
 
-        # Check if this is an XIP firmware
+        # Check if this is an XIP firmware (has firmware regions with spiflash_src already set)
         has_xip_firmware = False
         xip_offset = None
         for region in manifest.get("regions", []):
-            if region.get("spiflash_src") is not None:
+            # XIP firmware has regions with spiflash_src set and no psram_dst (not bitstream or options)
+            if (region.get("spiflash_src") is not None and 
+                region.get("psram_dst") is None and
+                region.get("filename") != BITSTREAM_REGION and
+                OPTION_STORAGE not in region.get("filename", "")):
                 has_xip_firmware = True
                 xip_offset = region["spiflash_src"]
                 break
@@ -260,36 +297,19 @@ def handle_xip_firmware(tmpdir: Path, manifest: Dict, commands: List, regions: L
     """
     print("\nPreparing to flash XIP firmware bitstream to bootloader slot...")
 
-    # Prepare bootloader bitstream
-    bitstream_path = tmpdir / "top.bit"
-    bitstream_size = os.path.getsize(bitstream_path)
+    # Update manifest regions with proper addresses for XIP
+    for region_info in manifest.get("regions", []):
+        if region_info["filename"] == BITSTREAM_REGION:
+            # Set bitstream address for bootloader slot
+            region_info["spiflash_src"] = BOOTLOADER_BITSTREAM_ADDR
 
-    # Collect commands for bootloader location
-    commands.append(flash_file(str(bitstream_path), BOOTLOADER_BITSTREAM_ADDR))
-
-    # Add bootloader bitstream region
-    regions.append(Region(BOOTLOADER_BITSTREAM_ADDR, bitstream_size, 'bootloader bitstream'))
-
-    # Collect commands for XIP firmware regions
+    # Process all regions using unified approach
     for region_info in manifest.get("regions", []):
         if ("filename" not in region_info or
             OPTION_STORAGE in region_info["filename"]):
             continue
-
-        region_path = tmpdir / region_info["filename"]
-        region_addr = region_info["spiflash_src"]
-
-        commands.append(flash_file(
-            str(region_path),
-            region_addr,
-            "raw",
-        ))
-
-        regions.append(Region(
-            region_addr,
-            region_info["size"],
-            f"firmware '{region_info['filename']}'"
-        ))
+        
+        process_region(tmpdir, region_info, commands, regions)
 
 
 def handle_psram_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: List, regions: List) -> None:
@@ -312,40 +332,25 @@ def handle_psram_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: Lis
     firmware_base = FIRMWARE_BASE_SLOT0 + (slot * SLOT_SIZE)
     options_base = OPTIONS_BASE_SLOT0 + (slot * SLOT_SIZE)
 
-    # Add bitstream region
-    bitstream_path = tmpdir / "top.bit"
-    bitstream_size = os.path.getsize(bitstream_path)
-    regions.append(Region(bitstream_addr, bitstream_size, 'bitstream'))
-
     # Add manifest region
     regions.append(Region(manifest_addr, MANIFEST_SIZE, 'manifest'))
 
-    # Update manifest and add firmware regions
+    # Update manifest regions with proper addresses for this slot
     for region_info in manifest.get("regions", []):
         if "filename" not in region_info:
             continue
 
-        if OPTION_STORAGE in region_info["filename"]:
+        if region_info["filename"] == BITSTREAM_REGION:
+            # Set bitstream address for this slot
+            region_info["spiflash_src"] = bitstream_addr
+        elif OPTION_STORAGE in region_info["filename"]:
             region_info["spiflash_src"] = options_base
-            regions.append(Region(
-                options_base,
-                region_info["size"],
-                region_info['filename']
-            ))
-            continue
-
-        if region_info.get("psram_dst") is not None:
+        elif region_info.get("psram_dst") is not None:
             if region_info.get("spiflash_src") is not None:
                 assert region_info["spiflash_src"] is None, "Both psram_dst and spiflash_src set"
 
             region_info["spiflash_src"] = firmware_base
             print(f"manifest: region {region_info['filename']}: spiflash_src set to 0x{firmware_base:x}")
-
-            regions.append(Region(
-                firmware_base,
-                region_info["size"],
-                region_info['filename']
-            ))
 
             # Align firmware base to next 4KB boundary (0x1000)
             firmware_base += region_info["size"]
@@ -357,22 +362,17 @@ def handle_psram_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: Lis
     with open(manifest_path, "w") as f:
         json.dump(manifest, f)
 
-    # Collect all commands
-    commands.append(flash_file(str(bitstream_path), bitstream_addr))
+    # Add manifest flash command
     commands.append(flash_file(str(manifest_path), manifest_addr, "raw"))
 
+    # Process all regions using unified approach
     for region_info in manifest.get("regions", []):
         if ("filename" not in region_info or
             "spiflash_src" not in region_info or
             OPTION_STORAGE in region_info["filename"]):
             continue
-
-        region_path = tmpdir / region_info["filename"]
-        commands.append(flash_file(
-            str(region_path),
-            region_info["spiflash_src"],
-            "raw",
-        ))
+        
+        process_region(tmpdir, region_info, commands, regions)
 
 
 def read_flash_segment(offset: int, size: int, reset: bool = False) -> bytes:
