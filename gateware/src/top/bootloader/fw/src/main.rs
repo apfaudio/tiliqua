@@ -24,7 +24,6 @@ use tiliqua_hal::persist::Persist;
 use tiliqua_hal::si5351::*;
 use tiliqua_hal::cy8cmbr3xxx::*;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
-use tiliqua_hal::hal_nb::serial::Read;
 use tiliqua_manifest::*;
 use opts::OptionString;
 
@@ -380,12 +379,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         if app.ui.opts.tracker.modify {
             if let Some(n) = app.ui.opts.tracker.selected {
                 app.reboot_n = Some(n)
-            }
-        }
-
-        if let Ok(ch) = unsafe { Serial0::summon() }.read() {
-            if ch >= ('0' as u8) && ch < ('8' as u8) {
-                app.reboot_n = Some((ch - ('0' as u8)) as usize)
             }
         }
 
