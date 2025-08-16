@@ -25,7 +25,6 @@ from rs.manifest.src.lib import OPTION_STORAGE, OPTION_STORAGE_SZ, BITSTREAM_REG
 
 @dataclass
 class BitstreamArchiver:
-
     """Class for building and writing bitstream archives."""
 
     build_path: str
@@ -39,6 +38,13 @@ class BitstreamArchiver:
     _regions: List[MemoryRegion] = field(default_factory=list)
     _manifest: Optional[BitstreamManifest] = None
     _firmware_bin_path: Optional[str] = None
+
+    @classmethod
+    def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision, brief: str = "") -> 'BitstreamArchiver':
+        """Create a BitstreamArchiver with standard regions (bitstream + manifest + options)."""
+        archiver = cls(build_path, name, sha, hw_rev, brief)
+        archiver._add_standard_regions()
+        return archiver
 
     def __post_init__(self):
         # Ensure build directory exists
@@ -61,6 +67,15 @@ class BitstreamArchiver:
     def bitstream_path(self) -> str:
         return os.path.join(self.build_path, "top.bit")
 
+    def _add_standard_regions(self) -> None:
+        """Add the standard regions that every bitstream needs."""
+        self.add_bitstream_region()
+        self.add_option_storage_region()
+
+    def with_firmware(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> 'BitstreamArchiver':
+        """Add firmware region and return self for chaining."""
+        self.add_firmware_region(firmware_bin_path, fw_location, fw_offset)
+        return self
 
     def add_firmware_region(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> None:
         """
@@ -170,6 +185,17 @@ class BitstreamArchiver:
     def bitstream_exists(self) -> bool:
         return os.path.exists(self.bitstream_path)
 
+    def create(self) -> bool:
+        """
+        One-shot creation with validation, manifest writing, and archive creation.
+        Returns True if archive was created, False otherwise.
+        """
+        if not self._validate():
+            return False
+        
+        self.write_manifest()
+        return self.create_archive()
+
     def create_archive(self) -> bool:
         """
         Create a bitstream archive containing the bitstream, manifest, and optionally firmware.
@@ -188,6 +214,13 @@ class BitstreamArchiver:
 
         self._print_archive_info()
         print(f"\nSaved to '{self.build_path}/{self.archive_name}'")
+        return True
+
+    def _validate(self) -> bool:
+        """Validate that the archiver is in a consistent state."""
+        if not self.bitstream_exists():
+            print(f"\nERROR: No bitstream found at {self.bitstream_path}")
+            return False
         return True
 
     def _print_archive_info(self):

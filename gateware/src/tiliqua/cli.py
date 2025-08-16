@@ -201,14 +201,14 @@ def top_level_cli(
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
 
-    archiver = BitstreamArchiver(
+    archiver = BitstreamArchiver.for_project(
         build_path=build_path,
         name=args.name,
         sha=repo_sha,
         hw_rev=args.hw,
-        brief=args.brief if args.brief is not None else getattr(fragment, "brief", ""),
-        video="<none>"
+        brief=args.brief if args.brief is not None else getattr(fragment, "brief", "")
     )
+    archiver.video = "<none>"
 
     if video_core:
         archiver.video ="<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
@@ -243,21 +243,17 @@ def top_level_cli(
         TiliquaSoc.compile_firmware(rust_fw_root, kwargs["firmware_bin_path"])
 
         # If necessary, add firmware region to bitstream archive.
-        archiver.add_firmware_region(
+        archiver.with_firmware(
             firmware_bin_path=kwargs["firmware_bin_path"],
             fw_location=args.fw_location,
             fw_offset=kwargs["fw_offset"]
         )
 
-        archiver.add_option_storage_region()
-
         # Create firmware-only archive if --fw-only specified
         if args.fw_only:
             if not archiver.validate_existing_bitstream():
                 sys.exit(1)
-            archiver.add_bitstream_region()
-            archiver.write_manifest()
-            archiver.create_archive()
+            archiver.create()
             sys.exit(0)
 
         # Simulation configuration
@@ -303,9 +299,7 @@ def top_level_cli(
 
         hw_platform.build(fragment, do_build=not args.skip_build, **build_flags)
 
-        archiver.add_bitstream_region()
-        archiver.write_manifest()
-        archiver.create_archive()
+        archiver.create()
 
         if hw_platform.ila:
             args_flash_bitstream = ["sudo", "openFPGALoader", "-c", "dirtyJtag",
