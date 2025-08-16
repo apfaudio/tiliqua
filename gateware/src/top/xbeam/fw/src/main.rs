@@ -114,10 +114,9 @@ fn main() -> ! {
 
             let (opts, draw_options, save_opts, wipe_opts) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
-                let opts_poll = app.ui.opts.clone();
                 let save_opts = app.ui.opts.misc.save_opts.poll();
                 let wipe_opts = app.ui.opts.misc.wipe_opts.poll();
-                (opts_poll, app.ui.draw(), save_opts, wipe_opts)
+                (app.ui.opts.clone(), app.ui.draw(), save_opts, wipe_opts)
             });
 
             if opts.beam.palette.value != last_palette || first {

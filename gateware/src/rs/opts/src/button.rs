@@ -14,6 +14,8 @@ pub enum ButtonMode {
 pub struct ButtonOption<T: ButtonOptionParams> {
     name: &'static str,
     pub value: bool,
+    // value delayed by 1 poll, only used for drawing oneshot
+    value_delay1: bool,
     init: bool,
     key: u32,
     _phantom: core::marker::PhantomData<T>,
@@ -28,6 +30,7 @@ impl<T: ButtonOptionParams> ButtonOption<T> {
         Self {
             name,
             value: init,
+            value_delay1: init,
             init,
             key,
             _phantom: core::marker::PhantomData,
@@ -41,19 +44,8 @@ impl<T: ButtonOptionParams> ButtonOption<T> {
         if T::MODE == ButtonMode::OneShot {
             self.value = false;
         }
+        self.value_delay1 = result;
         result
-    }
-
-    /// Simulates a button press - toggles for Toggle mode, latches for OneShot mode
-    pub fn press(&mut self) {
-        match T::MODE {
-            ButtonMode::Toggle => {
-                self.value = !self.value;
-            }
-            ButtonMode::OneShot => {
-                self.value = true;
-            }
-        }
     }
 }
 
@@ -69,7 +61,9 @@ impl<T: ButtonOptionParams> OptionTrait for ButtonOption<T> {
                 write!(&mut s, "{}", if self.value { "<Y>" } else { "<N>" }).ok();
             }
             ButtonMode::OneShot => {
-                write!(&mut s, "{}", if self.value { "<>" } else { "" }).ok();
+                // Also draw on 1 delayed poll cycle so we can draw straight after the first poll
+                // and still see something on the screen corresponding to the action.
+                write!(&mut s, "{}", if self.value || self.value_delay1 { "<>" } else { "" }).ok();
             }
         }
         s
@@ -99,7 +93,14 @@ impl<T: ButtonOptionParams> OptionTrait for ButtonOption<T> {
     }
 
     fn button_press(&mut self) -> bool {
-        self.press();
+        match T::MODE {
+            ButtonMode::Toggle => {
+                self.value = !self.value;
+            }
+            ButtonMode::OneShot => {
+                self.value = true;
+            }
+        }
         true // Always handled
     }
 
