@@ -79,12 +79,12 @@ fn main() -> ! {
         SPIFLASH_BASE,
         SPIFLASH_SZ_BYTES
     );
-    let flash_range = 0x1b0000u32..0x1b2000u32;
     use opts::persistence::{FlashOptionsPersistence, OptionsPersistence};
 
     /* LOAD OPTIONS */
     let mut opts = Opts::default();
-    let mut flash_persist = FlashOptionsPersistence::new(spiflash, flash_range);
+    let mut flash_persist = FlashOptionsPersistence::new(
+        spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
 
     flash_persist.load_options(&mut opts).unwrap();
 

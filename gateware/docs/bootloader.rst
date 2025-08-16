@@ -22,6 +22,7 @@ Tiliqua user projects are packaged into *Bitstream Archives*, which are ``.tar.g
 - Firmware binary (if applicable)
 - Any extra resources to be loaded into PSRAM (if applicable)
 - Manifest file (human-readable ``.json``) describing the contents
+- Options storage region for persistent settings (if applicable)
 
 Tiliqua's ``pdm flash`` command manages the memory layout on the SoldierCrab's SPI flash, ensuring that the components of a bitstream archive end up in the correct place. A picture of how the SPI flash is organized:
 
@@ -52,7 +53,12 @@ Tiliqua's ``pdm flash`` command manages the memory layout on the SoldierCrab's S
     │                            │
     ├────────────────────────────┤  (any additional slot 0 resources appended here)
     │          (padding)         │
-    ├────────────────────────────┤  0x1FFC00
+    ├────────────────────────────┤  0x1F8000
+    │    Slot 0 Options Storage  │
+    │                            │
+    ├────────────────────────────┤
+    │          (padding)         │
+    ├────────────────────────────┤  0x1FF000
     │      Slot 0 Manifest       │
     ╞════════════════════════════╡  0x200000 (End of Slot 0, start of Slot 1)
     │                            │
@@ -67,7 +73,12 @@ Tiliqua's ``pdm flash`` command manages the memory layout on the SoldierCrab's S
     │                            │
     ├────────────────────────────┤ (any additional slot 1 resources appended here)
     │          (padding)         │
-    ├────────────────────────────┤  0x2FFC00
+    ├────────────────────────────┤  0x2F8000
+    │    Slot 1 Options Storage  │
+    │                            │
+    ├────────────────────────────┤
+    │          (padding)         │
+    ├────────────────────────────┤  0x2FF000
     │       Slot 1 Manifest      │
     ╞════════════════════════════╡  0x300000 (End of Slot 1, start of Slot 2)
     │                            │
@@ -76,10 +87,11 @@ Tiliqua's ``pdm flash`` command manages the memory layout on the SoldierCrab's S
 
 - Bootloader bitstream: 0x000000
 - User bitstream slots: 0x100000, 0x200000, etc (1MB spacing)
-- Manifest: End of each slot (slot 0: 0x100000 + 0x100000 - 1024 (manifest size))
+- Manifest: End of each slot (slot 0: 0x100000 + 0x100000 - 4096 (manifest size))
 - Firmware: Loaded into PSRAM by bootloader, usually fixed offset from the bitstream start (i.e firmware for slot 0 is loaded from 0x100000 + 0xB0000 = 0x1B0000)
+- Options storage: Located at fixed offset before manifest (slot 0: 0x1F8000, slot 1: 0x2F8000, etc)
 
-The manifest includes metadata like the bitstream name and version, as well as information about where firmware should be loaded in PSRAM.
+The manifest includes metadata like the bitstream name and version, as well as information about where firmware should be loaded in PSRAM. It may also include an options storage region for persistent settings that survive power cycles.
 
 If an image requires firmware loaded to PSRAM, the SPI flash source address (in the manifest) is set to the true firmware base address by the flash tool when it is flashed.
 That is, the value of ``spiflash_src`` is not preserved by the flash tool and instead depends on the slot number.

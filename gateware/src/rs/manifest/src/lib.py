@@ -22,8 +22,11 @@ MANIFEST_MAGIC           = 0xFEEDBEEF
 N_MANIFESTS              = 8
 SLOT_BITSTREAM_BASE      = 0x100000 # First user slot starts here
 SLOT_SIZE                = 0x100000 # Spacing between user slots
-MANIFEST_SIZE            = 1024     # Each manifest starts at:
-                                    # SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
+FLASH_PAGE_SZ            = 4096
+MANIFEST_SIZE            = FLASH_PAGE_SZ  # Each manifest starts at:
+                                          # SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
+OPTION_STORAGE           = "options.storage"
+OPTION_STORAGE_SZ        = 2*FLASH_PAGE_SZ
 
 @dataclass_json
 @dataclass

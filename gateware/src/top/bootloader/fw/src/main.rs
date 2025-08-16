@@ -312,11 +312,16 @@ fn copy_spiflash_region_to_psram(region: &MemoryRegion) -> Result<(), BitstreamE
             }
         }
         let crc_result = digest.finalize();
-        info!("got PSRAM crc: {:#x}, manifest wants: {:#x}", crc_result, region.crc);
-        if crc_result == region.crc {
-            Ok(())
+        if let Some(crc_target) = region.crc {
+            info!("got PSRAM crc: {:#x}, manifest wants: {:#x}", crc_result, crc_target);
+            if crc_result == crc_target {
+                Ok(())
+            } else {
+                Err(BitstreamError::SpiflashCrcError)
+            }
         } else {
-            Err(BitstreamError::SpiflashCrcError)
+            info!("got PSRAM crc: {:#x}, manifest has NO CRC check.", crc_result);
+            Ok(())
         }
     } else {
         info!("skipping XiP memory region ...");

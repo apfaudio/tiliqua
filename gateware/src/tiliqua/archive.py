@@ -21,6 +21,8 @@ from typing import Optional, List
 from tiliqua.types import *
 from tiliqua.tiliqua_platform import TiliquaRevision
 
+from rs.manifest.src.lib import OPTION_STORAGE, OPTION_STORAGE_SZ
+
 @dataclass
 class BitstreamArchiver:
 
@@ -97,6 +99,16 @@ class BitstreamArchiver:
                 # No offset needed for BRAM
                 pass
 
+        self._regions.append(region)
+
+    def add_option_storage_region(self) -> None:
+        region = MemoryRegion(
+            filename=OPTION_STORAGE,
+            spiflash_src=None,
+            psram_dst=None,
+            size=OPTION_STORAGE_SZ,
+            crc=None
+        )
         self._regions.append(region)
 
     def write_manifest(self) -> BitstreamManifest:

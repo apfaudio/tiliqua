@@ -249,6 +249,8 @@ def top_level_cli(
             fw_offset=kwargs["fw_offset"]
         )
 
+        archiver.add_option_storage_region()
+
         # Create firmware-only archive if --fw-only specified
         if args.fw_only:
             if not archiver.validate_existing_bitstream():

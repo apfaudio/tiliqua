@@ -20,8 +20,9 @@ pub const MANIFEST_MAGIC: u32        = 0xFEEDBEEF;
 pub const N_MANIFESTS: usize         = 8;
 pub const SLOT_BITSTREAM_BASE: usize = 0x100000; // First user slot starts here
 pub const SLOT_SIZE: usize           = 0x100000; // Spacing between user slots
-pub const MANIFEST_SIZE: usize       = 1024;     // Each manifest starts at:
+pub const MANIFEST_SIZE: usize       = 4096;     // Each manifest starts at:
                                                  // SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
+pub const OPTION_STORAGE: &str       = "options.storage";
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct MemoryRegion {
@@ -29,7 +30,7 @@ pub struct MemoryRegion {
     pub spiflash_src: u32,
     pub psram_dst: Option<u32>,
     pub size: u32,
-    pub crc: u32,
+    pub crc: Option<u32>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -78,7 +79,9 @@ impl BitstreamManifest {
                 info!("\t\tpsram_dst:    {:#x} (copyto)", psram_dst);
             }
             info!("\t\tsize:         {:#x}", region.size);
-            info!("\t\tcrc:          {:#x}", region.crc);
+            if let Some(crc) = region.crc {
+                info!("\t\tcrc:          {:#x}", crc);
+            }
             info!("\t}}");
         }
         info!("}}");
@@ -89,15 +92,18 @@ impl BitstreamManifest {
         match manifest_de {
             Ok((contents, _rest)) => {
                 info!("BitstreamManifest: parse OK");
+                BitstreamManifest::print(&contents);
                 Some(contents)
             }
-            Err(_err) => {
+            Err(err) => {
+                info!("BitstreamManifest: parse error {:?}", err);
                 None
             }
         }
     }
 
     pub fn from_addr(addr: usize, size: usize) -> Option<BitstreamManifest> {
+
         let manifest_slice = unsafe {
             core::slice::from_raw_parts(
                 addr as *mut u8,
@@ -125,5 +131,14 @@ impl BitstreamManifest {
         info!("Manifest length: {}", last_byte);
 
         Self::from_slice(manifest_slice)
+    }
+
+    pub fn get_option_storage_window(&self) -> Option<core::ops::Range<u32>> {
+        for region in self.regions.iter() {
+            if region.filename.contains(OPTION_STORAGE) {
+                return Some(region.spiflash_src..(region.spiflash_src+region.size))
+            }
+        }
+        None
     }
 }
