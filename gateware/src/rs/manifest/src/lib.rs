@@ -25,9 +25,20 @@ pub const MANIFEST_SIZE: usize       = 4096;     // Each manifest starts at:
 pub const OPTION_STORAGE: &str       = "options.storage";
 pub const BITSTREAM_REGION: &str     = "top.bit";
 
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum RegionType {
+    /// Static region that executes/reads directly from SPI flash (XiP firmware, bitstreams)
+    Static,
+    /// Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
+    RamLoad,
+    /// Reserved region for system use (options.storage, etc.)
+    Reserved,
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 pub struct MemoryRegion {
     pub filename: String<32>,
+    pub region_type: RegionType,
     pub spiflash_src: u32,
     pub psram_dst: Option<u32>,
     pub size: u32,
@@ -136,7 +147,7 @@ impl BitstreamManifest {
 
     pub fn get_option_storage_window(&self) -> Option<core::ops::Range<u32>> {
         for region in self.regions.iter() {
-            if region.filename.contains(OPTION_STORAGE) {
+            if region.region_type == RegionType::Reserved {
                 return Some(region.spiflash_src..(region.spiflash_src+region.size))
             }
         }

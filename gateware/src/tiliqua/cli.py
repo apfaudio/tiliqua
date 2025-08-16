@@ -251,13 +251,11 @@ def top_level_cli(
 
         archiver.add_option_storage_region()
 
-        # Add bitstream region (spiflash_src will be set by flash.py based on slot)
-        archiver.add_bitstream_region()
-
         # Create firmware-only archive if --fw-only specified
         if args.fw_only:
             if not archiver.validate_existing_bitstream():
                 sys.exit(1)
+            archiver.add_bitstream_region()
             archiver.write_manifest()
             archiver.create_archive()
             sys.exit(0)
@@ -267,6 +265,10 @@ def top_level_cli(
         if sim_ports is None:
             sim_ports = sim.soc_simulation_ports
             sim_harness = "src/tb_cpp/sim_soc.cpp"
+
+    # Add bitstream region (spiflash_src will be set by flash.py based on slot)
+    # This should be added for ALL projects, not just SoC ones
+    archiver.add_bitstream_region()
 
     archiver.write_manifest()
 

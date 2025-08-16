@@ -21,7 +21,7 @@ from typing import Optional, List
 from tiliqua.types import *
 from tiliqua.tiliqua_platform import TiliquaRevision
 
-from rs.manifest.src.lib import OPTION_STORAGE, OPTION_STORAGE_SZ, BITSTREAM_REGION
+from rs.manifest.src.lib import OPTION_STORAGE, OPTION_STORAGE_SZ, BITSTREAM_REGION, RegionType
 
 @dataclass
 class BitstreamArchiver:
@@ -80,31 +80,37 @@ class BitstreamArchiver:
         # Calculate CRC32 of firmware binary
         fw_crc32 = crc32.bzip2(open(firmware_bin_path, "rb").read())
 
-        # Create a memory region for the firmware
-        region = MemoryRegion(
-            filename=os.path.basename(firmware_bin_path),
-            spiflash_src=None,
-            psram_dst=None,
-            size=os.path.getsize(firmware_bin_path),
-            crc=fw_crc32
-        )
-
-        # Set source/destination based on firmware location
+        # Create memory region based on firmware location
         match fw_location:
             case FirmwareLocation.SPIFlash:
-                region.spiflash_src = fw_offset
+                region = MemoryRegion(
+                    filename=os.path.basename(firmware_bin_path),
+                    region_type=RegionType.Static,
+                    spiflash_src=fw_offset,
+                    psram_dst=None,
+                    size=os.path.getsize(firmware_bin_path),
+                    crc=fw_crc32
+                )
+                self._regions.append(region)
             case FirmwareLocation.PSRAM:
-                region.psram_dst = fw_offset
+                region = MemoryRegion(
+                    filename=os.path.basename(firmware_bin_path),
+                    region_type=RegionType.RamLoad,
+                    spiflash_src=None,  # Will be set by flash.py based on slot
+                    psram_dst=fw_offset,
+                    size=os.path.getsize(firmware_bin_path),
+                    crc=fw_crc32
+                )
+                self._regions.append(region)
             case FirmwareLocation.BRAM:
-                # No offset needed for BRAM
+                # BRAM firmware is baked into bitstream, no separate region needed
                 pass
-
-        self._regions.append(region)
 
     def add_option_storage_region(self) -> None:
         region = MemoryRegion(
             filename=OPTION_STORAGE,
-            spiflash_src=None,
+            region_type=RegionType.Reserved,
+            spiflash_src=None,  # Will be set by flash.py based on slot
             psram_dst=None,
             size=OPTION_STORAGE_SZ,
             crc=None
@@ -126,6 +132,7 @@ class BitstreamArchiver:
         # Create a memory region for the bitstream
         region = MemoryRegion(
             filename=BITSTREAM_REGION,
+            region_type=RegionType.Static,
             spiflash_src=None,  # Will be set by flash.py based on slot
             psram_dst=None,     # Bitstream is never copied to PSRAM
             size=os.path.getsize(self.bitstream_path),

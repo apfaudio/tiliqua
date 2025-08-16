@@ -285,12 +285,24 @@ fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), Bitstr
     let spiflash_offset_words = region.spiflash_src as isize / 4isize;
     let size_words = region.size as isize / 4isize + 1;
 
-    if region.filename.contains(BITSTREAM_REGION) {
-        info!("Validating bitstream region at {:#x} (size: {} KiB) ...", 
-              SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
-    } else {
-        info!("Processing region '{}' at {:#x} (size: {} KiB) ...", 
-              region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+    match region.region_type {
+        RegionType::Static => {
+            if region.filename.contains(BITSTREAM_REGION) {
+                info!("Validating bitstream region at {:#x} (size: {} KiB) ...", 
+                      SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+            } else {
+                info!("Processing Static region '{}' at {:#x} (size: {} KiB) ...", 
+                      region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+            }
+        },
+        RegionType::RamLoad => {
+            info!("Processing RamLoad region '{}' at {:#x} (size: {} KiB) ...", 
+                  region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+        },
+        RegionType::Reserved => {
+            info!("Processing Reserved region '{}' at {:#x} (size: {} KiB) ...", 
+                  region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+        }
     }
 
     // Always validate CRC from SPI flash source first

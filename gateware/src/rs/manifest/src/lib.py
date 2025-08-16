@@ -13,6 +13,7 @@ This representation is used for manifest generation and flashing.
 """
 
 import json
+from enum import StrEnum
 
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
@@ -29,14 +30,21 @@ OPTION_STORAGE           = "options.storage"
 OPTION_STORAGE_SZ        = 2*FLASH_PAGE_SZ
 BITSTREAM_REGION         = "top.bit"
 
+class RegionType(StrEnum):
+    """Memory region type enum matching the Rust schema"""
+    Static = "Static"      # Static region that executes/reads directly from SPI flash (XiP firmware, bitstreams)
+    RamLoad = "RamLoad"    # Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
+    Reserved = "Reserved"  # Reserved region for system use (options.storage, etc.)
+
 @dataclass_json
 @dataclass
 class MemoryRegion:
     filename: str
-    spiflash_src: int
-    psram_dst: Optional[int]
     size: int
-    crc: int
+    region_type: RegionType = RegionType.Static
+    spiflash_src: Optional[int] = None
+    psram_dst: Optional[int] = None
+    crc: Optional[int] = None
 
 @dataclass_json
 @dataclass

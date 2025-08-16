@@ -39,6 +39,8 @@ from rs.manifest.src.lib import (
     MANIFEST_SIZE,
     OPTION_STORAGE,
     BITSTREAM_REGION,
+    RegionType,
+    BitstreamManifest,
 )
 
 # Where the XiP bootloader bitstream should be flashed.
@@ -114,21 +116,21 @@ class Region:
                 f"    end:   0x{self.addr + self.aligned_size - 1:x}")
 
 
-def process_region(tmpdir: Path, region_info: Dict, commands: List, regions: List) -> None:
+def process_region(tmpdir: Path, region, commands: List, regions: List) -> None:
     """
     Process a single memory region by adding flash commands and region descriptors.
     
     Args:
         tmpdir: Temporary directory with extracted files
-        region_info: Region dictionary from manifest
+        region: MemoryRegion object from manifest
         commands: List to append flash commands to
         regions: List to append Region objects to
     """
-    if "filename" not in region_info or "spiflash_src" not in region_info:
+    if region.spiflash_src is None:
         return
         
-    region_path = tmpdir / region_info["filename"]
-    region_addr = region_info["spiflash_src"]
+    region_path = tmpdir / region.filename
+    region_addr = region.spiflash_src
     
     # Flash all regions as raw binary to avoid header injection
     file_type = "raw"
@@ -141,8 +143,8 @@ def process_region(tmpdir: Path, region_info: Dict, commands: List, regions: Lis
     
     regions.append(Region(
         region_addr,
-        region_info["size"],
-        f"'{region_info['filename']}'"
+        region.size,
+        f"'{region.filename}'"
     ))
 
 
@@ -210,25 +212,24 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
         if not manifest_f:
             print("Error: Could not extract manifest.json from archive")
             sys.exit(1)
-        manifest = json.load(manifest_f)
+        manifest_dict = json.load(manifest_f)
+        manifest = BitstreamManifest.from_dict(manifest_dict)
 
-        hw_rev_manifest = manifest["hw_rev"]
-        if hw_rev_manifest != hw_rev_major:
-            print(f"Aborting: attached Tiliqua (hw=r{hw_rev_major}) does not match archive (hw=r{hw_rev_manifest}).")
+        if manifest.hw_rev != hw_rev_major:
+            print(f"Aborting: attached Tiliqua (hw=r{hw_rev_major}) does not match archive (hw=r{manifest.hw_rev}).")
             sys.exit(1)
 
 
-        # Check if this is an XIP firmware (has firmware regions with spiflash_src already set)
+        # Check if this is an XIP firmware (has Static firmware regions with spiflash_src already set)
         has_xip_firmware = False
         xip_offset = None
-        for region in manifest.get("regions", []):
-            # XIP firmware has regions with spiflash_src set and no psram_dst (not bitstream or options)
-            if (region.get("spiflash_src") is not None and 
-                region.get("psram_dst") is None and
-                region.get("filename") != BITSTREAM_REGION and
-                OPTION_STORAGE not in region.get("filename", "")):
+        for region in manifest.regions:
+            # XIP firmware has Static regions that aren't bitstreams or reserved areas
+            if (region.region_type == RegionType.Static and 
+                region.spiflash_src is not None and
+                region.filename != BITSTREAM_REGION):
                 has_xip_firmware = True
-                xip_offset = region["spiflash_src"]
+                xip_offset = region.spiflash_src
                 break
 
         if has_xip_firmware and slot is not None:
@@ -285,40 +286,39 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             print("\nFlashing completed successfully")
 
 
-def handle_xip_firmware(tmpdir: Path, manifest: Dict, commands: List, regions: List) -> None:
+def handle_xip_firmware(tmpdir: Path, manifest: BitstreamManifest, commands: List, regions: List) -> None:
     """
     Handle XIP firmware bitstream flashing preparation.
 
     Args:
         tmpdir: Temporary directory with extracted files
-        manifest: Parsed manifest.json
+        manifest: Parsed BitstreamManifest object
         commands: List to append commands to
         regions: List to append regions to
     """
     print("\nPreparing to flash XIP firmware bitstream to bootloader slot...")
 
     # Update manifest regions with proper addresses for XIP
-    for region_info in manifest.get("regions", []):
-        if region_info["filename"] == BITSTREAM_REGION:
+    for region in manifest.regions:
+        if region.filename == BITSTREAM_REGION:
             # Set bitstream address for bootloader slot
-            region_info["spiflash_src"] = BOOTLOADER_BITSTREAM_ADDR
+            region.spiflash_src = BOOTLOADER_BITSTREAM_ADDR
 
     # Process all regions using unified approach
-    for region_info in manifest.get("regions", []):
-        if ("filename" not in region_info or
-            OPTION_STORAGE in region_info["filename"]):
+    for region in manifest.regions:
+        if region.region_type == RegionType.Reserved:
             continue
         
-        process_region(tmpdir, region_info, commands, regions)
+        process_region(tmpdir, region, commands, regions)
 
 
-def handle_psram_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: List, regions: List) -> None:
+def handle_psram_firmware(tmpdir: Path, manifest: BitstreamManifest, slot: int, commands: List, regions: List) -> None:
     """
     Handle psram (user) firmware bitstream flashing preparation.
 
     Args:
         tmpdir: Temporary directory with extracted files
-        manifest: Parsed manifest.json
+        manifest: Parsed BitstreamManifest object
         slot: Slot number
         commands: List to append commands to
         regions: List to append regions to
@@ -336,43 +336,38 @@ def handle_psram_firmware(tmpdir: Path, manifest: Dict, slot: int, commands: Lis
     regions.append(Region(manifest_addr, MANIFEST_SIZE, 'manifest'))
 
     # Update manifest regions with proper addresses for this slot
-    for region_info in manifest.get("regions", []):
-        if "filename" not in region_info:
-            continue
-
-        if region_info["filename"] == BITSTREAM_REGION:
+    for region in manifest.regions:
+        if region.filename == BITSTREAM_REGION:
             # Set bitstream address for this slot
-            region_info["spiflash_src"] = bitstream_addr
-        elif OPTION_STORAGE in region_info["filename"]:
-            region_info["spiflash_src"] = options_base
-        elif region_info.get("psram_dst") is not None:
-            if region_info.get("spiflash_src") is not None:
-                assert region_info["spiflash_src"] is None, "Both psram_dst and spiflash_src set"
+            region.spiflash_src = bitstream_addr
+        elif region.region_type == RegionType.Reserved:
+            region.spiflash_src = options_base
+        elif region.region_type == RegionType.RamLoad:
+            assert region.spiflash_src is None, "RamLoad region already has spiflash_src set"
 
-            region_info["spiflash_src"] = firmware_base
-            print(f"manifest: region {region_info['filename']}: spiflash_src set to 0x{firmware_base:x}")
+            region.spiflash_src = firmware_base
+            print(f"manifest: region {region.filename}: spiflash_src set to 0x{firmware_base:x}")
 
             # Align firmware base to next 4KB boundary (0x1000)
-            firmware_base += region_info["size"]
+            firmware_base += region.size
             firmware_base = (firmware_base + 0xFFF) & ~0xFFF
 
     # Write updated manifest
     manifest_path = tmpdir / "manifest.json"
-    print(f"\nFinal manifest contents:\n{json.dumps(manifest, indent=2)}")
+    manifest_dict = manifest.to_dict()
+    print(f"\nFinal manifest contents:\n{json.dumps(manifest_dict, indent=2)}")
     with open(manifest_path, "w") as f:
-        json.dump(manifest, f)
+        json.dump(manifest_dict, f)
 
     # Add manifest flash command
     commands.append(flash_file(str(manifest_path), manifest_addr, "raw"))
 
     # Process all regions using unified approach
-    for region_info in manifest.get("regions", []):
-        if ("filename" not in region_info or
-            "spiflash_src" not in region_info or
-            OPTION_STORAGE in region_info["filename"]):
+    for region in manifest.regions:
+        if region.region_type == RegionType.Reserved:
             continue
         
-        process_region(tmpdir, region_info, commands, regions)
+        process_region(tmpdir, region, commands, regions)
 
 
 def read_flash_segment(offset: int, size: int, reset: bool = False) -> bytes:
