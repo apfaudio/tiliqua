@@ -16,16 +16,36 @@ import json
 import os
 import re
 from enum import StrEnum
+from functools import lru_cache
 
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 from typing import List, Optional
 
-MANIFEST_MAGIC           = 0xFEEDBEEF
-FLASH_PAGE_SZ            = 4096
-MANIFEST_SIZE            = FLASH_PAGE_SZ
-OPTION_STORAGE           = "options.storage"
+@lru_cache(maxsize=1)
+def _parse_rust_constants():
+    """Extract shared constants from lib.rs to avoid duplication here."""
+    lib_rs_path = os.path.join(os.path.dirname(__file__), 'lib.rs')
+    constants = {}
+    if os.path.exists(lib_rs_path):
+        with open(lib_rs_path, 'r') as f:
+            content = f.read()
+        # e.g. pub const NAME = 0x123456;
+        for match in re.finditer(r'pub const (\w+).* = (0x[0-9a-fA-F]+);', content):
+            name, value = match.groups()
+            constants[name] = int(value, 16)
+        # e.g. pub const NAME = 123;
+        for match in re.finditer(r'pub const (\w+).* = (\d+);', content):
+            name, value = match.groups()
+            constants[name] = int(value)
+    return constants
+
+RUST_CONSTANTS           = _parse_rust_constants()
+MANIFEST_MAGIC           = RUST_CONSTANTS['MANIFEST_MAGIC']
+MANIFEST_SIZE            = RUST_CONSTANTS['MANIFEST_SIZE']
+FLASH_PAGE_SZ            = 0x1000
 OPTION_STORAGE_SZ        = 2*FLASH_PAGE_SZ
+OPTION_STORAGE           = "options.storage"
 BITSTREAM_REGION         = "top.bit"
 
 class RegionType(StrEnum):
@@ -80,98 +100,68 @@ class BitstreamManifest:
             # Drop all keys with None values (optional fields)
             f.write(json.dumps(cleandict(self.to_dict())))
 
-
-def _parse_rust_constants():
-    """Parse constants from lib.rs using simple regex."""
-    lib_rs_path = os.path.join(os.path.dirname(__file__), 'lib.rs')
-    constants = {}
-    
-    if os.path.exists(lib_rs_path):
-        with open(lib_rs_path, 'r') as f:
-            content = f.read()
-            
-        # Match: pub const NAME = 0x123456;
-        for match in re.finditer(r'pub const (\w+).* = (0x[0-9a-fA-F]+);', content):
-            name, value = match.groups()
-            constants[name] = int(value, 16)
-            
-        # Match: pub const NAME = 123;  
-        for match in re.finditer(r'pub const (\w+).* = (\d+);', content):
-            name, value = match.groups()
-            constants[name] = int(value)
-    
-    return constants
-
-
 class SlotLayout:
-    """Manages memory layout for both bootloader and user slots."""
-    
+    """Flash addressing of overall SPI flash, for bootloader and user slots."""
+
     def __init__(self, slot_number: Optional[int] = None):
         self.slot_number = slot_number  # None = bootloader, int = user slot
-        
-        # Parse constants from lib.rs
-        rust_constants = _parse_rust_constants()
-        
+
         # Core manifest constants from lib.rs
-        self.n_manifests = rust_constants['N_MANIFESTS']
-        self.slot_bitstream_base = rust_constants['SLOT_BITSTREAM_BASE']
-        self.slot_size = rust_constants['SLOT_SIZE']
+        self.n_manifests = RUST_CONSTANTS['N_MANIFESTS']
+        self.slot_bitstream_base = RUST_CONSTANTS['SLOT_BITSTREAM_BASE']
+        self.slot_size = RUST_CONSTANTS['SLOT_SIZE']
         self.manifest_size = MANIFEST_SIZE
-        
-        # SlotLayout-specific constants (not in lib.rs)
+
+        # SlotLayout-specific constants (used by flashing tool, not in lib.rs)
         self.bootloader_bitstream_addr = 0x000000
         self.firmware_base_slot0 = 0x1B0000
         self.options_base_addr = 0xFD000
-    
+
+    @classmethod
+    def for_bootloader(cls) -> 'SlotLayout':
+        return cls(slot_number=None)
+
+    @classmethod
+    def for_user_slot(cls, slot: int) -> 'SlotLayout':
+        return cls(slot_number=slot)
+
     @property
     def is_bootloader(self) -> bool:
         return self.slot_number is None
-    
+
+
     @property
     def bitstream_addr(self) -> int:
         if self.is_bootloader:
             return self.bootloader_bitstream_addr
         else:
             return self.slot_bitstream_base + (self.slot_number * self.slot_size)
-    
-    @property 
+
+    @property
     def manifest_addr(self) -> int:
         if self.is_bootloader:
             return self.slot_bitstream_base - self.manifest_size
         else:
             return self.bitstream_addr + self.slot_size - self.manifest_size
-    
+
     @property
     def firmware_base(self) -> int:
         if self.is_bootloader:
             raise ValueError("Bootloader doesn't have firmware base (uses XiP)")
         return self.firmware_base_slot0 + (self.slot_number * self.slot_size)
-    
-    @property 
+
+    @property
     def options_base(self) -> int:
         if self.is_bootloader:
             return self.options_base_addr
         else:
             return self.options_base_addr + ((1+self.slot_number) * self.slot_size)
-    
+
     def slot_start_addr(self, slot: int) -> int:
-        """Get the start address of a given slot."""
         return self.slot_bitstream_base + (slot * self.slot_size)
-    
+
     def slot_end_addr(self, slot: int) -> int:
-        """Get the end address (exclusive) of a given slot."""
         return self.slot_start_addr(slot) + self.slot_size
-    
+
     def slot_from_addr(self, addr: int) -> int:
-        """Get the slot number for a given address."""
         return (addr - self.slot_bitstream_base) // self.slot_size
-    
-    @classmethod
-    def for_bootloader(cls) -> 'SlotLayout':
-        """Create layout for bootloader slot."""
-        return cls(slot_number=None)
-    
-    @classmethod
-    def for_user_slot(cls, slot: int) -> 'SlotLayout':
-        """Create layout for user slot."""
-        return cls(slot_number=slot)
