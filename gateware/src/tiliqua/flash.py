@@ -155,8 +155,8 @@ class FlashCommandGenerator:
         commands = []
         
         for region in self.flashable_regions:
-            # Skip Reserved regions - they don't have actual files to flash
-            if region.memory_region.region_type == RegionType.Reserved:
+            # Skip OptionStorage regions - they don't have actual files to flash
+            if region.memory_region.region_type == RegionType.OptionStorage:
                 continue
                 
             # All regions use their filename relative to tmpdir
@@ -366,7 +366,7 @@ def finalize_addresses(manifest: BitstreamManifest, tmpdir: Path, slot: Optional
             case RegionType.XipFirmware:
                 # XipFirmware regions already have spiflash_src set from archive creation
                 assert region.spiflash_src is not None, "XipFirmware region missing spiflash_src"
-            case RegionType.Reserved:
+            case RegionType.OptionStorage:
                 region.spiflash_src = layout.options_base
             case RegionType.RamLoad:
                 assert region.spiflash_src is None, "RamLoad region already has spiflash_src set"

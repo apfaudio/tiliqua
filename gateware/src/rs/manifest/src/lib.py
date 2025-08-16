@@ -44,8 +44,6 @@ RUST_CONSTANTS           = _parse_rust_constants()
 MANIFEST_MAGIC           = RUST_CONSTANTS['MANIFEST_MAGIC']
 MANIFEST_SIZE            = RUST_CONSTANTS['MANIFEST_SIZE']
 FLASH_PAGE_SZ            = 0x1000
-OPTION_STORAGE_SZ        = 2*FLASH_PAGE_SZ
-OPTION_STORAGE           = "options.storage"
 BITSTREAM_REGION         = "top.bit"
 
 class RegionType(StrEnum):
@@ -53,7 +51,7 @@ class RegionType(StrEnum):
     Bitstream = "Bitstream"        # Bitstream region that gets loaded directly by the bootloader
     XipFirmware = "XipFirmware"    # XiP firmware that executes directly from SPI flash
     RamLoad = "RamLoad"            # Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
-    Reserved = "Reserved"          # Reserved region for system use (options.storage, etc.)
+    OptionStorage = "OptionStorage"  # Option storage region for persistent application settings
     Manifest = "Manifest"          # Manifest region containing metadata about the bitstream
 
 @dataclass_json

@@ -31,8 +31,8 @@ pub enum RegionType {
     XipFirmware,
     /// Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
     RamLoad,
-    /// Reserved region for system use (options.storage, etc.)
-    Reserved,
+    /// Option storage region for persistent application settings
+    OptionStorage,
     /// Manifest region containing metadata about the bitstream
     Manifest,
 }
@@ -148,7 +148,7 @@ impl BitstreamManifest {
 
     pub fn get_option_storage_window(&self) -> Option<core::ops::Range<u32>> {
         for region in self.regions.iter() {
-            if region.region_type == RegionType::Reserved {
+            if region.region_type == RegionType::OptionStorage {
                 return Some(region.spiflash_src..(region.spiflash_src+region.size))
             }
         }

@@ -21,7 +21,7 @@ from typing import Optional, List
 from tiliqua.types import *
 from tiliqua.tiliqua_platform import TiliquaRevision
 
-from rs.manifest.src.lib import OPTION_STORAGE, OPTION_STORAGE_SZ, BITSTREAM_REGION, RegionType, MANIFEST_SIZE
+from rs.manifest.src.lib import BITSTREAM_REGION, RegionType, MANIFEST_SIZE, FLASH_PAGE_SZ
 
 @dataclass
 class BitstreamArchiver:
@@ -135,14 +135,14 @@ class BitstreamArchiver:
         
         return self
 
-    def with_option_storage_region(self) -> 'BitstreamArchiver':
+    def with_option_storage(self, filename: str = "<options>", size: int = 2*FLASH_PAGE_SZ) -> 'BitstreamArchiver':
         """Add option storage region and return self for chaining."""
         region = MemoryRegion(
-            filename=OPTION_STORAGE,
-            region_type=RegionType.Reserved,
+            filename=filename,
+            region_type=RegionType.OptionStorage,
             spiflash_src=None,  # Will be set by flash.py based on slot
             psram_dst=None,
-            size=OPTION_STORAGE_SZ,
+            size=size,
             crc=None
         )
         self._regions.append(region)
