@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+import json
+import subprocess
 import unittest
 import tempfile
 from pathlib import Path
@@ -142,6 +144,78 @@ class TestFlashCommandGenerator(unittest.TestCase):
             
             # Last command should not have --skip-reset
             self.assertNotIn("--skip-reset", commands[2])
+    
+    def test_manifest_rust_compatibility(self):
+        """Test that a Python-generated manifest can be read by Rust lib.rs."""
+
+        archiver = ArchiveBuilder.for_project(
+            build_path=str(self.build_path),
+            name="RUST_TEST",
+            sha="abc123",
+            hw_rev=TiliquaRevision.R5,
+            brief="Test manifest for Rust compatibility"
+        ).with_bitstream()                                                         \
+         .with_firmware(str(self.firmware_path), FirmwareLocation.PSRAM, 0x200000) \
+         .with_option_storage()
+
+        # Create the archive and then load it to get the finalized manifest
+        archiver.create()
+        with ArchiveLoader(archiver.archive_path) as loader:
+            flashable_regions = promote_to_flashable_regions(loader, slot=1)  # Use slot 1 for user bitstream
+            manifest_json_path = loader.get_tmpdir() / "manifest.json"
+            with open(manifest_json_path, 'r') as f:
+                manifest_json = f.read()
+
+        # Create a simple Rust test program to validate parsing
+        rust_test = f'''
+use tiliqua_manifest::BitstreamManifest;
+fn main() {{
+    let json_data = r#"{manifest_json}"#;
+    let json_bytes = json_data.as_bytes();
+    match BitstreamManifest::from_slice(json_bytes) {{
+        Some(manifest) => {{
+            println!("SUCCESS: Manifest parsed successfully");
+            std::process::exit(0);
+        }}
+        None => {{
+            println!("ERROR: Failed to parse manifest");
+            std::process::exit(1);
+        }}
+    }}
+}}
+'''
+
+        # Create a minimal Cargo project for the test
+        test_dir = Path(self.temp_dir) / "rust_test"
+        test_dir.mkdir()
+
+        # Create Cargo.toml
+        cargo_toml = f'''
+[package]
+name = "manifest_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tiliqua-manifest = {{ path = "{Path(__file__).parent.parent / "src" / "rs" / "manifest"}" }}
+'''
+        with open(test_dir / "Cargo.toml", 'w') as f:
+            f.write(cargo_toml)
+
+        # Create src directory and main.rs
+        src_dir = test_dir / "src"
+        src_dir.mkdir()
+        with open(src_dir / "main.rs", 'w') as f:
+            f.write(rust_test)
+
+        result = subprocess.run([
+            'cargo', 'run'
+        ], capture_output=True, text=True, cwd=test_dir)
+        print(f"\nRust test output: {result.stdout}")
+        if result.stderr:
+            print(f"Rust test stderr: {result.stderr}")
+        self.assertEqual(result.returncode, 0, "Rust parsing failed")
+        self.assertIn("SUCCESS: Manifest parsed successfully", result.stdout)
 
 if __name__ == '__main__':
     unittest.main()
