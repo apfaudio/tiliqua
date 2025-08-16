@@ -22,12 +22,8 @@ from dataclasses_json import dataclass_json
 from typing import List, Optional
 
 MANIFEST_MAGIC           = 0xFEEDBEEF
-N_MANIFESTS              = 8
-SLOT_BITSTREAM_BASE      = 0x100000 # First user slot starts here
-SLOT_SIZE                = 0x100000 # Spacing between user slots
 FLASH_PAGE_SZ            = 4096
-MANIFEST_SIZE            = FLASH_PAGE_SZ  # Each manifest starts at:
-                                          # SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
+MANIFEST_SIZE            = FLASH_PAGE_SZ
 OPTION_STORAGE           = "options.storage"
 OPTION_STORAGE_SZ        = 2*FLASH_PAGE_SZ
 BITSTREAM_REGION         = "top.bit"
@@ -116,10 +112,11 @@ class SlotLayout:
         # Parse constants from lib.rs
         rust_constants = _parse_rust_constants()
         
-        # Constants from lib.rs
+        # Core manifest constants from lib.rs
+        self.n_manifests = rust_constants['N_MANIFESTS']
         self.slot_bitstream_base = rust_constants['SLOT_BITSTREAM_BASE']
-        self.slot_size = rust_constants['SLOT_SIZE'] 
-        self.manifest_size = rust_constants['MANIFEST_SIZE']
+        self.slot_size = rust_constants['SLOT_SIZE']
+        self.manifest_size = MANIFEST_SIZE
         
         # SlotLayout-specific constants (not in lib.rs)
         self.bootloader_bitstream_addr = 0x000000
@@ -156,6 +153,18 @@ class SlotLayout:
             return self.options_base_addr
         else:
             return self.options_base_addr + ((1+self.slot_number) * self.slot_size)
+    
+    def slot_start_addr(self, slot: int) -> int:
+        """Get the start address of a given slot."""
+        return self.slot_bitstream_base + (slot * self.slot_size)
+    
+    def slot_end_addr(self, slot: int) -> int:
+        """Get the end address (exclusive) of a given slot."""
+        return self.slot_start_addr(slot) + self.slot_size
+    
+    def slot_from_addr(self, addr: int) -> int:
+        """Get the slot number for a given address."""
+        return (addr - self.slot_bitstream_base) // self.slot_size
     
     @classmethod
     def for_bootloader(cls) -> 'SlotLayout':

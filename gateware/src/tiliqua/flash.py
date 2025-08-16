@@ -34,12 +34,6 @@ from dataclasses import dataclass
 # Flash memory map constants shared with the bootloader
 from rs.manifest.src.lib import (
     FLASH_PAGE_SZ,
-    N_MANIFESTS,
-    SLOT_BITSTREAM_BASE,
-    SLOT_SIZE,
-    MANIFEST_SIZE,
-    OPTION_STORAGE,
-    BITSTREAM_REGION,
     RegionType,
     BitstreamManifest,
     MemoryRegion,
@@ -272,9 +266,10 @@ def check_region_overlaps(flashable_regions: List[FlashableRegion], slot: Option
     """
     # For non-XIP firmware, check if any region exceeds its slot
     if slot is not None:
+        layout = SlotLayout()
         for region in flashable_regions:
-            slot_start = (region.addr // SLOT_SIZE) * SLOT_SIZE
-            slot_end = slot_start + SLOT_SIZE
+            region_slot = layout.slot_from_addr(region.addr)
+            slot_end = layout.slot_end_addr(region_slot)
             if region.end_addr > slot_end:
                 return (True, f"Region {region.name} exceeds slot boundary: "
                              f"ends at 0x{region.end_addr:x}, slot ends at 0x{slot_end:x}")
@@ -457,15 +452,17 @@ def flash_status() -> None:
     """Display the status of flashed bitstreams in each manifest slot."""
     print("Reading manifests from flash...")
     manifest_data = []
+    layout = SlotLayout()
 
     # Read all manifests
-    for slot in range(N_MANIFESTS):
-        offset = SLOT_BITSTREAM_BASE + (slot + 1) * SLOT_SIZE - MANIFEST_SIZE
-        is_last = (slot == N_MANIFESTS - 1)
+    for slot in range(layout.n_manifests):
+        slot_layout = SlotLayout.for_user_slot(slot)
+        offset = slot_layout.manifest_addr
+        is_last = (slot == layout.n_manifests - 1)
 
         print(f"\nReading Slot {slot} manifest at {hex(offset)}:")
         try:
-            data = read_flash_segment(offset, MANIFEST_SIZE, reset=is_last)
+            data = read_flash_segment(offset, layout.manifest_size, reset=is_last)
             manifest_data.append((slot, offset, data))
         except subprocess.CalledProcessError as e:
             print(f"  Error reading flash: {e}")
@@ -524,8 +521,9 @@ def main():
             if not os.path.exists(args.archive_path):
                 print(f"Error: Archive not found: {args.archive_path}")
                 sys.exit(1)
-            if args.slot is not None and not 0 <= args.slot < N_MANIFESTS:
-                print(f"Error: Slot must be between 0 and {N_MANIFESTS-1}")
+            layout = SlotLayout()
+            if args.slot is not None and not 0 <= args.slot < layout.n_manifests:
+                print(f"Error: Slot must be between 0 and {layout.n_manifests-1}")
                 sys.exit(1)
             flash_archive(args.archive_path, hw_rev_major, args.slot, args.noconfirm)
         case 'status':

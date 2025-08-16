@@ -22,8 +22,6 @@ pub const SLOT_BITSTREAM_BASE: usize = 0x100000; // First user slot starts here
 pub const SLOT_SIZE: usize           = 0x100000; // Spacing between user slots
 pub const MANIFEST_SIZE: usize       = 4096;     // Each manifest starts at:
                                                  // SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
-pub const OPTION_STORAGE: &str       = "options.storage";
-pub const BITSTREAM_REGION: &str     = "top.bit";
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum RegionType {
