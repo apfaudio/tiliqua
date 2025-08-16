@@ -260,7 +260,7 @@ def top_level_cli(
         if args.fw_only:
             if not archiver.validate_existing_bitstream():
                 sys.exit(1)
-            archiver.create()
+            archiver.with_bitstream().create()
             sys.exit(0)
 
         # Simulation configuration
@@ -306,7 +306,7 @@ def top_level_cli(
 
         hw_platform.build(fragment, do_build=not args.skip_build, **build_flags)
 
-        archiver.create()
+        archiver.with_bitstream().create()
 
         if hw_platform.ila:
             args_flash_bitstream = ["sudo", "openFPGALoader", "-c", "dirtyJtag",

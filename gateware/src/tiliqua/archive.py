@@ -44,9 +44,9 @@ class ArchiveBuilder:
 
     @classmethod
     def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision, brief: str = "") -> 'ArchiveBuilder':
-        """Create an ArchiveBuilder with bitstream region."""
+        """Create an ArchiveBuilder for a project."""
         archiver = cls(build_path, name, sha, hw_rev, brief)
-        return archiver.with_bitstream()
+        return archiver
 
     def __post_init__(self):
         # Ensure build directory exists
@@ -186,14 +186,11 @@ class ArchiveBuilder:
     def bitstream_exists(self) -> bool:
         return os.path.exists(self.bitstream_path)
 
-    def create(self) -> bool:
+    def create(self):
         """
         One-shot creation with validation, manifest writing, and archive creation.
         Returns True if archive was created, False otherwise.
         """
-        if not self._validate():
-            return False
-        
         self.write_manifest()
         return self.create_archive()
 
@@ -215,13 +212,6 @@ class ArchiveBuilder:
 
         self._print_archive_info()
         print(f"\nSaved to '{self.build_path}/{self.archive_name}'")
-        return True
-
-    def _validate(self) -> bool:
-        """Validate that the archiver is in a consistent state."""
-        if not self.bitstream_exists():
-            print(f"\nERROR: No bitstream found at {self.bitstream_path}")
-            return False
         return True
 
     def _print_archive_info(self):

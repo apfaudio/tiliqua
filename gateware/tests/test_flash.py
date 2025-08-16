@@ -52,7 +52,7 @@ class TestFlashCommandGenerator(unittest.TestCase):
             name="BOOTLOADER",
             sha="abc123",
             hw_rev=TiliquaRevision.R5
-        ).with_firmware(str(self.firmware_path), FirmwareLocation.SPIFlash, 0xb0000)
+        ).with_bitstream().with_firmware(str(self.firmware_path), FirmwareLocation.SPIFlash, 0xb0000)
         
         archiver.create()
         
@@ -86,7 +86,7 @@ class TestFlashCommandGenerator(unittest.TestCase):
             name="USER_NO_FW",
             sha="def456",
             hw_rev=TiliquaRevision.R5
-        )
+        ).with_bitstream()
         
         archiver.create()
         
@@ -115,7 +115,7 @@ class TestFlashCommandGenerator(unittest.TestCase):
             name="USER_WITH_FW",
             sha="ghi789",
             hw_rev=TiliquaRevision.R5
-        ).with_firmware(str(self.firmware_path), FirmwareLocation.PSRAM, 0x200000).with_option_storage()
+        ).with_bitstream().with_firmware(str(self.firmware_path), FirmwareLocation.PSRAM, 0x200000).with_option_storage()
         
         archiver.create()
         
