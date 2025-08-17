@@ -16,6 +16,7 @@ use tiliqua_lib::calibration::*;
 use embedded_graphics::prelude::*;
 
 use options::*;
+use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::dma_framebuffer::Rotate;
@@ -54,6 +55,11 @@ fn main() -> ! {
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
+    let spiflash = SPIFlash0::new(
+        peripherals.SPIFLASH_CTRL,
+        SPIFLASH_BASE,
+        SPIFLASH_SZ_BYTES
+    );
 
     tiliqua_fw::handlers::logger_init(serial);
 
@@ -73,20 +79,18 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    /* SPI FLASH */
-    let spiflash = SPIFlash0::new(
-        peripherals.SPIFLASH_CTRL,
-        SPIFLASH_BASE,
-        SPIFLASH_SZ_BYTES
-    );
-    use opts::persistence::{FlashOptionsPersistence, OptionsPersistence};
+    //
+    // Create options and maybe load from persistent storage
+    //
 
-    /* LOAD OPTIONS */
     let mut opts = Opts::default();
     let mut flash_persist = FlashOptionsPersistence::new(
         spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
-
     flash_persist.load_options(&mut opts).unwrap();
+
+    //
+    // Create App instance
+    //
 
     let mut last_palette = opts.beam.palette.value;
     let app = Mutex::new(RefCell::new(App::new(opts)));

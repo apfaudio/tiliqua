@@ -19,6 +19,7 @@ use tiliqua_lib::*;
 use pac::constants::*;
 use tiliqua_hal::persist::Persist;
 use options::*;
+use opts::persistence::*;
 use hal::pca9635::*;
 use hal::dma_framebuffer::Rotate;
 
@@ -173,6 +174,11 @@ fn main() -> ! {
     let sysclk = pac::clock::sysclk();
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
+    let spiflash = SPIFlash0::new(
+        peripherals.SPIFLASH_CTRL,
+        SPIFLASH_BASE,
+        SPIFLASH_SZ_BYTES
+    );
 
     info!("Hello from Tiliqua MACRO-OSCILLATOR!");
 
@@ -200,20 +206,18 @@ fn main() -> ! {
 
     unsafe { HEAP.init(HEAP_START, HEAP_SIZE) }
 
-    /* SPI FLASH */
-    let spiflash = SPIFlash0::new(
-        peripherals.SPIFLASH_CTRL,
-        SPIFLASH_BASE,
-        SPIFLASH_SZ_BYTES
-    );
-    use opts::persistence::{FlashOptionsPersistence, OptionsPersistence};
+    //
+    // Create options and maybe load from persistent storage
+    //
 
-    /* LOAD OPTIONS */
     let mut opts = Opts::default();
     let mut flash_persist = FlashOptionsPersistence::new(
         spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
-
     flash_persist.load_options(&mut opts).unwrap();
+
+    //
+    // Create App instance
+    //
 
     let mut last_palette = opts.beam.palette.value;
     let app = App::new(opts);
