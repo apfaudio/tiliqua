@@ -42,11 +42,13 @@ def _parse_rust_constants():
 
 RUST_CONSTANTS           = _parse_rust_constants()
 MANIFEST_MAGIC           = RUST_CONSTANTS['MANIFEST_MAGIC']
+MANIFEST_OFFSET          = RUST_CONSTANTS['MANIFEST_OFFSET']
 MANIFEST_SIZE            = RUST_CONSTANTS['MANIFEST_SIZE']
 N_MANIFESTS              = RUST_CONSTANTS['N_MANIFESTS']
 SLOT_BITSTREAM_BASE      = RUST_CONSTANTS['SLOT_BITSTREAM_BASE']
 SLOT_SIZE                = RUST_CONSTANTS['SLOT_SIZE']
-FLASH_PAGE_SZ            = 0x1000
+FLASH_PAGE_SZ            = RUST_CONSTANTS['FLASH_PAGE_SZ']
+FLASH_SECTOR_SZ          = RUST_CONSTANTS['FLASH_SECTOR_SZ']
 
 class RegionType(StrEnum):
     """Memory region type enum matching the Rust schema"""

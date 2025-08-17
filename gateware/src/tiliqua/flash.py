@@ -31,31 +31,20 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 
-# Flash memory map constants shared with the bootloader
-from rs.manifest.src.lib import (
-    FLASH_PAGE_SZ,
-    RegionType,
-    BitstreamManifest,
-    MemoryRegion,
-    MANIFEST_SIZE,
-    N_MANIFESTS,
-    SLOT_BITSTREAM_BASE,
-    SLOT_SIZE,
-)
+from rs.manifest.src.lib import *
 from tiliqua.archive import ArchiveLoader
-
 
 class SlotLayout:
     """Flash addressing of overall SPI flash, for bootloader and user slots."""
 
-    def __init__(self, slot_number: Optional[int] = None, 
-                 bootloader_bitstream_addr: int = 0x000000,
-                 firmware_base_slot0: int = 0x1B0000,
-                 options_base_addr: int = 0xFD000):
+    def __init__(self, slot_number: Optional[int] = None,
+                 bootloader_bitstream_addr: int = 0x00000,
+                 firmware_base_offset:      int = 0x90000,
+                 options_base_offset:       int = 0xE0000):
         self.slot_number = slot_number  # None = bootloader, int = user slot
         self.bootloader_bitstream_addr = bootloader_bitstream_addr
-        self.firmware_base_slot0 = firmware_base_slot0
-        self.options_base_addr = options_base_addr
+        self.firmware_base_offset = firmware_base_offset
+        self.options_base_offset = options_base_offset
 
     @classmethod
     def for_bootloader(cls) -> 'SlotLayout':
@@ -79,22 +68,22 @@ class SlotLayout:
     @property
     def manifest_addr(self) -> int:
         if self.is_bootloader:
-            return SLOT_BITSTREAM_BASE - MANIFEST_SIZE
+            return MANIFEST_OFFSET
         else:
-            return self.bitstream_addr + SLOT_SIZE - MANIFEST_SIZE
+            return self.bitstream_addr + MANIFEST_OFFSET
 
     @property
     def firmware_base(self) -> int:
         if self.is_bootloader:
             raise ValueError("Bootloader doesn't have firmware base (uses XiP)")
-        return self.firmware_base_slot0 + (self.slot_number * SLOT_SIZE)
+        return self.firmware_base_offset + ((1+self.slot_number) * SLOT_SIZE)
 
     @property
     def options_base(self) -> int:
         if self.is_bootloader:
-            return self.options_base_addr
+            return self.options_base_offset
         else:
-            return self.options_base_addr + ((1+self.slot_number) * SLOT_SIZE)
+            return self.options_base_offset + ((1+self.slot_number) * SLOT_SIZE)
 
     @staticmethod
     def slot_start_addr(slot: int) -> int:
@@ -132,8 +121,8 @@ class FlashableRegion:
 
     @property
     def aligned_size(self) -> int:
-        """Return size aligned up to page boundary."""
-        return (self.size + FLASH_PAGE_SZ - 1) & ~(FLASH_PAGE_SZ - 1)
+        """Return size aligned up to sector boundary."""
+        return (self.size + FLASH_SECTOR_SZ - 1) & ~(FLASH_SECTOR_SZ - 1)
 
     @property
     def end_addr(self) -> int:
@@ -153,30 +142,29 @@ class FlashableRegion:
 
 class FlashCommandGenerator:
     """Generates and executes flash commands."""
-    
+
     def __init__(self, flashable_regions: List[FlashableRegion]):
         self.flashable_regions = sorted(flashable_regions)
-    
-    def generate_commands(self) -> List[List[str]]:
+
+    def generate_commands(self, erase_option_storage: bool = False) -> List[List[str]]:
         """Generate flash commands for all regions."""
         commands = []
-        
         for region in self.flashable_regions:
-            # Skip OptionStorage regions - they don't have actual files to flash
             if region.memory_region.region_type == RegionType.OptionStorage:
+                # Handle OptionStorage regions based on erase_option_storage flag
+                if erase_option_storage:
+                    temp_file = create_erased_file(region.memory_region.size)
+                    commands.append(flash_file(temp_file, region.addr, "raw"))
                 continue
-                
             # Use the pre-calculated file path
             commands.append(flash_file(str(region.file_path), region.addr, "raw"))
-        
         # Add skip-reset flag to all but the last command
         if len(commands) > 1:
             for cmd in commands[:-1]:
                 if "--skip-reset" not in cmd:
                     cmd.insert(-1, "--skip-reset")
-        
         return commands
-    
+
     def execute_commands(self, commands: List[List[str]]):
         """Execute all flash commands."""
         print("\nExecuting flash commands...")
@@ -222,33 +210,25 @@ def scan_for_tiliqua():
     print("Check it is turned on, plugged in ('dbg' port), permissions correct, and RP2040 firmware is up to date.")
     sys.exit(1)
 
+
 def promote_to_flashable_regions(loader: ArchiveLoader, slot: Optional[int]) -> List[FlashableRegion]:
     """
     Finalize addresses and promote MemoryRegions to FlashableRegions.
-    
-    Args:
-        loader: ArchiveLoader containing extracted archive and manifest
-        slot: Slot number (None for bootloader, int for user slots)
-    
-    Returns:
-        List of FlashableRegion objects ready for flashing
     """
-    # Finalize addresses using unified function
+
     finalize_addresses(loader, slot)
-    
+
     # Promote regions with finalized addresses
     flashable_regions = []
     manifest = loader.get_manifest()
     tmpdir = loader.get_tmpdir()
-    
+
     for region in manifest.regions:
         if region.spiflash_src is not None:
             file_path = tmpdir / region.filename
             flashable_regions.append(FlashableRegion(region, file_path))
-    
+
     return flashable_regions
-
-
 
 
 def flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str]:
@@ -263,6 +243,22 @@ def flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str
         cmd.extend(["--file-type", file_type])
     cmd.append(file_path)
     return cmd
+
+
+def create_erased_file(size: int) -> str:
+    """
+    Create a temporary file filled with 0xff bytes (erased flash state).
+    This is used to erase sectors because openFPGALoader does not have such a command.
+    """
+    import tempfile
+    fd, path = tempfile.mkstemp(suffix=".erase.bin")
+    try:
+        with os.fdopen(fd, 'wb') as f:
+            f.write(b'\xff' * size)
+    except:
+        os.close(fd)
+        raise
+    return path
 
 def check_region_overlaps(flashable_regions: List[FlashableRegion], slot: Optional[int] = None) -> Tuple[bool, str]:
     """
@@ -296,7 +292,7 @@ def check_region_overlaps(flashable_regions: List[FlashableRegion], slot: Option
     return (False, "")
 
 
-def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = None, noconfirm: bool = False) -> None:
+def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = None, noconfirm: bool = False, erase_option_storage: bool = False) -> None:
     """
     Flash a bitstream archive to the specified slot.
 
@@ -305,6 +301,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
         hw_rev_major: Hardware revision of attached Tiliqua
         slot: Slot number for bootloader-managed bitstreams
         noconfirm: Skip confirmation prompt if True
+        erase_option_storage: Erase option storage regions if True
     """
     # Load and extract archive
     with ArchiveLoader(archive_path) as loader:
@@ -340,7 +337,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
 
         # Generate and execute flash commands
         command_generator = FlashCommandGenerator(flashable_regions)
-        commands = command_generator.generate_commands()
+        commands = command_generator.generate_commands(erase_option_storage)
 
         # Show all commands and get confirmation
         print("\nThe following commands will be executed:")
@@ -391,9 +388,9 @@ def finalize_addresses(loader: ArchiveLoader, slot: Optional[int]) -> None:
                 assert region.spiflash_src is None, "RamLoad region already has spiflash_src set"
                 region.spiflash_src = ramload_base
                 print(f"manifest: region {region.filename}: spiflash_src set to 0x{ramload_base:x}")
-                # Align firmware base to next flash page boundary
+                # Align firmware base to next flash sector boundary
                 ramload_base += region.size
-                ramload_base = (ramload_base + FLASH_PAGE_SZ - 1) & ~(FLASH_PAGE_SZ - 1)
+                ramload_base = (ramload_base + FLASH_SECTOR_SZ - 1) & ~(FLASH_SECTOR_SZ - 1)
 
     # Write updated manifest for user slots
     manifest_path = tmpdir / "manifest.json"
@@ -526,6 +523,7 @@ def main():
     archive_parser.add_argument("archive_path", help="Path to bitstream archive (.tar.gz)")
     archive_parser.add_argument("--slot", type=int, help="Slot number (0-7) for bootloader-managed bitstreams")
     archive_parser.add_argument("--noconfirm", action="store_true", help="Do not ask for confirmation before flashing")
+    archive_parser.add_argument("--erase-option-storage", action="store_true", help="Erase option storage regions in the manifest")
 
     # Status command
     subparsers.add_parser('status', help='Display current bitstream status')
@@ -542,7 +540,7 @@ def main():
             if args.slot is not None and not 0 <= args.slot < N_MANIFESTS:
                 print(f"Error: Slot must be between 0 and {N_MANIFESTS-1}")
                 sys.exit(1)
-            flash_archive(args.archive_path, hw_rev_major, args.slot, args.noconfirm)
+            flash_archive(args.archive_path, hw_rev_major, args.slot, args.noconfirm, args.erase_option_storage)
         case 'status':
             flash_status()
 

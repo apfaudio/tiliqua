@@ -19,6 +19,7 @@ pub trait OptionsPersistence {
     type Error;
 
     fn save_key(&mut self, key: u32, value: &[u8]) -> Result<(), Self::Error>;
+    fn save_key_retries(&mut self, key: u32, value: &[u8], retries: usize) -> Result<(), Self::Error>;
     fn load_key(&mut self, key: u32, buffer: &mut [u8]) -> Result<Option<usize>, Self::Error>;
 
     fn erase_all(&mut self) -> Result<(), Self::Error>;
@@ -59,6 +60,19 @@ where
         )).map_err(|_| PersistenceError::StorageError)
     }
 
+    fn save_key_retries(&mut self, key: u32, value: &[u8], retries: usize) -> Result<(), Self::Error> {
+        let mut result = Ok(());
+        for _ in 0..retries {
+            result = self.save_key(key, value);
+            if result.is_ok() {
+                return result;
+            } else {
+                log::warn!("save_key_retries: failed once with {:?}", result);
+            }
+        }
+        return result;
+    }
+
     fn load_key(&mut self, key: u32, buffer: &mut [u8]) -> Result<Option<usize>, Self::Error> {
         let item = block_on(fetch_item::<u32, &[u8], _>(
             &mut self.flash,
@@ -91,7 +105,7 @@ where
             if let Some(encoded_len) = opt.encode(&mut buf) {
                 log::info!("opts/save: {}={} ({:x}={:?})", 
                           opt.name(), opt.value(), opt.key(), &buf[..encoded_len]);
-                self.save_key(opt.key(), &buf[..encoded_len])?;
+                self.save_key_retries(opt.key(), &buf[..encoded_len], 2)?;
             }
         }
         let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];

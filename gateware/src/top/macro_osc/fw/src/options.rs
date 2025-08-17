@@ -6,8 +6,9 @@ use tiliqua_lib::palette::ColorPalette;
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
-    Scope,
     #[default]
+    Misc,
+    Scope,
     Osc,
     Beam,
     Vector,
@@ -19,6 +20,14 @@ pub enum TriggerMode {
     Always,
     #[default]
     Rising,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[strum(serialize_all = "kebab-case")]
+pub enum PlotType {
+    Vector,
+    #[default]
+    Scope,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
@@ -61,6 +70,18 @@ int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
 int_params!(TimebaseParams<u16>   { step: 128, min: 32, max: 3872 });
 int_params!(TriggerLvlParams<i16> { step: 512, min: -16384, max: 16384 });
 int_params!(YPosParams<i16>       { step: 25, min: -500, max: 500 });
+
+button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
+
+#[derive(OptionPage, Clone)]
+pub struct MiscOpts {
+    #[option]
+    pub plot_type: EnumOption<PlotType>,
+    #[option(false)]
+    pub save_opts: ButtonOption<OneShotButtonParams>,
+    #[option(false)]
+    pub wipe_opts: ButtonOption<OneShotButtonParams>,
+}
 
 #[derive(OptionPage, Clone)]
 pub struct OscOpts {
@@ -123,6 +144,8 @@ pub struct ScopeOpts {
 #[derive(Options, Clone, Default)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
+    #[page(Page::Misc)]
+    pub misc: MiscOpts,
     #[page(Page::Scope)]
     pub scope: ScopeOpts,
     #[page(Page::Osc)]

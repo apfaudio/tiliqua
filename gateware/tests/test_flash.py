@@ -138,7 +138,7 @@ class TestFlashCommandGenerator(unittest.TestCase):
             self.assertIn("top.bit", " ".join(commands[0]))
             
             # Check firmware command (should be at firmware base for slot 2)
-            self.assertIn("0x3b0000", commands[1])
+            self.assertIn("0x390000", commands[1])
             self.assertIn("--skip-reset", commands[1])
             self.assertIn("firmware.bin", " ".join(commands[1]))
             

@@ -732,8 +732,7 @@ fn main() -> ! {
     let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
     for n in 0usize..N_MANIFESTS {
         let size: usize = MANIFEST_SIZE;
-        let manifest_first = SPIFLASH_BASE + SLOT_BITSTREAM_BASE;
-        let addr: usize = manifest_first + (n+1)*SLOT_SIZE - size;
+        let addr: usize = SPIFLASH_BASE + MANIFEST_OFFSET + (n+1)*SLOT_SIZE;
         info!("(entry {}) look for manifest from {:#x} to {:#x}", n, addr, addr+size);
         manifests[n] = BitstreamManifest::from_addr(addr, size);
     }

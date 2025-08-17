@@ -16,12 +16,14 @@ use heapless::{String, Vec};
 use serde::{Deserialize, Serialize};
 use log::info;
 
+pub const FLASH_PAGE_SZ: u32         = 0x1000;
+pub const FLASH_SECTOR_SZ: u32       = 0x10000;
 pub const MANIFEST_MAGIC: u32        = 0xFEEDBEEF;
 pub const N_MANIFESTS: usize         = 8;
 pub const SLOT_BITSTREAM_BASE: usize = 0x100000; // First user slot starts here
 pub const SLOT_SIZE: usize           = 0x100000; // Spacing between user slots
-pub const MANIFEST_SIZE: usize       = 4096;     // Each manifest starts at:
-                                                 // SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
+pub const MANIFEST_OFFSET: usize     = 0xF0000;
+pub const MANIFEST_SIZE: usize       = 0x1000;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum RegionType {

@@ -200,7 +200,21 @@ fn main() -> ! {
 
     unsafe { HEAP.init(HEAP_START, HEAP_SIZE) }
 
-    let opts = Opts::default();
+    /* SPI FLASH */
+    let spiflash = SPIFlash0::new(
+        peripherals.SPIFLASH_CTRL,
+        SPIFLASH_BASE,
+        SPIFLASH_SZ_BYTES
+    );
+    use opts::persistence::{FlashOptionsPersistence, OptionsPersistence};
+
+    /* LOAD OPTIONS */
+    let mut opts = Opts::default();
+    let mut flash_persist = FlashOptionsPersistence::new(
+        spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
+
+    flash_persist.load_options(&mut opts).unwrap();
+
     let mut last_palette = opts.beam.palette.value;
     let app = App::new(opts);
     let app = Mutex::new(RefCell::new(app));
@@ -272,9 +286,11 @@ fn main() -> ! {
             // to copy out the current state of application options.
             //
 
-            let (opts, draw_options) = critical_section::with(|cs| {
-                let ui = &app.borrow_ref(cs).ui;
-                (ui.opts.clone(), ui.draw()) 
+            let (opts, draw_options, save_opts, wipe_opts) = critical_section::with(|cs| {
+                let mut app = app.borrow_ref_mut(cs);
+                let save_opts = app.ui.opts.misc.save_opts.poll();
+                let wipe_opts = app.ui.opts.misc.wipe_opts.poll();
+                (app.ui.opts.clone(), app.ui.draw(), save_opts, wipe_opts)
             });
 
             if opts.beam.palette.value != last_palette || first {
@@ -286,6 +302,18 @@ fn main() -> ! {
                 draw::draw_options(&mut display, &opts, h_active-175, v_active/2-50, opts.beam.hue.value).ok();
                 draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.hue.value,
                                 &bootinfo.manifest.name, &bootinfo.manifest.sha, &modeline).ok();
+            }
+
+            if save_opts {
+                flash_persist.save_options(&opts).unwrap();
+            }
+
+            if wipe_opts {
+                critical_section::with(|cs| {
+                    let mut app = app.borrow_ref_mut(cs);
+                    app.ui.opts = Opts::default();
+                    flash_persist.erase_all().unwrap();
+                });
             }
 
             persist.set_persist(opts.beam.persist.value);
@@ -312,16 +340,14 @@ fn main() -> ! {
             }
 
 
-            if opts.tracker.page.value == Page::Vector {
+            if opts.misc.plot_type.value == PlotType::Vector {
                 scope.flags().write(
                     |w| w.enable().bit(false) );
                 vscope.flags().write(
                     |w| { w.enable().bit(true);
                           w.rotate_left().bit(modeline.rotate == Rotate::Left)
                     } );
-            }
-
-            if opts.tracker.page.value == Page::Scope || first {
+            } else {
                 scope.flags().write(
                     |w| { w.enable().bit(true);
                           w.rotate_left().bit(modeline.rotate == Rotate::Left);
