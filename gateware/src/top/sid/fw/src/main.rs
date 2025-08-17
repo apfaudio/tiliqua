@@ -24,6 +24,7 @@ use embedded_graphics::{
 };
 
 use options::Opts;
+use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
 
 use micromath::F32Ext;
@@ -179,6 +180,11 @@ fn main() -> ! {
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
+    let spiflash = SPIFlash0::new(
+        peripherals.SPIFLASH_CTRL,
+        SPIFLASH_BASE,
+        SPIFLASH_SZ_BYTES
+    );
 
     tiliqua_fw::handlers::logger_init(serial);
 
@@ -198,7 +204,19 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = options::Opts::default();
+    //
+    // Create options and maybe load from persistent storage
+    //
+
+    let mut opts = options::Opts::default();
+    let mut flash_persist = FlashOptionsPersistence::new(
+        spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
+    flash_persist.load_options(&mut opts).unwrap();
+
+    //
+    // Create App instance
+    //
+
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 5u8;
 
@@ -220,9 +238,24 @@ fn main() -> ! {
         let v_active = display.size().height;
 
         loop {
-            let opts = critical_section::with(|cs| {
-                app.borrow_ref(cs).ui.opts.clone()
+            let (opts, save_opts, wipe_opts) = critical_section::with(|cs| {
+                let mut app = app.borrow_ref_mut(cs);
+                let save_opts = app.ui.opts.misc.save_opts.poll();
+                let wipe_opts = app.ui.opts.misc.wipe_opts.poll();
+                (app.ui.opts.clone(), save_opts, wipe_opts)
             });
+
+            if save_opts {
+                flash_persist.save_options(&opts).unwrap();
+            }
+
+            if wipe_opts {
+                critical_section::with(|cs| {
+                    let mut app = app.borrow_ref_mut(cs);
+                    app.ui.opts = options::Opts::default();
+                    flash_persist.erase_all().unwrap();
+                });
+            }
 
             // Draw UI elements
             draw::draw_options(&mut display, &opts, 100, v_active/2, hue).ok();

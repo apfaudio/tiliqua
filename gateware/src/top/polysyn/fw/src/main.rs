@@ -25,6 +25,7 @@ use tiliqua_hal::pmod::EurorackPmod;
 
 use embedded_graphics::prelude::*;
 
+use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
 use hal::dma_framebuffer::Rotate;
 
@@ -55,7 +56,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             // Blink MIDI activity LED on TRS port
             app.ui.midi_activity();
             // Optionally dump raw MIDI messages out serial port.
-            if opts.usb.serial_debug.value == UsbMidiSerialDebug::On {
+            if opts.misc.serial_debug.value == UsbMidiSerialDebug::On {
                 info!("midi: 0x{:x} 0x{:x} 0x{:x}",
                       midi_word&0xff,
                       (midi_word>>8)&0xff,
@@ -108,9 +109,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             }
         }
 
-        app.synth.usb_midi_host(opts.usb.host.value == UsbHost::Enable,
-                                opts.usb.cfg_id.value,
-                                opts.usb.endpt_id.value);
+        app.synth.usb_midi_host(opts.misc.host.value == UsbHost::Enable,
+                                opts.misc.cfg_id.value,
+                                opts.misc.endpt_id.value);
     });
 }
 
@@ -154,6 +155,11 @@ fn main() -> ! {
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
+    let spiflash = SPIFlash0::new(
+        peripherals.SPIFLASH_CTRL,
+        SPIFLASH_BASE,
+        SPIFLASH_SZ_BYTES
+    );
     crate::handlers::logger_init(serial);
 
     info!("Hello from Tiliqua POLYSYN!");
@@ -176,7 +182,19 @@ fn main() -> ! {
     let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
     let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
 
-    let opts = Opts::default();
+    //
+    // Create options and maybe load from persistent storage
+    //
+
+    let mut opts = Opts::default();
+    let mut flash_persist = FlashOptionsPersistence::new(
+        spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
+    flash_persist.load_options(&mut opts).unwrap();
+
+    //
+    // Create App instance
+    //
+
     let mut last_palette = opts.beam.palette.value.clone();
     let app = Mutex::new(RefCell::new(App::new(opts)));
 
@@ -200,18 +218,34 @@ fn main() -> ! {
         loop {
 
 
-            let (opts, notes, cutoffs, draw_options) = critical_section::with(|cs| {
-                let app = app.borrow_ref(cs);
+            let (opts, notes, cutoffs, draw_options, save_opts, wipe_opts) = critical_section::with(|cs| {
+                let mut app = app.borrow_ref_mut(cs);
                 if pmod.jack() != last_jack {
                     // Re-calibrate touch sensing on jack swaps.
                     let _ = cy8.reset();
                 }
                 last_jack = pmod.jack();
+                let save_opts = app.ui.opts.misc.save_opts.poll();
+                let wipe_opts = app.ui.opts.misc.wipe_opts.poll();
                 (app.ui.opts.clone(),
                  app.synth.voice_notes().clone(),
                  app.synth.voice_cutoffs().clone(),
-                 app.ui.draw())
+                 app.ui.draw(),
+                 save_opts,
+                 wipe_opts)
             });
+
+            if save_opts {
+                flash_persist.save_options(&opts).unwrap();
+            }
+
+            if wipe_opts {
+                critical_section::with(|cs| {
+                    let mut app = app.borrow_ref_mut(cs);
+                    app.ui.opts = Opts::default();
+                    flash_persist.erase_all().unwrap();
+                });
+            }
 
             let help_screen: bool = opts.tracker.page.value == Page::Help;
 

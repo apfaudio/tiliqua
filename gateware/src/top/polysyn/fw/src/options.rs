@@ -12,7 +12,7 @@ pub enum Page {
     Poly,
     Beam,
     Vector,
-    Usb,
+    Misc,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
@@ -51,6 +51,8 @@ int_params!(XScaleParams<u8>      { step: 1, min: 0, max: 15 });
 int_params!(YScaleParams<u8>      { step: 1, min: 0, max: 15 });
 int_params!(CfgIdParams<u8>       { step: 1, min: 1, max: 15 });
 int_params!(EndptIdParams<u8>     { step: 1, min: 1, max: 15 });
+
+button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
 
 #[derive(OptionPage, Clone)]
 pub struct HelpOpts {
@@ -93,7 +95,7 @@ pub struct BeamOpts {
 }
 
 #[derive(OptionPage, Clone)]
-pub struct UsbOpts {
+pub struct MiscOpts {
     #[option]
     pub host: EnumOption<UsbHost>,
     #[option(1)]
@@ -102,6 +104,10 @@ pub struct UsbOpts {
     pub endpt_id: IntOption<EndptIdParams>,
     #[option]
     pub serial_debug: EnumOption<UsbMidiSerialDebug>,
+    #[option(false)]
+    pub save_opts: ButtonOption<OneShotButtonParams>,
+    #[option(false)]
+    pub wipe_opts: ButtonOption<OneShotButtonParams>,
 }
 
 #[derive(Options, Clone, Default)]
@@ -115,6 +121,6 @@ pub struct Opts {
     pub beam: BeamOpts,
     #[page(Page::Vector)]
     pub vector: VectorOpts,
-    #[page(Page::Usb)]
-    pub usb: UsbOpts,
+    #[page(Page::Misc)]
+    pub misc: MiscOpts,
 }

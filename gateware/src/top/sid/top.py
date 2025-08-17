@@ -270,4 +270,4 @@ class SIDSoc(TiliquaSoc):
 
 if __name__ == "__main__":
     this_path = os.path.dirname(os.path.realpath(__file__))
-    top_level_cli(SIDSoc, path=this_path)
+    top_level_cli(SIDSoc, path=this_path, archiver_callback=lambda archiver: archiver.with_option_storage())
