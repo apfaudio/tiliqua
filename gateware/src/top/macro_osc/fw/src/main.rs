@@ -100,6 +100,16 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         app.ui.update();
 
         //
+        // Page/option overrides
+        //
+
+        app.ui.opts.misc.plot_type.value = match app.ui.opts.tracker.page.value {
+            Page::Vector => PlotType::Vector,
+            Page::Scope => PlotType::Scope,
+            _ => app.ui.opts.misc.plot_type.value
+        };
+
+        //
         // Patch settings from UI
         //
 
@@ -323,6 +333,17 @@ fn main() -> ! {
             persist.set_persist(opts.beam.persist.value);
             persist.set_decay(opts.beam.decay.value);
 
+            let timebase_value = match opts.scope.timebase.value {
+                Timebase::Timebase1s    => 12,
+                Timebase::Timebase500ms => 24,
+                Timebase::Timebase250ms => 52,
+                Timebase::Timebase100ms => 128,
+                Timebase::Timebase50ms  => 256,
+                Timebase::Timebase25ms  => 512,
+                Timebase::Timebase10ms  => 1280,
+                Timebase::Timebase5ms   => 2560,
+            };
+
             unsafe {
                 vscope.hue().write(|w| w.hue().bits(opts.beam.hue.value));
                 vscope.intensity().write(|w| w.intensity().bits(opts.beam.intensity.value));
@@ -335,7 +356,7 @@ fn main() -> ! {
                 scope.trigger_lvl().write(|w| w.trigger_level().bits(opts.scope.trig_lvl.value as u16));
                 scope.xscale().write(|w| w.xscale().bits(opts.scope.xscale.value));
                 scope.yscale().write(|w| w.yscale().bits(opts.scope.yscale.value));
-                scope.timebase().write(|w| w.timebase().bits(opts.scope.timebase.value));
+                scope.timebase().write(|w| w.timebase().bits(timebase_value) );
 
                 scope.ypos0().write(|w| w.ypos().bits(opts.scope.ypos0.value as u16));
                 scope.ypos1().write(|w| w.ypos().bits(opts.scope.ypos1.value as u16));

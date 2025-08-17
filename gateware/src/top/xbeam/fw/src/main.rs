@@ -45,6 +45,12 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     critical_section::with(|cs| {
         let mut app = app.borrow_ref_mut(cs);
         app.ui.update();
+        app.ui.opts.misc.plot_type.value = match app.ui.opts.tracker.page.value {
+            Page::Vector => PlotType::Vector,
+            Page::Scope1 => PlotType::Scope,
+            Page::Scope2 => PlotType::Scope,
+            _ => app.ui.opts.misc.plot_type.value
+        };
     });
 }
 

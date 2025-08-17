@@ -7,12 +7,12 @@ use serde_derive::{Serialize, Deserialize};
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     #[default]
-    Misc,
-    Scope1,
-    Scope2,
     Vector,
     Delay,
     Beam,
+    Misc,
+    Scope1,
+    Scope2,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]

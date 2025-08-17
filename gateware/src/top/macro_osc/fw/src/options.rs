@@ -6,10 +6,10 @@ use tiliqua_lib::palette::ColorPalette;
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
-    #[default]
-    Misc,
     Scope,
+    #[default]
     Osc,
+    Misc,
     Beam,
     Vector,
 }
@@ -28,6 +28,28 @@ pub enum PlotType {
     Vector,
     #[default]
     Scope,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[strum(serialize_all = "kebab-case")]
+pub enum Timebase {
+    #[strum(serialize = "1s")]
+    Timebase1s,
+    #[strum(serialize = "500ms")]
+    Timebase500ms,
+    #[strum(serialize = "250ms")]
+    Timebase250ms,
+    #[strum(serialize = "100ms")]
+    Timebase100ms,
+    #[strum(serialize = "50ms")]
+    Timebase50ms,
+    #[strum(serialize = "25ms")]
+    Timebase25ms,
+    #[strum(serialize = "10ms")]
+    Timebase10ms,
+    #[default]
+    #[strum(serialize = "5ms")]
+    Timebase5ms,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
@@ -121,8 +143,8 @@ pub struct BeamOpts {
 
 #[derive(OptionPage, Clone)]
 pub struct ScopeOpts {
-    #[option(2048)]
-    pub timebase: IntOption<TimebaseParams>,
+    #[option]
+    pub timebase: EnumOption<Timebase>,
     #[option]
     pub trig_mode: EnumOption<TriggerMode>,
     #[option(512)]
