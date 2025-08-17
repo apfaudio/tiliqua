@@ -624,6 +624,7 @@ dependencies = [
  "critical-section",
  "embedded-graphics",
  "embedded-hal 1.0.0",
+ "embedded-storage",
  "fastrand",
  "heapless",
  "irq",
