@@ -182,7 +182,7 @@ pub struct ModulateOpts {
     pub in3: EnumOption<ModulationTarget>,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Modulate)]

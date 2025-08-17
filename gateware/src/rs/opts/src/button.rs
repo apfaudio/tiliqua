@@ -17,7 +17,7 @@ pub struct ButtonOption<T: ButtonOptionParams> {
     // value delayed by 1 poll, only used for drawing oneshot
     value_delay1: bool,
     init: bool,
-    key: u32,
+    option_key: OptionKey,
     _phantom: core::marker::PhantomData<T>,
 }
 
@@ -32,7 +32,7 @@ impl<T: ButtonOptionParams> ButtonOption<T> {
             value: init,
             value_delay1: init,
             init,
-            key,
+            option_key: OptionKey::new(key),
             _phantom: core::marker::PhantomData,
         }
     }
@@ -69,8 +69,12 @@ impl<T: ButtonOptionParams> OptionTrait for ButtonOption<T> {
         s
     }
 
-    fn key(&self) -> u32 {
-        self.key
+    fn option_key(&self) -> &OptionKey {
+        &self.option_key
+    }
+
+    fn option_key_mut(&mut self) -> &mut OptionKey {
+        &mut self.option_key
     }
 
     fn tick_up(&mut self) {

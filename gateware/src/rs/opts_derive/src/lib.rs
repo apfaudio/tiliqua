@@ -89,6 +89,10 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
                 #(r.push(&mut self.#option_fields).ok();)*
                 r
             }
+
+            fn set_parent_key(&mut self, parent_key: u32) {
+                #(self.#option_fields.set_parent_key(parent_key);)*
+            }
         }
     };
 
@@ -174,7 +178,35 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
 
     let page_field_names: Vec<_> = page_fields.iter().map(|(field_name, _)| field_name).collect();
 
+    // Generate parent keys for each page field
+    let page_key_assignments = page_fields.iter().map(|(field_name, _page_value)| {
+        let field_name_str = field_name.as_ref().unwrap().to_string();
+        
+        // Generate a hash for the field name
+        let mut fnv: FnvHasher = Default::default();
+        field_name_str.hash(&mut fnv);
+        let parent_key = fnv.finish32();
+        
+        quote! {
+            instance.#field_name.set_parent_key(#parent_key);
+        }
+    });
+
     let expanded = quote! {
+        impl Default for #name {
+            fn default() -> Self {
+                let mut instance = Self {
+                    tracker: Default::default(),
+                    #(#page_field_names: Default::default(),)*
+                };
+                
+                // Set parent keys for each page field
+                #(#page_key_assignments)*
+                
+                instance
+            }
+        }
+
         impl Options for #name {
             fn selected(&self) -> Option<usize> {
                 self.tracker.selected

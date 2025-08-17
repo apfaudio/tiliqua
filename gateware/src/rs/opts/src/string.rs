@@ -8,7 +8,7 @@ use core::str::FromStr;
 pub struct StringOption {
     pub name: &'static str,
     pub value: OptionString,
-    key: u32,
+    option_key: OptionKey,
 }
 
 impl StringOption {
@@ -16,7 +16,7 @@ impl StringOption {
         Self {
             name,
             value: OptionString::from_str(value).unwrap(),
-            key
+            option_key: OptionKey::new(key),
         }
     }
 }
@@ -30,8 +30,12 @@ impl OptionTrait for StringOption {
         self.value.clone()
     }
 
-    fn key(&self) -> u32 {
-        self.key
+    fn option_key(&self) -> &OptionKey {
+        &self.option_key
+    }
+
+    fn option_key_mut(&mut self) -> &mut OptionKey {
+        &mut self.option_key
     }
 
     fn tick_up(&mut self) {

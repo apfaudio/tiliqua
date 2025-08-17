@@ -10,7 +10,7 @@ pub struct EnumOption<T: Copy + IntoEnumIterator + Default> {
     pub name: &'static str,
     pub value: T,
     init: T,
-    key: u32,
+    option_key: OptionKey,
 }
 
 impl<T: Copy + IntoEnumIterator + Default> EnumOption<T> {
@@ -19,7 +19,7 @@ impl<T: Copy + IntoEnumIterator + Default> EnumOption<T> {
             name,
             value,
             init: value,
-            key
+            option_key: OptionKey::new(key),
         }
     }
 }
@@ -43,8 +43,12 @@ where
         String::from_str(self.value.into()).unwrap()
     }
 
-    fn key(&self) -> u32 {
-        self.key
+    fn option_key(&self) -> &OptionKey {
+        &self.option_key
+    }
+
+    fn option_key_mut(&mut self) -> &mut OptionKey {
+        &mut self.option_key
     }
 
     fn tick_up(&mut self) {

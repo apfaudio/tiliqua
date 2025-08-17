@@ -8,6 +8,25 @@ pub type OptionString = String<MAX_OPT_NAME>;
 pub type OptionVec<'a> = Vec<&'a dyn OptionTrait, MAX_OPTS_PER_TAB>;
 pub type OptionVecMut<'a> = Vec<&'a mut dyn OptionTrait, MAX_OPTS_PER_TAB>;
 
+#[derive(Clone, Default)]
+pub struct OptionKey {
+    key: u32,
+}
+
+impl OptionKey {
+    pub fn new(key: u32) -> Self {
+        Self { key }
+    }
+
+    pub fn hash_with(&mut self, other_key: u32) {
+        self.key ^= other_key;
+    }
+
+    pub fn key(&self) -> u32 {
+        self.key
+    }
+}
+
 pub trait OptionTrait {
     fn name(&self) -> &'static str;
     fn value(&self) -> OptionString;
@@ -16,7 +35,16 @@ pub trait OptionTrait {
     fn percent(&self) -> f32;
     fn n_unique_values(&self) -> usize;
 
-    fn key(&self) -> u32;
+    fn option_key(&self) -> &OptionKey;
+    fn option_key_mut(&mut self) -> &mut OptionKey;
+    
+    fn set_parent_key(&mut self, parent_key: u32) {
+        self.option_key_mut().hash_with(parent_key);
+    }
+    
+    fn key(&self) -> u32 {
+        self.option_key().key()
+    }
     fn encode(&self, buf: &mut [u8]) -> Option<usize>;
     fn decode(&mut self, buf: &[u8]) -> bool;
     
@@ -27,6 +55,7 @@ pub trait OptionTrait {
 pub trait OptionPage {
     fn options(&self) -> OptionVec<'_>;
     fn options_mut(&mut self) -> OptionVecMut<'_>;
+    fn set_parent_key(&mut self, parent_key: u32);
 }
 
 pub trait Options {

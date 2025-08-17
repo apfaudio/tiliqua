@@ -15,7 +15,7 @@ pub struct FloatOption<T: FloatOptionParams> {
     name: &'static str,
     pub value: T::Value,
     init: T::Value,
-    key: u32,
+    option_key: OptionKey,
 }
 
 pub trait FloatOptionParams {
@@ -32,7 +32,7 @@ impl<T: FloatOptionParams> FloatOption<T> {
             name,
             value,
             init: value,
-            key
+            option_key: OptionKey::new(key),
         }
     }
 }
@@ -70,8 +70,12 @@ where
         s
     }
 
-    fn key(&self) -> u32 {
-        self.key
+    fn option_key(&self) -> &OptionKey {
+        &self.option_key
+    }
+
+    fn option_key_mut(&mut self) -> &mut OptionKey {
+        &mut self.option_key
     }
 
     fn tick_up(&mut self) {
