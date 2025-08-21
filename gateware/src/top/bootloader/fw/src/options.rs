@@ -29,7 +29,7 @@ pub struct BootOpts {
     pub slot7: StringOption,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Boot)]

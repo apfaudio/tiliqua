@@ -163,7 +163,7 @@ pub struct ScopeOpts {
     pub xscale: IntOption<XScaleParams>,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Misc)]

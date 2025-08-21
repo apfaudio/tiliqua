@@ -110,7 +110,7 @@ pub struct MiscOpts {
     pub wipe_opts: ButtonOption<OneShotButtonParams>,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Help)]

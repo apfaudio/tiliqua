@@ -6,11 +6,11 @@ use serde_derive::{Serialize, Deserialize};
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
-    #[default]
     Vector,
     Delay,
     Beam,
     Misc,
+    #[default]
     Scope1,
     Scope2,
 }
@@ -173,7 +173,7 @@ pub struct ScopeOpts2 {
     pub ypos3: IntOption<PosParams>,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Misc)]

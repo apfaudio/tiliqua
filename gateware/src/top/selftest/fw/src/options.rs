@@ -81,7 +81,7 @@ pub struct CalOpts {
     pub scale3: IntOption<CalTweakerParams>,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Report)]
