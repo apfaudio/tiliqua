@@ -3,6 +3,7 @@ use heapless::Vec;
 
 pub const MAX_OPTS_PER_TAB: usize = 16;
 pub const MAX_OPT_NAME:     usize = 32;
+pub const MAX_N_OPTS:       usize = 128;
 
 pub type OptionString = String<MAX_OPT_NAME>;
 pub type OptionVec<'a> = Vec<&'a dyn OptionTrait, MAX_OPTS_PER_TAB>;
@@ -39,7 +40,7 @@ pub trait OptionTrait {
     fn key_mut(&mut self) -> &mut OptionKey;
     fn encode(&self, buf: &mut [u8]) -> Option<usize>;
     fn decode(&mut self, buf: &[u8]) -> bool;
-    
+
     /// Handle button press (toggle_modify). Returns true if handled, false otherwise.
     fn button_press(&mut self) -> bool { false }
 }
@@ -62,6 +63,23 @@ pub trait Options {
     fn view_mut(&mut self) -> &mut dyn OptionPage;
     fn page_mut(&mut self) -> &mut dyn OptionTrait;
     fn all_mut(&mut self) -> impl Iterator<Item = &mut dyn OptionTrait>;
+
+    /// Validates that all option keys are unique (no key collisions)
+    /// Returns Err with the colliding key if any duplicates are found
+    fn validate_keys_panic_on_failure(&self) {
+        use heapless::Vec;
+        let mut keys: Vec<u32, MAX_N_OPTS> = Vec::new();
+        for opt in self.all() {
+            let key = opt.key().value();
+            for &existing_key in &keys {
+                if existing_key == key {
+                    panic!("validate_keys: option key collision! name={} key=0x{:08x}",
+                           opt.name(), key);
+                }
+            }
+            keys.push(key).expect("validate_keys: Number of options exceeds MAX_N_OPTS");
+        }
+    }
 }
 
 pub trait OptionsEncoderInterface {

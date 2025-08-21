@@ -61,6 +61,7 @@ fn panic(panic_info: &PanicInfo) -> ! {
     } else {
         error!("panic(): no location information");
     }
+    error!("{:?}", panic_info.message());
     loop {}
 }
 
