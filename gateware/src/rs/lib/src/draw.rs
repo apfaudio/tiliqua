@@ -670,7 +670,7 @@ mod test_data {
         pub palette: EnumOption<palette::ColorPalette>,
     }
 
-    #[derive(Options, Clone, Default)]
+    #[derive(Options, Clone)]
     pub struct Opts {
         pub tracker: ScreenTracker<Page>,
         #[page(Page::Scope)]

@@ -57,7 +57,7 @@ mod tests {
         pub ypos4: IntOption<PositionParams>,
     }
 
-    #[derive(Options, Clone, Default)]
+    #[derive(Options, Clone)]
     pub struct Opts {
         pub tracker: ScreenTracker<Page>,
         #[page(Page::Scope)]
@@ -77,7 +77,7 @@ mod tests {
             info!("[n={}, v={}]",
                   opt.name(), opt.value());
             info!("\t\t(key={}, n={:?}, buf={:?})",
-                  opt.key(), n, buf);
+                  opt.key().value(), n, buf);
         }
 
         opts.tick_up();       // First option on page
@@ -98,13 +98,13 @@ mod tests {
             info!("[n={}, v={}]",
                   opt.name(), opt.value());
             info!("\t\t(key={}, n={:?}, buf={:?})",
-                  opt.key(), n, buf);
+                  opt.key().value(), n, buf);
             if let Some(ix) = n {
                 // Simulate flash lookup (second loop is not needed by the flash
                 // lookup cache, but its a simple way of checking the behavior).
                 info!("\t\t\t** modified option, push to opts2");
                 for opt2 in opts2.all_mut() {
-                    if opt2.key() == opt.key() {
+                    if opt2.key().value() == opt.key().value() {
                         assert!(opt2.decode(&buf[..ix]));
                         info!("\t\t\t** opt2 [n={}, v={}]",
                               opt2.name(), opt2.value());
