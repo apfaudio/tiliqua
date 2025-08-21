@@ -22,7 +22,7 @@ impl OptionKey {
         self.key ^= other_key;
     }
 
-    pub fn key(&self) -> u32 {
+    pub fn value(&self) -> u32 {
         self.key
     }
 }
@@ -35,16 +35,8 @@ pub trait OptionTrait {
     fn percent(&self) -> f32;
     fn n_unique_values(&self) -> usize;
 
-    fn option_key(&self) -> &OptionKey;
-    fn option_key_mut(&mut self) -> &mut OptionKey;
-    
-    fn set_parent_key(&mut self, parent_key: u32) {
-        self.option_key_mut().hash_with(parent_key);
-    }
-    
-    fn key(&self) -> u32 {
-        self.option_key().key()
-    }
+    fn key(&self) -> &OptionKey;
+    fn key_mut(&mut self) -> &mut OptionKey;
     fn encode(&self, buf: &mut [u8]) -> Option<usize>;
     fn decode(&mut self, buf: &[u8]) -> bool;
     

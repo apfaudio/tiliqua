@@ -91,7 +91,7 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
             }
 
             fn set_parent_key(&mut self, parent_key: u32) {
-                #(self.#option_fields.set_parent_key(parent_key);)*
+                #(self.#option_fields.key_mut().hash_with(parent_key);)*
             }
         }
     };

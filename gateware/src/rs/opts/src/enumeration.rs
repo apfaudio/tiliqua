@@ -43,11 +43,11 @@ where
         String::from_str(self.value.into()).unwrap()
     }
 
-    fn option_key(&self) -> &OptionKey {
+    fn key(&self) -> &OptionKey {
         &self.option_key
     }
 
-    fn option_key_mut(&mut self) -> &mut OptionKey {
+    fn key_mut(&mut self) -> &mut OptionKey {
         &mut self.option_key
     }
 

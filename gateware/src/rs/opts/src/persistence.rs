@@ -104,8 +104,8 @@ where
             let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
             if let Some(encoded_len) = opt.encode(&mut buf) {
                 log::info!("opts/save: {}={} ({:x}={:?})", 
-                          opt.name(), opt.value(), opt.key(), &buf[..encoded_len]);
-                self.save_key_retries(opt.key(), &buf[..encoded_len], 2)?;
+                          opt.name(), opt.value(), opt.key().value(), &buf[..encoded_len]);
+                self.save_key_retries(opt.key().value(), &buf[..encoded_len], 2)?;
             }
         }
         let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
@@ -118,10 +118,10 @@ where
     fn load_options<O: Options>(&mut self, opts: &mut O) -> Result<(), Self::Error> {
         for opt in opts.all_mut() {
             let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
-            if let Some(len) = self.load_key(opt.key(), &mut buf)? {
+            if let Some(len) = self.load_key(opt.key().value(), &mut buf)? {
                 opt.decode(&buf[..len]);
                 log::info!("opts/load: {}={} ({:x}={:?})", 
-                          opt.name(), opt.value(), opt.key(), &buf[..len]);
+                          opt.name(), opt.value(), opt.key().value(), &buf[..len]);
             }
         }
         let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
