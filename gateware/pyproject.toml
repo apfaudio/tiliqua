@@ -3,7 +3,7 @@ name = "tiliqua"
 version = "0.0.0"
 description = "Tiliqua DSP library and reference designs."
 
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "amaranth[builtin-yosys]==0.5.4",
     "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards@main",
@@ -11,11 +11,11 @@ dependencies = [
     "amaranth-stdio @ git+https://github.com/amaranth-lang/amaranth-stdio@main",
     "luna-usb @ git+https://github.com/greatscottgadgets/luna@main",
     "minerva @ git+https://github.com/minerva-cpu/minerva@main",
-    "luna-soc @ git+https://github.com/vk2seb/luna-soc@b8a1c2",
+    "luna-soc @ git+https://github.com/vk2seb/luna-soc@6ec272",
     "scipy>=1.9.3",
     "matplotlib>=3.9.0",
     "parameterized>=0.9.0",
-    "yowasp-yosys",
+    "yowasp-yosys==0.52.0.0.post894",
     "yowasp-nextpnr-ecp5",
     "gitpython>=3.1.43",
     "dataclasses-json>=0.6.7",
