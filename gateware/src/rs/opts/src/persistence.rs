@@ -13,7 +13,6 @@ pub enum PersistenceError {
     StorageError,
     SerializationError,
     FlashRangeError,
-    KeyCollision(u32),
 }
 
 pub trait OptionsPersistence {
@@ -26,7 +25,6 @@ pub trait OptionsPersistence {
     fn erase_all(&mut self) -> Result<(), Self::Error>;
     fn load_options<O: Options>(&mut self, opts: &mut O) -> Result<(), Self::Error>;
     fn save_options<O: Options>(&mut self, opts: &O) -> Result<(), Self::Error>;
-    fn validate_options<O: Options>(&self, opts: &O) -> Result<(), Self::Error>;
 }
 
 pub struct FlashOptionsPersistence<F> {
@@ -130,39 +128,6 @@ where
         if let Some(len) = self.load_key(DEFAULT_PAGE_KEY, &mut buf)? {
             opts.page_mut().decode(&buf[..len]);
         }
-        Ok(())
-    }
-
-    fn validate_options<O: Options>(&self, opts: &O) -> Result<(), Self::Error> {
-        use heapless::Vec;
-        
-        // Collect all keys into a small buffer - should be enough for most option sets
-        let mut keys: Vec<u32, 64> = Vec::new();
-        
-        // Collect all option keys
-        for opt in opts.all() {
-            let key = opt.key();
-            // Check if we've seen this key before
-            for &existing_key in &keys {
-                if existing_key == key {
-                    log::error!("Key collision detected: duplicate key 0x{:x}", key);
-                    return Err(PersistenceError::KeyCollision(key));
-                }
-            }
-            // Add to our seen keys (ignore if buffer is full - we'll catch major issues)
-            keys.push(key).ok();
-        }
-        
-        // Also check the page key doesn't collide
-        let page_key = DEFAULT_PAGE_KEY;
-        for &existing_key in &keys {
-            if existing_key == page_key {
-                log::error!("Page key collision detected: page key 0x{:x} conflicts with option key", page_key);
-                return Err(PersistenceError::KeyCollision(page_key));
-            }
-        }
-        
-        log::info!("Options validation passed: {} unique keys", keys.len());
         Ok(())
     }
 }

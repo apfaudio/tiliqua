@@ -20,7 +20,6 @@ pub mod persist;
 pub mod cy8cmbr3xxx;
 pub mod spiflash;
 pub mod eeprom;
-pub mod dummy;
 
 pub use embedded_hal as hal;
 pub use embedded_hal_nb as hal_nb;
