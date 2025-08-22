@@ -180,7 +180,7 @@ def scan_for_tiliqua():
     print("Scan for Tiliqua...")
     try:
         result = subprocess.run(
-            ["sudo", "openFPGALoader", "--scan-usb"],
+            ["openFPGALoader", "--scan-usb"],
             capture_output=True,
             text=True,
             check=True
@@ -191,13 +191,16 @@ def scan_for_tiliqua():
         sys.exit(1)
     print(output)
     lines = output.strip().split('\n')
-    data_lines = [line for line in lines if line and not line.startswith("Bus")]
-    for line in data_lines:
+    for line in lines:
         if "apfbug" in line.lower() or "apf.audio" in line.lower():
-            parts = re.split(r'\s{2,}', line.strip())
-            if len(parts) >= 5:
-                serial = parts[3].strip()
-                product = parts[4].strip()
+            # Extract serial (16-char hex string) and product (contains "Tiliqua R#")
+            serial_match = re.search(r'\b([A-F0-9]{16})\b', line)
+            product_match = re.search(r'(Tiliqua\s+R\d+[^$]*)', line, re.IGNORECASE)
+            
+            if serial_match and product_match:
+                serial = serial_match.group(1)
+                product = product_match.group(1).strip()
+                
                 hw_version_match = re.search(r'R(\d+)', product)
                 if hw_version_match:
                     hw_version = int(hw_version_match.group(1))
@@ -236,7 +239,7 @@ def flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str
     Generate an openFPGALoader command to flash a file to the specified offset.
     """
     cmd = [
-        "sudo", "openFPGALoader", "-c", "dirtyJtag",
+        "openFPGALoader", "-c", "dirtyJtag",
         "-f", "-o", f"{hex(offset)}",
     ]
     if file_type != "auto":
@@ -416,7 +419,7 @@ def read_flash_segment(offset: int, size: int, reset: bool = False) -> bytes:
         temp_file_name = tmp_file.name
 
     cmd = [
-        "sudo", "openFPGALoader", "-c", "dirtyJtag",
+        "openFPGALoader", "-c", "dirtyJtag",
         "--dump-flash", "-o", f"{hex(offset)}",
         "--file-size", str(size),
     ]
