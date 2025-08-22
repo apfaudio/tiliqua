@@ -422,6 +422,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                                 unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
                                     w.enable().bit(false)
                                 );
+                                riscv::asm::delay(10_000_000);
                                 configure_external_pll(&pll_config, pll).or(
                                     Err(BitstreamError::PllI2cError))?;
                             } else {
