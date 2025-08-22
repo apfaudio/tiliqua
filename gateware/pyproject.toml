@@ -22,6 +22,7 @@ dependencies = [
     "fastcrc>=0.3.2",
     "portalocker>=3.1.1",
     "apollo-fpga>=1.1.1",
+    "pytest-xdist>=3.8.0",
 ]
 
 [tool.pdm.dev-dependencies]
@@ -53,7 +54,7 @@ bootstub           = "src/top/bootstub/top.py"
 usb_audio          = "src/top/usb_audio/top.py"
 usb_host           = "src/top/usb_host/top.py"
 # Additional utilities
-test               = { cmd = "pytest tests/" }
+test               = { cmd = "pytest -n auto tests/" }
 colors_vectorscope = { call = "top.vectorscope_no_soc.top:colors()" }
 # Documentation
 document.cmd = "sphinx-build docs/ docs/_build/ -W --keep-going"
