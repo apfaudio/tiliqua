@@ -19,6 +19,7 @@ use tiliqua_lib::*;
 use pac::constants::*;
 use tiliqua_hal::persist::Persist;
 use options::*;
+use opts::persistence::*;
 use hal::pca9635::*;
 use hal::dma_framebuffer::Rotate;
 
@@ -99,6 +100,16 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         app.ui.update();
 
         //
+        // Page/option overrides
+        //
+
+        app.ui.opts.misc.plot_type.value = match app.ui.opts.tracker.page.value {
+            Page::Vector => PlotType::Vector,
+            Page::Scope => PlotType::Scope,
+            _ => app.ui.opts.misc.plot_type.value
+        };
+
+        //
         // Patch settings from UI
         //
 
@@ -173,10 +184,15 @@ fn main() -> ! {
     let sysclk = pac::clock::sysclk();
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
+    let spiflash = SPIFlash0::new(
+        peripherals.SPIFLASH_CTRL,
+        SPIFLASH_BASE,
+        SPIFLASH_SZ_BYTES
+    );
 
     info!("Hello from Tiliqua MACRO-OSCILLATOR!");
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = DMAFramebuffer0::new(
@@ -200,7 +216,19 @@ fn main() -> ! {
 
     unsafe { HEAP.init(HEAP_START, HEAP_SIZE) }
 
-    let opts = Opts::default();
+    //
+    // Create options and maybe load from persistent storage
+    //
+
+    let mut opts = Opts::default();
+    let mut flash_persist = FlashOptionsPersistence::new(
+        spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
+    flash_persist.load_options(&mut opts).unwrap();
+
+    //
+    // Create App instance
+    //
+
     let mut last_palette = opts.beam.palette.value;
     let app = App::new(opts);
     let app = Mutex::new(RefCell::new(app));
@@ -272,9 +300,11 @@ fn main() -> ! {
             // to copy out the current state of application options.
             //
 
-            let (opts, draw_options) = critical_section::with(|cs| {
-                let ui = &app.borrow_ref(cs).ui;
-                (ui.opts.clone(), ui.draw()) 
+            let (opts, draw_options, save_opts, wipe_opts) = critical_section::with(|cs| {
+                let mut app = app.borrow_ref_mut(cs);
+                let save_opts = app.ui.opts.misc.save_opts.poll();
+                let wipe_opts = app.ui.opts.misc.wipe_opts.poll();
+                (app.ui.opts.clone(), app.ui.draw(), save_opts, wipe_opts)
             });
 
             if opts.beam.palette.value != last_palette || first {
@@ -288,8 +318,31 @@ fn main() -> ! {
                                 &bootinfo.manifest.name, &bootinfo.manifest.sha, &modeline).ok();
             }
 
+            if save_opts {
+                flash_persist.save_options(&opts).unwrap();
+            }
+
+            if wipe_opts {
+                critical_section::with(|cs| {
+                    let mut app = app.borrow_ref_mut(cs);
+                    app.ui.opts = Opts::default();
+                    flash_persist.erase_all().unwrap();
+                });
+            }
+
             persist.set_persist(opts.beam.persist.value);
             persist.set_decay(opts.beam.decay.value);
+
+            let timebase_value = match opts.scope.timebase.value {
+                Timebase::Timebase1s    => 12,
+                Timebase::Timebase500ms => 24,
+                Timebase::Timebase250ms => 52,
+                Timebase::Timebase100ms => 128,
+                Timebase::Timebase50ms  => 256,
+                Timebase::Timebase25ms  => 512,
+                Timebase::Timebase10ms  => 1280,
+                Timebase::Timebase5ms   => 2560,
+            };
 
             unsafe {
                 vscope.hue().write(|w| w.hue().bits(opts.beam.hue.value));
@@ -303,7 +356,7 @@ fn main() -> ! {
                 scope.trigger_lvl().write(|w| w.trigger_level().bits(opts.scope.trig_lvl.value as u16));
                 scope.xscale().write(|w| w.xscale().bits(opts.scope.xscale.value));
                 scope.yscale().write(|w| w.yscale().bits(opts.scope.yscale.value));
-                scope.timebase().write(|w| w.timebase().bits(opts.scope.timebase.value));
+                scope.timebase().write(|w| w.timebase().bits(timebase_value) );
 
                 scope.ypos0().write(|w| w.ypos().bits(opts.scope.ypos0.value as u16));
                 scope.ypos1().write(|w| w.ypos().bits(opts.scope.ypos1.value as u16));
@@ -312,16 +365,14 @@ fn main() -> ! {
             }
 
 
-            if opts.tracker.page.value == Page::Vector {
+            if opts.misc.plot_type.value == PlotType::Vector {
                 scope.flags().write(
                     |w| w.enable().bit(false) );
                 vscope.flags().write(
                     |w| { w.enable().bit(true);
                           w.rotate_left().bit(modeline.rotate == Rotate::Left)
                     } );
-            }
-
-            if opts.tracker.page.value == Page::Scope || first {
+            } else {
                 scope.flags().write(
                     |w| { w.enable().bit(true);
                           w.rotate_left().bit(modeline.rotate == Rotate::Left);

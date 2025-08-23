@@ -17,10 +17,12 @@ macro_rules! impl_encoder {
                 rot: i16,
                 lrot: i16,
                 lbtn: bool,
+                btn_held: u16,
 
                 pending_ticks: i8,
                 pending_release: bool,
                 pending_press:   bool,
+
             }
 
             impl $ENCODERX {
@@ -30,12 +32,16 @@ macro_rules! impl_encoder {
                            rot: 0,
                            lrot: 0,
                            lbtn: btn,
+                           btn_held: 0,
                            pending_ticks: 0,
                            pending_release: false,
-                           pending_press: false
+                           pending_press: false,
                     }
                 }
 
+                pub unsafe fn summon() -> Self {
+                    Self::new(<$PACENCODERX>::steal())
+                }
             }
 
             impl hal::encoder::Encoder for $ENCODERX {
@@ -61,6 +67,12 @@ macro_rules! impl_encoder {
                     self.rot += (self.registers.step().read().bits() as i8) as i16;
                     let btn = self.registers.button().read().bits() != 0;
                     let mut delta_ticks = self.rot - self.lrot;
+
+                    if btn {
+                        self.btn_held += 1;
+                    } else {
+                        self.btn_held = 0;
+                    }
 
                     // This logic is dumb. Move it into RTL.
 

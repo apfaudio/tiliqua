@@ -8,13 +8,15 @@ use core::str::FromStr;
 pub struct StringOption {
     pub name: &'static str,
     pub value: OptionString,
+    option_key: OptionKey,
 }
 
 impl StringOption {
-    pub fn new(name: &'static str, value: &str) -> Self {
+    pub fn new(name: &'static str, value: &str, key: u32) -> Self {
         Self {
             name,
             value: OptionString::from_str(value).unwrap(),
+            option_key: OptionKey::new(key),
         }
     }
 }
@@ -26,6 +28,14 @@ impl OptionTrait for StringOption {
 
     fn value(&self) -> OptionString {
         self.value.clone()
+    }
+
+    fn key(&self) -> &OptionKey {
+        &self.option_key
+    }
+
+    fn key_mut(&mut self) -> &mut OptionKey {
+        &mut self.option_key
     }
 
     fn tick_up(&mut self) {
@@ -42,5 +52,13 @@ impl OptionTrait for StringOption {
 
     fn n_unique_values(&self) -> usize {
         1usize
+    }
+
+    fn encode(&self, _buf: &mut [u8]) -> Option<usize> {
+        None
+    }
+
+    fn decode(&mut self, _buf: &[u8]) -> bool {
+        false
     }
 }

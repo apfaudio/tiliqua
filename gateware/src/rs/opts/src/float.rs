@@ -1,5 +1,6 @@
 use heapless::String;
 use core::fmt::Write;
+use serde::{Serialize, Deserialize};
 
 use crate::traits::*;
 
@@ -13,6 +14,8 @@ pub enum FloatFormat {
 pub struct FloatOption<T: FloatOptionParams> {
     name: &'static str,
     pub value: T::Value,
+    init: T::Value,
+    option_key: OptionKey,
 }
 
 pub trait FloatOptionParams {
@@ -24,10 +27,12 @@ pub trait FloatOptionParams {
 }
 
 impl<T: FloatOptionParams> FloatOption<T> {
-    pub fn new(name: &'static str, value: T::Value) -> Self {
+    pub fn new(name: &'static str, value: T::Value, key: u32) -> Self {
         Self {
             name,
             value,
+            init: value,
+            option_key: OptionKey::new(key),
         }
     }
 }
@@ -41,7 +46,9 @@ where
         + core::ops::Div<Output = T::Value>
         + core::ops::Mul<Output = T::Value>
         + core::cmp::PartialOrd
-        + core::fmt::Display,
+        + core::fmt::Display
+        + Serialize
+        + for<'de> Deserialize<'de>,
     f32: From<T::Value>,
     T::Value: From<f32>,
 {
@@ -61,6 +68,14 @@ where
             }
         }
         s
+    }
+
+    fn key(&self) -> &OptionKey {
+        &self.option_key
+    }
+
+    fn key_mut(&mut self) -> &mut OptionKey {
+        &mut self.option_key
     }
 
     fn tick_up(&mut self) {
@@ -87,6 +102,30 @@ where
         let range = T::MAX - T::MIN;
         let steps = range / T::STEP;
         f32::from(steps) as usize + 1
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> Option<usize> {
+        if self.value != self.init {
+            use postcard::to_slice;
+            if let Ok(used) = to_slice(&self.value, buf) {
+                Some(used.len())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn decode(&mut self, buf: &[u8]) -> bool {
+        use postcard::from_bytes;
+        if let Ok(v) = from_bytes::<T::Value>(buf) {
+            self.value = v;
+            self.init = v;
+            true
+        } else {
+            false
+        }
     }
 }
 

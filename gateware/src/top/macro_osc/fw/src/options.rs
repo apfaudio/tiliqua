@@ -1,18 +1,20 @@
 use opts::*;
 use strum_macros::{EnumIter, IntoStaticStr};
+use serde_derive::{Serialize, Deserialize};
 use tiliqua_lib::palette::ColorPalette;
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     Scope,
     #[default]
     Osc,
+    Misc,
     Beam,
     Vector,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TriggerMode {
     Always,
@@ -20,7 +22,37 @@ pub enum TriggerMode {
     Rising,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[strum(serialize_all = "kebab-case")]
+pub enum PlotType {
+    Vector,
+    #[default]
+    Scope,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[strum(serialize_all = "kebab-case")]
+pub enum Timebase {
+    #[strum(serialize = "1s")]
+    Timebase1s,
+    #[strum(serialize = "500ms")]
+    Timebase500ms,
+    #[strum(serialize = "250ms")]
+    Timebase250ms,
+    #[strum(serialize = "100ms")]
+    Timebase100ms,
+    #[strum(serialize = "50ms")]
+    Timebase50ms,
+    #[strum(serialize = "25ms")]
+    Timebase25ms,
+    #[strum(serialize = "10ms")]
+    Timebase10ms,
+    #[default]
+    #[strum(serialize = "5ms")]
+    Timebase5ms,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Engine {
     #[default]
@@ -61,6 +93,18 @@ int_params!(TimebaseParams<u16>   { step: 128, min: 32, max: 3872 });
 int_params!(TriggerLvlParams<i16> { step: 512, min: -16384, max: 16384 });
 int_params!(YPosParams<i16>       { step: 25, min: -500, max: 500 });
 
+button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
+
+#[derive(OptionPage, Clone)]
+pub struct MiscOpts {
+    #[option]
+    pub plot_type: EnumOption<PlotType>,
+    #[option(false)]
+    pub save_opts: ButtonOption<OneShotButtonParams>,
+    #[option(false)]
+    pub wipe_opts: ButtonOption<OneShotButtonParams>,
+}
+
 #[derive(OptionPage, Clone)]
 pub struct OscOpts {
     #[option]
@@ -99,8 +143,8 @@ pub struct BeamOpts {
 
 #[derive(OptionPage, Clone)]
 pub struct ScopeOpts {
-    #[option(2048)]
-    pub timebase: IntOption<TimebaseParams>,
+    #[option]
+    pub timebase: EnumOption<Timebase>,
     #[option]
     pub trig_mode: EnumOption<TriggerMode>,
     #[option(512)]
@@ -119,9 +163,11 @@ pub struct ScopeOpts {
     pub xscale: IntOption<XScaleParams>,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
+    #[page(Page::Misc)]
+    pub misc: MiscOpts,
     #[page(Page::Scope)]
     pub scope: ScopeOpts,
     #[page(Page::Osc)]

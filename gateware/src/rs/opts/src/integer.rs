@@ -1,5 +1,6 @@
 use heapless::String;
 use core::fmt::Write;
+use serde::{Serialize, Deserialize};
 
 use crate::traits::*;
 
@@ -7,6 +8,8 @@ use crate::traits::*;
 pub struct IntOption<T: IntOptionParams> {
     name: &'static str,
     pub value: T::Value,
+    init: T::Value,
+    option_key: OptionKey,
 }
 
 pub trait IntOptionParams {
@@ -17,10 +20,12 @@ pub trait IntOptionParams {
 }
 
 impl<T: IntOptionParams> IntOption<T> {
-    pub fn new(name: &'static str, value: T::Value) -> Self {
+    pub fn new(name: &'static str, value: T::Value, key: u32) -> Self {
         Self {
             name,
             value,
+            init: value,
+            option_key: OptionKey::new(key),
         }
     }
 }
@@ -32,7 +37,9 @@ where
         + core::ops::Add<Output = T::Value>
         + core::ops::Sub<Output = T::Value>
         + core::cmp::Ord
-        + core::fmt::Display,
+        + core::fmt::Display
+        + Serialize
+        + for<'de> Deserialize<'de>,
     f32: From<T::Value>,
 {
     fn name(&self) -> &'static str {
@@ -43,6 +50,14 @@ where
         let mut s: OptionString = String::new();
         write!(&mut s, "{}", self.value).ok();
         s
+    }
+
+    fn key(&self) -> &OptionKey {
+        &self.option_key
+    }
+
+    fn key_mut(&mut self) -> &mut OptionKey {
+        &mut self.option_key
     }
 
     fn tick_up(&mut self) {
@@ -69,6 +84,30 @@ where
     fn n_unique_values(&self) -> usize {
         // TODO
         0
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> Option<usize> {
+        if self.value != self.init {
+            use postcard::to_slice;
+            if let Ok(used) = to_slice(&self.value, buf) {
+                Some(used.len())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn decode(&mut self, buf: &[u8]) -> bool {
+        use postcard::from_bytes;
+        if let Ok(v) = from_bytes::<T::Value>(buf) {
+            self.value = v;
+            self.init = v;
+            true
+        } else {
+            false
+        }
     }
 }
 

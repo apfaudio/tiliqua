@@ -1,7 +1,8 @@
 use opts::*;
 use strum_macros::{EnumIter, IntoStaticStr};
+use serde_derive::{Serialize, Deserialize};
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     #[default]
@@ -28,7 +29,7 @@ pub struct BootOpts {
     pub slot7: StringOption,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Boot)]

@@ -10,11 +10,13 @@ use heapless::String;
 use micromath::{F32Ext};
 use strum_macros::{EnumIter, IntoStaticStr};
 use embedded_hal::delay::DelayNs;
+use embedded_hal::i2c::Operation;
 
 use core::str::FromStr;
 use core::fmt::Write;
 
 use tiliqua_lib::*;
+use tiliqua_lib::eeprominfo::{EepromConfig, EepromManager};
 use pac::constants::*;
 use tiliqua_fw::*;
 use tiliqua_hal::pmod::EurorackPmod;
@@ -58,17 +60,21 @@ pub enum BitstreamError {
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
     pll: Option<Si5351Device<I2c0>>,
+    eeprom_manager: EepromManager<I2c1>,
     reboot_n: Option<usize>,
     error_n: [Option<String<32>>; N_MANIFESTS],
     time_since_reboot_requested: u32,
     manifests: [Option<BitstreamManifest>; N_MANIFESTS],
     animation_elapsed_ms: u32,
     modeline: DVIModeline,
+    autoboot_slot: Option<usize>,
+    autoboot_countdown_ms: u32,
 }
 
 impl App {
     pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
-               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline) -> Self {
+               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline, autoboot_slot: Option<usize>, 
+               eeprom_manager: EepromManager<I2c1>) -> Self {
         let peripherals = unsafe { pac::Peripherals::steal() };
         let encoder = Encoder0::new(peripherals.ENCODER0);
         let i2cdev = I2c0::new(peripherals.I2C0);
@@ -78,12 +84,15 @@ impl App {
             ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
                             encoder, pca9635, pmod),
             pll,
+            eeprom_manager,
             reboot_n: None,
             error_n: [const { None }; N_MANIFESTS],
             time_since_reboot_requested: 0u32,
             manifests,
             animation_elapsed_ms: 0u32,
             modeline,
+            autoboot_slot,
+            autoboot_countdown_ms: if autoboot_slot.is_some() { 5000 } else { 0 },
         }
     }
 
@@ -124,6 +133,26 @@ where
     Text::with_alignment(
         "REBOOTING",
         Point::new(rng.i32(0..h_active), rng.i32(0..v_active)),
+        style,
+        Alignment::Center,
+    )
+    .draw(d).ok();
+}
+
+fn print_autoboot_countdown<D>(d: &mut D, countdown_ms: u32, slot: usize, target: &OptionString)
+where
+    D: DrawTarget<Color = Gray8> + OriginDimensions,
+{
+    let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
+    let h_active = d.size().width as i32;
+    let v_active = d.size().height as i32;
+
+    let countdown_sec = (countdown_ms + 999) / 1000; // Round up
+    let mut countdown_text: String<64> = String::new();
+    write!(countdown_text, "Autoboot {} (slot {}) in {}sec", target, slot, countdown_sec).ok();
+    Text::with_alignment(
+        &countdown_text,
+        Point::new(h_active/2, v_active/2 - 125),
         style,
         Alignment::Center,
     )
@@ -250,49 +279,71 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
     }
 }
 
-fn copy_spiflash_region_to_psram(region: &MemoryRegion) -> Result<(), BitstreamError> {
-    if let Some(psram_dst) = region.psram_dst {
-        let psram_ptr = PSRAM_BASE as *mut u32;
-        let spiflash_ptr = SPIFLASH_BASE as *mut u32;
-        let spiflash_offset_words = region.spiflash_src as isize / 4isize;
-        let psram_offset_words = psram_dst as isize / 4isize;
-        let size_words = region.size as isize / 4isize + 1;
-        info!("Copying {:#x}..{:#x} (spi flash) to {:#x}..{:#x} (psram) ...",
-              SPIFLASH_BASE + region.spiflash_src as usize,
-              SPIFLASH_BASE + (region.spiflash_src + region.size) as usize,
-              PSRAM_BASE + psram_dst as usize,
-              PSRAM_BASE + (psram_dst + region.size) as usize);
-        for i in 0..size_words {
-            unsafe {
-                let d = spiflash_ptr.offset(spiflash_offset_words + i).read_volatile();
-                psram_ptr.offset(psram_offset_words + i).write_volatile(d);
-            }
+fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
+    let spiflash_ptr = SPIFLASH_BASE as *mut u32;
+    let spiflash_offset_words = region.spiflash_src as isize / 4isize;
+    let size_words = region.size as isize / 4isize + 1;
+
+    match region.region_type {
+        RegionType::Bitstream | RegionType::XipFirmware | RegionType::RamLoad => {
+            info!("Validate region '{}' at {:#x} (size: {} KiB) ...", 
+                  region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+        },
+        _ => {
+            info!("Skip region '{}' at {:#x} (size: {} KiB) ...", 
+                  region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+            return Ok(());
         }
-        info!("Verify {} KiB copied correctly ...", (size_words*4) / 1024);
+    }
+
+    // Always validate CRC from SPI flash source first
+    if let Some(crc_target) = region.crc {
         let crc_bzip2 = crc::Crc::<u32>::new(&crc::CRC_32_BZIP2);
         let mut digest = crc_bzip2.digest();
         for i in 0..size_words {
             unsafe {
-                let d1 = psram_ptr.offset(psram_offset_words + i).read_volatile();
+                let d = spiflash_ptr.offset(spiflash_offset_words + i).read_volatile();
                 if i != (size_words - 1) {
-                    digest.update(&d1.to_le_bytes());
+                    digest.update(&d.to_le_bytes());
                 } else {
-                    digest.update(&d1.to_le_bytes()[0..(region.size as usize)%4usize]);
+                    digest.update(&d.to_le_bytes()[0..(region.size as usize)%4usize]);
                 }
             }
         }
         let crc_result = digest.finalize();
-        info!("got PSRAM crc: {:#x}, manifest wants: {:#x}", crc_result, region.crc);
-        if crc_result == region.crc {
-            Ok(())
-        } else {
-            Err(BitstreamError::SpiflashCrcError)
+        info!("got SPI flash crc: {:#x}, manifest wants: {:#x}", crc_result, crc_target);
+        if crc_result != crc_target {
+            return Err(BitstreamError::SpiflashCrcError);
         }
     } else {
-        info!("skipping XiP memory region ...");
-        Ok(())
+        warn!("Expected region.crc target for region '{}'", region.filename);
+        return Err(BitstreamError::InvalidManifest);
     }
+
+    // Now copy to PSRAM if needed
+    if region.region_type == RegionType::RamLoad {
+        if let Some(psram_dst) = region.psram_dst {
+            let psram_ptr = PSRAM_BASE as *mut u32;
+            let psram_offset_words = psram_dst as isize / 4isize;
+            info!("Copying to {:#x}..{:#x} (psram) ...",
+                  PSRAM_BASE + psram_dst as usize,
+                  PSRAM_BASE + (psram_dst + region.size) as usize);
+            for i in 0..size_words {
+                unsafe {
+                    let d = spiflash_ptr.offset(spiflash_offset_words + i).read_volatile();
+                    psram_ptr.offset(psram_offset_words + i).write_volatile(d);
+                }
+            }
+            info!("Copy completed ({} KiB)", (size_words*4) / 1024);
+        } else {
+            warn!("RamLoad region'{}' without psram_dst! marking invalid...", region.filename);
+            return Err(BitstreamError::InvalidManifest);
+        }
+    }
+
+    Ok(())
 }
+
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
@@ -306,6 +357,23 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         if !app.startup_animation() {
             app.ui.update();
+        }
+
+        // Handle autoboot countdown
+        if let Some(slot) = app.autoboot_slot {
+            if app.ui.encoder_recently_touched(TIMER0_ISR_PERIOD_MS*2) {
+                // Encoder was touched during countdown, cancel autoboot, clear flag for next boot.
+                app.autoboot_slot = None;
+                app.autoboot_countdown_ms = 0;
+                let config = EepromConfig { last_boot_slot: None };
+                app.eeprom_manager.write_config(&config).ok();
+            } else if app.autoboot_countdown_ms > 0 {
+                // Autoboot is configured, continue countdown
+                app.autoboot_countdown_ms = app.autoboot_countdown_ms.saturating_sub(TIMER0_ISR_PERIOD_MS);
+            } else {
+                // Countdown finished, trigger autoboot into selected bitstream
+                app.reboot_n = Some(slot);
+            }
         }
 
         if app.ui.opts.tracker.modify {
@@ -332,6 +400,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             manifest: manifest.clone(),
                             modeline: app.modeline.clone(),
                         };
+                        for region in &manifest.regions {
+                            validate_and_copy_spiflash_region(region)?;
+                        }
                         if let Some(mut pll_config) = manifest.external_pll_config.clone() {
                             if pll_config.clk1_inherit {
                                 info!("video/pll: inherit pixel clock from bootloader modeline.");
@@ -351,6 +422,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                                 unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
                                     w.enable().bit(false)
                                 );
+                                riscv::asm::delay(10_000_000);
                                 configure_external_pll(&pll_config, pll).or(
                                     Err(BitstreamError::PllI2cError))?;
                             } else {
@@ -360,10 +432,10 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             }
                         }
                         // Place BootInfo at the end of PSRAM
-                        unsafe { bootinfo.to_addr(BOOTINFO_BASE) };
-                        for region in &manifest.regions {
-                            copy_spiflash_region_to_psram(region)?;
-                        }
+                        unsafe { bootinfo.to_addr(BOOTINFO_BASE).expect("Failed to serialize BootInfo") };
+                        // Save this bitstream as the last loaded
+                        let config = EepromConfig { last_boot_slot: Some(n as u8) };
+                        app.eeprom_manager.write_config(&config).ok();
                         riscv::asm::fence();
                         riscv::asm::fence_i();
                         Ok(())
@@ -401,7 +473,7 @@ pub enum StartupWarning {
     TouchNak,
 }
 
-use embedded_hal::i2c::{I2c, Operation};
+use embedded_hal::i2c::I2c;
 
 // Mitigation for https://github.com/apfaudio/tiliqua/issues/81
 pub fn maybe_restart_codec<CodecI2c, Pmod>(i2cdev: &mut CodecI2c, pmod: &mut Pmod) -> Result<(), StartupWarning>
@@ -578,6 +650,37 @@ fn main() -> ! {
 
     let mut startup_report: String<256> = Default::default();
 
+    // Check if we already started any bitstreams by checking if we already wrote
+    // something to the PSRAM for client bitstreams. Warm/Cold boots have different
+    // autoboot behavior, this is used to distinguish between them.
+
+    let cold_boot = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.is_none();
+    info!("cold_boot: {}", cold_boot);
+
+    // Read autoboot flag and maybe configure us to start an autoboot countdown by
+    // setting 'autoboot_to'.
+
+    let mut autoboot_to: Option<usize> = None;
+    let mut eeprom_manager = EepromManager::new(unsafe{I2c1::summon()});
+    if !cold_boot {
+        // Warm boot: Clear the autoboot flag.
+        let config = EepromConfig { last_boot_slot: None };
+        eeprom_manager.write_config(&config).ok();
+    } else {
+        // Cold boot: Check the autoboot flag and boot
+        match eeprom_manager.read_config() {
+            Ok(config) => {
+                log::info!("EepromConfig.read_config() wants: {:?}", config);
+                if let Some(slot) = config.last_boot_slot {
+                    autoboot_to = Some(slot as usize);
+                }
+            },
+            Err(e) => {
+                log::warn!("EepromConfig.read_config() failed: {:?}", e);
+            }
+        }
+    }
+
     // Verify/reprogram touch sensing NVM
 
     {
@@ -587,9 +690,7 @@ fn main() -> ! {
             timer.delay_ms(200); // Wait for POR on eurorack-pmod
             pmod.hard_reset();
         }
-        // TODO more sensible bus sharing
-        let i2cdev1 = I2c1::new(unsafe { pac::I2C1::steal() } );
-        let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1, &TOUCH_SENSOR_ORDER);
+        let mut cy8 = Cy8cmbr3108Driver::new(unsafe{I2c1::summon()}, &TOUCH_SENSOR_ORDER);
         if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
             let s: &'static str = e.into();
             write!(startup_report, "{}\r\n", s).ok();
@@ -627,17 +728,20 @@ fn main() -> ! {
     }
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
+    // Load serialized JSON manifests from spiflash
+
     let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
     for n in 0usize..N_MANIFESTS {
         let size: usize = MANIFEST_SIZE;
-        let manifest_first = SPIFLASH_BASE + SLOT_BITSTREAM_BASE;
-        let addr: usize = manifest_first + (n+1)*SLOT_SIZE - size;
+        let addr: usize = SPIFLASH_BASE + MANIFEST_OFFSET + (n+1)*SLOT_SIZE;
         info!("(entry {}) look for manifest from {:#x} to {:#x}", n, addr, addr+size);
         manifests[n] = BitstreamManifest::from_addr(addr, size);
     }
 
     let mut opts = Opts::default();
+
     // Populate option string values with bitstream names from manifest.
+
     let mut names: [OptionString; 8] = [const { OptionString::new() }; 8];
     for n in 0..manifests.len() {
         if let Some(manifest) = &manifests[n] {
@@ -653,9 +757,12 @@ fn main() -> ! {
     opts.boot.slot6.value = names[6].clone();
     opts.boot.slot7.value = names[7].clone();
     opts.tracker.selected = Some(0); // Don't start with page highlighted.
+    if let Some(n) = autoboot_to {
+        opts.tracker.selected = Some(n);
+    }
 
     let app = Mutex::new(RefCell::new(
-            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone())));
+            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone(), autoboot_to, eeprom_manager)));
 
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
@@ -697,7 +804,7 @@ fn main() -> ! {
             // Always mute the CODEC to stop pops on flashing while in the bootloader.
             pmod.mute(true);
 
-            let (opts, reboot_n, error_n, final_modeline) = critical_section::with(|cs| {
+            let (opts, reboot_n, error_n, final_modeline, autoboot_countdown_ms) = critical_section::with(|cs| {
 
                 let mut app = app.borrow_ref_mut(cs);
 
@@ -758,7 +865,8 @@ fn main() -> ! {
                 (app.ui.opts.clone(),
                  app.reboot_n.clone(),
                  app.error_n.clone(),
-                 app.modeline.clone())
+                 app.modeline.clone(),
+                 app.autoboot_countdown_ms)
             });
 
             modeline = final_modeline;
@@ -786,6 +894,12 @@ fn main() -> ! {
 
             if let Some(_) = reboot_n {
                 print_rebooting(&mut display, &mut rng);
+            }
+
+            if let Some(n) = autoboot_to {
+                if autoboot_countdown_ms > 0 {
+                    print_autoboot_countdown(&mut display, autoboot_countdown_ms, n, &names[n]);
+                }
             }
         }
     })

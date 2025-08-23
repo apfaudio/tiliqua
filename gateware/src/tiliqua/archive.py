@@ -14,6 +14,9 @@ bootloader and hardware revisions).
 import os
 import tarfile
 import json
+import tempfile
+import sys
+from pathlib import Path
 
 from dataclasses import dataclass, field
 from fastcrc import crc32
@@ -21,9 +24,10 @@ from typing import Optional, List
 from tiliqua.types import *
 from tiliqua.tiliqua_platform import TiliquaRevision
 
-@dataclass
-class BitstreamArchiver:
+from rs.manifest.src.lib import RegionType, MANIFEST_SIZE, FLASH_PAGE_SZ, BitstreamManifest
 
+@dataclass
+class ArchiveBuilder:
     """Class for building and writing bitstream archives."""
 
     build_path: str
@@ -37,6 +41,12 @@ class BitstreamArchiver:
     _regions: List[MemoryRegion] = field(default_factory=list)
     _manifest: Optional[BitstreamManifest] = None
     _firmware_bin_path: Optional[str] = None
+
+    @classmethod
+    def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision, brief: str = "") -> 'ArchiveBuilder':
+        """Create an ArchiveBuilder for a project."""
+        archiver = cls(build_path, name, sha, hw_rev, brief)
+        return archiver
 
     def __post_init__(self):
         # Ensure build directory exists
@@ -59,10 +69,32 @@ class BitstreamArchiver:
     def bitstream_path(self) -> str:
         return os.path.join(self.build_path, "top.bit")
 
+    def with_bitstream(self, filename: str = "top.bit") -> 'ArchiveBuilder':
+        """Add bitstream region and return self for chaining."""
+        if not os.path.exists(self.bitstream_path):
+            print(f"WARNING: Bitstream file not found at {self.bitstream_path}")
+            return self
 
-    def add_firmware_region(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> None:
+        # Calculate CRC32 of bitstream
+        bitstream_crc32 = crc32.bzip2(open(self.bitstream_path, "rb").read())
+
+        # Create a memory region for the bitstream
+        region = MemoryRegion(
+            filename=filename,
+            region_type=RegionType.Bitstream,
+            spiflash_src=None,  # Will be set by flash.py based on slot
+            psram_dst=None,     # Bitstream is never copied to PSRAM
+            size=os.path.getsize(self.bitstream_path),
+            crc=bitstream_crc32
+        )
+
+        # Insert bitstream region at the beginning
+        self._regions.insert(0, region)
+        return self
+
+    def with_firmware(self, firmware_bin_path: str, fw_location: FirmwareLocation, fw_offset: int) -> 'ArchiveBuilder':
         """
-        Add a memory region corresponding to a firmware image.
+        Add a memory region corresponding to a firmware image and return self for chaining.
 
         Args:
             firmware_bin_path: Path to the firmware binary file
@@ -73,34 +105,72 @@ class BitstreamArchiver:
 
         if not os.path.exists(firmware_bin_path):
             print(f"WARNING: Firmware file not found at {firmware_bin_path}")
-            return
+            return self
 
         # Calculate CRC32 of firmware binary
         fw_crc32 = crc32.bzip2(open(firmware_bin_path, "rb").read())
 
-        # Create a memory region for the firmware
-        region = MemoryRegion(
-            filename=os.path.basename(firmware_bin_path),
-            spiflash_src=None,
-            psram_dst=None,
-            size=os.path.getsize(firmware_bin_path),
-            crc=fw_crc32
-        )
-
-        # Set source/destination based on firmware location
+        # Create memory region based on firmware location
         match fw_location:
             case FirmwareLocation.SPIFlash:
-                region.spiflash_src = fw_offset
+                region = MemoryRegion(
+                    filename=os.path.basename(firmware_bin_path),
+                    region_type=RegionType.XipFirmware,
+                    spiflash_src=fw_offset,
+                    psram_dst=None,
+                    size=os.path.getsize(firmware_bin_path),
+                    crc=fw_crc32
+                )
+                self._regions.append(region)
             case FirmwareLocation.PSRAM:
-                region.psram_dst = fw_offset
+                region = MemoryRegion(
+                    filename=os.path.basename(firmware_bin_path),
+                    region_type=RegionType.RamLoad,
+                    spiflash_src=None,  # Will be set by flash.py based on slot
+                    psram_dst=fw_offset,
+                    size=os.path.getsize(firmware_bin_path),
+                    crc=fw_crc32
+                )
+                self._regions.append(region)
             case FirmwareLocation.BRAM:
-                # No offset needed for BRAM
+                # BRAM firmware is baked into bitstream, no separate region needed
                 pass
+        
+        return self
 
+    def with_option_storage(self, filename: str = "<options>", size: int = 2*FLASH_PAGE_SZ) -> 'ArchiveBuilder':
+        """Add option storage region and return self for chaining."""
+        region = MemoryRegion(
+            filename=filename,
+            region_type=RegionType.OptionStorage,
+            spiflash_src=None,  # Will be set by flash.py based on slot
+            psram_dst=None,
+            size=size,
+            crc=None
+        )
         self._regions.append(region)
+        return self
+
+    def with_manifest(self) -> 'ArchiveBuilder':
+        """Add manifest region and return self for chaining."""
+        manifest_region = MemoryRegion(
+            filename="manifest.json",
+            size=MANIFEST_SIZE,
+            region_type=RegionType.Manifest,
+            spiflash_src=None,  # Will be set by flash.py
+            psram_dst=None,
+            crc=None
+        )
+        self._regions.append(manifest_region)
+        return self
 
     def write_manifest(self) -> BitstreamManifest:
         """Write serialized manifest file, return the BitstreamManifest object."""
+        # Ensure manifest region is added if not already present
+        has_manifest = any(region.region_type == RegionType.Manifest for region in self._regions)
+        if not has_manifest:
+            self.with_manifest()
+        
         self._manifest = BitstreamManifest(
             name=self.name,
             hw_rev=self.hw_rev.platform_class().version_major,
@@ -115,6 +185,14 @@ class BitstreamArchiver:
 
     def bitstream_exists(self) -> bool:
         return os.path.exists(self.bitstream_path)
+
+    def create(self):
+        """
+        One-shot creation with validation, manifest writing, and archive creation.
+        Returns True if archive was created, False otherwise.
+        """
+        self.write_manifest()
+        return self.create_archive()
 
     def create_archive(self) -> bool:
         """
@@ -186,3 +264,54 @@ class BitstreamArchiver:
             return False
 
         return True
+
+
+class ArchiveLoader:
+    """Handles loading and extraction of bitstream archives."""
+    
+    def __init__(self, archive_path: str):
+        self.archive_path = archive_path
+        self.manifest: Optional[BitstreamManifest] = None
+        self.tmpdir: Optional[Path] = None
+    
+    def is_bootloader_archive(self) -> bool:
+        """Check if this is a bootloader bitstream (has XipFirmware regions)."""
+        if not self.manifest:
+            return False
+        return any(region.region_type == RegionType.XipFirmware for region in self.manifest.regions)
+    
+    def get_manifest(self) -> BitstreamManifest:
+        """Get the parsed manifest."""
+        if not self.manifest:
+            raise ValueError("Manifest not loaded - did you use the context manager?")
+        return self.manifest
+    
+    def get_tmpdir(self) -> Path:
+        """Get the temporary directory path."""
+        if not self.tmpdir:
+            raise ValueError("Archive not extracted - did you use the context manager?")
+        return self.tmpdir
+    
+    def __enter__(self):
+        """Extract archive and read manifest."""
+        # Create temporary directory and extract everything
+        self.tmpdir = Path(tempfile.mkdtemp())
+        
+        with tarfile.open(self.archive_path, "r:gz") as tar:
+            tar.extractall(self.tmpdir)
+            
+            # Read manifest
+            manifest_path = self.tmpdir / "manifest.json"
+            with open(manifest_path) as f:
+                manifest_dict = json.load(f)
+                self.manifest = BitstreamManifest.from_dict(manifest_dict)
+        
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Clean up temporary directory."""
+        if self.tmpdir and self.tmpdir.exists():
+            import shutil
+            shutil.rmtree(self.tmpdir)
+            self.tmpdir = None
+            self.manifest = None

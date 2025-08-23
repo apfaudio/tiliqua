@@ -1,6 +1,7 @@
 use heapless::String;
 use strum::IntoEnumIterator;
 use core::str::FromStr;
+use serde::{Serialize, Deserialize};
 
 use crate::traits::*;
 
@@ -8,13 +9,17 @@ use crate::traits::*;
 pub struct EnumOption<T: Copy + IntoEnumIterator + Default> {
     pub name: &'static str,
     pub value: T,
+    init: T,
+    option_key: OptionKey,
 }
 
 impl<T: Copy + IntoEnumIterator + Default> EnumOption<T> {
-    pub fn new(name: &'static str, value: T) -> Self {
+    pub fn new(name: &'static str, value: T, key: u32) -> Self {
         Self {
             name,
             value,
+            init: value,
+            option_key: OptionKey::new(key),
         }
     }
 }
@@ -26,6 +31,8 @@ where
         + PartialEq
         + Into<&'static str>
         + Default
+        + Serialize
+        + for<'de> Deserialize<'de>
     {
 
     fn name(&self) -> &'static str {
@@ -34,6 +41,14 @@ where
 
     fn value(&self) -> OptionString {
         String::from_str(self.value.into()).unwrap()
+    }
+
+    fn key(&self) -> &OptionKey {
+        &self.option_key
+    }
+
+    fn key_mut(&mut self) -> &mut OptionKey {
+        &mut self.option_key
     }
 
     fn tick_up(&mut self) {
@@ -76,5 +91,29 @@ where
 
     fn n_unique_values(&self) -> usize {
         T::iter().count()
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> Option<usize> {
+        use postcard::to_slice;
+        if self.value != self.init {
+            if let Ok(used) = to_slice(&self.value, buf) {
+                Some(used.len())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn decode(&mut self, buf: &[u8]) -> bool {
+        use postcard::from_bytes;
+        if let Ok(v) = from_bytes::<T>(buf) {
+            self.value = v;
+            self.init = v;
+            true
+        } else {
+            false
+        }
     }
 }

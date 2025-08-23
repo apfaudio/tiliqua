@@ -13,34 +13,68 @@ This representation is used for manifest generation and flashing.
 """
 
 import json
+import os
+import re
+from enum import StrEnum
+from functools import lru_cache
 
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 from typing import List, Optional
 
-MANIFEST_MAGIC           = 0xFEEDBEEF
-N_MANIFESTS              = 8
-SLOT_BITSTREAM_BASE      = 0x100000 # First user slot starts here
-SLOT_SIZE                = 0x100000 # Spacing between user slots
-MANIFEST_SIZE            = 1024     # Each manifest starts at:
-                                    # SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
+@lru_cache(maxsize=1)
+def _parse_rust_constants():
+    """Extract shared constants from lib.rs to avoid duplication here."""
+    lib_rs_path = os.path.join(os.path.dirname(__file__), 'lib.rs')
+    constants = {}
+    if os.path.exists(lib_rs_path):
+        with open(lib_rs_path, 'r') as f:
+            content = f.read()
+        # e.g. pub const NAME = 0x123456;
+        for match in re.finditer(r'pub const (\w+).* = (0x[0-9a-fA-F]+);', content):
+            name, value = match.groups()
+            constants[name] = int(value, 16)
+        # e.g. pub const NAME = 123;
+        for match in re.finditer(r'pub const (\w+).* = (\d+);', content):
+            name, value = match.groups()
+            constants[name] = int(value)
+    return constants
+
+RUST_CONSTANTS           = _parse_rust_constants()
+MANIFEST_MAGIC           = RUST_CONSTANTS['MANIFEST_MAGIC']
+MANIFEST_OFFSET          = RUST_CONSTANTS['MANIFEST_OFFSET']
+MANIFEST_SIZE            = RUST_CONSTANTS['MANIFEST_SIZE']
+N_MANIFESTS              = RUST_CONSTANTS['N_MANIFESTS']
+SLOT_BITSTREAM_BASE      = RUST_CONSTANTS['SLOT_BITSTREAM_BASE']
+SLOT_SIZE                = RUST_CONSTANTS['SLOT_SIZE']
+FLASH_PAGE_SZ            = RUST_CONSTANTS['FLASH_PAGE_SZ']
+FLASH_SECTOR_SZ          = RUST_CONSTANTS['FLASH_SECTOR_SZ']
+
+class RegionType(StrEnum):
+    """Memory region type enum matching the Rust schema"""
+    Bitstream = "Bitstream"        # Bitstream region that gets loaded directly by the bootloader
+    XipFirmware = "XipFirmware"    # XiP firmware that executes directly from SPI flash
+    RamLoad = "RamLoad"            # Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
+    OptionStorage = "OptionStorage"  # Option storage region for persistent application settings
+    Manifest = "Manifest"          # Manifest region containing metadata about the bitstream
 
 @dataclass_json
 @dataclass
 class MemoryRegion:
     filename: str
-    spiflash_src: int
-    psram_dst: Optional[int]
     size: int
-    crc: int
+    region_type: RegionType = RegionType.Bitstream
+    spiflash_src: Optional[int] = None
+    psram_dst: Optional[int] = None
+    crc: Optional[int] = None
 
 @dataclass_json
 @dataclass
 class ExternalPLLConfig:
     clk0_hz: int
-    clk1_hz: Optional[int]
     clk1_inherit: bool
-    spread_spectrum: Optional[float]
+    clk1_hz: Optional[int] = None
+    spread_spectrum: Optional[float] = None
 
 @dataclass_json
 @dataclass
@@ -50,8 +84,8 @@ class BitstreamManifest:
     sha: str
     brief: str
     video: str
-    external_pll_config: Optional[ExternalPLLConfig]
     regions: List[MemoryRegion]
+    external_pll_config: Optional[ExternalPLLConfig] = None
     magic: int = MANIFEST_MAGIC
 
     def write_to_path(self, manifest_path):
@@ -67,3 +101,4 @@ class BitstreamManifest:
         with open(manifest_path, "w") as f:
             # Drop all keys with None values (optional fields)
             f.write(json.dumps(cleandict(self.to_dict())))
+

@@ -9,8 +9,7 @@ use critical_section::Mutex;
 use core::cell::RefCell;
 use core::fmt::Write;
 
-use embedded_hal::i2c::Operation;
-use embedded_hal::i2c::I2c;
+use embedded_hal::i2c::{I2c, Operation};
 use embedded_hal::delay::DelayNs;
 use embedded_graphics::prelude::*;
 
@@ -27,6 +26,7 @@ use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pca9635::Pca9635Driver;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
+use tiliqua_hal::eeprom::EepromDriver;
 
 const TUSB322I_ADDR:  u8 = 0x47;
 
@@ -202,19 +202,22 @@ fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
 
 fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
     let mut ok = false;
-    let mut eeprom_id: [u8; 6] = [0; 6];
-    let err = i2cdev.transaction(EEPROM_ADDR, &mut [Operation::Write(&[0xFAu8]),
-                                                    Operation::Read(&mut eeprom_id)]);
-    if !err.is_ok() {
-        write!(s, "FAIL: eeprom_id (nak?) ").ok();
-    } else if eeprom_id[0] == 0x29 {
-        ok = true;
-        write!(s, "PASS: eeprom_id ").ok();
-    } else {
-        write!(s, "FAIL: eeprom_id ").ok();
-    }
-    for byte in eeprom_id {
-        write!(s, "{:x} ", byte).ok();
+    let mut eeprom = EepromDriver::new(i2cdev);
+    match eeprom.read_id() {
+        Ok(eeprom_id) => {
+            if eeprom_id[0] == 0x29 {
+                ok = true;
+                write!(s, "PASS: eeprom_id ").ok();
+            } else {
+                write!(s, "FAIL: eeprom_id ").ok();
+            }
+            for byte in eeprom_id {
+                write!(s, "{:x} ", byte).ok();
+            }
+        },
+        Err(_) => {
+            write!(s, "FAIL: eeprom_id (nak?) ").ok();
+        }
     }
     write!(s, "\r\n").ok();
     ok
@@ -393,7 +396,8 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua selftest!");
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
+
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
 
@@ -477,13 +481,7 @@ fn main() -> ! {
 
             let (opts, commit_to_eeprom) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
-                // Single-shot commit: when 'write' is selected and the encoder
-                // is turned, write once and change the enum back.
-                let mut commit_to_eeprom = false;
-                if app.ui.opts.autocal.write.value != EnWrite::Turn {
-                    commit_to_eeprom = true;
-                    app.ui.opts.autocal.write.value = EnWrite::Turn;
-                }
+                let commit_to_eeprom = app.ui.opts.autocal.write.poll();
                 (app.ui.opts.clone(), commit_to_eeprom)
             });
 
@@ -576,18 +574,20 @@ fn main() -> ! {
             );
             constants.write_to_pmod(&mut pmod);
 
+            if commit_to_eeprom {
+                critical_section::with(|_| {
+                    constants.write_to_eeprom(&mut i2cdev1);
+                });
+            }
+
             if opts.tracker.page.value != Page::Report {
                 draw::draw_cal(&mut display, h_active/2-128, v_active/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
                                &pmod.sample_i()).ok();
                 draw::draw_cal_constants(
                     &mut display, h_active/2-128, v_active/2+64, hue,
-                    &constants.adc_scale, &constants.adc_zero, &constants.dac_scale, &constants.dac_zero).ok();
+                    &constants.cal.adc_scale, &constants.cal.adc_zero, &constants.cal.dac_scale, &constants.cal.dac_zero).ok();
 
-                if commit_to_eeprom {
-                    constants.write_to_eeprom(&mut i2cdev1);
-                    //draw::draw_name(&mut display, h_active/2, v_active/2+64, hue, &"SAVED", &"").ok();
-                }
             }
 
         }

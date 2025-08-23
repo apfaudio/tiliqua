@@ -1,7 +1,8 @@
 use opts::*;
 use strum_macros::{EnumIter, IntoStaticStr};
+use serde_derive::{Serialize, Deserialize};
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     Modulate,
@@ -11,9 +12,10 @@ pub enum Page {
     Voice3,
     Filter,
     Scope,
+    Misc,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TriggerMode {
     Always,
@@ -21,7 +23,7 @@ pub enum TriggerMode {
     Rising,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Wave {
     #[default]
@@ -31,7 +33,7 @@ pub enum Wave {
     Noise,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ModulationTarget {
     #[default]
@@ -83,6 +85,16 @@ int_params!(TimebaseParams<u16>     { step: 128, min: 32,     max: 3872 });
 int_params!(TriggerLevelParams<i16> { step: 512, min: -16384, max: 16384 });
 int_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
 int_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
+
+button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
+
+#[derive(OptionPage, Clone)]
+pub struct MiscOpts {
+    #[option(false)]
+    pub save_opts: ButtonOption<OneShotButtonParams>,
+    #[option(false)]
+    pub wipe_opts: ButtonOption<OneShotButtonParams>,
+}
 
 #[derive(OptionPage, Clone)]
 pub struct VoiceOpts {
@@ -170,7 +182,7 @@ pub struct ModulateOpts {
     pub in3: EnumOption<ModulationTarget>,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Modulate)]
@@ -185,4 +197,6 @@ pub struct Opts {
     pub filter: FilterOpts,
     #[page(Page::Scope)]
     pub scope: ScopeOpts,
+    #[page(Page::Misc)]
+    pub misc: MiscOpts,
 }

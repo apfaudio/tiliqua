@@ -50,7 +50,7 @@ impl<EncoderT: Encoder,
             period_ms,
             encoder_fade_ms: 1000u32,
             touch_led_mask: 0u8,
-            draw: true
+            draw: true,
         }
     }
 
@@ -66,6 +66,10 @@ impl<EncoderT: Encoder,
         self.draw
     }
 
+    pub fn encoder_recently_touched(&self, threshold_ms: u32) -> bool {
+        self.time_since_encoder_touched < threshold_ms
+    }
+
     pub fn update(&mut self) {
         //
         // Consume encoder, update options
@@ -73,7 +77,7 @@ impl<EncoderT: Encoder,
 
         self.encoder.update();
 
-        self.time_since_encoder_touched += self.period_ms;
+        self.time_since_encoder_touched = self.time_since_encoder_touched.saturating_add(self.period_ms);
         self.time_since_midi_activity += self.period_ms;
         self.uptime_ms += self.period_ms;
 

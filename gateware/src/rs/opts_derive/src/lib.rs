@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Data, Fields, Type, Expr, Meta};
+use hash32::{FnvHasher, Hasher as _};
+use core::hash::Hash;
 
 #[proc_macro_derive(OptionPage, attributes(option))]
 pub fn derive_option(input: TokenStream) -> TokenStream {
@@ -39,13 +41,25 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
             quote! { FloatOption::new }
         } else if is_string_option(field_type) {
             quote! { StringOption::new }
+        } else if is_button_option(field_type) {
+            quote! { ButtonOption::new }
         } else {
             panic!("Unsupported field type for OptionPage")
         };
 
-        let field_name_str = field_name.as_ref().unwrap().to_string().replace("_","-");
+        let page_str: &str = &input.ident.to_string();
+        let field_name_str: &str = &field_name.as_ref().unwrap().to_string().replace("_","-");
+        let type_name_str: &str = &quote!(#field_type).to_string();
+
+        // Generate a unique key used for identifying the option when it is stored.
+        let mut fnv: FnvHasher = Default::default();
+        page_str.hash(&mut fnv);
+        field_name_str.hash(&mut fnv);
+        type_name_str.hash(&mut fnv);
+        let field_key = fnv.finish32();
+
         quote! {
-            #field_name: #constructor(#field_name_str, #default_value)
+            #field_name: #constructor(#field_name_str, #default_value, #field_key)
         }
     });
 
@@ -74,6 +88,10 @@ pub fn derive_option(input: TokenStream) -> TokenStream {
                 let mut r = OptionVecMut::new();
                 #(r.push(&mut self.#option_fields).ok();)*
                 r
+            }
+
+            fn set_parent_key(&mut self, parent_key: u32) {
+                #(self.#option_fields.key_mut().hash_with(parent_key);)*
             }
         }
     };
@@ -106,8 +124,14 @@ fn is_string_option(ty: &Type) -> bool {
         .unwrap_or(false))
 }
 
+fn is_button_option(ty: &Type) -> bool {
+    matches!(ty, Type::Path(path) if path.path.segments.first()
+        .map(|seg| seg.ident == "ButtonOption")
+        .unwrap_or(false))
+}
+
 fn is_option_type(ty: &Type) -> bool {
-    is_int_option(ty) || is_enum_option(ty) || is_float_option(ty) || is_string_option(ty)
+    is_int_option(ty) || is_enum_option(ty) || is_float_option(ty) || is_string_option(ty) || is_button_option(ty)
 }
 
 #[proc_macro_derive(Options, attributes(page))]
@@ -152,7 +176,40 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
         }
     });
 
+    let page_field_names: Vec<_> = page_fields.iter().map(|(field_name, _)| field_name).collect();
+
+    // Generate parent keys for each page field
+    let page_key_assignments = page_fields.iter().map(|(field_name, _page_value)| {
+        let field_name_str = field_name.as_ref().unwrap().to_string();
+
+        // Generate a hash for the field name
+        let mut fnv: FnvHasher = Default::default();
+        field_name_str.hash(&mut fnv);
+        let parent_key = fnv.finish32();
+
+        quote! {
+            instance.#field_name.set_parent_key(#parent_key);
+        }
+    });
+
     let expanded = quote! {
+        impl Default for #name {
+            fn default() -> Self {
+                let mut instance = Self {
+                    tracker: Default::default(),
+                    #(#page_field_names: Default::default(),)*
+                };
+
+                // Set parent keys for each page field
+                #(#page_key_assignments)*
+
+                // Validate that all keys are unique and panic if not
+                instance.validate_keys_panic_on_failure();
+
+                instance
+            }
+        }
+
         impl Options for #name {
             fn selected(&self) -> Option<usize> {
                 self.tracker.selected
@@ -188,6 +245,18 @@ pub fn page_derive(input: TokenStream) -> TokenStream {
                 match self.tracker.page.value {
                     #(#view_mut_match_arms)*
                 }
+            }
+
+            fn all(&self) -> impl Iterator<Item = &dyn OptionTrait> {
+                [
+                    #(self.#page_field_names.options()),*
+                ].into_iter().flatten()
+            }
+
+            fn all_mut(&mut self) -> impl Iterator<Item = &mut dyn OptionTrait> {
+                [
+                    #(self.#page_field_names.options_mut()),*
+                ].into_iter().flatten()
             }
         }
     };

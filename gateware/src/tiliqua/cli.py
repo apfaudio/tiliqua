@@ -19,7 +19,7 @@ from tiliqua                     import sim, dvi_modeline, tiliqua_pll
 from tiliqua.types               import *
 from tiliqua.tiliqua_platform    import *
 from tiliqua.tiliqua_soc         import TiliquaSoc
-from tiliqua.archive             import BitstreamArchiver
+from tiliqua.archive             import ArchiveBuilder
 from vendor.ila                  import AsyncSerialILAFrontend
 
 class CliAction(str, enum.Enum):
@@ -36,7 +36,8 @@ def top_level_cli(
     sim_ports=None,         # project has a list of simulation port names
     sim_harness=None,       # project has a .cpp simulation harness at this path
     argparse_callback=None, # project needs extra CLI flags before argparse.parse()
-    argparse_fragment=None # project needs to check args.<custom_flag> after argparse.parse()
+    argparse_fragment=None, # project needs to check args.<custom_flag> after argparse.parse()
+    archiver_callback=None  # project can customize the archiver (called with archiver instance)
     ):
 
     # Get some repository properties
@@ -201,14 +202,14 @@ def top_level_cli(
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
 
-    archiver = BitstreamArchiver(
+    archiver = ArchiveBuilder.for_project(
         build_path=build_path,
         name=args.name,
         sha=repo_sha,
         hw_rev=args.hw,
-        brief=args.brief if args.brief is not None else getattr(fragment, "brief", ""),
-        video="<none>"
+        brief=args.brief if args.brief is not None else getattr(fragment, "brief", "")
     )
+    archiver.video = "<none>"
 
     if video_core:
         archiver.video ="<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
@@ -243,18 +244,23 @@ def top_level_cli(
         TiliquaSoc.compile_firmware(rust_fw_root, kwargs["firmware_bin_path"])
 
         # If necessary, add firmware region to bitstream archive.
-        archiver.add_firmware_region(
+        archiver.with_firmware(
             firmware_bin_path=kwargs["firmware_bin_path"],
             fw_location=args.fw_location,
             fw_offset=kwargs["fw_offset"]
         )
 
+    # Allow project to customize the archiver, adding any extra data
+    # or memory regions as needed.
+    if archiver_callback:
+        archiver_callback(archiver)
+
+    if isinstance(fragment, TiliquaSoc):
         # Create firmware-only archive if --fw-only specified
         if args.fw_only:
             if not archiver.validate_existing_bitstream():
                 sys.exit(1)
-            archiver.write_manifest()
-            archiver.create_archive()
+            archiver.with_bitstream().create()
             sys.exit(0)
 
         # Simulation configuration
@@ -263,7 +269,6 @@ def top_level_cli(
             sim_ports = sim.soc_simulation_ports
             sim_harness = "src/tb_cpp/sim_soc.cpp"
 
-    archiver.write_manifest()
 
     if args.action == CliAction.Simulate:
         sim.simulate(fragment, sim_ports(fragment), sim_harness,
@@ -301,10 +306,10 @@ def top_level_cli(
 
         hw_platform.build(fragment, do_build=not args.skip_build, **build_flags)
 
-        archiver.create_archive()
+        archiver.with_bitstream().create()
 
         if hw_platform.ila:
-            args_flash_bitstream = ["sudo", "openFPGALoader", "-c", "dirtyJtag",
+            args_flash_bitstream = ["openFPGALoader", "-c", "dirtyJtag",
                                     archiver.bitstream_path]
             subprocess.check_call(args_flash_bitstream, env=os.environ)
             vcd_dst = "out.vcd"

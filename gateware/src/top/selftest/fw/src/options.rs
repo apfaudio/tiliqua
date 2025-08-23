@@ -1,7 +1,8 @@
 use opts::*;
 use strum_macros::{EnumIter, IntoStaticStr};
+use serde_derive::{Serialize, Deserialize};
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     #[default]
@@ -11,7 +12,7 @@ pub enum Page {
     TweakDac,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum AutoZero {
     #[default]
@@ -21,7 +22,7 @@ pub enum AutoZero {
     DacScale,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ReportPage {
     Startup,
@@ -29,7 +30,7 @@ pub enum ReportPage {
     Status,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum EnAutoZero {
     #[default]
@@ -37,17 +38,10 @@ pub enum EnAutoZero {
     Run,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
-#[strum(serialize_all = "kebab-case")]
-pub enum EnWrite {
-    WriteD,
-    #[default]
-    Turn,
-    WriteU,
-}
-
 int_params!(RefVoltageParams<i8>     { step: 1, min: -8, max: 8 });
 int_params!(CalTweakerParams<i16>    { step: 1, min: -256, max: 256 });
+
+button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
 
 #[derive(OptionPage, Clone)]
 pub struct ReportOpts {
@@ -64,7 +58,7 @@ pub struct AutocalOpts {
     #[option]
     pub autozero: EnumOption<EnAutoZero>,
     #[option]
-    pub write: EnumOption<EnWrite>,
+    pub write: ButtonOption<OneShotButtonParams>,
 }
 
 #[derive(OptionPage, Clone)]
@@ -87,7 +81,7 @@ pub struct CalOpts {
     pub scale3: IntOption<CalTweakerParams>,
 }
 
-#[derive(Options, Clone, Default)]
+#[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
     #[page(Page::Report)]

@@ -645,9 +645,10 @@ mod test_data {
     use opts::*;
     use crate::palette;
     use strum::{EnumIter, IntoStaticStr};
+    use serde_derive::{Serialize, Deserialize};
 
     // Fake set of options for quick render testing
-    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default)]
+    #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
     #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
     pub enum Page {
         #[default]
@@ -669,7 +670,7 @@ mod test_data {
         pub palette: EnumOption<palette::ColorPalette>,
     }
 
-    #[derive(Options, Clone, Default)]
+    #[derive(Options, Clone)]
     pub struct Opts {
         pub tracker: ScreenTracker<Page>,
         #[page(Page::Scope)]

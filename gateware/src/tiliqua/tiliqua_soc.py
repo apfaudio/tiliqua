@@ -65,7 +65,7 @@ from tiliqua                                     import sim, eurorack_pmod, tili
 
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, ui_name, ui_sha, platform_class, clock_settings,
-                 touch=False, finalize_csr_bridge=True, poke_outputs=False, mainram_size=0x2000,
+                 touch=False, finalize_csr_bridge=True, poke_outputs=False, mainram_size=0x4000,
                  fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
                  extra_cpu_regions=[]):
 

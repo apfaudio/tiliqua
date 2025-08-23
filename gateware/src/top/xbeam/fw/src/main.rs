@@ -16,6 +16,7 @@ use tiliqua_lib::calibration::*;
 use embedded_graphics::prelude::*;
 
 use options::*;
+use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::dma_framebuffer::Rotate;
@@ -44,6 +45,12 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     critical_section::with(|cs| {
         let mut app = app.borrow_ref_mut(cs);
         app.ui.update();
+        app.ui.opts.misc.plot_type.value = match app.ui.opts.tracker.page.value {
+            Page::Vector => PlotType::Vector,
+            Page::Scope1 => PlotType::Scope,
+            Page::Scope2 => PlotType::Scope,
+            _ => app.ui.opts.misc.plot_type.value
+        };
     });
 }
 
@@ -54,12 +61,17 @@ fn main() -> ! {
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
+    let spiflash = SPIFlash0::new(
+        peripherals.SPIFLASH_CTRL,
+        SPIFLASH_BASE,
+        SPIFLASH_SZ_BYTES
+    );
 
     tiliqua_fw::handlers::logger_init(serial);
 
     info!("Hello from Tiliqua XBEAM!");
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) };
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = DMAFramebuffer0::new(
@@ -73,7 +85,19 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let opts = Opts::default();
+    //
+    // Create options and maybe load from persistent storage
+    //
+
+    let mut opts = Opts::default();
+    let mut flash_persist = FlashOptionsPersistence::new(
+        spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
+    flash_persist.load_options(&mut opts).unwrap();
+
+    //
+    // Create App instance
+    //
+
     let mut last_palette = opts.beam.palette.value;
     let app = Mutex::new(RefCell::new(App::new(opts)));
 
@@ -98,9 +122,11 @@ fn main() -> ! {
 
         loop {
 
-            let (opts, draw_options) = critical_section::with(|cs| {
-                let ui = &app.borrow_ref(cs).ui;
-                (ui.opts.clone(), ui.draw()) 
+            let (opts, draw_options, save_opts, wipe_opts) = critical_section::with(|cs| {
+                let mut app = app.borrow_ref_mut(cs);
+                let save_opts = app.ui.opts.misc.save_opts.poll();
+                let wipe_opts = app.ui.opts.misc.wipe_opts.poll();
+                (app.ui.opts.clone(), app.ui.draw(), save_opts, wipe_opts)
             });
 
             if opts.beam.palette.value != last_palette || first {
@@ -112,6 +138,18 @@ fn main() -> ! {
                 draw::draw_options(&mut display, &opts, h_active-200, v_active/2, opts.beam.ui_hue.value).ok();
                 draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.ui_hue.value, UI_NAME, UI_SHA,
                                 &modeline).ok();
+            }
+
+            if save_opts {
+                flash_persist.save_options(&opts).unwrap();
+            }
+
+            if wipe_opts {
+                critical_section::with(|cs| {
+                    let mut app = app.borrow_ref_mut(cs);
+                    app.ui.opts = Opts::default();
+                    flash_persist.erase_all().unwrap();
+                });
             }
 
             persist.set_persist(opts.beam.persist.value);
@@ -152,8 +190,8 @@ fn main() -> ! {
             scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope2.ypos3.value as u16) } );
 
             xbeam_mux.flags().write(
-                |w| { w.usb_en().bit(opts.usb.mode.value == USBMode::Enable);
-                      w.show_outputs().bit(opts.usb.show.value == Show::Outputs)
+                |w| { w.usb_en().bit(opts.misc.usb_mode.value == USBMode::Enable);
+                      w.show_outputs().bit(opts.misc.plot_src.value == PlotSrc::Outputs)
                 } );
 
             xbeam_mux.delay0().write(|w| unsafe { w.value().bits(
@@ -165,18 +203,14 @@ fn main() -> ! {
             xbeam_mux.delay3().write(|w| unsafe { w.value().bits(
                     delay_smoothers[3].proc_u16(opts.delay.delay_c.value)) });
 
-            if opts.tracker.page.value == Page::Vector {
+            if opts.misc.plot_type.value == PlotType::Vector {
                 scope.flags().write(
                     |w| w.enable().bit(false) );
                 vscope.flags().write(
                     |w| { w.enable().bit(true);
                           w.rotate_left().bit(modeline.rotate == Rotate::Left)
                     } );
-            }
-
-            if opts.tracker.page.value == Page::Scope1 ||
-               opts.tracker.page.value == Page::Scope2 ||
-               first {
+            } else {
                 scope.flags().write(
                     |w| { w.enable().bit(true);
                           w.rotate_left().bit(modeline.rotate == Rotate::Left);

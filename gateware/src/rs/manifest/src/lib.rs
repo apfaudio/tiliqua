@@ -13,26 +13,43 @@
 // This representation is used manifest parsing in the bootloader.
 
 use heapless::{String, Vec};
-use serde::{Deserialize};
+use serde::{Deserialize, Serialize};
 use log::info;
 
+pub const FLASH_PAGE_SZ: u32         = 0x1000;
+pub const FLASH_SECTOR_SZ: u32       = 0x10000;
 pub const MANIFEST_MAGIC: u32        = 0xFEEDBEEF;
 pub const N_MANIFESTS: usize         = 8;
 pub const SLOT_BITSTREAM_BASE: usize = 0x100000; // First user slot starts here
 pub const SLOT_SIZE: usize           = 0x100000; // Spacing between user slots
-pub const MANIFEST_SIZE: usize       = 1024;     // Each manifest starts at:
-                                                 // SLOT_BITSTREAM_BASE + (N+1)*SLOT_SIZE-MANIFEST_SIZE
+pub const MANIFEST_OFFSET: usize     = 0xF0000;
+pub const MANIFEST_SIZE: usize       = 0x1000;
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum RegionType {
+    /// Bitstream region that gets loaded directly by the bootloader
+    Bitstream,
+    /// XiP firmware that executes directly from SPI flash
+    XipFirmware,
+    /// Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
+    RamLoad,
+    /// Option storage region for persistent application settings
+    OptionStorage,
+    /// Manifest region containing metadata about the bitstream
+    Manifest,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
 pub struct MemoryRegion {
-    pub filename: String<32>,
+    pub filename: String<16>,
+    pub region_type: RegionType,
     pub spiflash_src: u32,
     pub psram_dst: Option<u32>,
     pub size: u32,
-    pub crc: u32,
+    pub crc: Option<u32>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct ExternalPLLConfig {
     pub clk0_hz: u32,
     pub clk1_hz: Option<u32>,
@@ -40,7 +57,7 @@ pub struct ExternalPLLConfig {
     pub spread_spectrum: Option<f32>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct BitstreamManifest {
     pub hw_rev: u32,
     pub name: String<32>,
@@ -48,7 +65,7 @@ pub struct BitstreamManifest {
     pub brief: String<128>,
     pub video: String<64>,
     pub external_pll_config: Option<ExternalPLLConfig>,
-    pub regions: Vec<MemoryRegion, 3>,
+    pub regions: Vec<MemoryRegion, 5>,
     pub magic: u32,
 }
 
@@ -78,7 +95,9 @@ impl BitstreamManifest {
                 info!("\t\tpsram_dst:    {:#x} (copyto)", psram_dst);
             }
             info!("\t\tsize:         {:#x}", region.size);
-            info!("\t\tcrc:          {:#x}", region.crc);
+            if let Some(crc) = region.crc {
+                info!("\t\tcrc:          {:#x}", crc);
+            }
             info!("\t}}");
         }
         info!("}}");
@@ -91,13 +110,15 @@ impl BitstreamManifest {
                 info!("BitstreamManifest: parse OK");
                 Some(contents)
             }
-            Err(_err) => {
+            Err(err) => {
+                info!("BitstreamManifest: parse error {:?}", err);
                 None
             }
         }
     }
 
     pub fn from_addr(addr: usize, size: usize) -> Option<BitstreamManifest> {
+
         let manifest_slice = unsafe {
             core::slice::from_raw_parts(
                 addr as *mut u8,
@@ -125,5 +146,14 @@ impl BitstreamManifest {
         info!("Manifest length: {}", last_byte);
 
         Self::from_slice(manifest_slice)
+    }
+
+    pub fn get_option_storage_window(&self) -> Option<core::ops::Range<u32>> {
+        for region in self.regions.iter() {
+            if region.region_type == RegionType::OptionStorage {
+                return Some(region.spiflash_src..(region.spiflash_src+region.size))
+            }
+        }
+        None
     }
 }
