@@ -98,11 +98,12 @@ macro_rules! impl_dma_framebuffer {
                 registers_palette: $PACPALETTEX,
                 mode: DVIModeline,
                 framebuffer_base: *mut u32,
+                pixel_plot_mem_base: *mut u32,
             }
 
             impl $DMA_FRAMEBUFFERX {
                 pub fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, fb_base: usize,
-                       mode: DVIModeline) -> Self {
+                       mode: DVIModeline, pixel_plot_mem_base: usize) -> Self {
                     registers_fb.flags().write(|w| unsafe {
                         w.enable().bit(false)
                     });
@@ -139,6 +140,7 @@ macro_rules! impl_dma_framebuffer {
                         registers_palette,
                         mode,
                         framebuffer_base: fb_base as *mut u32,
+                        pixel_plot_mem_base: pixel_plot_mem_base as *mut u32,
                     }
                 }
 
@@ -182,24 +184,12 @@ macro_rules! impl_dma_framebuffer {
                 where
                     I: IntoIterator<Item = Pixel<Self::Color>>,
                 {
-                    let h_active = self.size().width;
-                    let v_active = self.size().height;
                     for Pixel(coord, color) in pixels.into_iter() {
-                        if let Ok((x, y)) = coord.try_into() {
-                            if x >= 0 && x < h_active && y >= 0 && y < v_active {
-                                let xf: u32 = if (self.mode.rotate == Rotate::Left) {v_active - y} else {x};
-                                let yf: u32 = if (self.mode.rotate == Rotate::Left) {x}            else {y};
-                                // Calculate the index in the framebuffer.
-                                let index: u32 = (xf + yf * h_active) / 4;
-                                unsafe {
-                                    // TODO: support anything other than Gray8
-                                    let mut px = self.framebuffer_base.offset(
-                                        index as isize).read_volatile();
-                                    px &= !(0xFFu32 << (8*(xf%4)));
-                                    self.framebuffer_base.offset(index as isize).write_volatile(
-                                        px | ((color.luma() as u32) << (8*(xf%4))));
-                                }
-                            }
+                        let cmd: u32 = ((coord.x as u32) << 20) |
+                                       ((coord.y as u32) << 8) |
+                                       (color.luma() as u32 & 0xffu32);
+                        unsafe {
+                            self.pixel_plot_mem_base.write_volatile(cmd);
                         }
                     }
                     Ok(())

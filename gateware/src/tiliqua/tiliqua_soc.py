@@ -60,7 +60,7 @@ from vendor.vexiiriscv                           import VexiiRiscv
 from tiliqua.tiliqua_platform                    import *
 from tiliqua.types                               import FirmwareLocation
 
-from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster_persist, palette
+from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster_persist, palette, pixel_plot
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class TiliquaSoc(Component):
@@ -102,8 +102,12 @@ class TiliquaSoc(Component):
         self.persist_periph_base  = 0x00000900
         self.palette_periph_base  = 0x00000A00
         self.fb_periph_base       = 0x00000B00
+        self.pixel_plot_csr_base  = 0x00000D00
         self.psram_csr_base       = 0x00000C00
-
+        
+        # Fast memory-mapped region for PixelPlot commands
+        self.pixel_plot_mem_base  = 0xb0000000
+        
         # Some settings depend on whether code is in block RAM or SPI flash
         self.fw_location = fw_location
         match fw_location:
@@ -129,6 +133,8 @@ class TiliquaSoc(Component):
                 VexiiRiscv.MemoryRegion(base=self.spiflash_base, size=self.spiflash_size, cacheable=True, executable=True),
                 VexiiRiscv.MemoryRegion(base=self.psram_base, size=self.psram_size, cacheable=True, executable=True),
                 VexiiRiscv.MemoryRegion(base=self.csr_base, size=0x10000, cacheable=False, executable=False),
+                # Fast PixelPlot command region - uncached for fastest writes
+                VexiiRiscv.MemoryRegion(base=self.pixel_plot_mem_base, size=4, cacheable=False, executable=False),
             ] + extra_cpu_regions,
             variant=cpu_variant,
             reset_addr=self.reset_addr,
@@ -232,9 +238,18 @@ class TiliquaSoc(Component):
             bus_dma=self.psram_periph)
         self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
 
+        # Hardware-accelerated pixel plotting
+        self.pixel_plot = pixel_plot.PixelPlotPeripheral(fb=self.fb, fifo_depth=1024)
+        self.csr_decoder.add(self.pixel_plot.csr_bus, addr=self.pixel_plot_csr_base, name="pixel_plot")
+        self.wb_decoder.add(self.pixel_plot.wb_bus, addr=self.pixel_plot_mem_base, name="pixel_plot")
+        self.psram_periph.add_master(self.pixel_plot.bus_dma)
+        
         self.permit_bus_traffic = Signal()
 
         self.extra_rust_constants = []
+        
+        # Export memory base constant for fast Rust writes
+        self.add_rust_constant(f"pub const PIXEL_PLOT_MEM_BASE: usize = 0x{self.pixel_plot_mem_base:x};\n")
 
         if finalize_csr_bridge:
             self.finalize_csr_bridge()
@@ -330,6 +345,10 @@ class TiliquaSoc(Component):
 
         # video periph / persist
         m.submodules.persist_periph = self.persist_periph
+        
+        # hardware-accelerated pixel plotting
+        m.submodules.pixel_plot = self.pixel_plot
+        m.d.comb += self.pixel_plot.enable.eq(self.permit_bus_traffic)
 
         # audio interface
         m.submodules.pmod0 = self.pmod0

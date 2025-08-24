@@ -397,8 +397,9 @@ fn main() -> ! {
     info!("Hello from Tiliqua selftest!");
 
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
-    let modeline = bootinfo.modeline.maybe_override_fixed(
+    //let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
+    use tiliqua_hal::dma_framebuffer::DVIModeline;
+    let modeline = DVIModeline::default().maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
 
     let mut i2cdev = I2c0::new(peripherals.I2C0);
@@ -407,6 +408,7 @@ fn main() -> ! {
     let dtr = peripherals.DTR0;
 
     let mut startup_report = ReportString::new();
+    /*
     psram_memtest(&mut startup_report, &mut timer);
     spiflash_memtest(&mut startup_report, &mut timer);
     tusb322i_id_test(&mut startup_report, &mut i2cdev);
@@ -417,16 +419,17 @@ fn main() -> ! {
     timer.disable();
     timer.delay_ns(0);
 
-    let mut opts = Opts::default();
 
-    let cal_default = DefaultCalibrationConstants::from_array(
-        &PMOD_DEFAULT_CAL, pmod.f_bits());
     if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
         push_to_opts(&cal_constants, &mut opts, &cal_default);
         write!(startup_report, "PASS: load calibration from EEPROM").ok();
     } else {
         write!(startup_report, "FAIL: load calibration from EEPROM").ok();
     }
+    */
+    let cal_default = DefaultCalibrationConstants::from_array(
+        &PMOD_DEFAULT_CAL, pmod.f_bits());
+    let mut opts = Opts::default();
     info!("STARTUP REPORT: {}", startup_report);
 
     let app = Mutex::new(RefCell::new(App::new(opts)));
@@ -437,6 +440,7 @@ fn main() -> ! {
         peripherals.PALETTE_PERIPH,
         PSRAM_FB_BASE,
         modeline.clone(),
+        PIXEL_PLOT_MEM_BASE,
     );
 
     handler!(timer0 = || timer0_handler(&app));
@@ -489,8 +493,11 @@ fn main() -> ! {
 
             draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                hue).ok();
+            info!("draw1");
+            /*
             draw::draw_name(&mut display, h_active/2, 30, hue,
                             &bootinfo.manifest.name, &bootinfo.manifest.sha, &modeline).ok();
+            */
 
             if opts.tracker.page.value == Page::Report {
                 let mut status_report = ReportString::new();
