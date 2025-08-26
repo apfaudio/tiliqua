@@ -47,7 +47,7 @@ class PixelPlotPeripheral(wiring.Component):
     class ControlReg(csr.Register, access="w"):
         rotate_left: csr.Field(csr.action.W, unsigned(1))
 
-    def __init__(self, fb: DMAFramebuffer, fifo_depth=512, granularity=8):
+    def __init__(self, fb: DMAFramebuffer, fifo_depth=8, granularity=8):
         self.fb = fb
         self.fifo_depth = fifo_depth
         
@@ -134,8 +134,8 @@ class PixelPlotPeripheral(wiring.Component):
         m.d.comb += [
             x_coord.eq(rstream.payload[20:32]),    # Bits [31:20]
             y_coord.eq(rstream.payload[8:20]),     # Bits [19:8]
-            color.eq(rstream.payload[4:8]),        # Bits [7:4]
-            intensity.eq(rstream.payload[0:4]),    # Bits [3:0]
+            intensity.eq(rstream.payload[4:8]),    # Bits [7:4]
+            color.eq(rstream.payload[0:4]),        # Bits [3:0]
         ]
         
         # Pixel position calculations
@@ -153,17 +153,16 @@ class PixelPlotPeripheral(wiring.Component):
         
         # Coordinate transformation and bounds checking
         with m.If(rotate_left):
-            # 90° left rotation (like in Stroke component)
             m.d.comb += [
                 pixel_index.eq((-y_coord)[0:2]),
-                x_offs.eq((fb_hwords//2) + ((-y_coord)>>2)),
-                y_offs.eq(x_coord + (self.fb.timings.v_active>>1)),
+                x_offs.eq(((-y_coord)>>2)),
+                y_offs.eq(x_coord),
             ]
         with m.Else():
             m.d.comb += [
                 pixel_index.eq(x_coord[0:2]),
-                x_offs.eq((fb_hwords//2) + (x_coord>>2)),
-                y_offs.eq(y_coord + (self.fb.timings.v_active>>1)),
+                x_offs.eq((x_coord>>2)),
+                y_offs.eq(y_coord),
             ]
         
         m.d.comb += pixel_addr.eq(self.fb.fb_base + y_offs*fb_hwords + x_offs)
@@ -201,33 +200,20 @@ class PixelPlotPeripheral(wiring.Component):
                     m.next = 'PROCESS'
             
             with m.State('PROCESS'):
-                # Calculate new pixel values with additive blending
-                current_intensity = Signal(unsigned(4))
-                new_intensity = Signal(unsigned(4))
-                
-                m.d.comb += current_intensity.eq(pixels_read[pixel_index].intensity)
-                
-                # Additive blending with saturation
-                with m.If(current_intensity + intensity >= 0xF):
-                    m.d.comb += new_intensity.eq(0xF)
-                with m.Else():
-                    m.d.comb += new_intensity.eq(current_intensity + intensity)
-                
                 # Update the target pixel, preserve others
                 for i in range(pixels_per_word):
                     with m.If(pixel_index == i):
                         m.d.sync += [
                             pixels_write[i].color.eq(color),
-                            pixels_write[i].intensity.eq(new_intensity),
+                            pixels_write[i].intensity.eq(intensity),
                         ]
                     with m.Else():
                         m.d.sync += [
                             pixels_write[i].color.eq(pixels_read[i].color),
                             pixels_write[i].intensity.eq(pixels_read[i].intensity),
                         ]
-                
                 m.next = 'WRITE'
-            
+
             with m.State('WRITE'):
                 # Write modified pixel data back
                 m.d.comb += [

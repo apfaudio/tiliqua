@@ -50,6 +50,12 @@ CPU_VARIANTS = {
         '--with-btb',
         '--relaxed-btb',
         '--with-late-alu',
+        #
+        '--with-gshare',
+        '--with-ras',
+        '--regfile-async',
+        '--with-aligner-buffer',
+        '--with-dispatcher-buffer',
     ],
     # special variant with big icache, necessary if
     # the CPU is directly fetching instructions from spiflash

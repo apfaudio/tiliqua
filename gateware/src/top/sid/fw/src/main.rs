@@ -198,6 +198,7 @@ fn main() -> ! {
         peripherals.PALETTE_PERIPH,
         PSRAM_FB_BASE,
         modeline.clone(),
+        PIXEL_PLOT_MEM_BASE
     );
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
