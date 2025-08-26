@@ -21,31 +21,29 @@ from amaranth_soc          import wishbone, csr
 from amaranth_soc.memory   import MemoryMap
 
 from tiliqua.dma_framebuffer import DMAFramebuffer
+from tiliqua.pixel_plot_backend import PixelRequest
 
 class PixelPlotPeripheral(wiring.Component):
     """
     Hardware-accelerated pixel plotter with single-word command FIFO interface.
     
     Command Format (32-bit):
-    - Bits [31:20]: X coordinate (12 bits, 0-4095)
-    - Bits [19:8]:  Y coordinate (12 bits, 0-4095)  
+    - Bits [31:20]: X coordinate (12 bits, signed -2048 to +2047)
+    - Bits [19:8]:  Y coordinate (12 bits, signed -2048 to +2047)  
     - Bits [7:4]:   Color (4 bits, 0-15)
     - Bits [3:0]:   Intensity (4 bits, 0-15)
     
     Features:
     - Single bus write per pixel command
     - Deep command FIFO for pixel operations 
-    - Asynchronous pixel processing with read-modify-write
-    - Additive blending with saturation
-    - Optional 90° rotation support
+    - Uses shared PixelPlotBackend for actual plotting
+    - Direct pixel replacement (non-additive)
+    - Absolute coordinate positioning
     """
 
     class StatusReg(csr.Register, access="r"):
         fifo_level: csr.Field(csr.action.R, unsigned(16))
         busy:       csr.Field(csr.action.R, unsigned(1))
-
-    class ControlReg(csr.Register, access="w"):
-        rotate_left: csr.Field(csr.action.W, unsigned(1))
 
     def __init__(self, fb: DMAFramebuffer, fifo_depth=8, granularity=8):
         self.fb = fb
@@ -54,10 +52,9 @@ class PixelPlotPeripheral(wiring.Component):
         # Single-word command FIFO - much more efficient!
         self._cmd_fifo = fifo.SyncFIFOBuffered(width=32, depth=fifo_depth)
 
-        # CSR registers for status and control
+        # CSR registers for status
         regs = csr.Builder(addr_width=6, data_width=8)
         self._status  = regs.add("status",  self.StatusReg(),  offset=0x00)
-        self._control = regs.add("control", self.ControlReg(), offset=0x04)
         self._bridge = csr.Bridge(regs.as_memory_map())
 
         # Memory region for fast command writes (single 32-bit word = 4 bytes)
@@ -68,8 +65,7 @@ class PixelPlotPeripheral(wiring.Component):
             "csr_bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
             "wb_bus":  In(wishbone.Signature(addr_width=exact_log2(mem_depth),
                                            data_width=32, granularity=granularity)),
-            "bus_dma": Out(wishbone.Signature(addr_width=fb.bus.addr_width, 
-                                            data_width=32, granularity=8)),
+            "pixel_req": Out(stream.Signature(PixelRequest)),
             "enable": In(1),
         })
 
@@ -88,11 +84,6 @@ class PixelPlotPeripheral(wiring.Component):
 
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
-        # Store CSR register values 
-        rotate_left = Signal()
-        with m.If(self._control.f.rotate_left.w_stb):
-            m.d.sync += rotate_left.eq(self._control.f.rotate_left.w_data)
-
         # Single-word command interface - immediate processing!
         wstream = self._cmd_fifo.w_stream
         with m.If(self.wb_bus.cyc & self.wb_bus.stb & self.wb_bus.we):
@@ -110,122 +101,32 @@ class PixelPlotPeripheral(wiring.Component):
             self._status.f.busy.r_data.eq(self._cmd_fifo.level != 0),
         ]
 
-        # Pixel plotting engine - all inline in elaborate()
-        # Framebuffer parameters
-        fb_hwords = ((self.fb.timings.h_active * self.fb.bytes_per_pixel) // 4)
-        
-        # Define pixel structure: 4-bit color + 4-bit intensity  
-        pixel_layout = data.StructLayout({
-            "color": unsigned(4),
-            "intensity": unsigned(4),
-        })
-        pixels_per_word = 32 // pixel_layout.as_shape().width
-        pixel_array_layout = data.ArrayLayout(pixel_layout, pixels_per_word)
-
         # Command FIFO read stream
         rstream = self._cmd_fifo.r_stream
         
-        # Extract single-word command: [X:12|Y:12|Color:4|Intensity:4]
-        x_coord = Signal(12)
-        y_coord = Signal(12) 
+        # Extract single-word command: [X:12|Y:12|Color:4|Intensity:4] (signed coordinates)
+        x_coord = Signal(signed(12))
+        y_coord = Signal(signed(12)) 
         color = Signal(4)
         intensity = Signal(4)
         
         m.d.comb += [
-            x_coord.eq(rstream.payload[20:32]),    # Bits [31:20]
-            y_coord.eq(rstream.payload[8:20]),     # Bits [19:8]
+            x_coord.eq(rstream.payload[20:32]),    # Bits [31:20] (signed)
+            y_coord.eq(rstream.payload[8:20]),     # Bits [19:8] (signed)
             intensity.eq(rstream.payload[4:8]),    # Bits [7:4]
             color.eq(rstream.payload[0:4]),        # Bits [3:0]
         ]
-        
-        # Pixel position calculations
-        x_offs = Signal(unsigned(16))
-        y_offs = Signal(unsigned(16))
-        pixel_index = Signal(unsigned(2))  # Which of the 4 pixels in the word
-        pixel_addr = Signal(unsigned(32))
-        
-        # Pixel data for read-modify-write
-        pixels_read = Signal(pixel_array_layout)
-        pixels_write = Signal(pixel_array_layout)
-        
-        # DMA bus
-        bus = self.bus_dma
-        
-        # Coordinate transformation and bounds checking
-        with m.If(rotate_left):
-            m.d.comb += [
-                pixel_index.eq((-y_coord)[0:2]),
-                x_offs.eq(((-y_coord)>>2)),
-                y_offs.eq(x_coord),
-            ]
-        with m.Else():
-            m.d.comb += [
-                pixel_index.eq(x_coord[0:2]),
-                x_offs.eq((x_coord>>2)),
-                y_offs.eq(y_coord),
-            ]
-        
-        m.d.comb += pixel_addr.eq(self.fb.fb_base + y_offs*fb_hwords + x_offs)
 
-        # Pixel plotting FSM - processes commands from FIFO
-        with m.FSM() as fsm:
-            
-            with m.State('IDLE'):
-                with m.If(self.enable & rstream.valid):
-                    m.next = 'CHECK_BOUNDS'
-            
-            with m.State('CHECK_BOUNDS'):
-                # Only plot pixels within framebuffer bounds (12-bit coords)
-                with m.If((x_offs < fb_hwords) & (y_offs < self.fb.timings.v_active)):
-                    m.d.sync += [
-                        bus.sel.eq(0xf),
-                        bus.adr.eq(pixel_addr),
-                    ]
-                    m.next = 'READ'
-                with m.Else():
-                    # Skip out-of-bounds pixels
-                    m.d.comb += rstream.ready.eq(1)
-                    m.next = 'IDLE'
-            
-            with m.State('READ'):
-                # Read current pixel data
-                m.d.comb += [
-                    bus.stb.eq(1),
-                    bus.cyc.eq(1),
-                    bus.we.eq(0),
-                ]
-                
-                with m.If(bus.stb & bus.ack):
-                    m.d.sync += pixels_read.as_value().eq(bus.dat_r)
-                    m.next = 'PROCESS'
-            
-            with m.State('PROCESS'):
-                # Update the target pixel, preserve others
-                for i in range(pixels_per_word):
-                    with m.If(pixel_index == i):
-                        m.d.sync += [
-                            pixels_write[i].color.eq(color),
-                            pixels_write[i].intensity.eq(intensity),
-                        ]
-                    with m.Else():
-                        m.d.sync += [
-                            pixels_write[i].color.eq(pixels_read[i].color),
-                            pixels_write[i].intensity.eq(pixels_read[i].intensity),
-                        ]
-                m.next = 'WRITE'
-
-            with m.State('WRITE'):
-                # Write modified pixel data back
-                m.d.comb += [
-                    bus.stb.eq(1),
-                    bus.cyc.eq(1),
-                    bus.we.eq(1),
-                    bus.dat_w.eq(pixels_write.as_value()),
-                ]
-                
-                with m.If(bus.stb & bus.ack):
-                    # Command complete, get next one
-                    m.d.comb += rstream.ready.eq(1)
-                    m.next = 'IDLE'
+        # Generate pixel requests for shared backend
+        m.d.comb += [
+            self.pixel_req.valid.eq(self.enable & rstream.valid),
+            self.pixel_req.payload.x.eq(x_coord),
+            self.pixel_req.payload.y.eq(y_coord),
+            self.pixel_req.payload.color.eq(color),
+            self.pixel_req.payload.intensity.eq(intensity),
+            self.pixel_req.payload.additive.eq(0),  # PixelPlot uses direct replacement
+            self.pixel_req.payload.center_relative.eq(0),  # Assume absolute coordinates
+            rstream.ready.eq(self.pixel_req.ready),
+        ]
 
         return m

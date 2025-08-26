@@ -18,6 +18,7 @@ from amaranth_future         import fixed
 
 from tiliqua                 import dsp
 from tiliqua.dma_framebuffer import DMAFramebuffer
+from tiliqua.pixel_plot_backend import PixelRequest
 from tiliqua.eurorack_pmod   import ASQ
 
 from amaranth_soc            import wishbone, csr
@@ -25,19 +26,15 @@ from amaranth_soc            import wishbone, csr
 class Stroke(wiring.Component):
 
     """
-    Read samples, upsample them, and draw to a framebuffer.
-    Pixels are DMA'd to PSRAM as a wishbone master, NOT in bursts, as we have no idea
-    where each pixel is going to land beforehand. This is the most expensive use of
-    PSRAM time in this project as we spend ages waiting on memory latency.
+    Read samples, upsample them, and generate pixel requests for a shared plotting backend.
+    
+    This refactored version removes the direct framebuffer access and instead generates
+    PixelRequest stream that can be fed to a shared PixelPlotBackend. This allows
+    multiple Stroke instances to share the same plotting hardware via round-robin
+    arbitration, greatly reducing resource usage.
 
-    TODO: can we somehow cache bursts of pixels here?
-
-    Each pixel must be read before we write it for 2 reasons:
-    - We have 4 pixels per word, so we can't just write 1 pixel as it would erase the
-      adjacent ones.
-    - We don't just set max intensity on drawing a pixel, rather we read the current
-      intensity and add to it. Otherwise, we get no intensity gradient and the display
-      looks nowhere near as nice :)
+    With the new signed coordinate system and center_relative flag, the stroke component
+    can work directly in center-relative coordinates, making the math much cleaner.
 
     To obtain more points, the pixels themselves are upsampled using an FIR-based
     fractional resampler. This is kind of analogous to sin(x)/x interpolation.
@@ -64,10 +61,8 @@ class Stroke(wiring.Component):
             # Point stream to render
             # 4 channels: x, y, intensity, color
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
-            # Rotate all draws 90 degrees to the left (screen_rotation)
-            "rotate_left": In(1),
-            # We are a DMA master (no burst support)
-            "bus":  Out(wishbone.Signature(addr_width=fb.bus.addr_width, data_width=32, granularity=8)),
+            # Pixel request output to shared backend
+            "pixel_req": Out(stream.Signature(PixelRequest)),
             # Kick this to start the core
             "enable": In(1),
             # Internal point stream, upsampled from self.i (TODO no need to expose this)
@@ -77,19 +72,6 @@ class Stroke(wiring.Component):
 
     def elaborate(self, platform) -> Module:
         m = Module()
-
-        bus = self.bus
-
-        fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
-        fb_hwords = ((self.fb.timings.h_active*self.fb.bytes_per_pixel)//4)
-
-        # Define pixel structure: 4-bit color + 4-bit intensity
-        pixel_layout = data.StructLayout({
-            "color": unsigned(4),
-            "intensity": unsigned(4),
-        })
-        pixels_per_word = self.bus.data_width // pixel_layout.as_shape().width
-        pixel_array_layout = data.ArrayLayout(pixel_layout, pixels_per_word)
 
         if self.n_upsample is not None and self.n_upsample != 1:
             # If interpolation is enabled, insert an FIR upsampling stage.
@@ -118,40 +100,28 @@ class Stroke(wiring.Component):
             # No upsampling.
             wiring.connect(m, wiring.flipped(self.i), self.point_stream)
 
-        # Structured pixel data
-        pixels_read = Signal(pixel_array_layout)
-        pixels_write = Signal(pixel_array_layout)
-
-        # pixel position
-        x_offs = Signal(unsigned(16))
-        y_offs = Signal(unsigned(16))
-        pixel_index = Signal(unsigned(2))  # Which of the 4 pixels in the word
-        pixel_offs = Signal(unsigned(32))
-
         # last sample
         sample_x = Signal(signed(16))
         sample_y = Signal(signed(16))
-        sample_p = Signal(signed(16)) # intensity modulation TODO
-        sample_c = Signal(signed(16)) # color modulation DONE
-
-        m.d.comb += pixel_offs.eq(y_offs*fb_hwords + x_offs),
-        with m.If(self.rotate_left):
-            # remap pixel offset for 90deg rotation
-            m.d.comb += [
-                pixel_index.eq((-sample_y)[0:2]),
-                x_offs.eq((fb_hwords//2) + ((-sample_y)>>2)),
-                y_offs.eq(sample_x + (self.fb.timings.v_active>>1)),
-            ]
-        with m.Else():
-            m.d.comb += [
-                pixel_index.eq(sample_x[0:2]),
-                x_offs.eq((fb_hwords//2) + (sample_x>>2)),
-                y_offs.eq(sample_y + (self.fb.timings.v_active>>1)),
-            ]
+        sample_p = Signal(signed(16)) # intensity modulation
+        sample_c = Signal(signed(16)) # color modulation
 
         # Overall x / y scale depends on ASQ fractional bits as we often take raw counts.
         # This ensures this component still works as expected with 10/16/24-bit samples.
         asq_extra_bits = ASQ.f_bits - 15
+
+        # Pixel request generation
+        new_color = Signal(unsigned(4))
+        sample_intensity = Signal(unsigned(4))
+
+        # Calculate new color (sample color + base hue)
+        m.d.comb += new_color.eq(sample_c + self.hue)
+
+        # Calculate sample intensity with bounds checking
+        with m.If((sample_p + self.intensity > 0) & (sample_p + self.intensity <= 0xf)):
+            m.d.comb += sample_intensity.eq(sample_p + self.intensity)
+        with m.Else():
+            m.d.comb += sample_intensity.eq(0)
 
         with m.FSM() as fsm:
 
@@ -160,7 +130,6 @@ class Stroke(wiring.Component):
                     m.next = 'LATCH0'
 
             with m.State('LATCH0'):
-
                 m.d.comb += self.point_stream.ready.eq(1)
                 # Fired on every audio sample fs_strobe
                 with m.If(self.point_stream.valid):
@@ -171,91 +140,22 @@ class Stroke(wiring.Component):
                         sample_p.eq(Mux(self.scale_p != 0xf, self.point_stream.payload[2].as_value()>>(self.scale_p+asq_extra_bits), 0)),
                         sample_c.eq(Mux(self.scale_c != 0xf, self.point_stream.payload[3].as_value()>>(self.scale_c+asq_extra_bits), 0)),
                     ]
-                    m.next = 'LATCH1'
+                    m.next = 'SEND_PIXEL'
 
-            with m.State('LATCH1'):
-
-                with m.If((x_offs < fb_hwords) & (y_offs < self.fb.timings.v_active)):
-                    m.d.sync += [
-                        bus.sel.eq(0xf),
-                        bus.adr.eq(self.fb.fb_base + pixel_offs),
-                    ]
-                    m.next = 'READ'
-                with m.Else():
-                    # don't draw outside the screen boundaries
-                    m.next = 'LATCH0'
-
-            with m.State('READ'):
-
+            with m.State('SEND_PIXEL'):
+                # Generate pixel request for the shared backend
+                # Using center_relative=1 since we work with signed offsets from center
                 m.d.comb += [
-                    bus.stb.eq(1),
-                    bus.cyc.eq(1),
-                    bus.we.eq(0),
+                    self.pixel_req.valid.eq(1),
+                    self.pixel_req.payload.x.eq(sample_x),
+                    self.pixel_req.payload.y.eq(sample_y),
+                    self.pixel_req.payload.color.eq(new_color),
+                    self.pixel_req.payload.intensity.eq(sample_intensity),
+                    self.pixel_req.payload.additive.eq(1),  # Stroke uses additive blending
+                    self.pixel_req.payload.center_relative.eq(1),  # Work relative to center
                 ]
-
-                with m.If(bus.stb & bus.ack):
-                    m.d.sync += pixels_read.as_value().eq(bus.dat_r)
-                    m.next = 'WAIT'
-
-            with m.State('WAIT'):
-                m.next = 'WAIT2'
-
-            with m.State('WAIT2'):
-                m.next = 'WAIT3'
-
-            with m.State('WAIT3'):
-                m.next = 'WRITE'
-
-            with m.State('WRITE'):
-
-                m.d.comb += [
-                    bus.stb.eq(1),
-                    bus.cyc.eq(1),
-                    bus.we.eq(1),
-                ]
-
-                # Calculate new pixel values
-                new_color = Signal(unsigned(4))
-                sample_intensity = Signal(unsigned(4))
-                current_intensity = Signal(unsigned(4))
-                new_intensity = Signal(unsigned(4))
-
-                # Extract current pixel data
-                m.d.comb += current_intensity.eq(pixels_read[pixel_index].intensity)
-
-                # Calculate new color (sample color + base hue)
-                m.d.comb += new_color.eq(sample_c + self.hue)
-
-                # Calculate sample intensity with bounds checking
-                with m.If((sample_p + self.intensity > 0) & (sample_p + self.intensity <= 0xf)):
-                    m.d.sync += sample_intensity.eq(sample_p + self.intensity)
-                with m.Else():
-                    m.d.sync += sample_intensity.eq(0)
-
-                # Calculate new intensity (add with saturation)
-                with m.If(current_intensity + sample_intensity >= 0xF):
-                    m.d.comb += new_intensity.eq(0xF)
-                with m.Else():
-                    m.d.comb += new_intensity.eq(current_intensity + sample_intensity)
-
-                # Copy new pixel from read data to write data
-                for i in range(pixels_per_word):
-                    with m.If(pixel_index == i):
-                        m.d.comb += [
-                            pixels_write[i].color.eq(new_color),
-                            pixels_write[i].intensity.eq(new_intensity),
-                        ]
-                    # Preserve other pixels unchanged
-                    with m.Else():
-                        m.d.comb += [
-                            pixels_write[i].color.eq(pixels_read[i].color),
-                            pixels_write[i].intensity.eq(pixels_read[i].intensity),
-                        ]
-
-                # Write pixel data back to bus
-                m.d.comb += bus.dat_w.eq(pixels_write.as_value())
-
-                with m.If(bus.stb & bus.ack):
+                
+                with m.If(self.pixel_req.ready):
                     m.next = 'LATCH0'
 
         return ResetInserter({'sync': ~self.fb.enable})(m)
