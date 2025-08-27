@@ -96,8 +96,8 @@ macro_rules! impl_dma_framebuffer {
     )+) => {
         $(
             use tiliqua_hal::dma_framebuffer::{DVIModeline, Rotate};
-            use embedded_graphics::prelude::{Pixel, Size, OriginDimensions, DrawTarget, GrayColor};
-            use embedded_graphics::pixelcolor::Gray8;
+            use tiliqua_hal::embedded_graphics::prelude::{Pixel, Size, OriginDimensions, DrawTarget, GrayColor};
+            use tiliqua_hal::embedded_graphics::pixelcolor::Gray8;
 
             pub struct $DMA_FRAMEBUFFERX {
                 registers_fb: $PACFRAMEBUFFERX,
