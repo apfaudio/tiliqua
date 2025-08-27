@@ -245,6 +245,7 @@ macro_rules! impl_dma_framebuffer {
                                 panic!("Sprite memory out of bounds: offset {} >= 2048", word_offset);
                             }
                             unsafe {
+                                log::info!("{:#x}@{:#x}", word_value, word_offset);
                                 sprite_mem.offset(word_offset).write_volatile(word_value);
                             }
                         }
@@ -256,7 +257,7 @@ macro_rules! impl_dma_framebuffer {
                     Ok(())
                 }
 
-                fn blit_sprite(&mut self, key: u32, src_x: u32, src_y: u32, width: u32, height: u32, dst_x: i32, dst_y: i32) -> Result<(), Self::Error> {
+                fn blit_sprite(&mut self, key: u32, src_x: u32, src_y: u32, width: u32, height: u32, dst_x: i32, dst_y: i32, color: Self::Color) -> Result<(), Self::Error> {
                     // Verify the correct spritesheet is loaded
                     if self.current_spritesheet_key != key {
                         // Spritesheet not loaded, this is an error condition
@@ -277,13 +278,20 @@ macro_rules! impl_dma_framebuffer {
                         w.height().bits(height as u8)
                     });
 
+                    //log::info!("s_x={} s_y={} w={} h={}", src_x, src_y, width, height);
+
+                    // Convert Gray8 color to 4-bit color and intensity
+                    let luma = color.luma();
+                    let intensity_4bit = (luma >> 4) & 0xF;
+                    let color_4bit = luma & 0xF;
+
                     // Trigger blit with destination parameters (CMD1)
                     // This starts the hardware operation in parallel
                     self.registers_blitter.blit().write(|w| unsafe {
                         w.dst_x().bits(dst_x as u16); // Convert signed to unsigned representation
                         w.dst_y().bits(dst_y as u16);
-                        w.color().bits(0xF); // White color
-                        w.intensity().bits(0xF) // Full intensity
+                        w.color().bits(color_4bit); // Use actual color from text style
+                        w.intensity().bits(intensity_4bit) // Use actual intensity from text style
                     });
 
                     // Don't wait for completion - let hardware run in parallel
