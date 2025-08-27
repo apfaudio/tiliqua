@@ -461,6 +461,13 @@ where
     for n in 0..text_l.len() { text_l[n][0] = 45 };
 
     Text::with_alignment(
+        text_title,
+        Point::new((x + 80) as i32, (y-10) as i32),
+        font_small_white,
+        Alignment::Center
+    ).draw(d)?;
+
+    Text::with_alignment(
         "touch  jack".into(),
         Point::new((x+45-15) as i32, (y+15+5) as i32),
         font_small_white,
@@ -493,13 +500,6 @@ where
             Alignment::Left
         ).draw(d)?;
     }
-
-    Text::with_alignment(
-        text_title,
-        Point::new((x + 80) as i32, (y-10) as i32),
-        font_small_white,
-        Alignment::Center
-    ).draw(d)?;
 
     Text::with_alignment(
         text_desc,
