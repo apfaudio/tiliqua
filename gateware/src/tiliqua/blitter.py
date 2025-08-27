@@ -200,7 +200,18 @@ class SimpleBlitterPeripheral(wiring.Component):
             with m.State('CHECK_PIXEL'):
                 # Check if current sprite pixel should be drawn (bit = 1)
                 current_pixel_bit = Signal()
-                m.d.comb += current_pixel_bit.eq(pixel_data.bit_select(pixel_bit_index, 1))
+                # Handle MSB-first bit ordering within bytes from embedded-graphics
+                # Convert bit index to account for byte-swapped storage
+                byte_in_word = Signal(3)  # Which byte (0-3)
+                bit_in_byte = Signal(3)   # Which bit in that byte (0-7)
+                corrected_bit_index = Signal(5)  # Corrected bit index (0-31)
+                
+                m.d.comb += [
+                    byte_in_word.eq(pixel_bit_index >> 3),  # Which byte (0-3)
+                    bit_in_byte.eq(pixel_bit_index[0:3]),   # Which bit in that byte (0-7)
+                    corrected_bit_index.eq((byte_in_word << 3) | (7 - bit_in_byte)),  # MSB-first within byte
+                    current_pixel_bit.eq(pixel_data.bit_select(corrected_bit_index, 1)),
+                ]
                 
                 with m.If(current_pixel_bit):
                     # Pixel should be drawn - send request to backend

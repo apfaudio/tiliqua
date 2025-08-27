@@ -218,6 +218,7 @@ macro_rules! impl_dma_framebuffer {
                     let sprite_mem = self.blitter_mem_base;
                     let bytes_per_row = (width + 7) / 8;
 
+                    /*
                     // Debug: Print first 32x32 section of original data
                     log::info!("First 32x32 section of original embedded-graphics data:");
                     for debug_y in 0..32.min(height) {
@@ -239,6 +240,7 @@ macro_rules! impl_dma_framebuffer {
                             log::info!("{}", line_str);
                         }
                     }
+                    */
 
                     // Debug: Store first 32 words for readback
                     let mut debug_words = [0u32; 32];
@@ -253,7 +255,8 @@ macro_rules! impl_dma_framebuffer {
                             
                             // Only fill with data if we're within the actual image width
                             if word_in_row * 32 < width {
-                                // Pack 4 bytes (32 pixels) into one 32-bit word
+                                // Pack 4 bytes (32 pixels) directly into one 32-bit word
+                                // Hardware will handle the MSB-first bit ordering
                                 for byte_in_word in 0..4 {
                                     let byte_idx = row_start_byte + (word_in_row * 4 + byte_in_word) as usize;
                                     if byte_idx < pixels.len() {
@@ -281,21 +284,28 @@ macro_rules! impl_dma_framebuffer {
                         }
                     }
 
+                    /*
                     // Debug: Print first 32x32 section as ASCII art using stored data
-                    log::info!("First 32x32 section of uploaded spritesheet:");
+                    // Use the same bit ordering correction as hardware
+                    log::info!("First 32x32 section of uploaded spritesheet (hardware view):");
                     for debug_y in 0..32 {
                         let mut line = [0u8; 33]; // 32 chars + null terminator
                         let word_data = debug_words[debug_y];
-                        // Extract each bit and convert to ASCII
-                        for bit_idx in 0..32 {
-                            let bit = (word_data >> bit_idx) & 1;
-                            line[bit_idx] = if bit == 1 { b'#' } else { b'.' };
+                        // Extract each bit using hardware's corrected indexing
+                        for pixel_idx in 0..32 {
+                            // Apply same correction as hardware:
+                            let byte_in_word = pixel_idx / 8;  // Which byte (0-3)
+                            let bit_in_byte = pixel_idx % 8;   // Which bit in that byte (0-7)
+                            let corrected_bit_index = (byte_in_word * 8) + (7 - bit_in_byte);  // MSB-first within byte
+                            let bit = (word_data >> corrected_bit_index) & 1;
+                            line[pixel_idx] = if bit == 1 { b'#' } else { b'.' };
                         }
                         line[32] = 0; // null terminator
                         if let Ok(line_str) = core::str::from_utf8(&line[..32]) {
                             log::info!("{}", line_str);
                         }
                     }
+                    */
 
                     // Update the local key to indicate this spritesheet is loaded
                     self.current_spritesheet_key = key;
