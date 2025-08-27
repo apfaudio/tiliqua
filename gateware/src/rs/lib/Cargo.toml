@@ -8,21 +8,29 @@ name = "tiliqua_lib"
 path = "src/lib.rs"
 
 [dependencies]
-log = "0.4.17"
-heapless = "0.8.0"
-strum_macros = "0.26.4"
-strum = {version = "0.25.0", features = ["derive"], default-features=false}
-micromath = "2.1.0"
-fixed = "1.28.0"
-midi-types = "0.1.7"
+# Use workspace dependencies
+log.workspace = true
+heapless.workspace = true
+strum_macros.workspace = true
+strum.workspace = true
+micromath.workspace = true
+fixed.workspace = true
+midi-types.workspace = true
+embedded-hal.workspace = true
+serde.workspace = true
+serde_derive.workspace = true
+postcard.workspace = true
+crc.workspace = true
+
+# Local dependencies
 tiliqua-hal = { path="../hal", default-features = false }
 tiliqua-manifest = { path="../manifest" }
 opts = { path="../opts" }
-embedded-hal = "=1.0.0"
-serde = { version="1.0.219", default-features=false }
-serde_derive = "1.0.219"
-postcard = { version="1.1.3", default-features=false, features = ["use-crc"] }
-crc = { version="3.0", default-features=false }
+
+# Additional dependencies for prelude re-exports
+fastrand.workspace = true
+critical-section.workspace = true
+irq.workspace = true
 
 [dev-dependencies]
 critical-section = { version = "1.1.2", features = ["std"] }

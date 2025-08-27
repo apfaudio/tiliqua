@@ -1,25 +1,18 @@
 #![no_std]
 #![no_main]
 
-use critical_section::Mutex;
-use log::info;
-use riscv_rt::entry;
-use irq::handler;
 use core::cell::RefCell;
+use riscv_rt::entry;
+
+// Import everything through the prelude
+use tiliqua_lib::prelude::*;
 
 use tiliqua_fw::*;
-use tiliqua_lib::*;
-use tiliqua_lib::dsp::OnePoleSmoother;
+use xbeam_pac as pac;
 use pac::constants::*;
-use tiliqua_lib::calibration::*;
-
-use tiliqua_hal::embedded_graphics::prelude::*;
 
 use options::*;
-use opts::persistence::*;
-use hal::pca9635::Pca9635Driver;
-use tiliqua_hal::persist::Persist;
-use tiliqua_hal::dma_framebuffer::Rotate;
+use colorsys;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 

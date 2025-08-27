@@ -12,3 +12,4 @@ pub mod calibration;
 pub mod edid;
 pub mod bootinfo;
 pub mod eeprominfo;
+pub mod prelude;

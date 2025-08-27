@@ -1,12 +1,12 @@
 [package]
-name = "tiliqua-fw"
+name = "bootloader-fw"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 tiliqua-hal = { path="../../../rs/hal", default-features = false }
 tiliqua-lib = { path = "../../../rs/lib" }
-tiliqua-pac = { path="../pac", default-features = false, features = ["critical-section", "vexriscv"] }
+bootloader-pac = { path="../pac", default-features = false, features = ["critical-section", "vexriscv"] }
 opts = { path = "../../../rs/opts" }
 
 log = "0.4.17"

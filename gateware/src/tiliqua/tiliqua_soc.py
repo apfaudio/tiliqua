@@ -480,6 +480,19 @@ class TiliquaSoc(Component):
         # Copy out the template and modify it for our SoC.
         shutil.rmtree(pac_dir, ignore_errors=True)
         shutil.copytree("src/rs/template/pac", pac_dir)
+        
+        # Use ui_name for consistent package naming
+        target_name = self.ui_name.lower()
+        cargo_toml_path = os.path.join(pac_dir, "Cargo.toml")
+        
+        # Read the Cargo.toml and replace the package name
+        with open(cargo_toml_path, 'r') as f:
+            content = f.read()
+        
+        content = content.replace('name = "tiliqua-pac"', f'name = "{target_name}-pac"')
+        
+        with open(cargo_toml_path, 'w') as f:
+            f.write(content)
         pac_build_dir = os.path.join(pac_dir, "build")
         pac_gen_dir   = os.path.join(pac_dir, "src/generated")
         src_genrs     = os.path.join(pac_dir, "src/generated.rs")

@@ -5,6 +5,9 @@ edition = "2021"
 rust-version = "1.68"
 include = ["src/**/*", "README.md", "device.x", "build.rs"]
 
+# Empty workspace table makes this crate standalone (not part of parent workspace)
+[workspace]
+
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 targets = [

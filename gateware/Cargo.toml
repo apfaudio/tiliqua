@@ -1,0 +1,83 @@
+[workspace]
+resolver = "2"
+members = [
+    "src/rs/hal",
+    "src/rs/lib", 
+    "src/rs/opts",
+    "src/rs/opts_derive",
+    "src/rs/manifest",
+    "src/rs/isr",
+    "src/top/*/fw",
+    "src/top/*/pac",
+]
+
+# Firmware and PAC crates are excluded from workspace as they:
+# - Depend on PACs that may not exist yet (generated dynamically)
+# - Are built individually by the project build system
+# - Still benefit from workspace.dependencies when built independently
+
+[workspace.dependencies]
+# Core embedded dependencies - pinned versions
+embedded-hal = "=1.0.0"
+embedded-hal-nb = "=1.0.0"
+riscv = { version = "=0.11.1", features = ["critical-section-single-hart"] }
+riscv-rt = { version = "=0.12.2", features = ["single-hart"] }
+critical-section = "1.2.0"
+
+# Common utility crates
+log = "0.4.17"
+heapless = "0.8.0"
+micromath = "2.1.0"
+fastrand = { version = "2.1.0", default-features = false }
+panic-halt = "0.2.0"
+nb = "=1.1.0"
+irq = "0.2.3"
+
+# Serialization - consistent versions
+serde = { version = "1.0.219", default-features = false }
+serde_derive = "1.0.219"
+postcard = { version = "1.1.3", default-features = false, features = ["use-crc"] }
+crc = { version = "3.0", default-features = false }
+
+# String/enum utilities
+strum = { version = "0.25.0", features = ["derive"], default-features = false }
+strum_macros = "0.26.4"
+
+# Math and data types
+fixed = "1.28.0"
+bitflags = "2.6.0"
+
+# Storage
+embedded-storage = "0.3.1"
+embedded-storage-async = "0.4.1"
+
+# Audio/MIDI specific
+midi-types = "0.1.7" 
+midi-convert = "0.2.0"
+mi-plaits-dsp = "0.2.0"
+
+# Graphics/colors
+colorsys = { version = "0.2.4", default-features = false }
+
+# Memory allocation
+embedded-alloc = "0.6.0"
+
+# Special dependencies
+serde-json-core = "0.6.0"
+
+# Graphics dependency
+embedded-graphics = { git = "https://github.com/vk2seb/embedded-graphics.git", branch = "seb/fast-draw" }
+
+# Development dependencies
+env_logger = "0.11.6"
+
+# Local crates
+tiliqua-hal = { path = "src/rs/hal", default-features = false }
+tiliqua-lib = { path = "src/rs/lib" }
+tiliqua-manifest = { path = "src/rs/manifest" }
+opts = { path = "src/rs/opts" }
+opts-derive = { path = "src/rs/opts_derive" }
+amaranth-soc-isr = { path = "src/rs/isr", default-features = false }
+
+# Template dependency for development
+image = "0.24.7"
