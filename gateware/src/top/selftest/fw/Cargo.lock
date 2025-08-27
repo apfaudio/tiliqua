@@ -127,14 +127,32 @@ dependencies = [
 [[package]]
 name = "embedded-graphics"
 version = "0.8.1"
+dependencies = [
+ "az",
+ "embedded-graphics-core 0.4.0",
+ "float-cmp",
+ "integer-sqrt",
+ "micromath",
+]
+
+[[package]]
+name = "embedded-graphics"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0649998afacf6d575d126d83e68b78c0ab0e00ca2ac7e9b3db11b4cbe8274ef0"
 dependencies = [
  "az",
  "byteorder",
- "embedded-graphics-core",
+ "embedded-graphics-core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "float-cmp",
  "micromath",
+]
+
+[[package]]
+name = "embedded-graphics-core"
+version = "0.4.0"
+dependencies = [
+ "az",
 ]
 
 [[package]]
@@ -316,6 +334,15 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+
+[[package]]
+name = "integer-sqrt"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "276ec31bcb4a9ee45f58bec6f9ec700ae4cf4f4f8f2fa7e06cb406bd5ffdd770"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "irq"
@@ -604,7 +631,7 @@ version = "0.1.0"
 dependencies = [
  "amaranth-soc-isr",
  "critical-section",
- "embedded-graphics",
+ "embedded-graphics 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 1.0.0",
  "fastrand",
  "heapless",
@@ -629,7 +656,7 @@ name = "tiliqua-hal"
 version = "0.0.0"
 dependencies = [
  "bitflags",
- "embedded-graphics",
+ "embedded-graphics 0.8.1",
  "embedded-hal 1.0.0",
  "embedded-hal-nb",
  "embedded-storage",
@@ -645,7 +672,7 @@ name = "tiliqua-lib"
 version = "0.1.0"
 dependencies = [
  "crc",
- "embedded-graphics",
+ "embedded-graphics 0.8.1",
  "embedded-hal 1.0.0",
  "fixed",
  "heapless",

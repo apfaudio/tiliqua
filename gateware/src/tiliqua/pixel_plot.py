@@ -45,8 +45,7 @@ class PixelPlotPeripheral(wiring.Component):
         fifo_level: csr.Field(csr.action.R, unsigned(16))
         busy:       csr.Field(csr.action.R, unsigned(1))
 
-    def __init__(self, fb: DMAFramebuffer, fifo_depth=8, granularity=8):
-        self.fb = fb
+    def __init__(self, fifo_depth=8, granularity=8):
         self.fifo_depth = fifo_depth
         
         # Single-word command FIFO - much more efficient!

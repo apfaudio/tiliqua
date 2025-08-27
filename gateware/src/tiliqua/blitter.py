@@ -71,7 +71,7 @@ class SimpleBlitterPeripheral(wiring.Component):
         self.memory_addr_width = exact_log2(memory_words)
         
         # Local sprite memory (1-bit per pixel, 32 pixels per word)
-        self._sprite_mem = Memory(width=32, depth=memory_words)
+        self._sprite_mem = Memory(shape=unsigned(32), depth=memory_words, init=[])
         
         # CSR registers
         regs = csr.Builder(addr_width=6, data_width=8)
@@ -94,7 +94,7 @@ class SimpleBlitterPeripheral(wiring.Component):
         self.csr_bus.memory_map = self._bridge.bus.memory_map
         
         # Memory map for sprite memory
-        sprite_mem_map = MemoryMap(addr_width=self.memory_addr_width, data_width=8)
+        sprite_mem_map = MemoryMap(addr_width=(self.memory_addr_width+2), data_width=8)
         sprite_mem_map.add_resource(name=("sprite_memory",), size=memory_words*4, resource=self)
         self.sprite_mem_bus.memory_map = sprite_mem_map
 
