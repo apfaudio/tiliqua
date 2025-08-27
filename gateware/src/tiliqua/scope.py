@@ -13,13 +13,13 @@ from amaranth_soc                                import csr
 
 from tiliqua                                     import dsp
 from tiliqua.raster_stroke                       import Stroke
+from tiliqua.pixel_plot_backend                  import PixelRequest
 from tiliqua.eurorack_pmod                       import ASQ
 
 class VectorTracePeripheral(wiring.Component):
 
     class Flags(csr.Register, access="w"):
         enable: csr.Field(csr.action.W, unsigned(1))
-        rotate_left: csr.Field(csr.action.W, unsigned(1))
 
     class HueReg(csr.Register, access="w"):
         hue: csr.Field(csr.action.W, unsigned(8))
@@ -55,11 +55,10 @@ class VectorTracePeripheral(wiring.Component):
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
             "en": In(1),
             "soc_en": In(1),
-            "rotate_left": In(1),
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            # DMA bus (plotting)
-            "bus_dma": Out(self.stroke.bus.signature),
+            # Pixel request output to shared backend
+            "pixel_req": Out(stream.Signature(PixelRequest)),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -69,11 +68,10 @@ class VectorTracePeripheral(wiring.Component):
         m.submodules += self.stroke
 
         wiring.connect(m, wiring.flipped(self.i), self.stroke.i)
-        wiring.connect(m, self.stroke.bus, wiring.flipped(self.bus_dma))
+        wiring.connect(m, self.stroke.pixel_req, wiring.flipped(self.pixel_req))
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         m.d.comb += self.stroke.enable.eq(self.en & self.soc_en)
-        m.d.comb += self.stroke.rotate_left.eq(self.rotate_left)
 
         with m.If(self._hue.f.hue.w_stb):
             m.d.sync += self.stroke.hue.eq(self._hue.f.hue.w_data)
@@ -102,16 +100,12 @@ class VectorTracePeripheral(wiring.Component):
         with m.If(self._flags.f.enable.w_stb):
             m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
 
-        with m.If(self._flags.f.rotate_left.w_stb):
-            m.d.sync += self.rotate_left.eq(self._flags.f.rotate_left.w_data)
-
         return m
 
 class ScopeTracePeripheral(wiring.Component):
 
     class Flags(csr.Register, access="w"):
         enable: csr.Field(csr.action.W, unsigned(1))
-        rotate_left: csr.Field(csr.action.W, unsigned(1))
         trigger_always: csr.Field(csr.action.W, unsigned(1))
 
     class Hue(csr.Register, access="w"):
@@ -161,11 +155,10 @@ class ScopeTracePeripheral(wiring.Component):
             "i": In(stream.Signature(data.ArrayLayout(ASQ, self.n_channels))),
             "en": In(1),
             "soc_en": In(1),
-            "rotate_left": In(1),
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            # DMA buses, one for plotting each channel
-            "bus_dma": Out(self.strokes[0].bus.signature).array(self.n_channels),
+            # Pixel request outputs, one for each channel
+            "pixel_reqs": Out(stream.Signature(PixelRequest)).array(self.n_channels),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -187,8 +180,7 @@ class ScopeTracePeripheral(wiring.Component):
 
         for i, s in enumerate(self.strokes):
             m.d.comb += s.enable.eq(self.en & self.soc_en)
-            m.d.comb += s.rotate_left.eq(self.rotate_left)
-            wiring.connect(m, s.bus, wiring.flipped(self.bus_dma[i]))
+            wiring.connect(m, s.pixel_req, wiring.flipped(self.pixel_reqs[i]))
 
         # Scope and trigger
         # Ch0 is routed through trigger, the rest are not.
@@ -241,9 +233,6 @@ class ScopeTracePeripheral(wiring.Component):
 
         with m.If(self._flags.f.trigger_always.w_stb):
             m.d.sync += trigger_always.eq(self._flags.f.trigger_always.w_data)
-
-        with m.If(self._flags.f.rotate_left.w_stb):
-            m.d.sync += self.rotate_left.eq(self._flags.f.rotate_left.w_data)
 
         with m.If(self._hue.f.hue.w_stb):
             for ch, s in enumerate(self.strokes):

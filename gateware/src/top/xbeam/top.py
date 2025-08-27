@@ -25,6 +25,7 @@ from amaranth_soc                                import csr, wishbone
 from amaranth_future                             import fixed
 
 from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio, cache, sim, delay_line
+from tiliqua.pixel_plot_backend                  import PixelPlotBackend, PixelPlotArbiter
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
@@ -104,23 +105,31 @@ class XbeamSoc(TiliquaSoc):
         self.scope_periph_base  = 0x00001100
         self.xbeam_periph_base  = 0x00001200
 
-        # Small localized write-back cache for plotting operations.
-        self.plotter_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.plotter_cache.bus)
+        # Dedicated pixel plot backends for scope peripherals
+        self.vector_backend = PixelPlotBackend(fb=self.fb)
+        self.scope_backend = PixelPlotBackend(fb=self.fb)
+        
+        # Shared plotter cache for both scope backends
+        self.scope_cache = cache.PlotterCache(fb=self.fb)
+        self.psram_periph.add_master(self.scope_cache.bus)
+        
+        # Connect both backends to shared cache
+        self.scope_cache.add(self.vector_backend.bus)
+        self.scope_cache.add(self.scope_backend.bus)
 
         # Vectorscope with upsampling and CSR registers
         self.vector_periph = scope.VectorTracePeripheral(
             fb=self.fb,
             n_upsample=8)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
-        self.plotter_cache.add(self.vector_periph.bus_dma)
 
-        # 4-ch oscilloscope with CSR registers
+        # 4-ch oscilloscope with CSR registers  
         self.scope_periph = scope.ScopeTracePeripheral(
             fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
-        for bus in self.scope_periph.bus_dma:
-            self.plotter_cache.add(bus)
+        
+        # Arbiter for scope's 4 channels to single backend
+        self.scope_arbiter = PixelPlotArbiter(backend=self.scope_backend, n_clients=4)
 
         # Extra peripheral for some global control flags.
         self.xbeam_periph = XbeamPeripheral()
@@ -133,13 +142,36 @@ class XbeamSoc(TiliquaSoc):
 
         m = Module()
 
-        m.submodules += self.plotter_cache
+        # Scope pixel plot infrastructure
+        m.submodules.vector_backend = self.vector_backend
+        m.submodules.scope_backend = self.scope_backend
+        m.submodules.scope_cache = self.scope_cache
+        m.submodules.scope_arbiter = self.scope_arbiter
 
-        m.submodules += self.vector_periph
+        # Scope peripherals
+        m.submodules.vector_periph = self.vector_periph
+        m.submodules.scope_periph = self.scope_periph
+        m.submodules.xbeam_periph = self.xbeam_periph
 
-        m.submodules += self.scope_periph
+        # Connect rotation signal to scope backends
+        m.d.comb += [
+            self.vector_backend.rotate_left.eq(self.framebuffer_periph.rotate_left),
+            self.scope_backend.rotate_left.eq(self.framebuffer_periph.rotate_left),
+        ]
 
-        m.submodules += self.xbeam_periph
+        # Connect vector periph directly to its backend
+        wiring.connect(m, self.vector_periph.pixel_req, self.vector_backend.req)
+        
+        # Connect scope periph channels to arbiter
+        for i in range(4):
+            wiring.connect(m, self.scope_periph.pixel_reqs[i], self.scope_arbiter.clients[i])
+        wiring.connect(m, self.scope_arbiter.backend_req, self.scope_backend.req)
+
+        # Enable scope backends when bus traffic is permitted
+        m.d.comb += [
+            self.vector_backend.enable.eq(self.permit_bus_traffic),
+            self.scope_backend.enable.eq(self.permit_bus_traffic),
+        ]
 
         m.submodules += super().elaborate(platform)
 

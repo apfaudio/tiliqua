@@ -229,8 +229,6 @@ class PixelPlotArbiter(wiring.Component):
             "clients": In(stream.Signature(PixelRequest)).array(n_clients),
             # Backend connection
             "backend_req": Out(stream.Signature(PixelRequest)),
-            # Control
-            "enable": In(1),
         })
     
     def elaborate(self, platform) -> Module:
@@ -239,39 +237,44 @@ class PixelPlotArbiter(wiring.Component):
         # Round-robin counter
         current_client = Signal(range(self.n_clients))
         
-        # Find next client with valid request
-        next_client = Signal(range(self.n_clients))
-        any_valid = Signal()
+        # Connect current client to backend (using multiplexing since we can't use dynamic indexing)
+        backend_valid = Signal()
+        backend_payload = Signal(self.backend_req.payload.shape())
         
-        # Check all clients for valid requests, starting from current+1
-        valid_found = Signal()
-        m.d.comb += valid_found.eq(0)  # Default
-        for i in range(self.n_clients):
-            client_idx = (current_client + 1 + i) % self.n_clients
-            with m.If(self.clients[client_idx].valid & ~valid_found):
-                m.d.comb += [
-                    next_client.eq(client_idx),
-                    any_valid.eq(1),
-                    valid_found.eq(1),
-                ]
+        # Multiplex based on current_client
+        with m.Switch(current_client):
+            for i in range(self.n_clients):
+                with m.Case(i):
+                    m.d.comb += [
+                        backend_valid.eq(self.clients[i].valid),
+                        backend_payload.eq(self.clients[i].payload),
+                    ]
         
-        # Connect current client to backend
         m.d.comb += [
-            self.backend_req.valid.eq(self.clients[current_client].valid & self.enable),
-            self.backend_req.payload.eq(self.clients[current_client].payload),
+            self.backend_req.valid.eq(backend_valid),
+            self.backend_req.payload.eq(backend_payload),
         ]
         
         # Ready signal back to current client
         for i in range(self.n_clients):
             with m.If(current_client == i):
-                m.d.comb += self.clients[i].ready.eq(self.backend_req.ready & self.enable)
+                m.d.comb += self.clients[i].ready.eq(self.backend_req.ready)
             with m.Else():
                 m.d.comb += self.clients[i].ready.eq(0)
         
-        # Advance to next client when current request completes
-        with m.If(self.enable & self.backend_req.valid & self.backend_req.ready):
-            with m.If(any_valid):
-                m.d.sync += current_client.eq(next_client)
-            # If no other clients have requests, stay on current client
+        # Simple round-robin: advance to next client every cycle, skip if not valid
+        # Always advance to next client after serving current one
+        with m.If(self.backend_req.valid & self.backend_req.ready):
+            # Move to next client
+            with m.If(current_client == (self.n_clients - 1)):
+                m.d.sync += current_client.eq(0)
+            with m.Else():
+                m.d.sync += current_client.eq(current_client + 1)
+        # If current client has no request, also move to next
+        with m.Elif(~backend_valid):
+            with m.If(current_client == (self.n_clients - 1)):
+                m.d.sync += current_client.eq(0)
+            with m.Else():
+                m.d.sync += current_client.eq(current_client + 1)
 
         return m
