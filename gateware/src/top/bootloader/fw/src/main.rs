@@ -767,8 +767,11 @@ fn main() -> ! {
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
+        peripherals.BLIT,
         PSRAM_FB_BASE,
         modeline.clone(),
+        PIXEL_PLOT_MEM_BASE,
+        BLIT_MEM_BASE,
     );
 
     handler!(timer0 = || timer0_handler(&app));
@@ -849,8 +852,11 @@ fn main() -> ! {
                         display = DMAFramebuffer0::new(
                             peripherals.FRAMEBUFFER_PERIPH,
                             peripherals.PALETTE_PERIPH,
+                            peripherals.BLIT,
                             PSRAM_FB_BASE,
-                            new_modeline.clone()
+                            new_modeline.clone(),
+                            PIXEL_PLOT_MEM_BASE,
+                            BLIT_MEM_BASE,
                         );
                         app.modeline = new_modeline;
                     }

@@ -137,7 +137,8 @@ macro_rules! impl_dma_framebuffer {
                             mode.h_active as u32 * mode.v_active as u32)
                     } );
                     registers_fb.flags().write(|w| unsafe {
-                        w.enable().bit(true)
+                        w.enable().bit(true);
+                        w.rotate_left().bit(mode.rotate == Rotate::Left)
                     });
                     Self {
                         registers_fb,

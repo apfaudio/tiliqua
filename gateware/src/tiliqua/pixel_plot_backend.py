@@ -111,9 +111,12 @@ class PixelPlotBackend(wiring.Component):
         
         # Handle rotation and pixel addressing
         with m.If(self.rotate_left):
+            # 90° clockwise rotation: (x,y) -> (v_active-1-y, x)
+            rotated_y = Signal(signed(16))
+            m.d.comb += rotated_y.eq(self.fb.timings.v_active - 1 - abs_y)
             m.d.comb += [
-                pixel_index.eq((-abs_y)[0:2]),
-                x_offs.eq(((-abs_y)>>2)),
+                pixel_index.eq(rotated_y[0:2]),
+                x_offs.eq(rotated_y >> 2),
                 y_offs.eq(abs_x),
             ]
         with m.Else():

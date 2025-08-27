@@ -371,6 +371,8 @@ class TiliquaSoc(Component):
         m.d.comb += self.blit.enable.eq(self.permit_bus_traffic)
         m.d.comb += self.pp_backend1.enable.eq(self.permit_bus_traffic)
         m.d.comb += self.pp_backend2.enable.eq(self.permit_bus_traffic)
+        m.d.comb += self.pp_backend1.rotate_left.eq(self.framebuffer_periph.rotate_left)
+        m.d.comb += self.pp_backend2.rotate_left.eq(self.framebuffer_periph.rotate_left)
 
         # audio interface
         m.submodules.pmod0 = self.pmod0
