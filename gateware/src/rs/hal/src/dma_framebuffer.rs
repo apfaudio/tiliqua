@@ -208,6 +208,12 @@ macro_rules! impl_dma_framebuffer {
                         return Ok(()); // Already loaded, NOP
                     }
 
+                    // Wait for command FIFO to be empty before changing spritesheet
+                    // This ensures all pending blit operations using the current spritesheet complete
+                    while !self.registers_blitter.status().read().empty().bit() {
+                        // Busy wait for all pending operations to complete
+                    }
+
                     // Get hardware spritesheet width from status register
                     let status = self.registers_blitter.status().read();
                     let hw_width_words = status.sheet_width_words().bits() as u32;
@@ -321,9 +327,10 @@ macro_rules! impl_dma_framebuffer {
                         return Ok(());
                     }
 
-                    // Wait for any previous operation to complete before starting new one
+                    // Wait only if command FIFO is full (busy flag)
+                    // This allows asynchronous operation while preventing overflow
                     while self.registers_blitter.status().read().busy().bit() {
-                        // Busy wait for previous operation
+                        // Busy wait for FIFO space to become available
                     }
 
                     // Set up source parameters (CMD0)
@@ -342,7 +349,7 @@ macro_rules! impl_dma_framebuffer {
                     let color_4bit = luma & 0xF;
 
                     // Trigger blit with destination parameters (CMD1)
-                    // This starts the hardware operation in parallel
+                    // This enqueues the command in the FIFO for asynchronous execution
                     self.registers_blitter.blit().write(|w| unsafe {
                         w.dst_x().bits(dst_x as u16); // Convert signed to unsigned representation
                         w.dst_y().bits(dst_y as u16);
@@ -350,8 +357,8 @@ macro_rules! impl_dma_framebuffer {
                         w.intensity().bits(intensity_4bit) // Use actual intensity from text style
                     });
 
-                    // Don't wait for completion - let hardware run in parallel
-                    // Next blit_sprite call will wait if needed
+                    // Command is now queued - hardware will execute asynchronously
+                    // Next blit_sprite call will wait only if FIFO becomes full
                     Ok(())
                 }
             }

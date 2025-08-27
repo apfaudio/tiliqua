@@ -497,7 +497,6 @@ fn main() -> ! {
 
             draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                hue).ok();
-            info!("draw1");
             /*
             draw::draw_name(&mut display, h_active/2, 30, hue,
                             &bootinfo.manifest.name, &bootinfo.manifest.sha, &modeline).ok();

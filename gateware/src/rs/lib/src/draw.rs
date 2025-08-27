@@ -381,6 +381,7 @@ where
                   .draw(disp).ok()
     };
 
+    /*
     ellipse(d, 70, 19, 4, 2);
     ellipse(d, 90, 19, 4, 2);
     ellipse(d, 70, 142, 4, 2);
@@ -448,6 +449,7 @@ where
     line(d, 115, 90, 101, 90);   // ex1
     line(d, 115, 111, 101, 111); // ex2
     line(d, 115, 129, 101, 129); // TRS midi
+                                 */
 
     let mut text_l = [[0u32; 2]; 8];
     text_l[0][1] = 31;

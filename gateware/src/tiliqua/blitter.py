@@ -11,7 +11,7 @@ and blitting them to the shared PixelPlotBackend with configurable color and int
 
 from amaranth              import *
 from amaranth.build        import *
-from amaranth.lib          import wiring, data, stream
+from amaranth.lib          import wiring, data, stream, fifo
 from amaranth.lib.wiring   import In, Out
 from amaranth.lib.memory   import Memory
 from amaranth.utils        import exact_log2
@@ -36,15 +36,17 @@ class SimpleBlitterPeripheral(wiring.Component):
     
     Features:
     - CPU can directly write sprite bitmaps to local memory
-    - Single command triggers efficient sprite blitting
+    - Asynchronous blit operations via command FIFO
     - 1-bit transparency: 1=draw pixel, 0=skip (transparent)
     - Color and intensity specified per blit operation
+    - Non-blocking command submission unless FIFO is full
     """
 
     class StatusReg(csr.Register, access="r"):
-        busy: csr.Field(csr.action.R, unsigned(1))
+        busy: csr.Field(csr.action.R, unsigned(1))  # FIFO full (can't accept new commands)
+        empty: csr.Field(csr.action.R, unsigned(1))  # FIFO empty (safe to change spritesheet)
         mem_words: csr.Field(csr.action.R, unsigned(15))  # Memory size in words
-        sheet_width_words: csr.Field(csr.action.R, unsigned(16))  # Spritesheet width in words
+        sheet_width_words: csr.Field(csr.action.R, unsigned(15))  # Spritesheet width in words
 
     class SrcReg(csr.Register, access="w"):
         src_x: csr.Field(csr.action.W, unsigned(8))
@@ -59,7 +61,7 @@ class SimpleBlitterPeripheral(wiring.Component):
         intensity: csr.Field(csr.action.W, unsigned(4))
         # Note: Writing to this register triggers the blit operation
 
-    def __init__(self, memory_words=2048, spritesheet_width_words=256//32):  # Default 8KB for 64K pixels
+    def __init__(self, memory_words=2048, spritesheet_width_words=256//32, fifo_depth=16):  # Default 8KB for 64K pixels
         """
         Initialize blitter with configurable sprite memory size.
         
@@ -69,13 +71,20 @@ class SimpleBlitterPeripheral(wiring.Component):
                          Example: 2048 words = 65536 pixels = 256x256 sprite sheet
             spritesheet_width_words: Width of spritesheet in 32-bit words
                                    Example: 256 pixels = 8 words
+            fifo_depth: Depth of command FIFO for queuing blit operations
         """
         self.memory_words = memory_words
         self.spritesheet_width_words = spritesheet_width_words
         self.memory_addr_width = exact_log2(memory_words)
+        self.fifo_depth = fifo_depth
         
         # Local sprite memory (1-bit per pixel, 32 pixels per word)
         self._sprite_mem = Memory(shape=unsigned(32), depth=memory_words, init=[])
+        
+        # Command FIFO to queue blit operations
+        # Each command contains: [src_x:8|src_y:8|width:8|height:8|dst_x:12|dst_y:12|color:4|intensity:4]
+        # Total: 64 bits per command
+        self._cmd_fifo = fifo.SyncFIFOBuffered(width=64, depth=fifo_depth)
         
         # CSR registers
         regs = csr.Builder(addr_width=6, data_width=8)
@@ -106,6 +115,7 @@ class SimpleBlitterPeripheral(wiring.Component):
         m = Module()
 
         m.submodules.bridge = self._bridge
+        m.submodules._cmd_fifo = self._cmd_fifo
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
         # Sprite memory ports
@@ -123,15 +133,11 @@ class SimpleBlitterPeripheral(wiring.Component):
             # No read data connection - CPU can't read back sprite data
         ]
 
-        # Latched command parameters
+        # Latched source parameters (for next command)
         src_x = Signal(8)
         src_y = Signal(8) 
         width = Signal(8)
         height = Signal(8)
-        dst_x = Signal(signed(12))
-        dst_y = Signal(signed(12))
-        color = Signal(4)
-        intensity = Signal(4)
         
         # Latch source parameters when source register is written
         with m.If(self._src.element.w_stb):
@@ -142,16 +148,33 @@ class SimpleBlitterPeripheral(wiring.Component):
                 height.eq(self._src.f.height.w_data),
             ]
         
-        # Latch blit parameters and trigger blit when blit register is written
-        start_blit = Signal()
-        with m.If(self._blit.element.w_stb):
-            m.d.sync += [
-                dst_x.eq(self._blit.f.dst_x.w_data),
-                dst_y.eq(self._blit.f.dst_y.w_data),
-                color.eq(self._blit.f.color.w_data),
-                intensity.eq(self._blit.f.intensity.w_data),
-                start_blit.eq(1),
+        # Enqueue command when blit register is written
+        cmd_fifo_w = self._cmd_fifo.w_stream
+        with m.If(self._blit.element.w_stb & cmd_fifo_w.ready):
+            m.d.comb += [
+                cmd_fifo_w.valid.eq(1),
+                # Pack 64-bit command: [src_x:8|src_y:8|width:8|height:8|dst_x:12|dst_y:12|color:4|intensity:4]
+                cmd_fifo_w.payload.eq(Cat(
+                    self._blit.f.intensity.w_data,  # [3:0]
+                    self._blit.f.color.w_data,      # [7:4]
+                    self._blit.f.dst_y.w_data,      # [19:8]
+                    self._blit.f.dst_x.w_data,      # [31:20]
+                    height,                         # [39:32]
+                    width,                          # [47:40]
+                    src_y,                          # [55:48]
+                    src_x,                          # [63:56]
+                ))
             ]
+        
+        # Current command being executed
+        current_src_x = Signal(8)
+        current_src_y = Signal(8)
+        current_width = Signal(8)
+        current_height = Signal(8)
+        current_dst_x = Signal(signed(12))
+        current_dst_y = Signal(signed(12))
+        current_color = Signal(4)
+        current_intensity = Signal(4)
 
         # Blit state machine
         current_x = Signal(8)
@@ -164,30 +187,45 @@ class SimpleBlitterPeripheral(wiring.Component):
         sprite_pixel_index = Signal(16)  # Linear pixel index in sprite memory
         
         m.d.comb += [
-            sprite_pixel_index.eq((src_y + current_y) * (self.spritesheet_width_words * 32) + (src_x + current_x)),
+            sprite_pixel_index.eq((current_src_y + current_y) * (self.spritesheet_width_words * 32) + (current_src_x + current_x)),
             sprite_pixel_addr.eq(sprite_pixel_index >> 5),  # Divide by 32 (pixels per word)
             pixel_bit_index.eq(sprite_pixel_index[0:5]),    # Modulo 32 (bit within word)
         ]
 
         # Status register
         m.d.comb += [
-            self._status.f.busy.r_data.eq(1),  # Default: busy
+            # busy = FIFO is full (can't accept new commands)
+            self._status.f.busy.r_data.eq(~cmd_fifo_w.ready),
+            # empty = FIFO is empty (safe to change spritesheet)
+            self._status.f.empty.r_data.eq(~self._cmd_fifo.r_stream.valid),
             self._status.f.mem_words.r_data.eq(self.memory_words),
             self._status.f.sheet_width_words.r_data.eq(self.spritesheet_width_words),
         ]
 
         m.d.comb += sprite_r_port.addr.eq(sprite_pixel_addr)
 
+        # Command FIFO read stream
+        cmd_fifo_r = self._cmd_fifo.r_stream
+
         with m.FSM() as fsm:
             
             with m.State('IDLE'):
-                m.d.comb += self._status.f.busy.r_data.eq(0)  # Not busy in IDLE
-                with m.If(self.enable & start_blit):
+                # Wait for command from FIFO
+                with m.If(self.enable & cmd_fifo_r.valid):
+                    # Unpack command from FIFO
                     m.d.sync += [
+                        current_intensity.eq(cmd_fifo_r.payload[0:4]),    # [3:0]
+                        current_color.eq(cmd_fifo_r.payload[4:8]),        # [7:4]
+                        current_dst_y.eq(cmd_fifo_r.payload[8:20]),       # [19:8]
+                        current_dst_x.eq(cmd_fifo_r.payload[20:32]),      # [31:20]
+                        current_height.eq(cmd_fifo_r.payload[32:40]),     # [39:32]
+                        current_width.eq(cmd_fifo_r.payload[40:48]),      # [47:40]
+                        current_src_y.eq(cmd_fifo_r.payload[48:56]),      # [55:48]
+                        current_src_x.eq(cmd_fifo_r.payload[56:64]),      # [63:56]
                         current_x.eq(0),
                         current_y.eq(0),
-                        start_blit.eq(0),
                     ]
+                    m.d.comb += cmd_fifo_r.ready.eq(1)
                     m.next = 'READ_SPRITE_DATA1'
             
             with m.State('READ_SPRITE_DATA1'):
@@ -217,10 +255,10 @@ class SimpleBlitterPeripheral(wiring.Component):
                     # Pixel should be drawn - send request to backend
                     m.d.comb += [
                         self.pixel_req.valid.eq(1),
-                        self.pixel_req.payload.x.eq(dst_x + current_x),
-                        self.pixel_req.payload.y.eq(dst_y + current_y),
-                        self.pixel_req.payload.color.eq(color),
-                        self.pixel_req.payload.intensity.eq(intensity),
+                        self.pixel_req.payload.x.eq(current_dst_x + current_x),
+                        self.pixel_req.payload.y.eq(current_dst_y + current_y),
+                        self.pixel_req.payload.color.eq(current_color),
+                        self.pixel_req.payload.intensity.eq(current_intensity),
                         self.pixel_req.payload.additive.eq(0),  # Direct replacement
                         self.pixel_req.payload.center_relative.eq(0),  # Absolute coords
                     ]
@@ -233,11 +271,11 @@ class SimpleBlitterPeripheral(wiring.Component):
             
             with m.State('NEXT_PIXEL'):
                 # Advance to next pixel
-                with m.If(current_x == (width - 1)):
+                with m.If(current_x == (current_width - 1)):
                     # End of row
                     m.d.sync += current_x.eq(0)
-                    with m.If(current_y == (height - 1)):
-                        # End of sprite - blit complete
+                    with m.If(current_y == (current_height - 1)):
+                        # End of sprite - blit complete, return to IDLE for next command
                         m.next = 'IDLE'
                     with m.Else():
                         # Next row
