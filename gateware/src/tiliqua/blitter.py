@@ -176,6 +176,8 @@ class SimpleBlitterPeripheral(wiring.Component):
             self._status.f.sheet_width_words.r_data.eq(self.spritesheet_width_words),
         ]
 
+        m.d.comb += sprite_r_port.addr.eq(sprite_pixel_addr)
+
         with m.FSM() as fsm:
             
             with m.State('IDLE'):
@@ -186,11 +188,12 @@ class SimpleBlitterPeripheral(wiring.Component):
                         current_y.eq(0),
                         start_blit.eq(0),
                     ]
-                    m.next = 'READ_SPRITE_DATA'
+                    m.next = 'READ_SPRITE_DATA1'
             
-            with m.State('READ_SPRITE_DATA'):
-                # Read sprite data word from memory
-                m.d.comb += sprite_r_port.addr.eq(sprite_pixel_addr)
+            with m.State('READ_SPRITE_DATA1'):
+                m.next = 'READ_SPRITE_DATA2'
+
+            with m.State('READ_SPRITE_DATA2'):
                 m.d.sync += pixel_data.eq(sprite_r_port.data)
                 m.next = 'CHECK_PIXEL'
             
@@ -228,10 +231,10 @@ class SimpleBlitterPeripheral(wiring.Component):
                     with m.Else():
                         # Next row
                         m.d.sync += current_y.eq(current_y + 1)
-                        m.next = 'READ_SPRITE_DATA'
+                        m.next = 'READ_SPRITE_DATA1'
                 with m.Else():
                     # Next column
                     m.d.sync += current_x.eq(current_x + 1)
-                    m.next = 'READ_SPRITE_DATA'
+                    m.next = 'READ_SPRITE_DATA1'
 
         return m
