@@ -60,7 +60,7 @@ from vendor.vexiiriscv                           import VexiiRiscv
 from tiliqua.tiliqua_platform                    import *
 from tiliqua.types                               import FirmwareLocation
 
-from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster_persist, palette, pixel_plot, cache
+from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster_persist, palette, pixel_plot, pixel_plot_backend, cache
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class TiliquaSoc(Component):
@@ -239,12 +239,13 @@ class TiliquaSoc(Component):
         self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
 
         # Hardware-accelerated pixel plotting
-        self.pixel_plot = pixel_plot.PixelPlotPeripheral(fb=self.fb, fifo_depth=1024)
+        self.pixel_plot = pixel_plot.PixelPlotPeripheral(fb=self.fb)
+        self.pp_backend = pixel_plot_backend.PixelPlotBackend(fb=self.fb)
         self.csr_decoder.add(self.pixel_plot.csr_bus, addr=self.pixel_plot_csr_base, name="pixel_plot")
         self.wb_decoder.add(self.pixel_plot.wb_bus, addr=self.pixel_plot_mem_base, name="pixel_plot")
         self.plotter_cache = cache.PlotterCache(fb=self.fb)
         self.psram_periph.add_master(self.plotter_cache.bus)
-        self.plotter_cache.add(self.pixel_plot.bus_dma)
+        self.plotter_cache.add(self.pp_backend.bus)
         
         self.permit_bus_traffic = Signal()
 
@@ -350,8 +351,11 @@ class TiliquaSoc(Component):
         
         # hardware-accelerated pixel plotting
         m.submodules.pixel_plot = self.pixel_plot
+        m.submodules.pp_backend = self.pp_backend
         m.submodules.pp_cache = self.plotter_cache
+        wiring.connect(m, self.pixel_plot.pixel_req, self.pp_backend.req)
         m.d.comb += self.pixel_plot.enable.eq(self.permit_bus_traffic)
+        m.d.comb += self.pp_backend.enable.eq(self.permit_bus_traffic)
 
         # audio interface
         m.submodules.pmod0 = self.pmod0
