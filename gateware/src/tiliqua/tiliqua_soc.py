@@ -242,8 +242,8 @@ class TiliquaSoc(Component):
         self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
 
         # Hardware-accelerated pixel plotting
-        self.pp_backend1 = pixel_plot_backend.PixelPlotBackend(fb=self.fb)
-        self.pp_backend2 = pixel_plot_backend.PixelPlotBackend(fb=self.fb)
+        self.pp_backend = pixel_plot_backend.PixelPlotBackend(fb=self.fb)
+        self.pp_arbiter = pixel_plot_backend.PixelPlotArbiter(backend=self.pp_backend, n_clients=2)
 
         # Pixel plotter
         self.pixel_plot = pixel_plot.PixelPlotPeripheral()
@@ -257,8 +257,7 @@ class TiliquaSoc(Component):
 
         self.plotter_cache = cache.PlotterCache(fb=self.fb)
         self.psram_periph.add_master(self.plotter_cache.bus)
-        self.plotter_cache.add(self.pp_backend1.bus)
-        self.plotter_cache.add(self.pp_backend2.bus)
+        self.plotter_cache.add(self.pp_backend.bus)
         
         self.permit_bus_traffic = Signal()
 
@@ -361,18 +360,16 @@ class TiliquaSoc(Component):
         
         # hardware-accelerated pixel plotting
         m.submodules.pixel_plot = self.pixel_plot
-        m.submodules.pp_backend1 = self.pp_backend1
-        m.submodules.pp_backend2 = self.pp_backend2
+        m.submodules.pp_backend = self.pp_backend
+        m.submodules.pp_arbiter = self.pp_arbiter
         m.submodules.pp_cache = self.plotter_cache
         m.submodules.blit = self.blit
-        wiring.connect(m, self.pixel_plot.pixel_req, self.pp_backend1.req)
-        wiring.connect(m, self.blit.pixel_req, self.pp_backend2.req)
+        wiring.connect(m, self.pixel_plot.pixel_req, self.pp_arbiter.clients[0])
+        wiring.connect(m, self.blit.pixel_req, self.pp_arbiter.clients[1])
         m.d.comb += self.pixel_plot.enable.eq(self.permit_bus_traffic)
         m.d.comb += self.blit.enable.eq(self.permit_bus_traffic)
-        m.d.comb += self.pp_backend1.enable.eq(self.permit_bus_traffic)
-        m.d.comb += self.pp_backend2.enable.eq(self.permit_bus_traffic)
-        m.d.comb += self.pp_backend1.rotation.eq(self.framebuffer_periph.rotation)
-        m.d.comb += self.pp_backend2.rotation.eq(self.framebuffer_periph.rotation)
+        m.d.comb += self.pp_backend.enable.eq(self.permit_bus_traffic)
+        m.d.comb += self.pp_backend.rotation.eq(self.framebuffer_periph.rotation)
 
         # audio interface
         m.submodules.pmod0 = self.pmod0

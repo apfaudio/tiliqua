@@ -106,7 +106,6 @@ class XbeamSoc(TiliquaSoc):
         self.xbeam_periph_base  = 0x00001200
 
         # Dedicated pixel plot backends for scope peripherals
-        self.vector_backend = PixelPlotBackend(fb=self.fb)
         self.scope_backend = PixelPlotBackend(fb=self.fb)
         
         # Shared plotter cache for both scope backends
@@ -114,7 +113,6 @@ class XbeamSoc(TiliquaSoc):
         self.psram_periph.add_master(self.scope_cache.bus)
         
         # Connect both backends to shared cache
-        self.scope_cache.add(self.vector_backend.bus)
         self.scope_cache.add(self.scope_backend.bus)
 
         # Vectorscope with upsampling and CSR registers
@@ -129,7 +127,7 @@ class XbeamSoc(TiliquaSoc):
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
         
         # Arbiter for scope's 4 channels to single backend
-        self.scope_arbiter = PixelPlotArbiter(backend=self.scope_backend, n_clients=4)
+        self.scope_arbiter = PixelPlotArbiter(backend=self.scope_backend, n_clients=5)
 
         # Extra peripheral for some global control flags.
         self.xbeam_periph = XbeamPeripheral()
@@ -143,7 +141,6 @@ class XbeamSoc(TiliquaSoc):
         m = Module()
 
         # Scope pixel plot infrastructure
-        m.submodules.vector_backend = self.vector_backend
         m.submodules.scope_backend = self.scope_backend
         m.submodules.scope_cache = self.scope_cache
         m.submodules.scope_arbiter = self.scope_arbiter
@@ -154,24 +151,16 @@ class XbeamSoc(TiliquaSoc):
         m.submodules.xbeam_periph = self.xbeam_periph
 
         # Connect rotation signal to scope backends
-        m.d.comb += [
-            self.vector_backend.rotation.eq(self.framebuffer_periph.rotation),
-            self.scope_backend.rotation.eq(self.framebuffer_periph.rotation),
-        ]
+        m.d.comb += self.scope_backend.rotation.eq(self.framebuffer_periph.rotation),
 
-        # Connect vector periph directly to its backend
-        wiring.connect(m, self.vector_periph.pixel_req, self.vector_backend.req)
-        
         # Connect scope periph channels to arbiter
+        wiring.connect(m, self.vector_periph.pixel_req, self.scope_arbiter.clients[0])
         for i in range(4):
-            wiring.connect(m, self.scope_periph.pixel_reqs[i], self.scope_arbiter.clients[i])
+            wiring.connect(m, self.scope_periph.pixel_reqs[i], self.scope_arbiter.clients[i+1])
         wiring.connect(m, self.scope_arbiter.backend_req, self.scope_backend.req)
 
         # Enable scope backends when bus traffic is permitted
-        m.d.comb += [
-            self.vector_backend.enable.eq(self.permit_bus_traffic),
-            self.scope_backend.enable.eq(self.permit_bus_traffic),
-        ]
+        m.d.comb += self.scope_backend.enable.eq(self.permit_bus_traffic),
 
         m.submodules += super().elaborate(platform)
 
