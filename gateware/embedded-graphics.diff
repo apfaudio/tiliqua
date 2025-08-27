@@ -1,0 +1,237 @@
+diff --git a/core/src/draw_target/mod.rs b/core/src/draw_target/mod.rs
+index aba8758..5d2e50f 100644
+--- a/core/src/draw_target/mod.rs
++++ b/core/src/draw_target/mod.rs
+@@ -422,4 +422,37 @@ pub trait DrawTarget: Dimensions {
+     fn clear(&mut self, color: Self::Color) -> Result<(), Self::Error> {
+         self.fill_solid(&self.bounding_box(), color)
+     }
++
++    /// Upload a spritesheet to the hardware with a unique identifier.
++    ///
++    /// If the key is already present in hardware, this is a no-op.
++    /// For targets that don't support hardware blitting, this can be a no-op that returns Ok(()).
++    ///
++    /// # Arguments
++    /// * `key` - Unique identifier for this spritesheet
++    /// * `pixels` - 1-bit pixel data (1=opaque, 0=transparent) 
++    /// * `width` - Width of the spritesheet in pixels
++    /// * `height` - Height of the spritesheet in pixels
++    fn upload_spritesheet(&mut self, key: u32, pixels: &[u8], width: u32, height: u32) -> Result<(), Self::Error> {
++        let _ = (key, pixels, width, height);
++        Ok(())
++    }
++
++    /// Blit a rectangular region from a spritesheet to the target.
++    ///
++    /// Default implementation does nothing and returns an error, indicating that hardware
++    /// blitting is not supported. Targets with hardware acceleration should override this.
++    ///
++    /// # Arguments
++    /// * `key` - Spritesheet identifier (must have been uploaded first)
++    /// * `src_x`, `src_y` - Source coordinates in the spritesheet
++    /// * `width`, `height` - Size of the region to blit
++    /// * `dst_x`, `dst_y` - Destination coordinates on the target
++    /// * `color` - Color to use for opaque pixels (implementation-specific format)
++    fn blit_sprite(&mut self, key: u32, src_x: u32, src_y: u32, width: u32, height: u32, dst_x: i32, dst_y: i32, color: Self::Color) -> Result<(), Self::Error> {
++        let _ = (key, src_x, src_y, width, height, dst_x, dst_y, color);
++        // Default: hardware blitting not supported, return success but do nothing
++        // The caller should check if the target actually supports blitting
++        Ok(())
++    }
+ }
+diff --git a/src/draw_target/clipped.rs b/src/draw_target/clipped.rs
+index 4aae0fe..9ec071e 100644
+--- a/src/draw_target/clipped.rs
++++ b/src/draw_target/clipped.rs
+@@ -67,6 +67,7 @@ where
+ 
+         self.parent.fill_solid(&area, color)
+     }
++
+ }
+ 
+ impl<T> Dimensions for Clipped<'_, T>
+diff --git a/src/image/image_raw.rs b/src/image/image_raw.rs
+index 2d3c61d..a4ca57e 100644
+--- a/src/image/image_raw.rs
++++ b/src/image/image_raw.rs
+@@ -176,6 +176,13 @@ where
+         }
+     }
+ 
++    /// Get the raw pixel data.
++    ///
++    /// Returns a reference to the underlying pixel data array.
++    pub const fn data(&self) -> &'a [u8] {
++        self.data
++    }
++
+     /// Returns the actual row width in pixels.
+     ///
+     /// For images with less than 8 bits per pixel each row is padded to contain an integer number
+diff --git a/src/mono_font/mod.rs b/src/mono_font/mod.rs
+index 1d8fb37..9757e88 100644
+--- a/src/mono_font/mod.rs
++++ b/src/mono_font/mod.rs
+@@ -121,6 +121,41 @@ impl MonoFont<'_> {
+             ),
+         )
+     }
++
++    /// Get a unique key for this font for hardware spritesheet caching.
++    ///
++    /// Uses the font data pointer as a unique identifier.
++    pub fn spritesheet_key(&self) -> u32 {
++        self.image.data().as_ptr() as u32
++    }
++
++    /// Get the 1-bit pixel data for hardware upload.
++    ///
++    /// Returns the raw font image data suitable for hardware blitting.
++    pub fn spritesheet_pixels(&self) -> &[u8] {
++        self.image.data()
++    }
++
++    /// Get spritesheet dimensions.
++    pub fn spritesheet_size(&self) -> (u32, u32) {
++        (self.image.size().width, self.image.size().height)
++    }
++
++    /// Get character dimensions for sprite blitting.
++    pub fn character_size(&self) -> (u32, u32) {
++        (self.character_size.width, self.character_size.height)
++    }
++
++    /// Get the source coordinates for a character in the spritesheet.
++    ///
++    /// Returns (src_x, src_y) coordinates for the given character.
++    pub fn character_source_coords(&self, c: char) -> (u32, u32) {
++        let glyph_index = self.glyph_mapping.index(c) as u32;
++        let tiles_per_row = self.image.size().width / self.character_size.width;
++        let tile_x = glyph_index % tiles_per_row;
++        let tile_y = glyph_index / tiles_per_row;
++        (tile_x * self.character_size.width, tile_y * self.character_size.height)
++    }
+ }
+ 
+ impl PartialEq for MonoFont<'_> {
+diff --git a/src/mono_font/mono_text_style.rs b/src/mono_font/mono_text_style.rs
+index a5cb310..64c083d 100644
+--- a/src/mono_font/mono_text_style.rs
++++ b/src/mono_font/mono_text_style.rs
+@@ -2,10 +2,7 @@ use crate::{
+     draw_target::DrawTarget,
+     geometry::{Point, Size},
+     image::Image,
+-    mono_font::{
+-        draw_target::{Background, Both, Foreground, MonoFontDrawTarget},
+-        MonoFont,
+-    },
++    mono_font::MonoFont,
+     pixelcolor::{BinaryColor, PixelColor},
+     primitives::Rectangle,
+     text::{
+@@ -128,6 +125,42 @@ where
+         Ok(())
+     }
+ 
++    /// Draw string using hardware sprite blitting.
++    fn draw_string_tiled<D>(
++        &self,
++        text: &str,
++        position: Point,
++        target: &mut D,
++        spritesheet_key: u32,
++    ) -> Result<Point, D::Error>
++    where
++        D: DrawTarget<Color = C>,
++    {
++        let (char_width, char_height) = self.font.character_size();
++        
++        for (p, element) in self.line_elements(position, text) {
++            match element {
++                LineElement::Char(c) => {
++                    let (src_x, src_y) = self.font.character_source_coords(c);
++                    if let Some(color) = self.text_color {
++                        target.blit_sprite(
++                            spritesheet_key,
++                            src_x, src_y,
++                            char_width, char_height,
++                            p.x, p.y,
++                            color
++                        )?;
++                    }
++                }
++                // For spacing, just skip - don't blit anything
++                LineElement::Spacing => {}
++                LineElement::Done => return Ok(p),
++            }
++        }
++
++        Ok(position)
++    }
++
+     fn draw_string_binary<D>(
+         &self,
+         text: &str,
+@@ -202,36 +235,23 @@ where
+     {
+         let position = position - Point::new(0, self.baseline_offset(baseline));
+ 
+-        let next = match (self.text_color, self.background_color) {
+-            (Some(text_color), Some(background_color)) => self.draw_string_binary(
+-                text,
+-                position,
+-                MonoFontDrawTarget::new(target, Both(text_color, background_color)),
+-            )?,
+-            (Some(text_color), None) => self.draw_string_binary(
+-                text,
+-                position,
+-                MonoFontDrawTarget::new(target, Foreground(text_color)),
+-            )?,
+-            (None, Some(background_color)) => self.draw_string_binary(
+-                text,
+-                position,
+-                MonoFontDrawTarget::new(target, Background(background_color)),
+-            )?,
+-            (None, None) => {
+-                let dx = (self.font.character_size.width + self.font.character_spacing)
+-                    * text.chars().count() as u32;
+-
+-                position + Size::new(dx, 0)
+-            }
+-        };
+-
++        // Upload spritesheet to hardware (if supported)
++        let spritesheet_key = self.font.spritesheet_key();
++        let (width, height) = self.font.spritesheet_size();
++        let pixels = self.font.spritesheet_pixels();
++        target.upload_spritesheet(spritesheet_key, pixels, width, height)?;
++        
++        // Use hardware sprite blitting
++        let next = self.draw_string_tiled(text, position, target, spritesheet_key)?;
++        let final_pos = next + Point::new(0, self.baseline_offset(baseline));
++        
++        // Still need to draw decorations using regular rendering
+         if next.x > position.x {
+             let width = (next.x - position.x) as u32;
+             self.draw_decorations(width, position, target)?;
+         }
+-
+-        Ok(next + Point::new(0, self.baseline_offset(baseline)))
++        
++        Ok(final_pos)
+     }
+ 
+     fn draw_whitespace<D>(
+diff --git a/src/text/renderer/mod.rs b/src/text/renderer/mod.rs
+index ccb4cb1..343029f 100644
+--- a/src/text/renderer/mod.rs
++++ b/src/text/renderer/mod.rs
+@@ -95,3 +95,5 @@ pub struct TextMetrics {
+     /// The position of the next text.
+     pub next_position: Point,
+ }
++
++
