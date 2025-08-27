@@ -162,6 +162,7 @@ macro_rules! impl_dma_framebuffer {
                         w.enable().bit(true);
                         w.rotation().bits(rotation.clone() as u8)
                     });
+                    self.mode.rotate = rotation.clone();
                 }
 
             }
@@ -193,8 +194,16 @@ macro_rules! impl_dma_framebuffer {
 
             impl OriginDimensions for $DMA_FRAMEBUFFERX {
                 fn size(&self) -> Size {
-                    Size::new(self.mode.h_active as u32,
-                              self.mode.v_active as u32)
+                    match self.mode.rotate {
+                        Rotate::Normal | Rotate::Inverted => {
+                            Size::new(self.mode.h_active as u32,
+                                      self.mode.v_active as u32)
+                        }
+                        Rotate::Left | Rotate::Right => {
+                            Size::new(self.mode.v_active as u32,
+                                      self.mode.h_active as u32)
+                        }
+                    }
                 }
             }
 

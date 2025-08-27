@@ -93,6 +93,7 @@ fn main() -> ! {
     //
 
     let mut opts = Opts::default();
+    opts.misc.rotation.value = modeline.rotate.clone();
     let mut flash_persist = FlashOptionsPersistence::new(
         spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
     flash_persist.load_options(&mut opts).unwrap();
@@ -120,10 +121,11 @@ fn main() -> ! {
         let xbeam_mux = peripherals.XBEAM_PERIPH;
         let mut first = true;
 
-        let h_active = display.size().width;
-        let v_active = display.size().height;
 
         loop {
+
+            let h_active = display.size().width;
+            let v_active = display.size().height;
 
             let (opts, draw_options, save_opts, wipe_opts) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
