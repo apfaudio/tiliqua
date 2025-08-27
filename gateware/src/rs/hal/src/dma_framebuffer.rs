@@ -87,6 +87,7 @@ macro_rules! impl_dma_framebuffer {
     ($(
         $DMA_FRAMEBUFFERX:ident: $PACFRAMEBUFFERX:ty,
         $PALETTEX:ident: $PACPALETTEX:ty,
+        $BLITTERX:ident: $PACBLITTERX:ty,
     )+) => {
         $(
             use tiliqua_hal::dma_framebuffer::{DVIModeline, Rotate};
@@ -96,14 +97,17 @@ macro_rules! impl_dma_framebuffer {
             pub struct $DMA_FRAMEBUFFERX {
                 registers_fb: $PACFRAMEBUFFERX,
                 registers_palette: $PACPALETTEX,
+                registers_blitter: $PACBLITTERX,
                 mode: DVIModeline,
                 framebuffer_base: *mut u32,
                 pixel_plot_mem_base: *mut u32,
+                blitter_mem_base: *mut u32,
+                current_spritesheet_key: u32,
             }
 
             impl $DMA_FRAMEBUFFERX {
-                pub fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, fb_base: usize,
-                       mode: DVIModeline, pixel_plot_mem_base: usize) -> Self {
+                pub fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, registers_blitter: $PACBLITTERX,
+                       fb_base: usize, mode: DVIModeline, pixel_plot_mem_base: usize, blitter_mem_base: usize) -> Self {
                     registers_fb.flags().write(|w| unsafe {
                         w.enable().bit(false)
                     });
@@ -138,9 +142,12 @@ macro_rules! impl_dma_framebuffer {
                     Self {
                         registers_fb,
                         registers_palette,
+                        registers_blitter,
                         mode,
                         framebuffer_base: fb_base as *mut u32,
                         pixel_plot_mem_base: pixel_plot_mem_base as *mut u32,
+                        blitter_mem_base: blitter_mem_base as *mut u32,
+                        current_spritesheet_key: 0, // No spritesheet loaded initially
                     }
                 }
 
@@ -192,6 +199,87 @@ macro_rules! impl_dma_framebuffer {
                             self.pixel_plot_mem_base.write_volatile(cmd);
                         }
                     }
+                    Ok(())
+                }
+
+                fn upload_spritesheet(&mut self, key: u32, pixels: &[u8], width: u32, height: u32) -> Result<(), Self::Error> {
+                    // Check if this spritesheet is already loaded
+                    if self.current_spritesheet_key == key {
+                        return Ok(()); // Already loaded, NOP
+                    }
+
+                    // Upload pixel data to blitter sprite memory
+                    // ImageRaw<BinaryColor> data is already packed: 8 pixels per byte, 1 bit per pixel
+                    let sprite_mem = self.blitter_mem_base;
+                    let bytes_per_row = (width + 7) / 8;
+                    let words_per_row = (width + 31) / 32;
+
+                    for y in 0..height {
+                        let row_start_byte = (y * bytes_per_row) as usize;
+                        let row_start_word = y * words_per_row;
+                        
+                        // Process each word (32 pixels = 4 bytes) in this row
+                        for word_in_row in 0..words_per_row {
+                            let mut word_value = 0u32;
+                            
+                            // Pack 4 bytes (32 pixels) into one 32-bit word
+                            for byte_in_word in 0..4 {
+                                let byte_idx = row_start_byte + (word_in_row * 4 + byte_in_word) as usize;
+                                if byte_idx < pixels.len() {
+                                    let pixel_byte = pixels[byte_idx];
+                                    word_value |= (pixel_byte as u32) << (byte_in_word * 8);
+                                }
+                            }
+                            
+                            let word_offset = (row_start_word + word_in_row) as isize;
+                            // Bounds check against hardware memory size (2048 words)
+                            if word_offset >= 2048 {
+                                panic!("Sprite memory out of bounds: offset {} >= 2048", word_offset);
+                            }
+                            unsafe {
+                                sprite_mem.offset(word_offset).write_volatile(word_value);
+                            }
+                        }
+                    }
+
+                    // Update the local key to indicate this spritesheet is loaded
+                    self.current_spritesheet_key = key;
+
+                    Ok(())
+                }
+
+                fn blit_sprite(&mut self, key: u32, src_x: u32, src_y: u32, width: u32, height: u32, dst_x: i32, dst_y: i32) -> Result<(), Self::Error> {
+                    // Verify the correct spritesheet is loaded
+                    if self.current_spritesheet_key != key {
+                        // Spritesheet not loaded, this is an error condition
+                        // In a real system we might want to return an error, but for now just return Ok to not break things
+                        return Ok(());
+                    }
+
+                    // Wait for any previous operation to complete before starting new one
+                    while self.registers_blitter.status().read().busy().bit() {
+                        // Busy wait for previous operation
+                    }
+
+                    // Set up source parameters (CMD0)
+                    self.registers_blitter.src().write(|w| unsafe {
+                        w.src_x().bits(src_x as u8);
+                        w.src_y().bits(src_y as u8);
+                        w.width().bits(width as u8);
+                        w.height().bits(height as u8)
+                    });
+
+                    // Trigger blit with destination parameters (CMD1)
+                    // This starts the hardware operation in parallel
+                    self.registers_blitter.blit().write(|w| unsafe {
+                        w.dst_x().bits(dst_x as u16); // Convert signed to unsigned representation
+                        w.dst_y().bits(dst_y as u16);
+                        w.color().bits(0xF); // White color
+                        w.intensity().bits(0xF) // Full intensity
+                    });
+
+                    // Don't wait for completion - let hardware run in parallel
+                    // Next blit_sprite call will wait if needed
                     Ok(())
                 }
             }

@@ -168,6 +168,7 @@ class SimpleBlitterPeripheral(wiring.Component):
         with m.FSM() as fsm:
             
             with m.State('IDLE'):
+                m.d.comb += self._status.f.busy.r_data.eq(0)  # Not busy in IDLE
                 m.d.sync += start_blit.eq(0)
                 with m.If(self.enable & start_blit):
                     m.d.sync += [
@@ -185,7 +186,7 @@ class SimpleBlitterPeripheral(wiring.Component):
             with m.State('CHECK_PIXEL'):
                 # Check if current sprite pixel should be drawn (bit = 1)
                 current_pixel_bit = Signal()
-                m.d.comb += current_pixel_bit.eq(pixel_data[pixel_bit_index])
+                m.d.comb += current_pixel_bit.eq(pixel_data.bit_select(pixel_bit_index, 1))
                 
                 with m.If(current_pixel_bit):
                     # Pixel should be drawn - send request to backend
@@ -224,7 +225,7 @@ class SimpleBlitterPeripheral(wiring.Component):
 
         # Status register
         m.d.comb += [
-            self._status.f.busy.r_data.eq(fsm.state != 'IDLE'),
+            self._status.f.busy.r_data.eq(1),  # Default: busy
             self._status.f.mem_words.r_data.eq(self.memory_words),
         ]
 

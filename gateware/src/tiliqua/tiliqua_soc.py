@@ -137,7 +137,7 @@ class TiliquaSoc(Component):
                 VexiiRiscv.MemoryRegion(base=self.csr_base, size=0x10000, cacheable=False, executable=False),
                 # Fast PixelPlot command region - uncached for fastest writes
                 VexiiRiscv.MemoryRegion(base=self.pixel_plot_mem_base, size=4, cacheable=False, executable=False),
-                VexiiRiscv.MemoryRegion(base=self.blit_mem_base, size=4, cacheable=False, executable=False),
+                VexiiRiscv.MemoryRegion(base=self.blit_mem_base, size=0x2000, cacheable=False, executable=False),
             ] + extra_cpu_regions,
             variant=cpu_variant,
             reset_addr=self.reset_addr,
@@ -364,6 +364,7 @@ class TiliquaSoc(Component):
         m.submodules.pp_backend1 = self.pp_backend1
         m.submodules.pp_backend2 = self.pp_backend2
         m.submodules.pp_cache = self.plotter_cache
+        m.submodules.blit = self.blit
         wiring.connect(m, self.pixel_plot.pixel_req, self.pp_backend1.req)
         wiring.connect(m, self.blit.pixel_req, self.pp_backend2.req)
         m.d.comb += self.pixel_plot.enable.eq(self.permit_bus_traffic)

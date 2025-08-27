@@ -129,40 +129,17 @@ name = "embedded-graphics"
 version = "0.8.1"
 dependencies = [
  "az",
- "embedded-graphics-core 0.4.0",
+ "embedded-graphics-core",
  "float-cmp",
  "integer-sqrt",
  "micromath",
 ]
 
 [[package]]
-name = "embedded-graphics"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0649998afacf6d575d126d83e68b78c0ab0e00ca2ac7e9b3db11b4cbe8274ef0"
-dependencies = [
- "az",
- "byteorder",
- "embedded-graphics-core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "float-cmp",
- "micromath",
-]
-
-[[package]]
 name = "embedded-graphics-core"
 version = "0.4.0"
 dependencies = [
  "az",
-]
-
-[[package]]
-name = "embedded-graphics-core"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba9ecd261f991856250d2207f6d8376946cd9f412a2165d3b75bc87a0bc7a044"
-dependencies = [
- "az",
- "byteorder",
 ]
 
 [[package]]
@@ -631,7 +608,7 @@ version = "0.1.0"
 dependencies = [
  "amaranth-soc-isr",
  "critical-section",
- "embedded-graphics 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "embedded-graphics",
  "embedded-hal 1.0.0",
  "fastrand",
  "heapless",
@@ -656,7 +633,7 @@ name = "tiliqua-hal"
 version = "0.0.0"
 dependencies = [
  "bitflags",
- "embedded-graphics 0.8.1",
+ "embedded-graphics",
  "embedded-hal 1.0.0",
  "embedded-hal-nb",
  "embedded-storage",
@@ -672,7 +649,7 @@ name = "tiliqua-lib"
 version = "0.1.0"
 dependencies = [
  "crc",
- "embedded-graphics 0.8.1",
+ "embedded-graphics",
  "embedded-hal 1.0.0",
  "fixed",
  "heapless",

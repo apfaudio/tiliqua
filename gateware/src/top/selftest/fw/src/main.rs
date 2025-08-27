@@ -440,9 +440,11 @@ fn main() -> ! {
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
+        peripherals.BLIT,
         PSRAM_FB_BASE,
         modeline.clone(),
         PIXEL_PLOT_MEM_BASE,
+        BLIT_MEM_BASE,
     );
 
     handler!(timer0 = || timer0_handler(&app));
