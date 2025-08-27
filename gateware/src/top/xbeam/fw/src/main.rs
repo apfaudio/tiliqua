@@ -77,8 +77,11 @@ fn main() -> ! {
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
+        peripherals.BLIT,
         PSRAM_FB_BASE,
         modeline.clone(),
+        PIXEL_PLOT_MEM_BASE,
+        BLIT_MEM_BASE,
     );
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
@@ -207,13 +210,10 @@ fn main() -> ! {
                 scope.flags().write(
                     |w| w.enable().bit(false) );
                 vscope.flags().write(
-                    |w| { w.enable().bit(true);
-                          w.rotate_left().bit(modeline.rotate == Rotate::Left)
-                    } );
+                    |w| w.enable().bit(true) );
             } else {
                 scope.flags().write(
                     |w| { w.enable().bit(true);
-                          w.rotate_left().bit(modeline.rotate == Rotate::Left);
                           w.trigger_always().bit(opts.scope1.trig_mode.value == TriggerMode::Always)
                     } );
                 vscope.flags().write(
