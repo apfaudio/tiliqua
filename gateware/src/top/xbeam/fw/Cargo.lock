@@ -660,6 +660,8 @@ dependencies = [
  "riscv",
  "serde",
  "serde_derive",
+ "strum",
+ "strum_macros 0.26.4",
 ]
 
 [[package]]

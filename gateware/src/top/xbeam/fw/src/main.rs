@@ -206,6 +206,8 @@ fn main() -> ! {
             xbeam_mux.delay3().write(|w| unsafe { w.value().bits(
                     delay_smoothers[3].proc_u16(opts.delay.delay_c.value)) });
 
+            display.rotate(&opts.misc.rotation.value);
+
             if opts.misc.plot_type.value == PlotType::Vector {
                 scope.flags().write(
                     |w| w.enable().bit(false) );

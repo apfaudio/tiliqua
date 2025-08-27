@@ -1,9 +1,10 @@
 use serde_derive::{Serialize, Deserialize};
 use strum_macros::{EnumIter, IntoStaticStr};
 
-#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize, EnumIter, IntoStaticStr)]
+#[derive(Default, Debug, PartialEq, PartialOrd, Clone, Copy, Serialize, Deserialize, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Rotate {
+    #[default]
     Normal = 0,
     Left = 1,
     Inverted = 2,
@@ -156,7 +157,15 @@ macro_rules! impl_dma_framebuffer {
                     }
                 }
 
+                pub fn rotate(&mut self, rotation: &Rotate) {
+                    self.registers_fb.flags().write(|w| unsafe {
+                        w.enable().bit(true);
+                        w.rotation().bits(rotation.clone() as u8)
+                    });
+                }
+
             }
+
 
             impl hal::dma_framebuffer::DMAFramebuffer for $DMA_FRAMEBUFFERX {
                 fn update_fb_base(&mut self, fb_base: u32) {

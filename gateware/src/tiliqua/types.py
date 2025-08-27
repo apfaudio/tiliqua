@@ -5,7 +5,7 @@
 import enum
 
 from amaranth import *
-from amaranth.lib import data
+from amaranth.lib import enum as amaranth_enum
 
 # Re-export `tiliqua-manifest` types.
 from rs.manifest.src.lib import BitstreamManifest as BitstreamManifest
@@ -47,7 +47,7 @@ class AudioClock(str, enum.Enum):
             self.COARSE_192KHZ,
         ]
 
-class Rotation(data.Enum, shape=unsigned(2)):
+class Rotation(amaranth_enum.Enum, shape=unsigned(2)):
     """
     Display rotation enumeration supporting all 90-degree orientations.
     
