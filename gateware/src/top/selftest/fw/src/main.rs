@@ -11,7 +11,7 @@ use core::fmt::Write;
 
 use embedded_hal::i2c::{I2c, Operation};
 use embedded_hal::delay::DelayNs;
-use embedded_graphics::prelude::*;
+use tiliqua_hal::embedded_graphics::prelude::*;
 
 use heapless::String;
 

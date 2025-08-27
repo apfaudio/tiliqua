@@ -27,7 +27,7 @@ use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 use tiliqua_manifest::*;
 use opts::OptionString;
 
-use embedded_graphics::{
+use tiliqua_hal::embedded_graphics::{
     mono_font::{ascii::FONT_9X15, ascii::FONT_9X15_BOLD, MonoTextStyle},
     prelude::*,
     primitives::{PrimitiveStyleBuilder, Line},

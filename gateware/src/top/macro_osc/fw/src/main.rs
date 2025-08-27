@@ -10,7 +10,7 @@ use critical_section::Mutex;
 use irq::handler;
 use embedded_alloc::LlffHeap as Heap;
 use mi_plaits_dsp::dsp::voice::{Modulations, Patch, Voice};
-use embedded_graphics::prelude::*;
+use tiliqua_hal::embedded_graphics::prelude::*;
 
 use tiliqua_pac as pac;
 use tiliqua_hal as hal;

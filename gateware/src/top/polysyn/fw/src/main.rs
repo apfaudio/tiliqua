@@ -23,7 +23,7 @@ use tiliqua_fw::*;
 use tiliqua_fw::options::*;
 use tiliqua_hal::pmod::EurorackPmod;
 
-use embedded_graphics::prelude::*;
+use tiliqua_hal::embedded_graphics::prelude::*;
 
 use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;

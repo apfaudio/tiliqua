@@ -16,7 +16,7 @@ use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::dma_framebuffer::Rotate;
 
-use embedded_graphics::{
+use tiliqua_hal::embedded_graphics::{
     prelude::*,
     pixelcolor::Gray8,
     mono_font::{MonoTextStyle, ascii::FONT_9X15_BOLD},

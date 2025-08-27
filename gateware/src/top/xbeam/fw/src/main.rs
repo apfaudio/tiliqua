@@ -13,7 +13,7 @@ use tiliqua_lib::dsp::OnePoleSmoother;
 use pac::constants::*;
 use tiliqua_lib::calibration::*;
 
-use embedded_graphics::prelude::*;
+use tiliqua_hal::embedded_graphics::prelude::*;
 
 use options::*;
 use opts::persistence::*;

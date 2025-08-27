@@ -24,6 +24,7 @@ pub mod eeprom;
 pub use embedded_hal as hal;
 pub use embedded_hal_nb as hal_nb;
 pub use embedded_storage::nor_flash;
+pub use embedded_graphics;
 
 #[macro_use]
 extern crate bitflags;
