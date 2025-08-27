@@ -208,28 +208,36 @@ macro_rules! impl_dma_framebuffer {
                         return Ok(()); // Already loaded, NOP
                     }
 
+                    // Get hardware spritesheet width from status register
+                    let status = self.registers_blitter.status().read();
+                    let hw_width_words = status.sheet_width_words().bits() as u32;
+                    let hw_width_pixels = hw_width_words * 32;
+
                     // Upload pixel data to blitter sprite memory
                     // ImageRaw<BinaryColor> data is already packed: 8 pixels per byte, 1 bit per pixel
                     let sprite_mem = self.blitter_mem_base;
                     let bytes_per_row = (width + 7) / 8;
-                    let words_per_row = (width + 31) / 32;
 
                     for y in 0..height {
                         let row_start_byte = (y * bytes_per_row) as usize;
-                        let row_start_word = y * words_per_row;
+                        let row_start_word = y * hw_width_words;
                         
-                        // Process each word (32 pixels = 4 bytes) in this row
-                        for word_in_row in 0..words_per_row {
+                        // Process each word in the hardware row (may be wider than actual data)
+                        for word_in_row in 0..hw_width_words {
                             let mut word_value = 0u32;
                             
-                            // Pack 4 bytes (32 pixels) into one 32-bit word
-                            for byte_in_word in 0..4 {
-                                let byte_idx = row_start_byte + (word_in_row * 4 + byte_in_word) as usize;
-                                if byte_idx < pixels.len() {
-                                    let pixel_byte = pixels[byte_idx];
-                                    word_value |= (pixel_byte as u32) << (byte_in_word * 8);
+                            // Only fill with data if we're within the actual image width
+                            if word_in_row * 32 < width {
+                                // Pack 4 bytes (32 pixels) into one 32-bit word
+                                for byte_in_word in 0..4 {
+                                    let byte_idx = row_start_byte + (word_in_row * 4 + byte_in_word) as usize;
+                                    if byte_idx < pixels.len() {
+                                        let pixel_byte = pixels[byte_idx];
+                                        word_value |= (pixel_byte as u32) << (byte_in_word * 8);
+                                    }
                                 }
                             }
+                            // If word_in_row * 32 >= width, word_value stays 0 (padding)
                             
                             let word_offset = (row_start_word + word_in_row) as isize;
                             // Bounds check against hardware memory size (2048 words)

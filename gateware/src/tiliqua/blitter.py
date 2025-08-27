@@ -43,7 +43,8 @@ class SimpleBlitterPeripheral(wiring.Component):
 
     class StatusReg(csr.Register, access="r"):
         busy: csr.Field(csr.action.R, unsigned(1))
-        mem_words: csr.Field(csr.action.R, unsigned(16))  # Memory size in words
+        mem_words: csr.Field(csr.action.R, unsigned(15))  # Memory size in words
+        sheet_width_words: csr.Field(csr.action.R, unsigned(16))  # Spritesheet width in words
 
     class SrcReg(csr.Register, access="w"):
         src_x: csr.Field(csr.action.W, unsigned(8))
@@ -58,7 +59,7 @@ class SimpleBlitterPeripheral(wiring.Component):
         intensity: csr.Field(csr.action.W, unsigned(4))
         # Note: Writing to this register triggers the blit operation
 
-    def __init__(self, memory_words=2048):  # Default 8KB for 64K pixels
+    def __init__(self, memory_words=2048, spritesheet_width_words=256//32):  # Default 8KB for 64K pixels
         """
         Initialize blitter with configurable sprite memory size.
         
@@ -66,8 +67,11 @@ class SimpleBlitterPeripheral(wiring.Component):
             memory_words: Size of sprite memory in 32-bit words
                          Each word stores 32 pixels (1-bit each)
                          Example: 2048 words = 65536 pixels = 256x256 sprite sheet
+            spritesheet_width_words: Width of spritesheet in 32-bit words
+                                   Example: 256 pixels = 8 words
         """
         self.memory_words = memory_words
+        self.spritesheet_width_words = spritesheet_width_words
         self.memory_addr_width = exact_log2(memory_words)
         
         # Local sprite memory (1-bit per pixel, 32 pixels per word)
@@ -160,20 +164,27 @@ class SimpleBlitterPeripheral(wiring.Component):
         sprite_pixel_index = Signal(16)  # Linear pixel index in sprite memory
         
         m.d.comb += [
-            sprite_pixel_index.eq((src_y + current_y) * 256 + (src_x + current_x)),  # Assumes max 256-wide sprite sheet
+            sprite_pixel_index.eq((src_y + current_y) * (self.spritesheet_width_words * 32) + (src_x + current_x)),
             sprite_pixel_addr.eq(sprite_pixel_index >> 5),  # Divide by 32 (pixels per word)
             pixel_bit_index.eq(sprite_pixel_index[0:5]),    # Modulo 32 (bit within word)
+        ]
+
+        # Status register
+        m.d.comb += [
+            self._status.f.busy.r_data.eq(1),  # Default: busy
+            self._status.f.mem_words.r_data.eq(self.memory_words),
+            self._status.f.sheet_width_words.r_data.eq(self.spritesheet_width_words),
         ]
 
         with m.FSM() as fsm:
             
             with m.State('IDLE'):
                 m.d.comb += self._status.f.busy.r_data.eq(0)  # Not busy in IDLE
-                m.d.sync += start_blit.eq(0)
                 with m.If(self.enable & start_blit):
                     m.d.sync += [
                         current_x.eq(0),
                         current_y.eq(0),
+                        start_blit.eq(0),
                     ]
                     m.next = 'READ_SPRITE_DATA'
             
@@ -222,11 +233,5 @@ class SimpleBlitterPeripheral(wiring.Component):
                     # Next column
                     m.d.sync += current_x.eq(current_x + 1)
                     m.next = 'READ_SPRITE_DATA'
-
-        # Status register
-        m.d.comb += [
-            self._status.f.busy.r_data.eq(1),  # Default: busy
-            self._status.f.mem_words.r_data.eq(self.memory_words),
-        ]
 
         return m
