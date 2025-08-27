@@ -254,7 +254,7 @@ class SIDSoc(TiliquaSoc):
         m.submodules.scope_periph = self.scope_periph
         
         # Connect rotation signal to scope backend
-        m.d.comb += self.scope_backend.rotate_left.eq(self.framebuffer_periph.rotate_left)
+        m.d.comb += self.scope_backend.rotation.eq(self.framebuffer_periph.rotation)
 
         # Connect scope periph channels to arbiter
         for i in range(4):

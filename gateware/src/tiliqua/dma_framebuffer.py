@@ -21,6 +21,8 @@ from amaranth_soc          import wishbone, csr
 from tiliqua               import sim, dvi, palette
 from tiliqua.dvi_modeline  import DVIModeline
 
+from tiliqua.types import Rotation
+
 class DMAFramebuffer(wiring.Component):
 
     """
@@ -222,7 +224,7 @@ class Peripheral(wiring.Component):
 
     class FlagsReg(csr.Register, access="w"):
         enable:        csr.Field(csr.action.W, unsigned(1))
-        rotate_left:   csr.Field(csr.action.W, unsigned(1))
+        rotation:      csr.Field(csr.action.W, Rotation)
 
     class FBBaseReg(csr.Register, access="w"):
         fb_base: csr.Field(csr.action.W, unsigned(32))
@@ -249,7 +251,7 @@ class Peripheral(wiring.Component):
 
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            "rotate_left": Out(1),
+            "rotation": Out(Rotation),
         })
 
         self.bus.memory_map = self._bridge.bus.memory_map
@@ -280,8 +282,8 @@ class Peripheral(wiring.Component):
                 m.d.sync += self.fb.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
         with m.If(self._flags.f.enable.w_stb):
             m.d.sync += self.fb.enable.eq(self._flags.f.enable.w_data)
-        with m.If(self._flags.f.rotate_left.w_stb):
-            m.d.sync += self.rotate_left.eq(self._flags.f.rotate_left.w_data)
+        with m.If(self._flags.f.rotation.w_stb):
+            m.d.sync += self.rotation.eq(self._flags.f.rotation.w_data)
         with m.If(self._fb_base.f.fb_base.w_stb):
             m.d.sync += self.fb.fb_base.eq(self._fb_base.f.fb_base.w_data)
 

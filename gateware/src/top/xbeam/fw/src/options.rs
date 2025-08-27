@@ -1,6 +1,7 @@
 use opts::*;
 use strum_macros::{EnumIter, IntoStaticStr};
 use tiliqua_lib::palette::ColorPalette;
+use tiliqua_hal::dma_framebuffer::Rotate;
 use serde_derive::{Serialize, Deserialize};
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
@@ -137,6 +138,8 @@ pub struct MiscOpts {
     pub plot_src: EnumOption<PlotSrc>,
     #[option]
     pub usb_mode: EnumOption<USBMode>,
+    #[option]
+    pub rotation: EnumOption<Rotate>,
     #[option(false)]
     pub save_opts: ButtonOption<OneShotButtonParams>,
     #[option(false)]

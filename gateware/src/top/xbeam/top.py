@@ -155,8 +155,8 @@ class XbeamSoc(TiliquaSoc):
 
         # Connect rotation signal to scope backends
         m.d.comb += [
-            self.vector_backend.rotate_left.eq(self.framebuffer_periph.rotate_left),
-            self.scope_backend.rotate_left.eq(self.framebuffer_periph.rotate_left),
+            self.vector_backend.rotation.eq(self.framebuffer_periph.rotation),
+            self.scope_backend.rotation.eq(self.framebuffer_periph.rotation),
         ]
 
         # Connect vector periph directly to its backend

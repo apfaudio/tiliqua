@@ -19,6 +19,7 @@ from amaranth.utils        import exact_log2
 from amaranth_soc          import wishbone
 
 from tiliqua.dma_framebuffer import DMAFramebuffer
+from tiliqua.types import Rotation
 
 class PixelRequest(data.Struct):
     """Single pixel plotting request."""
@@ -60,7 +61,7 @@ class PixelPlotBackend(wiring.Component):
                                         data_width=32, granularity=8)),
             # Control signals
             "enable": In(1),
-            "rotate_left": In(1),
+            "rotation": In(Rotation),
         })
 
     def elaborate(self, platform) -> Module:
@@ -92,17 +93,30 @@ class PixelPlotBackend(wiring.Component):
         # Convert to absolute coordinates if center_relative is set
         # Center calculation depends on rotation
         with m.If(current_req.center_relative):
-            with m.If(self.rotate_left):
-                # When rotated, X maps to Y and Y maps to X
-                m.d.comb += [
-                    abs_x.eq(current_req.x + (self.fb.timings.v_active >> 1)),
-                    abs_y.eq(current_req.y + (self.fb.timings.h_active >> 1)),
-                ]
-            with m.Else():
-                m.d.comb += [
-                    abs_x.eq(current_req.x + (self.fb.timings.h_active >> 1)),
-                    abs_y.eq(current_req.y + (self.fb.timings.v_active >> 1)),
-                ]
+            with m.Switch(self.rotation):
+                with m.Case(Rotation.NORMAL):
+                    m.d.comb += [
+                        abs_x.eq(current_req.x + (self.fb.timings.h_active >> 1)),
+                        abs_y.eq(current_req.y + (self.fb.timings.v_active >> 1)),
+                    ]
+                with m.Case(Rotation.LEFT):
+                    # 90° CCW: swap dimensions
+                    m.d.comb += [
+                        abs_x.eq(current_req.x + (self.fb.timings.v_active >> 1)),
+                        abs_y.eq(current_req.y + (self.fb.timings.h_active >> 1)),
+                    ]
+                with m.Case(Rotation.INVERTED):
+                    # 180°: same dimensions
+                    m.d.comb += [
+                        abs_x.eq(current_req.x + (self.fb.timings.h_active >> 1)),
+                        abs_y.eq(current_req.y + (self.fb.timings.v_active >> 1)),
+                    ]
+                with m.Case(Rotation.RIGHT):
+                    # 90° CW: swap dimensions  
+                    m.d.comb += [
+                        abs_x.eq(current_req.x + (self.fb.timings.v_active >> 1)),
+                        abs_y.eq(current_req.y + (self.fb.timings.h_active >> 1)),
+                    ]
         with m.Else():
             m.d.comb += [
                 abs_x.eq(current_req.x),
@@ -110,21 +124,40 @@ class PixelPlotBackend(wiring.Component):
             ]
         
         # Handle rotation and pixel addressing
-        with m.If(self.rotate_left):
-            # 90° clockwise rotation: (x,y) -> (v_active-1-y, x)
-            rotated_y = Signal(signed(16))
-            m.d.comb += rotated_y.eq(self.fb.timings.v_active - 1 - abs_y)
-            m.d.comb += [
-                pixel_index.eq(rotated_y[0:2]),
-                x_offs.eq(rotated_y >> 2),
-                y_offs.eq(abs_x),
-            ]
-        with m.Else():
-            m.d.comb += [
-                pixel_index.eq(abs_x[0:2]),
-                x_offs.eq((abs_x>>2)),
-                y_offs.eq(abs_y),
-            ]
+        final_x = Signal(signed(16))
+        final_y = Signal(signed(16))
+        
+        with m.Switch(self.rotation):
+            with m.Case(Rotation.NORMAL):
+                # 0°: no change
+                m.d.comb += [
+                    final_x.eq(abs_x),
+                    final_y.eq(abs_y),
+                ]
+            with m.Case(Rotation.LEFT):
+                # 90° CCW: (x,y) -> (-y, x) -> (h_active-1-y, x)
+                m.d.comb += [
+                    final_x.eq(self.fb.timings.h_active - 1 - abs_y),
+                    final_y.eq(abs_x),
+                ]
+            with m.Case(Rotation.INVERTED):
+                # 180°: (x,y) -> (-x, -y) -> (h_active-1-x, v_active-1-y)
+                m.d.comb += [
+                    final_x.eq(self.fb.timings.h_active - 1 - abs_x),
+                    final_y.eq(self.fb.timings.v_active - 1 - abs_y),
+                ]
+            with m.Case(Rotation.RIGHT):
+                # 90° CW: (x,y) -> (y, -x) -> (y, v_active-1-x)
+                m.d.comb += [
+                    final_x.eq(abs_y),
+                    final_y.eq(self.fb.timings.v_active - 1 - abs_x),
+                ]
+        
+        m.d.comb += [
+            pixel_index.eq(final_x[0:2]),
+            x_offs.eq(final_x >> 2),
+            y_offs.eq(final_y),
+        ]
         
         m.d.comb += pixel_addr.eq(self.fb.fb_base + y_offs*fb_hwords + x_offs)
 

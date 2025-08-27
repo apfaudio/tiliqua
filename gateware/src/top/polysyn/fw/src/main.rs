@@ -313,9 +313,7 @@ fn main() -> ! {
                 persist.set_persist(opts.beam.persist.value);
                 persist.set_decay(opts.beam.decay.value);
                 vscope.flags().write(
-                    |w| { w.enable().bit(true);
-                          w.rotate_left().bit(modeline.rotate == Rotate::Left)
-                    } );
+                    |w| w.enable().bit(true) );
             }
 
             vscope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );

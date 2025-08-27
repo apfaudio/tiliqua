@@ -1,9 +1,13 @@
 use serde_derive::{Serialize, Deserialize};
+use strum_macros::{EnumIter, IntoStaticStr};
 
-#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize, EnumIter, IntoStaticStr)]
+#[strum(serialize_all = "kebab-case")]
 pub enum Rotate {
-    Normal,
-    Left,
+    Normal = 0,
+    Left = 1,
+    Inverted = 2,
+    Right = 3,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -138,7 +142,7 @@ macro_rules! impl_dma_framebuffer {
                     } );
                     registers_fb.flags().write(|w| unsafe {
                         w.enable().bit(true);
-                        w.rotate_left().bit(mode.rotate == Rotate::Left)
+                        w.rotation().bits(mode.rotate.clone() as u8)
                     });
                     Self {
                         registers_fb,
