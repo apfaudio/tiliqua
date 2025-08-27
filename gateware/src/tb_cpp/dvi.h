@@ -34,7 +34,7 @@ public:
                 if (y >= DVI_V_ACTIVE) {
                     char name[64];
                     sprintf(name, "frame%02d.bmp", frames);
-                    printf("DVIDriver: %s\n", name);
+                    //printf("DVIDriver: %s\n", name);
                     stbi_write_bmp(name, DVI_H_ACTIVE, DVI_V_ACTIVE, 3, image_data);
                     ++frames;
                     y = 0;
