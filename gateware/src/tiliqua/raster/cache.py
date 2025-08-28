@@ -1,0 +1,114 @@
+# Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+
+"""
+Cache components optimized for raster graphics operations.
+"""
+
+from amaranth                    import *
+from amaranth.lib                import data, wiring
+from amaranth.lib.wiring         import Component, In, Out, flipped, connect
+from amaranth.utils              import exact_log2
+from amaranth.lib.memory         import Memory
+
+from amaranth_soc                import wishbone
+
+from tiliqua.cache               import WishboneL2Cache
+
+
+class CacheFlusher(wiring.Component):
+    """Periodically flushes cache lines to avoid stale dirty data."""
+    
+    def __init__(self, base, addr_width, burst_len):
+        self.base = base
+        self.burst_len = burst_len
+        
+        super().__init__({
+            "bus": Out(wishbone.Signature(addr_width=addr_width, data_width=32, granularity=8)),
+            "enable": In(1),
+        })
+    
+    def elaborate(self, platform) -> Module:
+        m = Module()
+        
+        bus = self.bus
+        flush_adr = Signal(bus.addr_width)
+        
+        # Simple periodic flusher
+        with m.FSM():
+            with m.State('WAIT'):
+                flush_counter = Signal(16)
+                m.d.sync += flush_counter.eq(flush_counter + 1)
+                with m.If(self.enable & (flush_counter == 0)):
+                    m.next = 'READ'
+                    m.d.sync += flush_adr.eq(self.base)
+            
+            with m.State('READ'):
+                m.d.comb += [
+                    bus.stb.eq(1),
+                    bus.cyc.eq(1),
+                    bus.adr.eq(flush_adr),
+                ]
+                with m.If(bus.stb & bus.ack):
+                    m.next = 'WAIT'
+                    m.d.sync += flush_adr.eq(flush_adr + self.burst_len)
+
+        return m
+
+
+class Cache(wiring.Component):
+    """
+    Cache optimized for plot operations with integrated arbiter and flusher.
+    """
+
+    def __init__(self, fb, n_ports=1, cachesize_words=64):
+        self.fb = fb
+        self.n_ports = n_ports
+        
+        # L2 cache
+        self.cache = WishboneL2Cache(
+            addr_width=fb.bus.addr_width,
+            cachesize_words=cachesize_words)
+
+        # Arbiter for cache access
+        self.arbiter = wishbone.Arbiter(
+            addr_width=self.cache.master.addr_width,
+            data_width=self.cache.master.data_width,
+            granularity=self.cache.master.granularity,
+        )
+
+        # Cache flusher
+        self.flusher = CacheFlusher(
+            base=fb.fb_base,
+            addr_width=self.cache.master.addr_width,
+            burst_len=8)
+        self.arbiter.add(self.flusher.bus)
+
+        super().__init__({
+            # Output to backing store 
+            "bus": Out(wishbone.Signature(addr_width=self.cache.slave.addr_width,
+                                        data_width=self.cache.slave.data_width,
+                                        granularity=self.cache.slave.granularity,
+                                        features={"cti", "bte"})),
+        })
+
+    def add_port(self, bus):
+        """Add a wishbone bus to the cache arbiter."""
+        self.arbiter.add(bus)
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.cache = self.cache
+        m.submodules.flusher = self.flusher  
+        m.submodules.arbiter = self.arbiter
+
+        wiring.connect(m, self.arbiter.bus, self.cache.master)
+        wiring.connect(m, self.cache.slave, wiring.flipped(self.bus))
+
+        # Enable flusher when cache is active
+        with m.If(self.cache.slave.ack):
+            m.d.sync += self.flusher.enable.eq(1)
+
+        return m

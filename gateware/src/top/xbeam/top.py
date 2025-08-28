@@ -24,8 +24,9 @@ from amaranth_soc                                import csr, wishbone
 
 from amaranth_future                             import fixed
 
-from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio, cache, sim, delay_line
-from tiliqua.pixel_plot_backend                  import PixelPlotBackend, PixelPlotArbiter
+from tiliqua                                     import eurorack_pmod, dsp, usb_audio, sim, delay_line
+from tiliqua.raster                              import scope
+from tiliqua.raster.plot                         import FramebufferPlotter
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
@@ -105,29 +106,22 @@ class XbeamSoc(TiliquaSoc):
         self.scope_periph_base  = 0x00001100
         self.xbeam_periph_base  = 0x00001200
 
-        # Dedicated pixel plot backends for scope peripherals
-        self.scope_backend = PixelPlotBackend(fb=self.fb)
-        
-        # Shared plotter cache for both scope backends
-        self.scope_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.scope_cache.bus)
-        
-        # Connect both backends to shared cache
-        self.scope_cache.add(self.scope_backend.bus)
+        # Dedicated framebuffer plotter for scope peripherals (5 ports: 1 vector + 4 scope channels)
+        self.scope_plotter = FramebufferPlotter(fb=self.fb, n_ports=5)
+        self.psram_periph.add_master(self.scope_plotter.bus)
 
         # Vectorscope with upsampling and CSR registers
-        self.vector_periph = scope.VectorTracePeripheral(
+        self.vector_periph = scope.VectorPeripheral(
             fb=self.fb,
             n_upsample=8)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
         # 4-ch oscilloscope with CSR registers  
-        self.scope_periph = scope.ScopeTracePeripheral(
+        self.scope_periph = scope.ScopePeripheral(
             fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
         
-        # Arbiter for scope's 4 channels to single backend
-        self.scope_arbiter = PixelPlotArbiter(backend=self.scope_backend, n_clients=5)
+        # Note: Arbiter is now built into the FramebufferPlotter
 
         # Extra peripheral for some global control flags.
         self.xbeam_periph = XbeamPeripheral()
@@ -140,27 +134,24 @@ class XbeamSoc(TiliquaSoc):
 
         m = Module()
 
-        # Scope pixel plot infrastructure
-        m.submodules.scope_backend = self.scope_backend
-        m.submodules.scope_cache = self.scope_cache
-        m.submodules.scope_arbiter = self.scope_arbiter
+        # Scope plotting infrastructure
+        m.submodules.scope_plotter = self.scope_plotter
 
         # Scope peripherals
         m.submodules.vector_periph = self.vector_periph
         m.submodules.scope_periph = self.scope_periph
         m.submodules.xbeam_periph = self.xbeam_periph
 
-        # Connect rotation signal to scope backends
-        m.d.comb += self.scope_backend.rotation.eq(self.framebuffer_periph.rotation),
-
-        # Connect scope periph channels to arbiter
-        wiring.connect(m, self.vector_periph.pixel_req, self.scope_arbiter.clients[0])
+        # Connect scope peripherals to plotter ports
+        wiring.connect(m, self.vector_periph.plot_req, self.scope_plotter.ports[0])
         for i in range(4):
-            wiring.connect(m, self.scope_periph.pixel_reqs[i], self.scope_arbiter.clients[i+1])
-        wiring.connect(m, self.scope_arbiter.backend_req, self.scope_backend.req)
-
-        # Enable scope backends when bus traffic is permitted
-        m.d.comb += self.scope_backend.enable.eq(self.permit_bus_traffic),
+            wiring.connect(m, self.scope_periph.plot_reqs[i], self.scope_plotter.ports[i+1])
+        
+        # Connect control signals to scope plotter
+        m.d.comb += [
+            self.scope_plotter.enable.eq(self.fb.enable),
+            self.scope_plotter.rotation.eq(self.framebuffer_periph.rotation),
+        ]
 
         m.submodules += super().elaborate(platform)
 

@@ -18,7 +18,8 @@ from amaranth_future         import fixed
 
 from tiliqua                 import dsp
 from tiliqua.dma_framebuffer import DMAFramebuffer
-from tiliqua.pixel_plot_backend import PixelRequest
+from tiliqua.types           import Pixel
+from tiliqua.raster.plot import PlotRequest
 from tiliqua.eurorack_pmod   import ASQ
 
 from amaranth_soc            import wishbone, csr
@@ -29,7 +30,7 @@ class Stroke(wiring.Component):
     Read samples, upsample them, and generate pixel requests for a shared plotting backend.
     
     This refactored version removes the direct framebuffer access and instead generates
-    PixelRequest stream that can be fed to a shared PixelPlotBackend. This allows
+    PlotRequest stream that can be fed to a shared FramebufferBackend. This allows
     multiple Stroke instances to share the same plotting hardware via round-robin
     arbitration, greatly reducing resource usage.
 
@@ -61,8 +62,8 @@ class Stroke(wiring.Component):
             # Point stream to render
             # 4 channels: x, y, intensity, color
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
-            # Pixel request output to shared backend
-            "pixel_req": Out(stream.Signature(PixelRequest)),
+            # Plot request output to shared backend
+            "plot_req": Out(stream.Signature(PlotRequest)),
             # Kick this to start the core
             "enable": In(1),
             # Internal point stream, upsampled from self.i (TODO no need to expose this)
@@ -146,16 +147,16 @@ class Stroke(wiring.Component):
                 # Generate pixel request for the shared backend
                 # Using center_relative=1 since we work with signed offsets from center
                 m.d.comb += [
-                    self.pixel_req.valid.eq(1),
-                    self.pixel_req.payload.x.eq(sample_x),
-                    self.pixel_req.payload.y.eq(sample_y),
-                    self.pixel_req.payload.color.eq(new_color),
-                    self.pixel_req.payload.intensity.eq(sample_intensity),
-                    self.pixel_req.payload.additive.eq(1),  # Stroke uses additive blending
-                    self.pixel_req.payload.center_relative.eq(1),  # Work relative to center
+                    self.plot_req.valid.eq(1),
+                    self.plot_req.payload.x.eq(sample_x),
+                    self.plot_req.payload.y.eq(sample_y),
+                    self.plot_req.payload.pixel.color.eq(new_color),
+                    self.plot_req.payload.pixel.intensity.eq(sample_intensity),
+                    self.plot_req.payload.additive.eq(1),  # Stroke uses additive blending
+                    self.plot_req.payload.center_relative.eq(1),  # Work relative to center
                 ]
                 
-                with m.If(self.pixel_req.ready):
+                with m.If(self.plot_req.ready):
                     m.next = 'LATCH0'
 
         return ResetInserter({'sync': ~self.fb.enable})(m)

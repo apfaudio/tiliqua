@@ -60,7 +60,8 @@ from vendor.vexiiriscv                           import VexiiRiscv
 from tiliqua.tiliqua_platform                    import *
 from tiliqua.types                               import FirmwareLocation
 
-from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster_persist, palette, pixel_plot, pixel_plot_backend, cache, blitter
+from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, palette
+from tiliqua.raster                              import plot, blit, persist
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class TiliquaSoc(Component):
@@ -236,28 +237,24 @@ class TiliquaSoc(Component):
                 self.framebuffer_periph.bus, addr=self.fb_periph_base, name="framebuffer_periph")
 
         # Video persistance DMA effect
-        self.persist_periph = raster_persist.Peripheral(
+        self.persist_periph = persist.Peripheral(
             fb=self.fb,
             bus_dma=self.psram_periph)
         self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
 
-        # Hardware-accelerated pixel plotting
-        self.pp_backend = pixel_plot_backend.PixelPlotBackend(fb=self.fb)
-        self.pp_arbiter = pixel_plot_backend.PixelPlotArbiter(backend=self.pp_backend, n_clients=2)
+        # Hardware-accelerated pixel plotting (integrated solution)
+        self.framebuffer_plotter = plot.FramebufferPlotter(fb=self.fb, n_ports=2)
+        self.psram_periph.add_master(self.framebuffer_plotter.bus)
 
-        # Pixel plotter
-        self.pixel_plot = pixel_plot.PixelPlotPeripheral()
+        # Pixel plotter peripheral
+        self.pixel_plot = plot.Peripheral()
         self.csr_decoder.add(self.pixel_plot.csr_bus, addr=self.pixel_plot_csr_base, name="pixel_plot")
         self.wb_decoder.add(self.pixel_plot.wb_bus, addr=self.pixel_plot_mem_base, name="pixel_plot")
 
-        # Blitter
-        self.blit = blitter.SimpleBlitterPeripheral()
+        # Blitter peripheral
+        self.blit = blit.Peripheral()
         self.csr_decoder.add(self.blit.csr_bus, addr=self.blit_csr_base, name="blit")
         self.wb_decoder.add(self.blit.sprite_mem_bus, addr=self.blit_mem_base, name="blit")
-
-        self.plotter_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.plotter_cache.bus)
-        self.plotter_cache.add(self.pp_backend.bus)
         
         self.permit_bus_traffic = Signal()
 
@@ -360,16 +357,22 @@ class TiliquaSoc(Component):
         
         # hardware-accelerated pixel plotting
         m.submodules.pixel_plot = self.pixel_plot
-        m.submodules.pp_backend = self.pp_backend
-        m.submodules.pp_arbiter = self.pp_arbiter
-        m.submodules.pp_cache = self.plotter_cache
+        m.submodules.framebuffer_plotter = self.framebuffer_plotter
         m.submodules.blit = self.blit
-        wiring.connect(m, self.pixel_plot.pixel_req, self.pp_arbiter.clients[0])
-        wiring.connect(m, self.blit.pixel_req, self.pp_arbiter.clients[1])
+        
+        # Connect peripherals to plotter ports
+        wiring.connect(m, self.pixel_plot.plot_req, self.framebuffer_plotter.ports[0])
+        wiring.connect(m, self.blit.plot_req, self.framebuffer_plotter.ports[1])
+        
+        # Connect control signals to framebuffer plotter
+        m.d.comb += [
+            self.framebuffer_plotter.enable.eq(self.fb.enable),
+            self.framebuffer_plotter.rotation.eq(self.framebuffer_periph.rotation),
+        ]
+        
+        # Enable peripherals when bus traffic is permitted
         m.d.comb += self.pixel_plot.enable.eq(self.permit_bus_traffic)
         m.d.comb += self.blit.enable.eq(self.permit_bus_traffic)
-        m.d.comb += self.pp_backend.enable.eq(self.permit_bus_traffic)
-        m.d.comb += self.pp_backend.rotation.eq(self.framebuffer_periph.rotation)
 
         # audio interface
         m.submodules.pmod0 = self.pmod0

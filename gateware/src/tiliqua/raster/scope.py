@@ -12,11 +12,11 @@ from amaranth.lib.wiring                         import In, Out
 from amaranth_soc                                import csr
 
 from tiliqua                                     import dsp
-from tiliqua.raster_stroke                       import Stroke
-from tiliqua.pixel_plot_backend                  import PixelRequest
+from tiliqua.raster.stroke                       import Stroke
+from tiliqua.raster.plot                         import PlotRequest
 from tiliqua.eurorack_pmod                       import ASQ
 
-class VectorTracePeripheral(wiring.Component):
+class VectorPeripheral(wiring.Component):
 
     class Flags(csr.Register, access="w"):
         enable: csr.Field(csr.action.W, unsigned(1))
@@ -57,8 +57,8 @@ class VectorTracePeripheral(wiring.Component):
             "soc_en": In(1),
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            # Pixel request output to shared backend
-            "pixel_req": Out(stream.Signature(PixelRequest)),
+            # Plot request output to shared backend
+            "plot_req": Out(stream.Signature(PlotRequest)),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -68,7 +68,7 @@ class VectorTracePeripheral(wiring.Component):
         m.submodules += self.stroke
 
         wiring.connect(m, wiring.flipped(self.i), self.stroke.i)
-        wiring.connect(m, self.stroke.pixel_req, wiring.flipped(self.pixel_req))
+        wiring.connect(m, self.stroke.plot_req, wiring.flipped(self.plot_req))
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         m.d.comb += self.stroke.enable.eq(self.en & self.soc_en)
@@ -102,7 +102,7 @@ class VectorTracePeripheral(wiring.Component):
 
         return m
 
-class ScopeTracePeripheral(wiring.Component):
+class ScopePeripheral(wiring.Component):
 
     class Flags(csr.Register, access="w"):
         enable: csr.Field(csr.action.W, unsigned(1))
@@ -158,7 +158,7 @@ class ScopeTracePeripheral(wiring.Component):
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
             # Pixel request outputs, one for each channel
-            "pixel_reqs": Out(stream.Signature(PixelRequest)).array(self.n_channels),
+            "plot_reqs": Out(stream.Signature(PlotRequest)).array(self.n_channels),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -180,7 +180,7 @@ class ScopeTracePeripheral(wiring.Component):
 
         for i, s in enumerate(self.strokes):
             m.d.comb += s.enable.eq(self.en & self.soc_en)
-            wiring.connect(m, s.pixel_req, wiring.flipped(self.pixel_reqs[i]))
+            wiring.connect(m, s.plot_req, wiring.flipped(self.plot_reqs[i]))
 
         # Scope and trigger
         # Ch0 is routed through trigger, the rest are not.

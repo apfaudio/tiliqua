@@ -57,7 +57,8 @@ from amaranth_soc.memory  import MemoryMap
 
 from amaranth_future                             import fixed
 
-from tiliqua                                     import eurorack_pmod, dsp, scope, cache
+from tiliqua                                     import eurorack_pmod, dsp, cache
+from tiliqua.raster                              import scope
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
@@ -174,14 +175,14 @@ class MacroOscSoc(TiliquaSoc):
         self.plotter_cache = cache.PlotterCache(fb=self.fb)
         self.psram_periph.add_master(self.plotter_cache.bus)
 
-        self.vector_periph = scope.VectorTracePeripheral(
+        self.vector_periph = scope.VectorPeripheral(
             fb=self.fb,
             n_upsample=16,
             fs=48000)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
         self.plotter_cache.add(self.vector_periph.bus_dma)
 
-        self.scope_periph = scope.ScopeTracePeripheral(
+        self.scope_periph = scope.ScopePeripheral(
             fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
         for bus in self.scope_periph.bus_dma:

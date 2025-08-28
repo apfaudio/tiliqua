@@ -45,8 +45,8 @@ from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
 from tiliqua.sim              import FakeTiliquaDomainGenerator
-from tiliqua.raster_persist   import Persistance
-from tiliqua.raster_stroke    import Stroke
+from tiliqua.raster.persist import Persistance
+from tiliqua.raster.stroke import Stroke
 
 from vendor.ila               import AsyncSerialILA
 

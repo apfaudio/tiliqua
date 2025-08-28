@@ -9,7 +9,8 @@ import unittest
 from amaranth              import *
 from amaranth.sim          import *
 from amaranth.lib          import wiring
-from tiliqua               import raster_persist, raster_stroke, test_util, eurorack_pmod, dma_framebuffer, dvi_modeline, palette
+from tiliqua               import test_util, eurorack_pmod, dma_framebuffer, dvi_modeline, palette
+from tiliqua.raster        import stroke, persist
 
 from amaranth_soc          import csr
 from amaranth_soc.csr      import wishbone
@@ -25,7 +26,7 @@ class RasterTests(unittest.TestCase):
         m = Module()
         fb = dma_framebuffer.DMAFramebuffer(
             fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
-        dut = raster_persist.Persistance(fb=fb)
+        dut = persist.Persistance(fb=fb)
         m.submodules += [dut, fb, fb.palette]
 
         # No actual FB backing store, just simulating WB transactions
@@ -62,7 +63,7 @@ class RasterTests(unittest.TestCase):
         m = Module()
         fb = dma_framebuffer.DMAFramebuffer(
             fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
-        dut = raster_stroke.Stroke(fb=fb)
+        dut = stroke.Stroke(fb=fb)
         m.submodules += [dut, fb, fb.palette]
 
         async def stimulus(ctx):

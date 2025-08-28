@@ -39,7 +39,8 @@ from amaranth_soc              import csr, wishbone
 
 from amaranth_future           import fixed
 
-from tiliqua                   import eurorack_pmod, dsp, mac, midi, scope, sim, delay, cache
+from tiliqua                   import eurorack_pmod, dsp, mac, midi, sim, delay, cache
+from tiliqua.raster            import scope
 from tiliqua.delay_line        import DelayLine
 from tiliqua.eurorack_pmod     import ASQ
 from tiliqua.tiliqua_soc       import TiliquaSoc
@@ -374,7 +375,7 @@ class PolySoc(TiliquaSoc):
         self.plotter_cache = cache.PlotterCache(fb=self.fb)
         self.psram_periph.add_master(self.plotter_cache.bus)
 
-        self.vector_periph = scope.VectorTracePeripheral(
+        self.vector_periph = scope.VectorPeripheral(
             fb=self.fb,
             fs=48000,
             n_upsample=32)

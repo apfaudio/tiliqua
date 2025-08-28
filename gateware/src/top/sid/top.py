@@ -15,11 +15,12 @@ from amaranth_soc          import csr
 
 from amaranth_future       import fixed
 
-from tiliqua               import eurorack_pmod, dsp, scope, cache
-from tiliqua.pixel_plot_backend import PixelPlotBackend, PixelPlotArbiter
+from tiliqua               import eurorack_pmod, dsp
+from tiliqua.raster        import scope
+from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc   import TiliquaSoc
 from tiliqua.cli           import top_level_cli
-from tiliqua.scope         import ScopeTracePeripheral
+from tiliqua.raster.scope  import ScopePeripheral
 
 class SID(wiring.Component):
 
@@ -218,23 +219,16 @@ class SIDSoc(TiliquaSoc):
         self.sid_periph = SIDPeripheral()
         self.csr_decoder.add(self.sid_periph.bus, addr=0x1000, name="sid_periph")
 
-        # Dedicated pixel plot backend for scope
-        self.scope_backend = PixelPlotBackend(fb=self.fb)
-        
-        # Plotter cache for scope backend (maintains same interface)
-        self.scope_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.scope_cache.bus)
-        
-        # Connect backend to cache
-        self.scope_cache.add(self.scope_backend.bus)
+        # Dedicated framebuffer plotter for scope (4 channels)
+        self.scope_plotter = FramebufferPlotter(fb=self.fb, n_ports=4)
+        self.psram_periph.add_master(self.scope_plotter.bus)
 
         # Add scope peripheral 
-        self.scope_periph = scope.ScopeTracePeripheral(
+        self.scope_periph = scope.ScopePeripheral(
             fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=0x1100, name="scope_periph")
         
-        # Arbiter for scope's 4 channels to single backend
-        self.scope_arbiter = PixelPlotArbiter(backend=self.scope_backend, n_clients=4)
+        # Note: Arbiter is now built into the FramebufferPlotter
 
         # Now finalize the CSR bridge
         self.finalize_csr_bridge()
@@ -243,26 +237,23 @@ class SIDSoc(TiliquaSoc):
 
         m = Module()
 
-        # Scope pixel plot infrastructure
-        m.submodules.scope_backend = self.scope_backend
-        m.submodules.scope_cache = self.scope_cache
-        m.submodules.scope_arbiter = self.scope_arbiter
+        # Scope plotting infrastructure
+        m.submodules.scope_plotter = self.scope_plotter
 
         # Main components
         m.submodules.sid = sid = SID()
         m.submodules.sid_periph = self.sid_periph
         m.submodules.scope_periph = self.scope_periph
         
-        # Connect rotation signal to scope backend
-        m.d.comb += self.scope_backend.rotation.eq(self.framebuffer_periph.rotation)
-
-        # Connect scope periph channels to arbiter
+        # Connect scope periph channels to plotter ports
         for i in range(4):
-            wiring.connect(m, self.scope_periph.pixel_reqs[i], self.scope_arbiter.clients[i])
-        wiring.connect(m, self.scope_arbiter.backend_req, self.scope_backend.req)
-
-        # Enable scope backend when bus traffic is permitted
-        m.d.comb += self.scope_backend.enable.eq(self.permit_bus_traffic)
+            wiring.connect(m, self.scope_periph.plot_reqs[i], self.scope_plotter.ports[i])
+        
+        # Connect control signals to scope plotter
+        m.d.comb += [
+            self.scope_plotter.enable.eq(self.fb.enable),
+            self.scope_plotter.rotation.eq(self.framebuffer_periph.rotation),
+        ]
 
         m.submodules += super().elaborate(platform)
 

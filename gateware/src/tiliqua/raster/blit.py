@@ -19,9 +19,11 @@ from amaranth.utils        import exact_log2
 from amaranth_soc          import wishbone, csr
 from amaranth_soc.memory   import MemoryMap
 
-from tiliqua.pixel_plot_backend import PixelRequest
+from tiliqua.types         import Pixel
 
-class SimpleBlitterPeripheral(wiring.Component):
+from tiliqua.raster.plot import PlotRequest
+
+class Peripheral(wiring.Component):
     """
     Simple sprite blitter with 1-bit per pixel local memory.
     
@@ -99,8 +101,8 @@ class SimpleBlitterPeripheral(wiring.Component):
             # Sprite memory interface for CPU
             "sprite_mem_bus": In(wishbone.Signature(addr_width=self.memory_addr_width, 
                                                   data_width=32, granularity=8)),
-            # Output to shared pixel plot backend
-            "pixel_req": Out(stream.Signature(PixelRequest)),
+            # Output to shared plot backend
+            "plot_req": Out(stream.Signature(PlotRequest)),
             "enable": In(1),
         })
 
@@ -254,16 +256,16 @@ class SimpleBlitterPeripheral(wiring.Component):
                 with m.If(current_pixel_bit):
                     # Pixel should be drawn - send request to backend
                     m.d.comb += [
-                        self.pixel_req.valid.eq(1),
-                        self.pixel_req.payload.x.eq(current_dst_x + current_x),
-                        self.pixel_req.payload.y.eq(current_dst_y + current_y),
-                        self.pixel_req.payload.color.eq(current_color),
-                        self.pixel_req.payload.intensity.eq(current_intensity),
-                        self.pixel_req.payload.additive.eq(0),  # Direct replacement
-                        self.pixel_req.payload.center_relative.eq(0),  # Absolute coords
+                        self.plot_req.valid.eq(1),
+                        self.plot_req.payload.x.eq(current_dst_x + current_x),
+                        self.plot_req.payload.y.eq(current_dst_y + current_y),
+                        self.plot_req.payload.pixel.color.eq(current_color),
+                        self.plot_req.payload.pixel.intensity.eq(current_intensity),
+                        self.plot_req.payload.additive.eq(0),  # Direct replacement
+                        self.plot_req.payload.center_relative.eq(0),  # Absolute coords
                     ]
                     
-                    with m.If(self.pixel_req.ready):
+                    with m.If(self.plot_req.ready):
                         m.next = 'NEXT_PIXEL'
                 with m.Else():
                     # Pixel is transparent - skip to next
