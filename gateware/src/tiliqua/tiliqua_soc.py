@@ -107,8 +107,6 @@ class TiliquaSoc(Component):
         self.pixel_plot_csr_base  = 0x00000D00
         self.blit_csr_base        = 0x00000E00
         
-        # Fast memory-mapped region for PixelPlot commands
-        self.pixel_plot_mem_base  = 0xb0000000
         self.blit_mem_base        = 0xc0000000
         
         # Some settings depend on whether code is in block RAM or SPI flash
@@ -136,8 +134,6 @@ class TiliquaSoc(Component):
                 VexiiRiscv.MemoryRegion(base=self.spiflash_base, size=self.spiflash_size, cacheable=True, executable=True),
                 VexiiRiscv.MemoryRegion(base=self.psram_base, size=self.psram_size, cacheable=True, executable=True),
                 VexiiRiscv.MemoryRegion(base=self.csr_base, size=0x10000, cacheable=False, executable=False),
-                # Fast PixelPlot command region - uncached for fastest writes
-                VexiiRiscv.MemoryRegion(base=self.pixel_plot_mem_base, size=4, cacheable=False, executable=False),
                 VexiiRiscv.MemoryRegion(base=self.blit_mem_base, size=0x2000, cacheable=False, executable=False),
             ] + extra_cpu_regions,
             variant=cpu_variant,
@@ -249,7 +245,6 @@ class TiliquaSoc(Component):
         # Pixel plotter peripheral
         self.pixel_plot = plot.Peripheral()
         self.csr_decoder.add(self.pixel_plot.csr_bus, addr=self.pixel_plot_csr_base, name="pixel_plot")
-        self.wb_decoder.add(self.pixel_plot.wb_bus, addr=self.pixel_plot_mem_base, name="pixel_plot")
 
         # Blitter peripheral
         self.blit = blit.Peripheral()
@@ -469,7 +464,6 @@ class TiliquaSoc(Component):
             pmod_rev = TiliquaRevision.from_platform(self.platform_class).pmod_rev()
             f.write(f"pub const TOUCH_SENSOR_ORDER: [u8; 8] = {pmod_rev.touch_order()};\n")
             f.write(f"pub const PMOD_DEFAULT_CAL: [f32; 4] = {pmod_rev.default_calibration_rs()};\n")
-            f.write(f"pub const PIXEL_PLOT_MEM_BASE: usize = 0x{self.pixel_plot_mem_base:x};\n")
             f.write(f"pub const BLIT_MEM_BASE: usize = 0x{self.blit_mem_base:x};\n")
 
             f.write("// Extra constants specified by an SoC subclass:\n")

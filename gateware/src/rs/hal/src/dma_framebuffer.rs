@@ -93,6 +93,7 @@ macro_rules! impl_dma_framebuffer {
         $DMA_FRAMEBUFFERX:ident: $PACFRAMEBUFFERX:ty,
         $PALETTEX:ident: $PACPALETTEX:ty,
         $BLITTERX:ident: $PACBLITTERX:ty,
+        $PIXEL_PLOTX:ident: $PACPIXEL_PLOTX:ty,
     )+) => {
         $(
             use tiliqua_hal::dma_framebuffer::{DVIModeline, Rotate};
@@ -103,16 +104,16 @@ macro_rules! impl_dma_framebuffer {
                 registers_fb: $PACFRAMEBUFFERX,
                 registers_palette: $PACPALETTEX,
                 registers_blitter: $PACBLITTERX,
+                registers_pixel_plot: $PACPIXEL_PLOTX,
                 mode: DVIModeline,
                 framebuffer_base: *mut u32,
-                pixel_plot_mem_base: *mut u32,
                 blitter_mem_base: *mut u32,
                 current_spritesheet_key: u32,
             }
 
             impl $DMA_FRAMEBUFFERX {
                 pub fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, registers_blitter: $PACBLITTERX,
-                       fb_base: usize, mode: DVIModeline, pixel_plot_mem_base: usize, blitter_mem_base: usize) -> Self {
+                       registers_pixel_plot: $PACPIXEL_PLOTX, fb_base: usize, mode: DVIModeline, blitter_mem_base: usize) -> Self {
                     registers_fb.flags().write(|w| unsafe {
                         w.enable().bit(false)
                     });
@@ -149,9 +150,9 @@ macro_rules! impl_dma_framebuffer {
                         registers_fb,
                         registers_palette,
                         registers_blitter,
+                        registers_pixel_plot,
                         mode,
                         framebuffer_base: fb_base as *mut u32,
-                        pixel_plot_mem_base: pixel_plot_mem_base as *mut u32,
                         blitter_mem_base: blitter_mem_base as *mut u32,
                         current_spritesheet_key: 0, // No spritesheet loaded initially
                     }
@@ -215,12 +216,18 @@ macro_rules! impl_dma_framebuffer {
                     I: IntoIterator<Item = Pixel<Self::Color>>,
                 {
                     for Pixel(coord, color) in pixels.into_iter() {
-                        let cmd: u32 = ((coord.x as u32) << 20) |
-                                       ((coord.y as u32) << 8) |
-                                       (color.luma() as u32 & 0xffu32);
-                        unsafe {
-                            self.pixel_plot_mem_base.write_volatile(cmd);
-                        }
+                        // Extract color and intensity from luma value
+                        let luma = color.luma() as u32;
+                        let pixel_color = (luma >> 4) & 0xf;      // Upper 4 bits for color
+                        let pixel_intensity = luma & 0xf;         // Lower 4 bits for intensity
+                        
+                        // Write to CSR registers (writing to plot register triggers the operation)
+                        self.registers_pixel_plot.plot().write(|w| unsafe {
+                            w.x().bits(coord.x as u16);             // x coordinate  
+                            w.y().bits(coord.y as u16);             // y coordinate
+                            w.color().bits(pixel_color as u8);      // color (4 bits)
+                            w.intensity().bits(pixel_intensity as u8) // intensity (4 bits)
+                        });
                     }
                     Ok(())
                 }

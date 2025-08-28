@@ -15,7 +15,7 @@ Command format: [X:12|Y:12|Color:4|Intensity:4] (single 32-bit word)
 
 from amaranth              import *
 from amaranth.build        import *
-from amaranth.lib          import wiring, data, stream, fifo
+from amaranth.lib          import wiring, data, stream, fifo, enum
 from amaranth.lib.wiring   import In, Out
 from amaranth.lib.memory   import Memory
 from amaranth.utils        import exact_log2
@@ -28,117 +28,112 @@ from .cache                import Cache
 from tiliqua.dma_framebuffer import DMAFramebuffer
 from tiliqua.types import Rotation, Pixel
 
+class BlendMode(enum.Enum, shape=unsigned(1)):
+    REPLACE  = 0  # Direct pixel replacement
+    ADDITIVE = 1  # Additive blending with saturation
+
+class OffsetMode(enum.Enum, shape=unsigned(1)):
+    ABSOLUTE = 0  # Absolute coordinates
+    CENTER   = 1  # Relative to center coordinates
+
 class PlotRequest(data.Struct):
     """Single pixel plotting request."""
     x:         signed(12)    # X coordinate (signed, -2048 to +2047)
     y:         signed(12)    # Y coordinate (signed, -2048 to +2047)  
     pixel:     Pixel         # Color and intensity
-    additive:  unsigned(1)   # 1=additive blend, 0=replace
-    center_relative: unsigned(1)  # 1=relative to center, 0=absolute coordinates
+    blend:     BlendMode     # Blending mode (replace vs additive)
+    offset:    OffsetMode    # Coordinate system (absolute vs center-relative)
 
 
 class Peripheral(wiring.Component):
     """
-    Hardware-accelerated pixel plotter with single-word command FIFO interface.
+    Hardware-accelerated pixel plotter with CSR command interface.
     
-    Command Format (32-bit):
-    - Bits [31:20]: X coordinate (12 bits, signed -2048 to +2047)
-    - Bits [19:8]:  Y coordinate (12 bits, signed -2048 to +2047)  
-    - Bits [7:4]:   Color (4 bits, 0-15)
-    - Bits [3:0]:   Intensity (4 bits, 0-15)
+    Command Interface:
+    PLOT: [x:12|y:12|color:4|intensity:4] - Plot pixel with specified parameters
     
     Features:
-    - Single bus write per pixel command
+    - CSR-based command interface for single pixel plots
     - Deep command FIFO for pixel operations 
     - Uses shared FramebufferBackend for actual plotting
-    - Direct pixel replacement (non-additive)
+    - Direct pixel replacement (REPLACE blend mode)
     - Absolute coordinate positioning
     """
 
     class StatusReg(csr.Register, access="r"):
         fifo_level: csr.Field(csr.action.R, unsigned(16))
         busy:       csr.Field(csr.action.R, unsigned(1))
+    
+    class PlotReg(csr.Register, access="w"):
+        x: csr.Field(csr.action.W, signed(12))
+        y: csr.Field(csr.action.W, signed(12))
+        color: csr.Field(csr.action.W, unsigned(4))
+        intensity: csr.Field(csr.action.W, unsigned(4))
+        # Note: Writing to this register triggers the plot operation
 
-    def __init__(self, fifo_depth=8, granularity=8):
+    def __init__(self, fifo_depth=8):
         self.fifo_depth = fifo_depth
         
-        # Single-word command FIFO - much more efficient!
-        self._cmd_fifo = fifo.SyncFIFOBuffered(width=32, depth=fifo_depth)
+        # Command FIFO for queuing plot operations
+        # Stores PlotRequest structs directly
+        self._cmd_fifo = fifo.SyncFIFOBuffered(width=PlotRequest.as_shape().size, depth=fifo_depth)
 
-        # CSR registers for status
+        # CSR registers
         regs = csr.Builder(addr_width=6, data_width=8)
-        self._status  = regs.add("status",  self.StatusReg(),  offset=0x00)
+        self._status = regs.add("status", self.StatusReg(), offset=0x00)
+        self._plot = regs.add("plot", self.PlotReg(), offset=0x04)
         self._bridge = csr.Bridge(regs.as_memory_map())
 
-        # Memory region for fast command writes (single 32-bit word = 4 bytes)
-        cmd_fifo_size = 4
-        mem_depth = max(1, (cmd_fifo_size * granularity) // 32)
-
         super().__init__({
+            # CSR interface for commands and status
             "csr_bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            "wb_bus":  In(wishbone.Signature(addr_width=exact_log2(mem_depth),
-                                           data_width=32, granularity=granularity)),
+            # Output to shared plot backend
             "plot_req": Out(stream.Signature(PlotRequest)),
             "enable": In(1),
         })
 
         self.csr_bus.memory_map = self._bridge.bus.memory_map
-        
-        # Memory map for command writes
-        wb_memory_map = MemoryMap(addr_width=exact_log2(cmd_fifo_size), data_width=granularity)
-        wb_memory_map.add_resource(name=("pixel_cmd_fifo",), size=cmd_fifo_size, resource=self)
-        self.wb_bus.memory_map = wb_memory_map
 
     def elaborate(self, platform) -> Module:
         m = Module()
         
         m.submodules.bridge = self._bridge
         m.submodules._cmd_fifo = self._cmd_fifo
-
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
-        # Single-word command interface - immediate processing!
-        wstream = self._cmd_fifo.w_stream
-        with m.If(self.wb_bus.cyc & self.wb_bus.stb & self.wb_bus.we):
+        # Enqueue command when plot register is written
+        cmd_fifo_w = self._cmd_fifo.w_stream
+        
+        # Build PlotRequest from CSR fields
+        plot_request = Signal(PlotRequest)
+        m.d.comb += [
+            plot_request.x.eq(self._plot.f.x.w_data),
+            plot_request.y.eq(self._plot.f.y.w_data),
+            plot_request.pixel.color.eq(self._plot.f.color.w_data),
+            plot_request.pixel.intensity.eq(self._plot.f.intensity.w_data),
+            plot_request.blend.eq(BlendMode.REPLACE),  # Plot uses direct replacement
+            plot_request.offset.eq(OffsetMode.ABSOLUTE),  # Absolute coordinates
+        ]
+        
+        with m.If(self._plot.element.w_stb & cmd_fifo_w.ready):
             m.d.comb += [
-                # Direct FIFO write - single command word
-                wstream.valid.eq(1),
-                wstream.payload.eq(self.wb_bus.dat_w),
-                # ACK immediately if FIFO accepts, otherwise stall
-                self.wb_bus.ack.eq(wstream.ready),
+                cmd_fifo_w.valid.eq(1),
+                cmd_fifo_w.payload.eq(plot_request),
             ]
 
         # Status register updates
         m.d.comb += [
             self._status.f.fifo_level.r_data.eq(self._cmd_fifo.level),
-            self._status.f.busy.r_data.eq(self._cmd_fifo.level != 0),
+            self._status.f.busy.r_data.eq(~cmd_fifo_w.ready),  # Busy when FIFO full
         ]
 
-        # Command FIFO read stream
+        # Command FIFO read stream - directly contains PlotRequest
         rstream = self._cmd_fifo.r_stream
-        
-        # Extract single-word command: [X:12|Y:12|Color:4|Intensity:4] (signed coordinates)
-        x_coord = Signal(signed(12))
-        y_coord = Signal(signed(12)) 
-        color = Signal(4)
-        intensity = Signal(4)
-        
-        m.d.comb += [
-            x_coord.eq(rstream.payload[20:32]),    # Bits [31:20] (signed)
-            y_coord.eq(rstream.payload[8:20]),     # Bits [19:8] (signed)
-            intensity.eq(rstream.payload[4:8]),    # Bits [7:4]
-            color.eq(rstream.payload[0:4]),        # Bits [3:0]
-        ]
 
-        # Generate plot requests for shared backend
+        # Generate plot requests for shared backend - no unpacking needed!
         m.d.comb += [
             self.plot_req.valid.eq(self.enable & rstream.valid),
-            self.plot_req.payload.x.eq(x_coord),
-            self.plot_req.payload.y.eq(y_coord),
-            self.plot_req.payload.pixel.color.eq(color),
-            self.plot_req.payload.pixel.intensity.eq(intensity),
-            self.plot_req.payload.additive.eq(0),  # Plot uses direct replacement
-            self.plot_req.payload.center_relative.eq(0),  # Assume absolute coordinates
+            self.plot_req.payload.eq(rstream.payload),
             rstream.ready.eq(self.plot_req.ready),
         ]
 
@@ -158,7 +153,7 @@ class _FramebufferBackend(wiring.Component):
         
         # Use standard Pixel structure
         self.pixels_per_word = 32 // Pixel.as_shape().size
-        self.pixel_array_layout = data.ArrayLayout(Pixel, self.pixels_per_word)
+        self.word_layout = data.ArrayLayout(Pixel, self.pixels_per_word)
 
         super().__init__({
             # Pixel request stream
@@ -181,8 +176,8 @@ class _FramebufferBackend(wiring.Component):
         fb_hwords = ((self.fb.timings.h_active * self.fb.bytes_per_pixel) // 4)
         
         # Pixel data for read-modify-write
-        pixels_read = Signal(self.pixel_array_layout)
-        pixels_write = Signal(self.pixel_array_layout)
+        pixels_read = Signal(self.word_layout)
+        pixels_write = Signal(self.word_layout)
         
         # Current request being processed
         current_req = Signal(PlotRequest)
@@ -197,9 +192,9 @@ class _FramebufferBackend(wiring.Component):
         abs_x = Signal(signed(16))
         abs_y = Signal(signed(16))
         
-        # Convert to absolute coordinates if center_relative is set
+        # Convert to absolute coordinates if offset is CENTER
         # Center calculation depends on rotation
-        with m.If(current_req.center_relative):
+        with m.If(current_req.offset == OffsetMode.CENTER):
             with m.Switch(self.rotation):
                 with m.Case(Rotation.NORMAL):
                     m.d.comb += [
@@ -306,7 +301,7 @@ class _FramebufferBackend(wiring.Component):
                 for i in range(self.pixels_per_word):
                     with m.If(pixel_index == i):
                         # Choose blending mode
-                        with m.If(current_req.additive):
+                        with m.If(current_req.blend == BlendMode.ADDITIVE):
                             # Additive blending with saturation
                             current_intensity = Signal(unsigned(4))
                             new_intensity = Signal(unsigned(4))

@@ -21,7 +21,7 @@ from amaranth_soc.memory   import MemoryMap
 
 from tiliqua.types         import Pixel
 
-from tiliqua.raster.plot import PlotRequest
+from tiliqua.raster.plot import PlotRequest, BlendMode, OffsetMode
 
 class Peripheral(wiring.Component):
     """
@@ -261,8 +261,8 @@ class Peripheral(wiring.Component):
                         self.plot_req.payload.y.eq(current_dst_y + current_y),
                         self.plot_req.payload.pixel.color.eq(current_color),
                         self.plot_req.payload.pixel.intensity.eq(current_intensity),
-                        self.plot_req.payload.additive.eq(0),  # Direct replacement
-                        self.plot_req.payload.center_relative.eq(0),  # Absolute coords
+                        self.plot_req.payload.blend.eq(BlendMode.REPLACE),  # Direct replacement
+                        self.plot_req.payload.offset.eq(OffsetMode.ABSOLUTE),  # Absolute coords
                     ]
                     
                     with m.If(self.plot_req.ready):

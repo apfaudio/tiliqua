@@ -19,7 +19,7 @@ from amaranth_future         import fixed
 from tiliqua                 import dsp
 from tiliqua.dma_framebuffer import DMAFramebuffer
 from tiliqua.types           import Pixel
-from tiliqua.raster.plot import PlotRequest
+from tiliqua.raster.plot import PlotRequest, BlendMode, OffsetMode
 from tiliqua.eurorack_pmod   import ASQ
 
 from amaranth_soc            import wishbone, csr
@@ -34,7 +34,7 @@ class Stroke(wiring.Component):
     multiple Stroke instances to share the same plotting hardware via round-robin
     arbitration, greatly reducing resource usage.
 
-    With the new signed coordinate system and center_relative flag, the stroke component
+    With the new signed coordinate system and CENTER offset mode, the stroke component
     can work directly in center-relative coordinates, making the math much cleaner.
 
     To obtain more points, the pixels themselves are upsampled using an FIR-based
@@ -145,15 +145,15 @@ class Stroke(wiring.Component):
 
             with m.State('SEND_PIXEL'):
                 # Generate pixel request for the shared backend
-                # Using center_relative=1 since we work with signed offsets from center
+                # Using CENTER offset mode since we work with signed offsets from center
                 m.d.comb += [
                     self.plot_req.valid.eq(1),
                     self.plot_req.payload.x.eq(sample_x),
                     self.plot_req.payload.y.eq(sample_y),
                     self.plot_req.payload.pixel.color.eq(new_color),
                     self.plot_req.payload.pixel.intensity.eq(sample_intensity),
-                    self.plot_req.payload.additive.eq(1),  # Stroke uses additive blending
-                    self.plot_req.payload.center_relative.eq(1),  # Work relative to center
+                    self.plot_req.payload.blend.eq(BlendMode.ADDITIVE),  # Stroke uses additive blending
+                    self.plot_req.payload.offset.eq(OffsetMode.CENTER),  # Work relative to center
                 ]
                 
                 with m.If(self.plot_req.ready):
