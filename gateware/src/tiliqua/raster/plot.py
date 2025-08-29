@@ -366,34 +366,17 @@ class FramebufferPlotter(wiring.Component):
         self.fb = fb
         self.n_ports = n_ports
         self.cachesize_words = cachesize_words
-        
-        # Create interface based on number of ports  
-        if n_ports == 1:
-            interface = {
-                # Single plot request stream
-                "req": In(stream.Signature(PlotRequest)),
-                # DMA bus to PSRAM (via integrated cache)
-                "bus": Out(wishbone.Signature(addr_width=fb.bus.addr_width,
-                                            data_width=32, granularity=8,
-                                            features={"cti", "bte"})),
-                # Control signals
-                "enable": In(1),
-                "rotation": In(Rotation),
-            }
-        else:
-            interface = {
-                # Multiple plot request ports with automatic arbitration
-                "ports": In(stream.Signature(PlotRequest)).array(n_ports),
-                # DMA bus to PSRAM (via integrated cache)
-                "bus": Out(wishbone.Signature(addr_width=fb.bus.addr_width,
-                                            data_width=32, granularity=8,
-                                            features={"cti", "bte"})),
-                # Control signals
-                "enable": In(1),
-                "rotation": In(Rotation),
-            }
-        
-        super().__init__(interface)
+        super().__init__({
+            # Multiple plot request ports with automatic arbitration
+            "ports": In(stream.Signature(PlotRequest)).array(n_ports),
+            # DMA bus to PSRAM (via integrated cache)
+            "bus": Out(wishbone.Signature(addr_width=fb.bus.addr_width,
+                                        data_width=32, granularity=8,
+                                        features={"cti", "bte"})),
+            # Control signals
+            "enable": In(1),
+            "rotation": In(Rotation),
+        })
     
     def elaborate(self, platform) -> Module:
         m = Module()
@@ -411,21 +394,16 @@ class FramebufferPlotter(wiring.Component):
             backend.rotation.eq(self.rotation),
         ]
         
-        # Handle single vs multiple ports
-        if self.n_ports == 1:
-            # Single port - direct connection
-            wiring.connect(m, self.req, backend.req)
-        else:
-            # Multiple ports - create internal arbiter
-            arbiter = PlotArbiter(n_ports=self.n_ports)
-            m.submodules.arbiter = arbiter
-            
-            # Connect ports to arbiter
-            for i in range(self.n_ports):
-                wiring.connect(m, wiring.flipped(self.ports[i]), arbiter.ports[i])
-            
-            # Connect arbiter output to backend
-            wiring.connect(m, arbiter.req, backend.req)
+        # Multiple ports - create internal arbiter
+        arbiter = PlotArbiter(n_ports=self.n_ports)
+        m.submodules.arbiter = arbiter
+        
+        # Connect ports to arbiter
+        for i in range(self.n_ports):
+            wiring.connect(m, wiring.flipped(self.ports[i]), arbiter.ports[i])
+        
+        # Connect arbiter output to backend
+        wiring.connect(m, arbiter.req, backend.req)
         
         # Connect backend to cache, cache to external bus
         cache.add_port(backend.bus)

@@ -198,8 +198,11 @@ fn main() -> ! {
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
+        peripherals.BLIT,
+        peripherals.PIXEL_PLOT,
         PSRAM_FB_BASE,
         modeline.clone(),
+        BLIT_MEM_BASE,
     );
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);

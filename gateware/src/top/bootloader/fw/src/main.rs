@@ -32,8 +32,8 @@ use tiliqua_hal::embedded_graphics::{
     prelude::*,
     primitives::{PrimitiveStyleBuilder, Line},
     text::{Alignment, Text},
-    pixelcolor::Gray8,
 };
+use tiliqua_lib::color::TiliquaColor;
 
 use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;

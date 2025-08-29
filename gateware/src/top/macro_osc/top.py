@@ -59,6 +59,7 @@ from amaranth_future                             import fixed
 
 from tiliqua                                     import eurorack_pmod, dsp, cache
 from tiliqua.raster                              import scope
+from tiliqua.raster.plot                         import FramebufferPlotter
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
@@ -172,21 +173,21 @@ class MacroOscSoc(TiliquaSoc):
         super().__init__(finalize_csr_bridge=False, mainram_size=0x10000,
                          cpu_variant="tiliqua_rv32imafc", extra_cpu_regions=extra_cpu_regions, **kwargs)
 
-        self.plotter_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.plotter_cache.bus)
+        # Dedicated framebuffer plotter for scope peripherals (5 ports: 1 vector + 4 scope channels)
+        self.scope_plotter = FramebufferPlotter(fb=self.fb, n_ports=5)
+        self.psram_periph.add_master(self.scope_plotter.bus)
 
         self.vector_periph = scope.VectorPeripheral(
             fb=self.fb,
             n_upsample=16,
             fs=48000)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
-        self.plotter_cache.add(self.vector_periph.bus_dma)
 
         self.scope_periph = scope.ScopePeripheral(
             fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
-        for bus in self.scope_periph.bus_dma:
-            self.plotter_cache.add(bus)
+        
+        # Note: Arbiter is now built into the FramebufferPlotter
 
         self.audio_fifo = AudioFIFOPeripheral()
         self.csr_decoder.add(self.audio_fifo.csr_bus, addr=self.audio_fifo_csr_base, name="audio_fifo")
@@ -205,11 +206,22 @@ class MacroOscSoc(TiliquaSoc):
 
         m = Module()
 
-        m.submodules += self.plotter_cache
+        m.submodules += self.scope_plotter
 
         m.submodules += self.vector_periph
 
         m.submodules += self.scope_periph
+        
+        # Connect scope peripherals to plotter ports
+        wiring.connect(m, self.vector_periph.plot_req, self.scope_plotter.ports[0])
+        for i in range(4):
+            wiring.connect(m, self.scope_periph.plot_reqs[i], self.scope_plotter.ports[i+1])
+        
+        # Connect control signals to scope plotter
+        m.d.comb += [
+            self.scope_plotter.enable.eq(self.fb.enable),
+            self.scope_plotter.rotation.eq(self.framebuffer_periph.rotation),
+        ]
 
         m.submodules += self.audio_fifo
 
