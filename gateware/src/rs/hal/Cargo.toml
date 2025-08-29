@@ -22,7 +22,7 @@ embedded-hal-nb = "=1.0.0"
 log = { version = "0.4.*", optional = true }
 nb = "=1.1.0"
 riscv = { version = "=0.11.1", features = ["critical-section-single-hart"] }
-embedded-graphics = { path = "/home/seb/dev/embedded-graphics" }
+embedded-graphics = { git = "https://github.com/vk2seb/embedded-graphics.git", branch = "seb/fast-draw" }
 bitflags = "2.6.0"
 micromath = "2.1.0"
 embedded-storage = "0.3.1"
