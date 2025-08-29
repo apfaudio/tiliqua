@@ -3,8 +3,8 @@ use tiliqua_hal::embedded_graphics::pixelcolor::{PixelColor, raw::{RawU8, RawDat
 /// Tiliqua hardware color type representing hue and intensity.
 ///
 /// This color type matches the hardware pixel format used by Tiliqua:
-/// - Upper 4 bits (7:4): Hue index (0-15)  
-/// - Lower 4 bits (3:0): Intensity/brightness (0-15)
+/// - Upper 4 bits (7:4): Intensity/brightness (0-15)
+/// - Lower 4 bits (3:0): Hue index (0-15)
 ///
 /// The intensity controls brightness where:
 /// - Intensity 0: Always black (regardless of hue)
@@ -40,7 +40,7 @@ impl TiliquaColor {
     pub const fn new(hue: u8, intensity: u8) -> Self {
         let hue = hue & 0x0F;
         let intensity = intensity & 0x0F;
-        Self(RawU8::new((hue << 4) | intensity))
+        Self(RawU8::new((intensity << 4) | hue))
     }
     
     /// Creates a new Tiliqua color from a raw 8-bit value.
@@ -52,12 +52,12 @@ impl TiliquaColor {
     
     /// Returns the hue component (0-15).
     pub fn hue(self) -> u8 {
-        (self.0.into_inner() >> 4) & 0x0F
+        self.0.into_inner() & 0x0F
     }
     
     /// Returns the intensity/brightness component (0-15).  
     pub fn intensity(self) -> u8 {
-        self.0.into_inner() & 0x0F
+        (self.0.into_inner() >> 4) & 0x0F
     }
     
     /// Returns the raw 8-bit representation matching hardware format.
