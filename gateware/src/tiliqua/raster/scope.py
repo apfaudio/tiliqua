@@ -11,10 +11,10 @@ from amaranth.lib.wiring                         import In, Out
 
 from amaranth_soc                                import csr
 
-from tiliqua                                     import dsp
-from tiliqua.raster.stroke                       import Stroke
-from tiliqua.raster.plot                         import PlotRequest
-from tiliqua.eurorack_pmod                       import ASQ
+from .. import dsp
+from .stroke import Stroke
+from .plot import PlotRequest
+from ..eurorack_pmod import ASQ
 
 class VectorPeripheral(wiring.Component):
 

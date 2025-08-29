@@ -32,7 +32,7 @@ from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 
 from rs.manifest.src.lib import *
-from tiliqua.archive import ArchiveLoader
+from .archive import ArchiveLoader
 
 class SlotLayout:
     """Flash addressing of overall SPI flash, for bootloader and user slots."""

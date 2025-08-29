@@ -13,8 +13,8 @@ from amaranth_boards.resources   import *
 
 from luna.gateware.platform.core import LUNAPlatform
 
-from tiliqua                     import tiliqua_pll
-from tiliqua.types               import *
+from . import tiliqua_pll
+from .types import *
 
 class _SoldierCrabPlatform(LatticeECP5Platform):
     package      = "BG256"

@@ -14,9 +14,9 @@ from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 from amaranth.utils           import exact_log2, ceil_log2
 
-from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay_line
-from tiliqua.cache            import WishboneL2Cache
-from tiliqua.eurorack_pmod    import ASQ
+from . import eurorack_pmod, dsp, midi, psram_peripheral, delay_line
+from .cache import WishboneL2Cache
+from .eurorack_pmod import ASQ
 
 class PingPongDelay(wiring.Component):
 

@@ -19,9 +19,9 @@ from amaranth.utils        import exact_log2
 from amaranth_soc          import wishbone, csr
 from amaranth_soc.memory   import MemoryMap
 
-from tiliqua.types         import Pixel
+from ..types import Pixel
 
-from tiliqua.raster.plot import PlotRequest, BlendMode, OffsetMode
+from .plot import PlotRequest, BlendMode, OffsetMode
 
 class Peripheral(wiring.Component):
     """

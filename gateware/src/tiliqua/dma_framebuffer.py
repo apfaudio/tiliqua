@@ -18,10 +18,10 @@ from amaranth.lib.memory   import Memory
 
 from amaranth_soc          import wishbone, csr
 
-from tiliqua               import sim, dvi, palette
-from tiliqua.dvi_modeline  import DVIModeline
+from . import sim, dvi, palette
+from .dvi_modeline import DVIModeline
 
-from tiliqua.types import Rotation
+from .types import Rotation
 
 class DMAFramebuffer(wiring.Component):
 

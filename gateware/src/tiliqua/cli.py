@@ -15,11 +15,11 @@ import subprocess
 import sys
 import time
 
-from tiliqua                     import sim, dvi_modeline, tiliqua_pll
-from tiliqua.types               import *
-from tiliqua.tiliqua_platform    import *
-from tiliqua.tiliqua_soc         import TiliquaSoc
-from tiliqua.archive             import ArchiveBuilder
+from . import sim, dvi_modeline, tiliqua_pll
+from .types import *
+from .tiliqua_platform import *
+from .tiliqua_soc import TiliquaSoc
+from .archive import ArchiveBuilder
 from vendor.ila                  import AsyncSerialILAFrontend
 
 class CliAction(str, enum.Enum):

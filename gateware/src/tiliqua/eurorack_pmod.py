@@ -17,8 +17,8 @@ from amaranth.lib.memory        import Memory
 from amaranth.utils             import exact_log2
 from amaranth_soc               import gpio
 
-from tiliqua                    import i2c
-from tiliqua.tiliqua_platform   import TiliquaRevision, EurorackPmodRevision
+from . import i2c
+from .tiliqua_platform import TiliquaRevision, EurorackPmodRevision
 from vendor                     import i2c as vendor_i2c
 
 from amaranth_future            import fixed

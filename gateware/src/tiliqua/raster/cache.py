@@ -14,7 +14,7 @@ from amaranth.lib.memory         import Memory
 
 from amaranth_soc                import wishbone
 
-from tiliqua.cache               import WishboneL2Cache
+from ..cache import WishboneL2Cache
 
 
 class CacheFlusher(wiring.Component):

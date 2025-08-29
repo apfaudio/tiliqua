@@ -25,8 +25,8 @@ from amaranth_soc.memory   import MemoryMap
 
 from .cache                import Cache
 
-from tiliqua.dma_framebuffer import DMAFramebuffer
-from tiliqua.types import Rotation, Pixel
+from ..dma_framebuffer import DMAFramebuffer
+from ..types import Rotation, Pixel
 
 class BlendMode(enum.Enum, shape=unsigned(1)):
     REPLACE  = 0  # Direct pixel replacement

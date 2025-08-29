@@ -17,9 +17,9 @@ from amaranth.utils        import exact_log2, ceil_log2
 from scipy import signal
 
 from amaranth_future       import fixed
-from tiliqua               import mac
+from . import mac
 
-from tiliqua.eurorack_pmod import ASQ # hardware native fixed-point sample type
+from .eurorack_pmod import ASQ # hardware native fixed-point sample type
 
 # dummy values used to hook up to unused stream in/out ports, so they don't block forever
 ASQ_READY = stream.Signature(ASQ, always_ready=True).flip().create()

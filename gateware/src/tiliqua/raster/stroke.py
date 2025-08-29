@@ -16,11 +16,11 @@ from amaranth.lib.cdc        import FFSynchronizer
 
 from amaranth_future         import fixed
 
-from tiliqua                 import dsp
-from tiliqua.dma_framebuffer import DMAFramebuffer
-from tiliqua.types           import Pixel
-from tiliqua.raster.plot import PlotRequest, BlendMode, OffsetMode
-from tiliqua.eurorack_pmod   import ASQ
+from .. import dsp
+from ..dma_framebuffer import DMAFramebuffer
+from ..types import Pixel
+from .plot import PlotRequest, BlendMode, OffsetMode
+from ..eurorack_pmod import ASQ
 
 from amaranth_soc            import wishbone, csr
 

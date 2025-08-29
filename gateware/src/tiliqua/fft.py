@@ -14,8 +14,8 @@ from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
 
-from tiliqua.complex import CQ, connect_sq_to_real, connect_real_to_sq
-from tiliqua.block   import Block
+from .complex import CQ, connect_sq_to_real, connect_real_to_sq
+from .block import Block
 
 from math import cos, sin, pi, sqrt
 

@@ -14,9 +14,9 @@ from amaranth_future import fixed
 
 from math import atan, pi, log2
 
-from tiliqua import dsp, mac, cordic, block
-from tiliqua.complex import CQ, connect_magnitude_to_sq
-from tiliqua.block import Block
+from . import dsp, mac, cordic, block
+from .complex import CQ, connect_magnitude_to_sq
+from .block import Block
 
 class BlockLPF(wiring.Component):
 

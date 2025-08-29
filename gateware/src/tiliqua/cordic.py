@@ -14,7 +14,7 @@ from amaranth_future import fixed
 
 from math import atan, pi
 
-from tiliqua.complex import CQ, Polar
+from .complex import CQ, Polar
 
 class RectToPolarCordic(wiring.Component):
 
