@@ -125,9 +125,9 @@ impl App {
 
 fn print_rebooting<D>(d: &mut D, rng: &mut fastrand::Rng)
 where
-    D: DrawTarget<Color = Gray8> + OriginDimensions,
+    D: DrawTarget<Color = TiliquaColor> + OriginDimensions,
 {
-    let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
+    let style = MonoTextStyle::new(&FONT_9X15_BOLD, TiliquaColor::WHITE);
     let h_active = d.size().width as i32;
     let v_active = d.size().height as i32;
     Text::with_alignment(
@@ -141,9 +141,9 @@ where
 
 fn print_autoboot_countdown<D>(d: &mut D, countdown_ms: u32, slot: usize, target: &OptionString)
 where
-    D: DrawTarget<Color = Gray8> + OriginDimensions,
+    D: DrawTarget<Color = TiliquaColor> + OriginDimensions,
 {
-    let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
+    let style = MonoTextStyle::new(&FONT_9X15_BOLD, TiliquaColor::WHITE);
     let h_active = d.size().width as i32;
     let v_active = d.size().height as i32;
 
@@ -165,11 +165,11 @@ fn draw_summary<D>(d: &mut D,
                    startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
-    D: DrawTarget<Color = Gray8> + OriginDimensions,
+    D: DrawTarget<Color = TiliquaColor> + OriginDimensions,
 {
     let h_active = d.size().width as i32;
     let v_active = d.size().height as i32;
-    let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
+    let norm = MonoTextStyle::new(&FONT_9X15, TiliquaColor::new(hue, 11));
     if let Some(bitstream) = bitstream_manifest {
         Text::with_alignment(
             "brief:".into(),
@@ -768,9 +768,10 @@ fn main() -> ! {
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
         peripherals.BLIT,
+        peripherals.PIXEL_PLOT,
+        peripherals.LINE,
         PSRAM_FB_BASE,
         modeline.clone(),
-        PIXEL_PLOT_MEM_BASE,
         BLIT_MEM_BASE,
     );
 
@@ -784,7 +785,7 @@ fn main() -> ! {
         persist.set_persist(256);
 
         let stroke = PrimitiveStyleBuilder::new()
-            .stroke_color(Gray8::new(0xB0))
+            .stroke_color(TiliquaColor::new(0, 11))
             .stroke_width(1)
             .build();
 
@@ -853,9 +854,10 @@ fn main() -> ! {
                             peripherals.FRAMEBUFFER_PERIPH,
                             peripherals.PALETTE_PERIPH,
                             peripherals.BLIT,
+                            peripherals.PIXEL_PLOT,
+                            peripherals.LINE,
                             PSRAM_FB_BASE,
                             new_modeline.clone(),
-                            PIXEL_PLOT_MEM_BASE,
                             BLIT_MEM_BASE,
                         );
                         app.modeline = new_modeline;
