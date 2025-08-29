@@ -441,9 +441,9 @@ fn main() -> ! {
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
         peripherals.BLIT,
+        peripherals.PIXEL_PLOT,
         PSRAM_FB_BASE,
         modeline.clone(),
-        PIXEL_PLOT_MEM_BASE,
         BLIT_MEM_BASE,
     );
 

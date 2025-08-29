@@ -216,17 +216,17 @@ macro_rules! impl_dma_framebuffer {
                     I: IntoIterator<Item = Pixel<Self::Color>>,
                 {
                     for Pixel(coord, color) in pixels.into_iter() {
-                        // Extract color and intensity from luma value
-                        let luma = color.luma() as u32;
-                        let pixel_color = (luma >> 4) & 0xf;      // Upper 4 bits for color
-                        let pixel_intensity = luma & 0xf;         // Lower 4 bits for intensity
-                        
+                        // Convert Gray8 color to 4-bit color and intensity
+                        let luma = color.luma();
+                        let intensity_4bit = (luma >> 4) & 0xF;
+                        let color_4bit = luma & 0xF;
+
                         // Write to CSR registers (writing to plot register triggers the operation)
                         self.registers_pixel_plot.plot().write(|w| unsafe {
-                            w.x().bits(coord.x as u16);             // x coordinate  
+                            w.x().bits(coord.x as u16);             // x coordinate
                             w.y().bits(coord.y as u16);             // y coordinate
-                            w.color().bits(pixel_color as u8);      // color (4 bits)
-                            w.intensity().bits(pixel_intensity as u8) // intensity (4 bits)
+                            w.color().bits(color_4bit as u8);      // color (4 bits)
+                            w.intensity().bits(intensity_4bit as u8) // intensity (4 bits)
                         });
                     }
                     Ok(())
