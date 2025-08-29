@@ -273,10 +273,17 @@ class _FramebufferBackend(wiring.Component):
                 # Only plot pixels within framebuffer bounds
                 with m.If((x_offs < fb_hwords) & (y_offs < self.fb.timings.v_active)):
                     m.d.sync += [
-                        bus.sel.eq(0xf),
                         bus.adr.eq(pixel_addr),
                     ]
-                    m.next = 'READ'
+                    # Fast path for REPLACE mode - use byte select to write single pixel
+                    with m.If(current_req.blend == BlendMode.REPLACE):
+                        # Set byte select to write only the target pixel (8 bits each)
+                        m.d.sync += bus.sel.eq(1 << pixel_index)
+                        m.next = 'WRITE_DIRECT'
+                    with m.Else():
+                        # Need read-modify-write for additive blending
+                        m.d.sync += bus.sel.eq(0xf)
+                        m.next = 'READ'
                 with m.Else():
                     # Skip out-of-bounds pixels
                     m.d.comb += req.ready.eq(1)
@@ -328,8 +335,32 @@ class _FramebufferBackend(wiring.Component):
                         ]
                 m.next = 'WRITE'
 
+            with m.State('WRITE_DIRECT'):
+                # Fast path for REPLACE mode - direct write using byte select
+                # Only the selected byte (pixel) will be written
+                pixel_data_word = Signal(32)
+                
+                # Position the pixel data in the correct byte of the 32-bit word
+                for i in range(self.pixels_per_word):
+                    with m.If(pixel_index == i):
+                        m.d.comb += pixel_data_word[i*8:(i+1)*8].eq(
+                            Cat(current_req.pixel.color, current_req.pixel.intensity)
+                        )
+                
+                m.d.comb += [
+                    bus.stb.eq(1),
+                    bus.cyc.eq(1),
+                    bus.we.eq(1),
+                    bus.dat_w.eq(pixel_data_word),
+                ]
+                
+                with m.If(bus.stb & bus.ack):
+                    # Request complete, get next one
+                    m.d.comb += req.ready.eq(1)
+                    m.next = 'IDLE'
+
             with m.State('WRITE'):
-                # Write modified pixel data back
+                # Write modified pixel data back (for additive blending)
                 m.d.comb += [
                     bus.stb.eq(1),
                     bus.cyc.eq(1),
