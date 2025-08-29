@@ -390,12 +390,15 @@ macro_rules! impl_dma_framebuffer {
                 }
 
                 fn draw_line_solid(&mut self, start_x: i32, start_y: i32, end_x: i32, end_y: i32, stroke_width: u32, color: Self::Color) -> Option<Result<(), Self::Error>> {
+
                     // Only support 1-pixel wide solid lines for now
                     if stroke_width != 1 {
                         return None; // Fall back to software implementation for thick lines
                     }
 
                     let pixel_data = color.to_raw();
+
+                    //log::info!("line sx={} sy={} ex={} ey={} w={}", start_x, start_y, end_x, end_y, stroke_width);
 
                     // Wait if FIFO is full
                     while self.registers_line.status().read().full().bit() {
@@ -422,6 +425,8 @@ macro_rules! impl_dma_framebuffer {
                         w.pixel().bits(pixel_data);
                         w.cmd().bit(true) // END (1)
                     });
+
+                    //log::info!("done sx={} sy={} ex={} ey={} w={}", start_x, start_y, end_x, end_y, stroke_width);
 
                     Some(Ok(()))
                 }

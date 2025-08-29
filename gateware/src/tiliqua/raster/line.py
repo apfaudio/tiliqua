@@ -82,8 +82,9 @@ class _LinePlotter(wiring.Component):
         with m.FSM() as fsm:
             
             with m.State('IDLE'):
+                m.d.comb += cmd.ready.eq(self.enable)
                 # Wait for command from stream
-                with m.If(self.enable & cmd.valid):
+                with m.If(cmd.ready & cmd.valid):
                     # Unpack command from stream using struct
                     new_cmd = Signal(LineCommand)
                     m.d.comb += new_cmd.eq(cmd.payload)
@@ -98,7 +99,6 @@ class _LinePlotter(wiring.Component):
                             current_pixel.eq(new_cmd.pixel),
                             end_strip.eq(new_cmd.cmd == LineStripCommand.END),
                         ]
-                        m.d.comb += cmd.ready.eq(1)
                         m.next = 'SETUP_BRESENHAM'
                     with m.Else():
                         # First point in strip - just store it and plot the point
@@ -109,7 +109,6 @@ class _LinePlotter(wiring.Component):
                             end_strip.eq(new_cmd.cmd == LineStripCommand.END),
                             has_prev_point.eq(new_cmd.cmd == LineStripCommand.CONTINUE),  # Set if continuing strip
                         ]
-                        m.d.comb += cmd.ready.eq(1)
                         m.next = 'PLOT_SINGLE_POINT'
             
             with m.State('PLOT_SINGLE_POINT'):
@@ -153,7 +152,17 @@ class _LinePlotter(wiring.Component):
                         sy.eq(-1),
                     ]
                 
-                m.next = 'INIT_BRESENHAM'
+                # Handle zero-length lines (same start and end point)
+                with m.If((target_x == current_x) & (target_y == current_y)):
+                    # Skip drawing for zero-length lines, just update state
+                    m.d.sync += [
+                        prev_x.eq(target_x),
+                        prev_y.eq(target_y),
+                        has_prev_point.eq(~end_strip),  # Clear if ending strip
+                    ]
+                    m.next = 'IDLE'
+                with m.Else():
+                    m.next = 'INIT_BRESENHAM'
                 
             with m.State('INIT_BRESENHAM'):
                 # Initialize error term: err = dx - dy
@@ -188,24 +197,26 @@ class _LinePlotter(wiring.Component):
             with m.State('BRESENHAM_STEP'):
                 # Bresenham step calculation
                 m.d.sync += e2.eq(err << 1)  # e2 = 2 * err
-                m.next = 'BRESENHAM_UPDATE'
+                m.next = 'BRESENHAM_UPDATE_X'
 
-            with m.State('BRESENHAM_UPDATE'):
-                # Update coordinates based on error term
+            with m.State('BRESENHAM_UPDATE_X'):
+                # Update X coordinate if needed
                 with m.If(e2 > -dy):
                     # err -= dy; x += sx
                     m.d.sync += [
                         err.eq(err - dy),
                         current_x.eq(current_x + sx),
                     ]
+                m.next = 'BRESENHAM_UPDATE_Y'
                 
+            with m.State('BRESENHAM_UPDATE_Y'):
+                # Update Y coordinate if needed
                 with m.If(e2 < dx):
                     # err += dx; y += sy
                     m.d.sync += [
                         err.eq(err + dx),
                         current_y.eq(current_y + sy),
                     ]
-                
                 m.next = 'DRAW_LINE'
 
         return m
