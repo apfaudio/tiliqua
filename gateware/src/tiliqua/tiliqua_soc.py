@@ -61,7 +61,7 @@ from tiliqua.tiliqua_platform                    import *
 from tiliqua.types                               import FirmwareLocation
 
 from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, palette
-from tiliqua.raster                              import plot, blit, persist
+from tiliqua.raster                              import plot, blit, persist, line
 from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class TiliquaSoc(Component):
@@ -106,6 +106,7 @@ class TiliquaSoc(Component):
         self.psram_csr_base       = 0x00000C00
         self.pixel_plot_csr_base  = 0x00000D00
         self.blit_csr_base        = 0x00000E00
+        self.line_csr_base        = 0x00000F00
         
         self.blit_mem_base        = 0xc0000000
         
@@ -239,7 +240,7 @@ class TiliquaSoc(Component):
         self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
 
         # Hardware-accelerated pixel plotting (integrated solution)
-        self.framebuffer_plotter = plot.FramebufferPlotter(fb=self.fb, n_ports=2)
+        self.framebuffer_plotter = plot.FramebufferPlotter(fb=self.fb, n_ports=3)
         self.psram_periph.add_master(self.framebuffer_plotter.bus)
 
         # Pixel plotter peripheral
@@ -250,6 +251,10 @@ class TiliquaSoc(Component):
         self.blit = blit.Peripheral()
         self.csr_decoder.add(self.blit.csr_bus, addr=self.blit_csr_base, name="blit")
         self.wb_decoder.add(self.blit.sprite_mem_bus, addr=self.blit_mem_base, name="blit")
+
+        # Line plotter peripheral
+        self.line = line.Peripheral()
+        self.csr_decoder.add(self.line.csr_bus, addr=self.line_csr_base, name="line")
         
         self.permit_bus_traffic = Signal()
 
@@ -354,10 +359,12 @@ class TiliquaSoc(Component):
         m.submodules.pixel_plot = self.pixel_plot
         m.submodules.framebuffer_plotter = self.framebuffer_plotter
         m.submodules.blit = self.blit
+        m.submodules.line = self.line
         
         # Connect peripherals to plotter ports
         wiring.connect(m, self.pixel_plot.plot_req, self.framebuffer_plotter.ports[0])
         wiring.connect(m, self.blit.plot_req, self.framebuffer_plotter.ports[1])
+        wiring.connect(m, self.line.plot_req, self.framebuffer_plotter.ports[2])
         
         # Connect control signals to framebuffer plotter
         m.d.comb += [
@@ -368,6 +375,7 @@ class TiliquaSoc(Component):
         # Enable peripherals when bus traffic is permitted
         m.d.comb += self.pixel_plot.enable.eq(self.permit_bus_traffic)
         m.d.comb += self.blit.enable.eq(self.permit_bus_traffic)
+        m.d.comb += self.line.enable.eq(self.permit_bus_traffic)
 
         # audio interface
         m.submodules.pmod0 = self.pmod0

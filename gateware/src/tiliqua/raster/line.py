@@ -36,99 +36,27 @@ class LineCommand(data.Struct):
     cmd:   LineStripCommand  # Line strip command
 
 
-class Peripheral(wiring.Component):
+class _LinePlotter(wiring.Component):
     """
-    Hardware-accelerated line strip plotter with CSR command interface.
+    Private line plotting backend implementation.
     
-    Builds connected line segments by enqueueing points sequentially.
-    Each point connects to the previous point in the strip using
-    Bresenham's line algorithm.
-    
-    Command Interface:
-    POINT: [x:12|y:12|pixel:8|end_strip:1] - Add point to current line strip
-    
-    Features:
-    - Sequential point enqueueing for continuous line strips
-    - Bresenham line algorithm for pixel-perfect lines
-    - Command FIFO for asynchronous line operations
-    - Direct pixel replacement (REPLACE blend mode)
-    - Absolute coordinate positioning
-    - Automatic line strip management
+    This is the core line drawing engine that handles Bresenham line algorithm
+    and generates PlotRequest streams. Use Peripheral for the public CSR API.
     """
 
-    class StatusReg(csr.Register, access="r"):
-        full: csr.Field(csr.action.R, unsigned(1))    # FIFO full (can't accept new commands)
-        empty: csr.Field(csr.action.R, unsigned(1))   # FIFO empty (no pending operations)
-
-    class PointReg(csr.Register, access="w"):
-        x: csr.Field(csr.action.W, signed(12))         # Point X coordinate
-        y: csr.Field(csr.action.W, signed(11))         # Point Y coordinate
-        pixel: csr.Field(csr.action.W, Pixel)          # Pixel color/intensity
-        cmd: csr.Field(csr.action.W, LineStripCommand)  # Line strip command
-        # Note: Writing to this register enqueues the point
-
-    def __init__(self, fifo_depth=16):
-        """
-        Initialize line plotter with configurable command FIFO depth.
-        
-        Args:
-            fifo_depth: Depth of command FIFO for queuing line operations
-        """
-        self.fifo_depth = fifo_depth
-        
-        # Command FIFO to queue line points
-        # Each command contains: [x:12|y:11|pixel:8|cmd:1]
-        # Total: 32 bits per command
-        self._cmd_fifo = fifo.SyncFIFOBuffered(width=LineCommand.as_shape().size, depth=fifo_depth)
-        
-        # CSR registers
-        regs = csr.Builder(addr_width=6, data_width=8)
-        self._status = regs.add("status", self.StatusReg(), offset=0x00)
-        self._point = regs.add("point", self.PointReg(), offset=0x04)
-        self._bridge = csr.Bridge(regs.as_memory_map())
-
+    def __init__(self):
         super().__init__({
-            # CSR interface for commands and status
-            "csr_bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            # Output to shared plot backend
+            # Line command stream input
+            "cmd": In(stream.Signature(LineCommand)),
+            # Plot request output to shared backend
             "plot_req": Out(stream.Signature(PlotRequest)),
             "enable": In(1),
         })
 
-        self.csr_bus.memory_map = self._bridge.bus.memory_map
-
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        m.submodules.bridge = self._bridge
-        m.submodules._cmd_fifo = self._cmd_fifo
-        wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
-
-        # Enqueue command when point register is written
-        cmd_fifo_w = self._cmd_fifo.w_stream
-        
-        # Build LineCommand from CSR fields
-        line_cmd = Signal(LineCommand)
-        m.d.comb += [
-            line_cmd.x.eq(self._point.f.x.w_data),
-            line_cmd.y.eq(self._point.f.y.w_data),
-            line_cmd.pixel.eq(self._point.f.pixel.w_data),
-            line_cmd.cmd.eq(self._point.f.cmd.w_data),
-        ]
-        
-        with m.If(self._point.element.w_stb & cmd_fifo_w.ready):
-            m.d.comb += [
-                cmd_fifo_w.valid.eq(1),
-                cmd_fifo_w.payload.eq(line_cmd),
-            ]
-
-        # Status register
-        m.d.comb += [
-            # full = FIFO is full (can't accept new commands)
-            self._status.f.full.r_data.eq(~cmd_fifo_w.ready),
-            # empty = FIFO is empty (no pending operations)
-            self._status.f.empty.r_data.eq(~self._cmd_fifo.r_stream.valid),
-        ]
+        cmd = self.cmd
 
         # Line drawing state
         prev_x = Signal(signed(12))
@@ -151,17 +79,14 @@ class Peripheral(wiring.Component):
         err = Signal(signed(14)) # Error term (needs extra bits for dx + dy)
         e2 = Signal(signed(14))  # 2 * err
 
-        # Command FIFO read stream
-        cmd_fifo_r = self._cmd_fifo.r_stream
-
         with m.FSM() as fsm:
             
             with m.State('IDLE'):
-                # Wait for command from FIFO
-                with m.If(self.enable & cmd_fifo_r.valid):
-                    # Unpack command from FIFO using struct
+                # Wait for command from stream
+                with m.If(self.enable & cmd.valid):
+                    # Unpack command from stream using struct
                     new_cmd = Signal(LineCommand)
-                    m.d.comb += new_cmd.eq(cmd_fifo_r.payload)
+                    m.d.comb += new_cmd.eq(cmd.payload)
                     
                     with m.If(has_prev_point):
                         # We have a previous point - draw line from prev to new point
@@ -173,7 +98,7 @@ class Peripheral(wiring.Component):
                             current_pixel.eq(new_cmd.pixel),
                             end_strip.eq(new_cmd.cmd == LineStripCommand.END),
                         ]
-                        m.d.comb += cmd_fifo_r.ready.eq(1)
+                        m.d.comb += cmd.ready.eq(1)
                         m.next = 'SETUP_BRESENHAM'
                     with m.Else():
                         # First point in strip - just store it and plot the point
@@ -184,7 +109,7 @@ class Peripheral(wiring.Component):
                             end_strip.eq(new_cmd.cmd == LineStripCommand.END),
                             has_prev_point.eq(new_cmd.cmd == LineStripCommand.CONTINUE),  # Set if continuing strip
                         ]
-                        m.d.comb += cmd_fifo_r.ready.eq(1)
+                        m.d.comb += cmd.ready.eq(1)
                         m.next = 'PLOT_SINGLE_POINT'
             
             with m.State('PLOT_SINGLE_POINT'):
@@ -282,5 +207,115 @@ class Peripheral(wiring.Component):
                     ]
                 
                 m.next = 'DRAW_LINE'
+
+        return m
+
+
+class Peripheral(wiring.Component):
+    """
+    Hardware-accelerated line strip plotter with CSR command interface.
+    
+    Builds connected line segments by enqueueing points sequentially.
+    Each point connects to the previous point in the strip using
+    Bresenham's line algorithm.
+    
+    Command Interface:
+    POINT: [x:12|y:12|pixel:8|end_strip:1] - Add point to current line strip
+    
+    Features:
+    - Sequential point enqueueing for continuous line strips
+    - Bresenham line algorithm for pixel-perfect lines
+    - Command FIFO for asynchronous line operations
+    - Direct pixel replacement (REPLACE blend mode)
+    - Absolute coordinate positioning
+    - Automatic line strip management
+    """
+
+    class StatusReg(csr.Register, access="r"):
+        full: csr.Field(csr.action.R, unsigned(1))    # FIFO full (can't accept new commands)
+        empty: csr.Field(csr.action.R, unsigned(1))   # FIFO empty (no pending operations)
+
+    class PointReg(csr.Register, access="w"):
+        x: csr.Field(csr.action.W, signed(12))         # Point X coordinate
+        y: csr.Field(csr.action.W, signed(11))         # Point Y coordinate
+        pixel: csr.Field(csr.action.W, Pixel)          # Pixel color/intensity
+        cmd: csr.Field(csr.action.W, LineStripCommand)  # Line strip command
+        # Note: Writing to this register enqueues the point
+
+    def __init__(self, fifo_depth=16):
+        """
+        Initialize line plotter with configurable command FIFO depth.
+        
+        Args:
+            fifo_depth: Depth of command FIFO for queuing line operations
+        """
+        self.fifo_depth = fifo_depth
+        
+        # Command FIFO to queue line points
+        # Each command contains: [x:12|y:11|pixel:8|cmd:1]
+        # Total: 32 bits per command
+        self._cmd_fifo = fifo.SyncFIFOBuffered(width=LineCommand.as_shape().size, depth=fifo_depth)
+        
+        # CSR registers
+        regs = csr.Builder(addr_width=6, data_width=8)
+        self._status = regs.add("status", self.StatusReg(), offset=0x00)
+        self._point = regs.add("point", self.PointReg(), offset=0x04)
+        self._bridge = csr.Bridge(regs.as_memory_map())
+
+        super().__init__({
+            # CSR interface for commands and status
+            "csr_bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            # Output to shared plot backend
+            "plot_req": Out(stream.Signature(PlotRequest)),
+            "enable": In(1),
+        })
+
+        self.csr_bus.memory_map = self._bridge.bus.memory_map
+
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules.bridge = self._bridge
+        m.submodules._cmd_fifo = self._cmd_fifo
+        wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
+
+        # Line plotter backend
+        line_plotter = _LinePlotter()
+        m.submodules.line_plotter = line_plotter
+
+        # Connect enable signal
+        m.d.comb += line_plotter.enable.eq(self.enable)
+
+        # Enqueue command when point register is written
+        cmd_fifo_w = self._cmd_fifo.w_stream
+        
+        # Build LineCommand from CSR fields
+        line_cmd = Signal(LineCommand)
+        m.d.comb += [
+            line_cmd.x.eq(self._point.f.x.w_data),
+            line_cmd.y.eq(self._point.f.y.w_data),
+            line_cmd.pixel.eq(self._point.f.pixel.w_data),
+            line_cmd.cmd.eq(self._point.f.cmd.w_data),
+        ]
+        
+        with m.If(self._point.element.w_stb & cmd_fifo_w.ready):
+            m.d.comb += [
+                cmd_fifo_w.valid.eq(1),
+                cmd_fifo_w.payload.eq(line_cmd),
+            ]
+
+        # Status register
+        m.d.comb += [
+            # full = FIFO is full (can't accept new commands)
+            self._status.f.full.r_data.eq(~cmd_fifo_w.ready),
+            # empty = FIFO is empty (no pending operations)
+            self._status.f.empty.r_data.eq(~self._cmd_fifo.r_stream.valid),
+        ]
+
+        # Connect FIFO output to line plotter input
+        wiring.connect(m, self._cmd_fifo.r_stream, line_plotter.cmd)
+
+        # Connect line plotter output to external plot_req
+        wiring.connect(m, line_plotter.plot_req, wiring.flipped(self.plot_req))
 
         return m

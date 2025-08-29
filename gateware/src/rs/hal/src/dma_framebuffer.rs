@@ -94,6 +94,7 @@ macro_rules! impl_dma_framebuffer {
         $PALETTEX:ident: $PACPALETTEX:ty,
         $BLITTERX:ident: $PACBLITTERX:ty,
         $PIXEL_PLOTX:ident: $PACPIXEL_PLOTX:ty,
+        $LINEX:ident: $PACLINEX:ty,
     )+) => {
         $(
             use tiliqua_hal::dma_framebuffer::{DVIModeline, Rotate};
@@ -105,6 +106,7 @@ macro_rules! impl_dma_framebuffer {
                 registers_palette: $PACPALETTEX,
                 registers_blitter: $PACBLITTERX,
                 registers_pixel_plot: $PACPIXEL_PLOTX,
+                registers_line: $PACLINEX,
                 mode: DVIModeline,
                 framebuffer_base: *mut u32,
                 blitter_mem_base: *mut u32,
@@ -113,7 +115,7 @@ macro_rules! impl_dma_framebuffer {
 
             impl $DMA_FRAMEBUFFERX {
                 pub fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, registers_blitter: $PACBLITTERX,
-                       registers_pixel_plot: $PACPIXEL_PLOTX, fb_base: usize, mode: DVIModeline, blitter_mem_base: usize) -> Self {
+                       registers_pixel_plot: $PACPIXEL_PLOTX, registers_line: $PACLINEX, fb_base: usize, mode: DVIModeline, blitter_mem_base: usize) -> Self {
                     registers_fb.flags().write(|w| unsafe {
                         w.enable().bit(false)
                     });
@@ -151,6 +153,7 @@ macro_rules! impl_dma_framebuffer {
                         registers_palette,
                         registers_blitter,
                         registers_pixel_plot,
+                        registers_line,
                         mode,
                         framebuffer_base: fb_base as *mut u32,
                         blitter_mem_base: blitter_mem_base as *mut u32,
@@ -164,6 +167,39 @@ macro_rules! impl_dma_framebuffer {
                         w.rotation().bits(rotation.clone() as u8)
                     });
                     self.mode.rotate = rotation.clone();
+                }
+
+                /// Draw a line from start to end point using hardware line plotter
+                pub fn draw_line(&mut self, start_x: i32, start_y: i32, end_x: i32, end_y: i32, color: Self::Color) -> Result<(), core::convert::Infallible> {
+                    let pixel_data = color.to_raw();
+
+                    // Wait if FIFO is full
+                    while self.registers_line.status().read().full().bit() {
+                        // Busy wait for FIFO space
+                    }
+
+                    // Send start point (first point in strip)
+                    self.registers_line.point().write(|w| unsafe {
+                        w.x().bits(start_x as u16);
+                        w.y().bits(start_y as u16);
+                        w.pixel().bits(pixel_data);
+                        w.cmd().bit(false) // CONTINUE (0)
+                    });
+
+                    // Wait if FIFO is full again
+                    while self.registers_line.status().read().full().bit() {
+                        // Busy wait for FIFO space
+                    }
+
+                    // Send end point (end of strip)
+                    self.registers_line.point().write(|w| unsafe {
+                        w.x().bits(end_x as u16);
+                        w.y().bits(end_y as u16);
+                        w.pixel().bits(pixel_data);
+                        w.cmd().bit(true) // END (1)
+                    });
+
+                    Ok(())
                 }
 
             }
