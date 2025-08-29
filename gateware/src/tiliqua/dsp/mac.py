@@ -45,7 +45,7 @@ from amaranth              import *
 from amaranth.lib          import wiring, data, stream, enum
 from amaranth.lib.wiring   import In, Out
 
-from .eurorack_pmod import ASQ
+from ..eurorack_pmod import ASQ
 from amaranth_future       import fixed
 
 # Native 18-bit multiplier type.

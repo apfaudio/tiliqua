@@ -14,7 +14,8 @@ from amaranth_future import fixed
 
 from math import atan, pi, log2
 
-from . import dsp, mac, cordic, block
+from . import mac, cordic, block
+from . import Merge, connect_remap
 from .complex import CQ, connect_magnitude_to_sq
 from .block import Block
 
@@ -245,9 +246,9 @@ class SpectralCrossSynthesis(wiring.Component):
         # Time-synchronize output of 'spectral_envelope' with 'i_carrier' by
         # merging these two streams together, so we can multiply them pointwise.
 
-        m.submodules.merge2 = merge2 = dsp.Merge(n_channels=2, shape=self.i_carrier.payload.shape())
+        m.submodules.merge2 = merge2 = Merge(n_channels=2, shape=self.i_carrier.payload.shape())
         wiring.connect(m, wiring.flipped(self.i_carrier), merge2.i[0])
-        dsp.connect_remap(m, spectral_envelope.o, merge2.i[1], lambda o, i : [
+        connect_remap(m, spectral_envelope.o, merge2.i[1], lambda o, i : [
             i.payload.sample.real.eq(o.payload.sample),
             i.payload.first.eq(o.payload.first),
         ])

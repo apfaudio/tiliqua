@@ -14,9 +14,11 @@ from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 from amaranth.utils           import exact_log2, ceil_log2
 
-from . import eurorack_pmod, dsp, midi, psram_peripheral, delay_line
-from .cache import WishboneL2Cache
-from .eurorack_pmod import ASQ
+from .. import eurorack_pmod, psram_peripheral, midi
+from . import delay_line
+from . import MatrixMix, Merge, Split, connect_feedback_kick
+from ..cache import WishboneL2Cache
+from ..eurorack_pmod import ASQ
 
 class PingPongDelay(wiring.Component):
 
@@ -55,7 +57,7 @@ class PingPongDelay(wiring.Component):
         # Feedback network of ping-ping delay. Each tap is fed back into the input of the
         # opposite tap, mixed 50% with the audio input.
 
-        m.submodules.matrix_mix = matrix_mix = dsp.MatrixMix(
+        m.submodules.matrix_mix = matrix_mix = MatrixMix(
             i_channels=4, o_channels=4,
             coefficients=[[0.5, 0.0, 0.5, 0.0],  # in0
                           [0.0, 0.5, 0.0, 0.5],  # in1
@@ -65,17 +67,17 @@ class PingPongDelay(wiring.Component):
 
         # Split matrix input / output into independent streams
 
-        m.submodules.imix4 = imix4 = dsp.Merge(n_channels=4)
-        m.submodules.omix4 = omix4 = dsp.Split(n_channels=4, source=matrix_mix.o)
+        m.submodules.imix4 = imix4 = Merge(n_channels=4)
+        m.submodules.omix4 = omix4 = Split(n_channels=4, source=matrix_mix.o)
 
         # Close feedback path
 
-        dsp.connect_feedback_kick(m, imix4.o, matrix_mix.i)
+        connect_feedback_kick(m, imix4.o, matrix_mix.i)
 
         # Split left/right channels of self.i / self.o into independent streams
 
-        m.submodules.isplit2 = isplit2 = dsp.Split(n_channels=2, source=wiring.flipped(self.i))
-        m.submodules.omerge2 = omerge2 = dsp.Merge(n_channels=2, sink=wiring.flipped(self.o))
+        m.submodules.isplit2 = isplit2 = Split(n_channels=2, source=wiring.flipped(self.i))
+        m.submodules.omerge2 = omerge2 = Merge(n_channels=2, sink=wiring.flipped(self.o))
 
         # Connect up delayln writes, read tap, audio in / out as described above
         # to the matrix feedback network.
@@ -139,7 +141,7 @@ class Diffuser(wiring.Component):
         # [delay -> out] [delay -> delay] <- feedback
         #
 
-        self.matrix_mix = dsp.MatrixMix(
+        self.matrix_mix = MatrixMix(
             i_channels=8, o_channels=8,
             coefficients=[[0.6, 0.0, 0.0, 0.0, 0.8, 0.0, 0.0, 0.0], # in0
                           [0.0, 0.6, 0.0, 0.0, 0.0, 0.8, 0.0, 0.0], #  |
@@ -156,17 +158,17 @@ class Diffuser(wiring.Component):
 
         m.submodules.matrix_mix = matrix_mix = self.matrix_mix
 
-        m.submodules.split4 = split4 = dsp.Split(n_channels=4)
-        m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4)
+        m.submodules.split4 = split4 = Split(n_channels=4)
+        m.submodules.merge4 = merge4 = Merge(n_channels=4)
 
-        m.submodules.split8 = split8 = dsp.Split(n_channels=8)
-        m.submodules.merge8 = merge8 = dsp.Merge(n_channels=8)
+        m.submodules.split8 = split8 = Split(n_channels=8)
+        m.submodules.merge8 = merge8 = Merge(n_channels=8)
 
         wiring.connect(m, wiring.flipped(self.i), split4.i)
 
         # matrix <-> independent streams
         wiring.connect(m, matrix_mix.o, split8.i)
-        dsp.connect_feedback_kick(m, merge8.o, matrix_mix.i)
+        connect_feedback_kick(m, merge8.o, matrix_mix.i)
 
         for n in range(4):
             # audio -> matrix [0-3]

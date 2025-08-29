@@ -39,10 +39,12 @@ from amaranth_soc              import csr, wishbone
 
 from amaranth_future           import fixed
 
-from tiliqua                   import eurorack_pmod, dsp, mac, midi, sim, delay, cache
+from tiliqua                   import eurorack_pmod, midi, sim, cache
+from tiliqua                   import dsp
+from tiliqua.dsp               import mac, delay
 from tiliqua.raster            import scope
 from tiliqua.raster.plot       import FramebufferPlotter
-from tiliqua.delay_line        import DelayLine
+from tiliqua.dsp.delay_line    import DelayLine
 from tiliqua.eurorack_pmod     import ASQ
 from tiliqua.tiliqua_soc       import TiliquaSoc
 from tiliqua.cli               import top_level_cli

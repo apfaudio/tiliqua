@@ -29,10 +29,12 @@ from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 
-from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll, fft, spectral
+from tiliqua                  import eurorack_pmod, midi, psram_peripheral, tiliqua_pll
+from tiliqua                  import dsp
+from tiliqua.dsp              import delay, fft, spectral
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua.cli              import top_level_cli
-from tiliqua.delay_line       import DelayLine
+from tiliqua.dsp.delay_line   import DelayLine
 from tiliqua.tiliqua_platform import RebootProvider
 
 # for sim

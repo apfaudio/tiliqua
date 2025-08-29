@@ -10,7 +10,7 @@ from amaranth.lib import data
 from amaranth.lib.wiring import In, Out
 from amaranth_future import fixed
 
-from tiliqua import block
+from . import block
 
 class CQ(data.StructLayout):
     """:class:`data.StructLayout` representing a complex number, formed by a pair of numbers.

@@ -15,10 +15,10 @@ from amaranth_soc          import wishbone
 
 from luna_soc.gateware.core import blockram
 
-from .eurorack_pmod import ASQ
-from .cache import WishboneL2Cache
+from ..eurorack_pmod import ASQ
+from ..cache import WishboneL2Cache
 
-from .dsp import *
+from . import *
 
 class DelayLine(wiring.Component):
 

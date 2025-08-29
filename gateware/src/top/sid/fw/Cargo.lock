@@ -133,6 +133,7 @@ dependencies = [
 [[package]]
 name = "embedded-graphics"
 version = "0.8.1"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#a90a1363783aab3b1db27aa315bf729ca7561b47"
 dependencies = [
  "az",
  "embedded-graphics-core",
@@ -144,6 +145,7 @@ dependencies = [
 [[package]]
 name = "embedded-graphics-core"
 version = "0.4.0"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#a90a1363783aab3b1db27aa315bf729ca7561b47"
 dependencies = [
  "az",
 ]
@@ -626,7 +628,6 @@ dependencies = [
  "amaranth-soc-isr",
  "colorsys",
  "critical-section",
- "embedded-graphics",
  "embedded-hal 1.0.0",
  "fastrand",
  "heapless",
@@ -660,6 +661,8 @@ dependencies = [
  "riscv",
  "serde",
  "serde_derive",
+ "strum",
+ "strum_macros 0.26.4",
 ]
 
 [[package]]
@@ -667,8 +670,8 @@ name = "tiliqua-lib"
 version = "0.1.0"
 dependencies = [
  "crc",
- "embedded-graphics",
  "embedded-hal 1.0.0",
+ "fastrand",
  "fixed",
  "heapless",
  "log",

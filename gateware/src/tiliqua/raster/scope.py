@@ -51,10 +51,12 @@ class VectorPeripheral(wiring.Component):
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
+        # Create soc_en as internal signal with default enabled
+        self.soc_en = Signal(init=1)
+        
         super().__init__({
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
             "en": In(1),
-            "soc_en": In(1),
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
             # Plot request output to shared backend

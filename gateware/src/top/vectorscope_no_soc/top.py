@@ -40,13 +40,16 @@ from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer, palette, fft, spectral, block
+from tiliqua                  import eurorack_pmod, sim, cache, dma_framebuffer, palette
+from tiliqua                  import dsp
+from tiliqua.dsp              import fft, spectral, block
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
 from tiliqua.sim              import FakeTiliquaDomainGenerator
 from tiliqua.raster.persist import Persistance
-from tiliqua.raster.stroke import Stroke
+from tiliqua.raster import scope
+from tiliqua.raster.plot import FramebufferPlotter
 
 from vendor.ila               import AsyncSerialILA
 
@@ -162,10 +165,11 @@ class VectorScopeTop(Elaboratable):
         self.psram_periph.add_master(self.persist.bus)
 
         self.spectrogram = spectrogram
-        self.stroke = Stroke(fb=self.fb, n_upsample=32 if self.spectrogram else 8, fs=clock_settings.audio_clock.fs())
-        self.plotter_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.plotter_cache.bus)
-        self.plotter_cache.add(self.stroke.bus)
+        # Use VectorPeripheral instead of direct Stroke
+        self.vector_periph = scope.VectorPeripheral(fb=self.fb, n_upsample=32 if self.spectrogram else 8, fs=clock_settings.audio_clock.fs())
+        # Use FramebufferPlotter instead of PlotterCache
+        self.scope_plotter = FramebufferPlotter(fb=self.fb, n_ports=1)
+        self.psram_periph.add_master(self.scope_plotter.bus)
 
         if self.spectrogram:
             self.spectro = Spectro(fs=clock_settings.audio_clock.fs())
@@ -177,7 +181,7 @@ class VectorScopeTop(Elaboratable):
 
         m.submodules.pmod0 = pmod0 = self.pmod0
 
-        m.submodules.plotter_cache = self.plotter_cache
+        m.submodules.scope_plotter = self.scope_plotter
 
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
@@ -190,19 +194,22 @@ class VectorScopeTop(Elaboratable):
         else:
             m.submodules.car = FakeTiliquaDomainGenerator()
 
-        self.stroke.pmod0 = pmod0
+        # Remove the old pmod0 assignment
 
         m.submodules.palette = self.palette
         m.submodules.fb = self.fb
         m.submodules.persist = self.persist
-        m.submodules.stroke = self.stroke
+        m.submodules.vector_periph = self.vector_periph
 
         if self.spectrogram:
             m.submodules.spectro = self.spectro
             wiring.connect(m, self.pmod0.o_cal, self.spectro.i)
-            wiring.connect(m, self.spectro.o, self.stroke.i)
+            wiring.connect(m, self.spectro.o, self.vector_periph.i)
         else:
-            wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
+            wiring.connect(m, self.pmod0.o_cal, self.vector_periph.i)
+        
+        # Connect vector peripheral to plotter
+        wiring.connect(m, self.vector_periph.plot_req, self.scope_plotter.ports[0])
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
@@ -211,7 +218,9 @@ class VectorScopeTop(Elaboratable):
         with m.Else():
             m.d.sync += self.fb.enable.eq(1)
             m.d.sync += self.persist.enable.eq(1)
-            m.d.sync += self.stroke.enable.eq(1)
+            m.d.sync += self.vector_periph.en.eq(1)
+            # Don't drive soc_en - it's driven internally by VectorPeripheral
+            m.d.sync += self.scope_plotter.enable.eq(1)
 
         # Optional ILA, very useful for low-level PSRAM debugging...
         if not platform.ila:

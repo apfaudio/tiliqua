@@ -24,7 +24,9 @@ from amaranth_soc                                import csr, wishbone
 
 from amaranth_future                             import fixed
 
-from tiliqua                                     import eurorack_pmod, dsp, usb_audio, sim, delay_line
+from tiliqua                                     import eurorack_pmod, usb_audio, sim
+from tiliqua                                     import dsp
+from tiliqua.dsp                                 import delay_line
 from tiliqua.raster                              import scope
 from tiliqua.raster.plot                         import FramebufferPlotter
 from tiliqua.tiliqua_soc                         import TiliquaSoc
