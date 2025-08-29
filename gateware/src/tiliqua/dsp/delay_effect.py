@@ -16,7 +16,8 @@ from amaranth.utils           import exact_log2, ceil_log2
 
 from .. import eurorack_pmod, psram_peripheral, midi
 from . import delay_line
-from . import MatrixMix, Merge, Split, connect_feedback_kick
+from .mix import MatrixMix
+from .stream_util import Merge, Split, connect_feedback_kick
 from ..cache import WishboneL2Cache
 from ..eurorack_pmod import ASQ
 

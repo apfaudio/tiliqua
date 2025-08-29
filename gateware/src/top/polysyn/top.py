@@ -41,10 +41,8 @@ from amaranth_future           import fixed
 
 from tiliqua                   import eurorack_pmod, midi, sim, cache
 from tiliqua                   import dsp
-from tiliqua.dsp               import mac, delay
 from tiliqua.raster            import scope
 from tiliqua.raster.plot       import FramebufferPlotter
-from tiliqua.dsp.delay_line    import DelayLine
 from tiliqua.eurorack_pmod     import ASQ
 from tiliqua.tiliqua_soc       import TiliquaSoc
 from tiliqua.cli               import top_level_cli
@@ -61,13 +59,13 @@ class Diffuser(wiring.Component):
         # 4 delay lines, backed by 4 independent SRAM banks.
 
         self.delay_lines = [
-            DelayLine(max_delay=2048),
-            DelayLine(max_delay=4096),
-            DelayLine(max_delay=8192),
-            DelayLine(max_delay=8192),
+            dsp.DelayLine(max_delay=2048),
+            dsp.DelayLine(max_delay=4096),
+            dsp.DelayLine(max_delay=8192),
+            dsp.DelayLine(max_delay=8192),
         ]
 
-        self.diffuser = delay.Diffuser(self.delay_lines)
+        self.diffuser = dsp.delay_effect.Diffuser(self.delay_lines)
 
         # Coefficients of this are tweaked by the SoC
 
@@ -111,7 +109,7 @@ class PolySynth(wiring.Component):
         ncos = [dsp.SawNCO(shift=0) for _ in range(n_voices)]
 
         # All SVFs share the same multiplier tile through a RingMAC.
-        m.submodules.server = server = mac.RingMACServer()
+        m.submodules.server = server = dsp.mac.RingMACServer()
         svfs = [dsp.SVF(macp=server.new_client()) for _ in range(n_voices)]
 
         m.submodules.merge = merge = dsp.Merge(n_channels=n_voices)

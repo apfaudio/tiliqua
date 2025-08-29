@@ -26,7 +26,6 @@ from amaranth_future                             import fixed
 
 from tiliqua                                     import eurorack_pmod, usb_audio, sim
 from tiliqua                                     import dsp
-from tiliqua.dsp                                 import delay_line
 from tiliqua.raster                              import scope
 from tiliqua.raster.plot                         import FramebufferPlotter
 from tiliqua.tiliqua_soc                         import TiliquaSoc
@@ -77,7 +76,7 @@ class XbeamPeripheral(wiring.Component):
         m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4, sink=wiring.flipped(self.delay_o))
         delay = [Signal(16) for _ in range(4)]
         for ch in range(4):
-            delayln = delay_line.DelayLine(max_delay=512, write_triggers_read=False)
+            delayln = dsp.DelayLine(max_delay=512, write_triggers_read=False)
             split2 = dsp.Split(n_channels=2, source=split4.o[ch], replicate=True)
             m.submodules += [delayln, split2]
             tap = delayln.add_tap()

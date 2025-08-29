@@ -42,7 +42,6 @@ from amaranth_soc             import wishbone
 from tiliqua.tiliqua_platform import *
 from tiliqua                  import eurorack_pmod, sim, cache, dma_framebuffer, palette
 from tiliqua                  import dsp
-from tiliqua.dsp              import fft, spectral, block
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
 from tiliqua.cli              import top_level_cli
@@ -87,15 +86,15 @@ class Spectro(wiring.Component):
 
         # Resample input down, so visible area is a fraction of the nyquist (e.g. 192khz/8 = 24kHz visual bandwidth)
         m.submodules.resample = resample = dsp.Resample(fs_in=self.fs, n_up=1, m_down=8 if self.fs > 48000 else 2)
-        m.submodules.analyzer = analyzer = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
-        m.submodules.envelope = envelope = spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
+        m.submodules.analyzer = analyzer = dsp.fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
+        m.submodules.envelope = envelope = dsp.spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
         def log_lut(x):
             # map 0 - 1 (linear) to 0 - 1 (log representing -X dBr to 0dBr)
             # where -X (smallest value) represents 1 LSB of the fixed.SQ.
             max_v = 1 << ASQ.f_bits
             r = max(0, math.log2(max(1, x*max_v))/math.log2(max_v))
             return r
-        m.submodules.log = log = block.WrapCore(dsp.WaveShaper(
+        m.submodules.log = log = dsp.block.WrapCore(dsp.WaveShaper(
                 lut_function=log_lut, lut_size=512, continuous=False))
 
         wiring.connect(m, split4.o[0], resample.i)

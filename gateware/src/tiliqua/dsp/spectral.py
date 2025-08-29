@@ -15,7 +15,7 @@ from amaranth_future import fixed
 from math import atan, pi, log2
 
 from . import mac, cordic, block
-from . import Merge, connect_remap
+from .stream_util import Merge, connect_remap
 from .complex import CQ, connect_magnitude_to_sq
 from .block import Block
 
