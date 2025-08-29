@@ -97,8 +97,8 @@ macro_rules! impl_dma_framebuffer {
     )+) => {
         $(
             use tiliqua_hal::dma_framebuffer::{DVIModeline, Rotate};
-            use tiliqua_hal::embedded_graphics::prelude::{Pixel, Size, OriginDimensions, DrawTarget, GrayColor};
-            use tiliqua_hal::embedded_graphics::pixelcolor::Gray8;
+            use tiliqua_hal::embedded_graphics::prelude::{Pixel, Size, OriginDimensions, DrawTarget};
+            use tiliqua_lib::color::TiliquaColor;
 
             pub struct $DMA_FRAMEBUFFERX {
                 registers_fb: $PACFRAMEBUFFERX,
@@ -209,15 +209,15 @@ macro_rules! impl_dma_framebuffer {
             }
 
             impl DrawTarget for $DMA_FRAMEBUFFERX {
-                type Color = Gray8;
+                type Color = TiliquaColor;
                 type Error = core::convert::Infallible;
                 fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
                 where
                     I: IntoIterator<Item = Pixel<Self::Color>>,
                 {
                     for Pixel(coord, color) in pixels.into_iter() {
-                        // Use luma value directly as pixel data
-                        let pixel_data = color.luma();
+                        // Use raw color value directly as pixel data
+                        let pixel_data = color.to_raw();
 
                         // Write to CSR registers (writing to plot register triggers the operation)
                         self.registers_pixel_plot.plot().write(|w| unsafe {
@@ -370,8 +370,8 @@ macro_rules! impl_dma_framebuffer {
 
                     //log::info!("s_x={} s_y={} w={} h={}", src_x, src_y, width, height);
 
-                    // Use luma value directly as pixel data
-                    let pixel_data = color.luma();
+                    // Use raw color value directly as pixel data  
+                    let pixel_data = color.to_raw();
 
                     // Trigger blit with destination parameters (CMD1)
                     // This enqueues the command in the FIFO for asynchronous execution
