@@ -1,35 +1,35 @@
-Frequency-domain processing
----------------------------
+FFT Processing
+--------------
+
+Frequency-domain processing components.
 
 FFTs
 ^^^^
 
-.. autoclass:: tiliqua.fft.FFT
+.. autoclass:: tiliqua.dsp.fft.FFT
 
 Windowing
 ^^^^^^^^^
 
-.. autoclass:: tiliqua.fft.Window
+.. autoclass:: tiliqua.dsp.fft.Window
 
 Overlap / Add
 ^^^^^^^^^^^^^
 
-.. autoclass:: tiliqua.fft.ComputeOverlappingBlocks
+.. autoclass:: tiliqua.dsp.fft.ComputeOverlappingBlocks
 
-.. autoclass:: tiliqua.fft.OverlapAddBlocks
+.. autoclass:: tiliqua.dsp.fft.OverlapAddBlocks
 
 STFTs
 ^^^^^
 
-.. autoclass:: tiliqua.fft.STFTProcessor
+.. autoclass:: tiliqua.dsp.fft.STFTProcessor
 
-.. autoclass:: tiliqua.fft.STFTAnalyzer
+.. autoclass:: tiliqua.dsp.fft.STFTAnalyzer
 
-.. autoclass:: tiliqua.fft.STFTSynthesizer
+.. autoclass:: tiliqua.dsp.fft.STFTSynthesizer
 
-.. autoclass:: tiliqua.fft.STFTProcessorPipelined
+.. autoclass:: tiliqua.dsp.fft.STFTProcessorPipelined
 
-Spectral utilities
-^^^^^^^^^^^^^^^^^^
-
-.. automodule:: tiliqua.spectral
+.. note::
+   For spectral processing utilities, see :doc:`spectral`.

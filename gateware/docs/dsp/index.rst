@@ -11,8 +11,10 @@ TODO link to Amaranth documentation on streams.
 .. image:: /_static/mydsp.png
   :width: 800
 
-DSP Components
---------------
+Basic DSP Components
+--------------------
+
+These components are available directly as ``dsp.ComponentName``:
 
 .. toctree::
    :maxdepth: 2
@@ -24,9 +26,22 @@ DSP Components
    vca
    mix
    resample
-   fft
-   cordic
    oneshot
-   stream
+   stream_util
    misc
-   types
+
+Specialized Modules
+-------------------
+
+These require qualified access (e.g., ``dsp.fft.STFTProcessor``):
+
+.. toctree::
+   :maxdepth: 2
+
+   delay_effect
+   fft
+   spectral
+   mac
+   block
+   complex
+   cordic

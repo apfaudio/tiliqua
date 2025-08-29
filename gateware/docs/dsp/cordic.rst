@@ -1,4 +1,6 @@
 Trigonometry / CORDIC
 ---------------------
 
-.. automodule:: tiliqua.cordic
+CORDIC algorithm implementations.
+
+.. autoclass:: tiliqua.dsp.cordic.RectToPolarCordic
