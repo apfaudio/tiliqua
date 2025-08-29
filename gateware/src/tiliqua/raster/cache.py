@@ -18,37 +18,51 @@ from tiliqua.cache               import WishboneL2Cache
 
 
 class CacheFlusher(wiring.Component):
-    """Periodically flushes cache lines to avoid stale dirty data."""
-    
-    def __init__(self, base, addr_width, burst_len):
+
+    """
+    Periodically flush stale cache lines.
+    """
+
+    def __init__(self, *, base, addr_width, burst_len, flush_backoff_bits=10):
         self.base = base
         self.burst_len = burst_len
-        
+        self.flush_backoff_bits = flush_backoff_bits
         super().__init__({
-            "bus": Out(wishbone.Signature(addr_width=addr_width, data_width=32, granularity=8)),
+            # Kick this to start the core
             "enable": In(1),
+            # We are a DMA master (no burst support)
+            "bus":  Out(wishbone.Signature(addr_width=addr_width, data_width=32, granularity=8)),
         })
-    
+
     def elaborate(self, platform) -> Module:
         m = Module()
-        
+
         bus = self.bus
-        flush_adr = Signal(bus.addr_width)
-        
-        # Simple periodic flusher
-        with m.FSM():
+
+        flush_wait = Signal(self.flush_backoff_bits, init=1)
+        flush_adr  = Signal(16)
+
+        m.d.comb += [
+            bus.we.eq(0),
+            bus.sel.eq(0xf),
+            bus.adr.eq(self.base + flush_adr),
+        ]
+
+        with m.FSM() as fsm:
+
+            with m.State('OFF'):
+                with m.If(self.enable):
+                    m.next = 'WAIT'
+
             with m.State('WAIT'):
-                flush_counter = Signal(16)
-                m.d.sync += flush_counter.eq(flush_counter + 1)
-                with m.If(self.enable & (flush_counter == 0)):
+                m.d.sync += flush_wait.eq(flush_wait+1)
+                with m.If(flush_wait == 0):
                     m.next = 'READ'
-                    m.d.sync += flush_adr.eq(self.base)
-            
+
             with m.State('READ'):
                 m.d.comb += [
                     bus.stb.eq(1),
                     bus.cyc.eq(1),
-                    bus.adr.eq(flush_adr),
                 ]
                 with m.If(bus.stb & bus.ack):
                     m.next = 'WAIT'
