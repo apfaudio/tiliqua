@@ -68,6 +68,7 @@ macro_rules! impl_tiliqua_soc_pac {
             Palette0: tiliqua_pac::PALETTE_PERIPH,
             Blit0: tiliqua_pac::BLIT,
             PixelPlot0: tiliqua_pac::PIXEL_PLOT,
+            Line0: tiliqua_pac::LINE,
         }
 
         tiliqua_hal::impl_spiflash! {

@@ -442,6 +442,7 @@ fn main() -> ! {
         peripherals.PALETTE_PERIPH,
         peripherals.BLIT,
         peripherals.PIXEL_PLOT,
+        peripherals.LINE,
         PSRAM_FB_BASE,
         modeline.clone(),
         BLIT_MEM_BASE,

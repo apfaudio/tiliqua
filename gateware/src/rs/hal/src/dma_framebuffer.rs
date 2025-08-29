@@ -169,39 +169,6 @@ macro_rules! impl_dma_framebuffer {
                     self.mode.rotate = rotation.clone();
                 }
 
-                /// Draw a line from start to end point using hardware line plotter
-                pub fn draw_line(&mut self, start_x: i32, start_y: i32, end_x: i32, end_y: i32, color: Self::Color) -> Result<(), core::convert::Infallible> {
-                    let pixel_data = color.to_raw();
-
-                    // Wait if FIFO is full
-                    while self.registers_line.status().read().full().bit() {
-                        // Busy wait for FIFO space
-                    }
-
-                    // Send start point (first point in strip)
-                    self.registers_line.point().write(|w| unsafe {
-                        w.x().bits(start_x as u16);
-                        w.y().bits(start_y as u16);
-                        w.pixel().bits(pixel_data);
-                        w.cmd().bit(false) // CONTINUE (0)
-                    });
-
-                    // Wait if FIFO is full again
-                    while self.registers_line.status().read().full().bit() {
-                        // Busy wait for FIFO space
-                    }
-
-                    // Send end point (end of strip)
-                    self.registers_line.point().write(|w| unsafe {
-                        w.x().bits(end_x as u16);
-                        w.y().bits(end_y as u16);
-                        w.pixel().bits(pixel_data);
-                        w.cmd().bit(true) // END (1)
-                    });
-
-                    Ok(())
-                }
-
             }
 
 
@@ -420,6 +387,43 @@ macro_rules! impl_dma_framebuffer {
                     // Command is now queued - hardware will execute asynchronously
                     // Next blit_sprite call will wait only if FIFO becomes full
                     Ok(())
+                }
+
+                fn draw_line_solid(&mut self, start_x: i32, start_y: i32, end_x: i32, end_y: i32, stroke_width: u32, color: Self::Color) -> Option<Result<(), Self::Error>> {
+                    // Only support 1-pixel wide solid lines for now
+                    if stroke_width != 1 {
+                        return None; // Fall back to software implementation for thick lines
+                    }
+
+                    let pixel_data = color.to_raw();
+
+                    // Wait if FIFO is full
+                    while self.registers_line.status().read().full().bit() {
+                        // Busy wait for FIFO space
+                    }
+
+                    // Send start point (first point in strip)
+                    self.registers_line.point().write(|w| unsafe {
+                        w.x().bits(start_x as u16);
+                        w.y().bits(start_y as u16);
+                        w.pixel().bits(pixel_data);
+                        w.cmd().bit(false) // CONTINUE (0)
+                    });
+
+                    // Wait if FIFO is full again
+                    while self.registers_line.status().read().full().bit() {
+                        // Busy wait for FIFO space
+                    }
+
+                    // Send end point (end of strip)
+                    self.registers_line.point().write(|w| unsafe {
+                        w.x().bits(end_x as u16);
+                        w.y().bits(end_y as u16);
+                        w.pixel().bits(pixel_data);
+                        w.cmd().bit(true) // END (1)
+                    });
+
+                    Some(Ok(()))
                 }
             }
         )+
