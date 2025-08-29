@@ -10,7 +10,7 @@ This module provides:
 - FramebufferBackend: Shared read-modify-write pixel plotting backend  
 - Arbiter: Round-robin arbitration for multiple clients
 
-Command format: [X:12|Y:12|Color:4|Intensity:4] (single 32-bit word)
+Command format: [X:12|Y:12|Pixel:8] (single 32-bit word)
 """
 
 from amaranth              import *
@@ -50,7 +50,7 @@ class Peripheral(wiring.Component):
     Hardware-accelerated pixel plotter with CSR command interface.
     
     Command Interface:
-    PLOT: [x:12|y:12|color:4|intensity:4] - Plot pixel with specified parameters
+    PLOT: [x:12|y:12|pixel:8] - Plot pixel with specified parameters
     
     Features:
     - CSR-based command interface for single pixel plots
@@ -67,8 +67,7 @@ class Peripheral(wiring.Component):
     class PlotReg(csr.Register, access="w"):
         x: csr.Field(csr.action.W, signed(12))
         y: csr.Field(csr.action.W, signed(12))
-        color: csr.Field(csr.action.W, unsigned(4))
-        intensity: csr.Field(csr.action.W, unsigned(4))
+        pixel: csr.Field(csr.action.W, Pixel)
         # Note: Writing to this register triggers the plot operation
 
     def __init__(self, fifo_depth=8):
@@ -109,8 +108,7 @@ class Peripheral(wiring.Component):
         m.d.comb += [
             plot_request.x.eq(self._plot.f.x.w_data),
             plot_request.y.eq(self._plot.f.y.w_data),
-            plot_request.pixel.color.eq(self._plot.f.color.w_data),
-            plot_request.pixel.intensity.eq(self._plot.f.intensity.w_data),
+            plot_request.pixel.eq(self._plot.f.pixel.w_data),
             plot_request.blend.eq(BlendMode.REPLACE),  # Plot uses direct replacement
             plot_request.offset.eq(OffsetMode.ABSOLUTE),  # Absolute coordinates
         ]

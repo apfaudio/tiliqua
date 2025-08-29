@@ -34,13 +34,13 @@ class Peripheral(wiring.Component):
     
     Command Interface:
     CMD0: [src_x:8|src_y:8|width:8|height:8] - Define sprite region
-    CMD1: [dst_x:12|dst_y:12|color:4|intensity:4] - Blit sprite with color/intensity
+    CMD1: [dst_x:12|dst_y:12|pixel:8] - Blit sprite with pixel data
     
     Features:
     - CPU can directly write sprite bitmaps to local memory
     - Asynchronous blit operations via command FIFO
     - 1-bit transparency: 1=draw pixel, 0=skip (transparent)
-    - Color and intensity specified per blit operation
+    - Pixel color and intensity specified per blit operation
     - Non-blocking command submission unless FIFO is full
     """
 
@@ -59,8 +59,7 @@ class Peripheral(wiring.Component):
     class BlitReg(csr.Register, access="w"):
         dst_x: csr.Field(csr.action.W, signed(12))
         dst_y: csr.Field(csr.action.W, signed(12))
-        color: csr.Field(csr.action.W, unsigned(4))
-        intensity: csr.Field(csr.action.W, unsigned(4))
+        pixel: csr.Field(csr.action.W, Pixel)
         # Note: Writing to this register triggers the blit operation
 
     def __init__(self, memory_words=2048, spritesheet_width_words=256//32, fifo_depth=16):  # Default 8KB for 64K pixels
@@ -84,7 +83,7 @@ class Peripheral(wiring.Component):
         self._sprite_mem = Memory(shape=unsigned(32), depth=memory_words, init=[])
         
         # Command FIFO to queue blit operations
-        # Each command contains: [src_x:8|src_y:8|width:8|height:8|dst_x:12|dst_y:12|color:4|intensity:4]
+        # Each command contains: [src_x:8|src_y:8|width:8|height:8|dst_x:12|dst_y:12|pixel:8]
         # Total: 64 bits per command
         self._cmd_fifo = fifo.SyncFIFOBuffered(width=64, depth=fifo_depth)
         
@@ -155,10 +154,9 @@ class Peripheral(wiring.Component):
         with m.If(self._blit.element.w_stb & cmd_fifo_w.ready):
             m.d.comb += [
                 cmd_fifo_w.valid.eq(1),
-                # Pack 64-bit command: [src_x:8|src_y:8|width:8|height:8|dst_x:12|dst_y:12|color:4|intensity:4]
+                # Pack 64-bit command: [src_x:8|src_y:8|width:8|height:8|dst_x:12|dst_y:12|pixel:8]
                 cmd_fifo_w.payload.eq(Cat(
-                    self._blit.f.intensity.w_data,  # [3:0]
-                    self._blit.f.color.w_data,      # [7:4]
+                    self._blit.f.pixel.w_data,      # [7:0]
                     self._blit.f.dst_y.w_data,      # [19:8]
                     self._blit.f.dst_x.w_data,      # [31:20]
                     height,                         # [39:32]
@@ -175,8 +173,7 @@ class Peripheral(wiring.Component):
         current_height = Signal(8)
         current_dst_x = Signal(signed(12))
         current_dst_y = Signal(signed(12))
-        current_color = Signal(4)
-        current_intensity = Signal(4)
+        current_pixel = Signal(Pixel)
 
         # Blit state machine
         current_x = Signal(8)
@@ -216,8 +213,7 @@ class Peripheral(wiring.Component):
                 with m.If(self.enable & cmd_fifo_r.valid):
                     # Unpack command from FIFO
                     m.d.sync += [
-                        current_intensity.eq(cmd_fifo_r.payload[0:4]),    # [3:0]
-                        current_color.eq(cmd_fifo_r.payload[4:8]),        # [7:4]
+                        current_pixel.eq(cmd_fifo_r.payload[0:8]),        # [7:0]
                         current_dst_y.eq(cmd_fifo_r.payload[8:20]),       # [19:8]
                         current_dst_x.eq(cmd_fifo_r.payload[20:32]),      # [31:20]
                         current_height.eq(cmd_fifo_r.payload[32:40]),     # [39:32]
@@ -259,8 +255,7 @@ class Peripheral(wiring.Component):
                         self.plot_req.valid.eq(1),
                         self.plot_req.payload.x.eq(current_dst_x + current_x),
                         self.plot_req.payload.y.eq(current_dst_y + current_y),
-                        self.plot_req.payload.pixel.color.eq(current_color),
-                        self.plot_req.payload.pixel.intensity.eq(current_intensity),
+                        self.plot_req.payload.pixel.eq(current_pixel),
                         self.plot_req.payload.blend.eq(BlendMode.REPLACE),  # Direct replacement
                         self.plot_req.payload.offset.eq(OffsetMode.ABSOLUTE),  # Absolute coords
                     ]

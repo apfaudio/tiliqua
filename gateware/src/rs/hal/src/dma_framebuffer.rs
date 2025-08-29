@@ -216,17 +216,14 @@ macro_rules! impl_dma_framebuffer {
                     I: IntoIterator<Item = Pixel<Self::Color>>,
                 {
                     for Pixel(coord, color) in pixels.into_iter() {
-                        // Convert Gray8 color to 4-bit color and intensity
-                        let luma = color.luma();
-                        let intensity_4bit = (luma >> 4) & 0xF;
-                        let color_4bit = luma & 0xF;
+                        // Use luma value directly as pixel data
+                        let pixel_data = color.luma();
 
                         // Write to CSR registers (writing to plot register triggers the operation)
                         self.registers_pixel_plot.plot().write(|w| unsafe {
                             w.x().bits(coord.x as u16);             // x coordinate
                             w.y().bits(coord.y as u16);             // y coordinate
-                            w.color().bits(color_4bit as u8);      // color (4 bits)
-                            w.intensity().bits(intensity_4bit as u8) // intensity (4 bits)
+                            w.pixel().bits(pixel_data)              // pixel data (8 bits)
                         });
                     }
                     Ok(())
@@ -373,18 +370,15 @@ macro_rules! impl_dma_framebuffer {
 
                     //log::info!("s_x={} s_y={} w={} h={}", src_x, src_y, width, height);
 
-                    // Convert Gray8 color to 4-bit color and intensity
-                    let luma = color.luma();
-                    let intensity_4bit = (luma >> 4) & 0xF;
-                    let color_4bit = luma & 0xF;
+                    // Use luma value directly as pixel data
+                    let pixel_data = color.luma();
 
                     // Trigger blit with destination parameters (CMD1)
                     // This enqueues the command in the FIFO for asynchronous execution
                     self.registers_blitter.blit().write(|w| unsafe {
                         w.dst_x().bits(dst_x as u16); // Convert signed to unsigned representation
                         w.dst_y().bits(dst_y as u16);
-                        w.color().bits(color_4bit); // Use actual color from text style
-                        w.intensity().bits(intensity_4bit) // Use actual intensity from text style
+                        w.pixel().bits(pixel_data) // pixel data (8 bits)
                     });
 
                     // Command is now queued - hardware will execute asynchronously
