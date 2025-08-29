@@ -14,6 +14,7 @@ use embedded_hal::delay::DelayNs;
 use tiliqua_hal::embedded_graphics::prelude::*;
 
 use heapless::String;
+use fastrand::Rng;
 
 use tiliqua_pac as pac;
 use tiliqua_fw::*;
@@ -49,7 +50,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         let opts_ro = app.ui.opts.clone();
 
-        if opts_ro.autocal.autozero.value == EnAutoZero::Run {
+        if opts_ro.autocal.autozero.value == StopRun::Run {
             let stimulus_raw = 4000 * opts_ro.autocal.volts.value as i16;
             let sample_i = app.ui.pmod.sample_i();
             let mut deltas = [0i16; 4];
@@ -398,7 +399,6 @@ fn main() -> ! {
 
 
     let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
-    use tiliqua_hal::dma_framebuffer::DVIModeline;
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
     //let modeline = DVIModeline::default().maybe_override_fixed(
@@ -453,6 +453,8 @@ fn main() -> ! {
     let psram = peripherals.PSRAM_CSR;
 
     let mut last_hpd = display.get_hpd();
+
+    let mut benchmark_rng = Rng::with_seed(0);
 
     use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
     let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
@@ -549,6 +551,35 @@ fn main() -> ! {
                 pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
             }
 
+            if opts.tracker.page.value == Page::Benchmark {
+                let fps = {
+                    psram.ctrl().write(|w| w.collect().bit(false));
+                    let cycles_elapsed: u32 = psram.stats0().read().cycles_elapsed().bits();
+                    psram.ctrl().write(|w| w.collect().bit(true));
+                    sysclk / (cycles_elapsed+1)
+                };
+                let mut ops_per_loop = 0u32;
+                if opts.benchmark.enabled.value == StopRun::Run{
+                    use options::BenchmarkType;
+                    match opts.benchmark.test_type.value {
+                        BenchmarkType::Lines => {
+                            ops_per_loop = 150;
+                            draw::draw_benchmark_lines(&mut display, ops_per_loop, &mut benchmark_rng, hue).ok();
+                        },
+                        BenchmarkType::Text => {
+                            ops_per_loop = 150;
+                            draw::draw_benchmark_text(&mut display, ops_per_loop, &mut benchmark_rng, hue).ok();
+                        },
+                        BenchmarkType::Pixels => {
+                            ops_per_loop = 5000;
+                            draw::draw_benchmark_pixels(&mut display, ops_per_loop, &mut benchmark_rng, hue).ok();
+                        },
+                    }
+                }
+                draw::draw_benchmark_stats(&mut display, h_active/2-50, v_active-50, hue,
+                                           fps, fps*ops_per_loop).ok();
+            }
+
             //
             // Push calibration constants to audio interface
             //
@@ -589,7 +620,7 @@ fn main() -> ! {
                 });
             }
 
-            if opts.tracker.page.value != Page::Report {
+            if opts.tracker.page.value != Page::Report && opts.tracker.page.value != Page::Benchmark {
                 draw::draw_cal(&mut display, h_active/2-128, v_active/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
                                &pmod.sample_i()).ok();

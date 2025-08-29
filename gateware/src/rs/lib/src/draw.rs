@@ -12,6 +12,7 @@ use crate::logo_coords;
 
 use heapless::String;
 use core::fmt::Write;
+use fastrand::Rng;
 
 pub fn draw_options<D, O>(d: &mut D, opts: &O,
                        pos_x: u32, pos_y: u32, hue: u8) -> Result<(), D::Error>
@@ -636,6 +637,103 @@ where
     rect(d,   96,  29, 23,  33, filter);
 
     circle(d, 108, 90, 8);
+
+    Ok(())
+}
+
+pub fn draw_benchmark_lines<D>(d: &mut D, count: u32, rng: &mut Rng, hue: u8) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = TiliquaColor>,
+{
+    let size = d.bounding_box().size;
+    let stroke = PrimitiveStyleBuilder::new()
+        .stroke_color(TiliquaColor::new(hue, rng.u8(10..16)))
+        .stroke_width(1)
+        .build();
+
+    for _ in 0..count {
+        let x1 = rng.u32(0..size.width);
+        let y1 = rng.u32(0..size.height);
+        let x2 = rng.u32(0..size.width);
+        let y2 = rng.u32(0..size.height);
+        
+        Line::new(Point::new(x1 as i32, y1 as i32),
+                  Point::new(x2 as i32, y2 as i32))
+                  .into_styled(stroke)
+                  .draw(d)?;
+    }
+    Ok(())
+}
+
+pub fn draw_benchmark_text<D>(d: &mut D, count: u32, rng: &mut Rng, hue: u8) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = TiliquaColor>,
+{
+    let size = d.bounding_box().size;
+    let font_style = MonoTextStyle::new(&FONT_9X15, TiliquaColor::new(hue, rng.u8(10..16)));
+    
+    const TEXT_OPTIONS: &[&str] = &[
+        "BENCHMARK", "TILIQUA", "TEST", "0123456789", "ABCDEFGH",
+        "********", "~~~~~~~~", "||||||||", "--------", "========",
+        "FPS", "Hz", "ms", "OK", "FAIL", "PASS", "ERROR", "DEBUG"
+    ];
+
+    for _ in 0..count {
+        let x = rng.u32(0..size.width.saturating_sub(80)) as i32;
+        let y = rng.u32(15..size.height) as i32;
+        let text = TEXT_OPTIONS[rng.usize(0..TEXT_OPTIONS.len())];
+        
+        Text::new(text, Point::new(x, y), font_style).draw(d)?;
+    }
+    Ok(())
+}
+
+pub fn draw_benchmark_pixels<D>(d: &mut D, count: u32, rng: &mut Rng, hue: u8) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = TiliquaColor>,
+{
+    let size = d.bounding_box().size;
+    
+    for _ in 0..count {
+        let x = rng.u32(0..size.width);
+        let y = rng.u32(0..size.height);
+        let brightness = rng.u8(5..16);
+        let color = TiliquaColor::new(hue, brightness);
+        
+        d.draw_iter([Pixel(Point::new(x as i32, y as i32), color)])?;
+    }
+    Ok(())
+}
+
+pub fn draw_benchmark_stats<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, 
+                              refresh_rate: u32, frame_count: u32) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = TiliquaColor>,
+{
+    let font_white = MonoTextStyle::new(&FONT_9X15_BOLD, TiliquaColor::new(hue, 15));
+    let font_grey = MonoTextStyle::new(&FONT_9X15, TiliquaColor::new(hue, 10));
+
+    Text::new(
+        "[benchmark mode]",
+        Point::new(pos_x as i32, pos_y as i32),
+        font_white,
+    ).draw(d)?;
+
+    let mut refresh_text: String<32> = String::new();
+    write!(refresh_text, "refresh: {}Hz", refresh_rate).ok();
+    Text::new(
+        &refresh_text,
+        Point::new(pos_x as i32, (pos_y + 20) as i32),
+        font_grey,
+    ).draw(d)?;
+
+    let mut frame_text: String<32> = String::new();
+    write!(frame_text, "ops/sec: {}", frame_count).ok();
+    Text::new(
+        &frame_text,
+        Point::new(pos_x as i32, (pos_y + 40) as i32),
+        font_grey,
+    ).draw(d)?;
 
     Ok(())
 }

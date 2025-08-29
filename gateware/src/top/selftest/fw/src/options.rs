@@ -10,6 +10,7 @@ pub enum Page {
     Autocal,
     TweakAdc,
     TweakDac,
+    Benchmark,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
@@ -32,7 +33,7 @@ pub enum ReportPage {
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
-pub enum EnAutoZero {
+pub enum StopRun {
     #[default]
     Stop,
     Run,
@@ -42,6 +43,15 @@ int_params!(RefVoltageParams<i8>     { step: 1, min: -8, max: 8 });
 int_params!(CalTweakerParams<i16>    { step: 1, min: -256, max: 256 });
 
 button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
+
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[strum(serialize_all = "kebab-case")]
+pub enum BenchmarkType {
+    #[default]
+    Lines,
+    Text,
+    Pixels,
+}
 
 #[derive(OptionPage, Clone)]
 pub struct ReportOpts {
@@ -56,7 +66,7 @@ pub struct AutocalOpts {
     #[option]
     pub set: EnumOption<AutoZero>,
     #[option]
-    pub autozero: EnumOption<EnAutoZero>,
+    pub autozero: EnumOption<StopRun>,
     #[option]
     pub write: ButtonOption<OneShotButtonParams>,
 }
@@ -81,6 +91,14 @@ pub struct CalOpts {
     pub scale3: IntOption<CalTweakerParams>,
 }
 
+#[derive(OptionPage, Clone)]
+pub struct BenchmarkOpts {
+    #[option]
+    pub test_type: EnumOption<BenchmarkType>,
+    #[option]
+    pub enabled: EnumOption<StopRun>,
+}
+
 #[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
@@ -92,4 +110,6 @@ pub struct Opts {
     pub caladc: CalOpts,
     #[page(Page::TweakDac)]
     pub caldac: CalOpts,
+    #[page(Page::Benchmark)]
+    pub benchmark: BenchmarkOpts,
 }
