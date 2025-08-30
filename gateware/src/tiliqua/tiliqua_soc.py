@@ -105,9 +105,9 @@ class TiliquaSoc(Component):
         self.pixel_plot_csr_base  = 0x00000D00
         self.blit_csr_base        = 0x00000E00
         self.line_csr_base        = 0x00000F00
-        
+
         self.blit_mem_base        = 0xc0000000
-        
+
         # Some settings depend on whether code is in block RAM or SPI flash
         self.fw_location = fw_location
         match fw_location:
@@ -253,11 +253,11 @@ class TiliquaSoc(Component):
         # Line plotter peripheral
         self.line = line.Peripheral()
         self.csr_decoder.add(self.line.csr_bus, addr=self.line_csr_base, name="line")
-        
+
         self.permit_bus_traffic = Signal()
 
         self.extra_rust_constants = []
-        
+
         if finalize_csr_bridge:
             self.finalize_csr_bridge()
 
@@ -352,24 +352,24 @@ class TiliquaSoc(Component):
 
         # video periph / persist
         m.submodules.persist_periph = self.persist_periph
-        
+
         # hardware-accelerated pixel plotting
         m.submodules.pixel_plot = self.pixel_plot
         m.submodules.framebuffer_plotter = self.framebuffer_plotter
         m.submodules.blit = self.blit
         m.submodules.line = self.line
-        
+
         # Connect peripherals to plotter ports
         wiring.connect(m, self.pixel_plot.plot_req, self.framebuffer_plotter.ports[0])
         wiring.connect(m, self.blit.plot_req, self.framebuffer_plotter.ports[1])
         wiring.connect(m, self.line.plot_req, self.framebuffer_plotter.ports[2])
-        
+
         # Connect control signals to framebuffer plotter
         m.d.comb += [
             self.framebuffer_plotter.enable.eq(self.fb.enable),
             self.framebuffer_plotter.rotation.eq(self.framebuffer_periph.rotation),
         ]
-        
+
         # Enable peripherals when bus traffic is permitted
         m.d.comb += self.pixel_plot.enable.eq(self.permit_bus_traffic)
         m.d.comb += self.blit.enable.eq(self.permit_bus_traffic)

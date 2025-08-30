@@ -53,7 +53,7 @@ class VectorPeripheral(wiring.Component):
 
         # Create soc_en as internal signal with default enabled
         self.soc_en = Signal(init=1)
-        
+
         super().__init__({
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
             "en": In(1),

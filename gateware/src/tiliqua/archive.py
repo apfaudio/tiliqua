@@ -134,7 +134,7 @@ class ArchiveBuilder:
             case FirmwareLocation.BRAM:
                 # BRAM firmware is baked into bitstream, no separate region needed
                 pass
-        
+
         return self
 
     def with_option_storage(self, filename: str = "<options>", size: int = 2*FLASH_PAGE_SZ) -> 'ArchiveBuilder':
@@ -169,7 +169,7 @@ class ArchiveBuilder:
         has_manifest = any(region.region_type == RegionType.Manifest for region in self._regions)
         if not has_manifest:
             self.with_manifest()
-        
+
         self._manifest = BitstreamManifest(
             name=self.name,
             hw_rev=self.hw_rev.platform_class().version_major,
@@ -267,46 +267,46 @@ class ArchiveBuilder:
 
 class ArchiveLoader:
     """Handles loading and extraction of bitstream archives."""
-    
+
     def __init__(self, archive_path: str):
         self.archive_path = archive_path
         self.manifest: Optional[BitstreamManifest] = None
         self.tmpdir: Optional[Path] = None
-    
+
     def is_bootloader_archive(self) -> bool:
         """Check if this is a bootloader bitstream (has XipFirmware regions)."""
         if not self.manifest:
             return False
         return any(region.region_type == RegionType.XipFirmware for region in self.manifest.regions)
-    
+
     def get_manifest(self) -> BitstreamManifest:
         """Get the parsed manifest."""
         if not self.manifest:
             raise ValueError("Manifest not loaded - did you use the context manager?")
         return self.manifest
-    
+
     def get_tmpdir(self) -> Path:
         """Get the temporary directory path."""
         if not self.tmpdir:
             raise ValueError("Archive not extracted - did you use the context manager?")
         return self.tmpdir
-    
+
     def __enter__(self):
         """Extract archive and read manifest."""
         # Create temporary directory and extract everything
         self.tmpdir = Path(tempfile.mkdtemp())
-        
+
         with tarfile.open(self.archive_path, "r:gz") as tar:
             tar.extractall(self.tmpdir)
-            
+
             # Read manifest
             manifest_path = self.tmpdir / "manifest.json"
             with open(manifest_path) as f:
                 manifest_dict = json.load(f)
                 self.manifest = BitstreamManifest.from_dict(manifest_dict)
-        
+
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Clean up temporary directory."""
         if self.tmpdir and self.tmpdir.exists():

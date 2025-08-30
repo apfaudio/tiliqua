@@ -183,7 +183,7 @@ class MacroOscSoc(TiliquaSoc):
         self.scope_periph = scope.ScopePeripheral(
             fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
-        
+
         # Note: Arbiter is now built into the FramebufferPlotter
 
         self.audio_fifo = AudioFIFOPeripheral()
@@ -208,12 +208,12 @@ class MacroOscSoc(TiliquaSoc):
         m.submodules += self.vector_periph
 
         m.submodules += self.scope_periph
-        
+
         # Connect scope peripherals to plotter ports
         wiring.connect(m, self.vector_periph.plot_req, self.scope_plotter.ports[0])
         for i in range(4):
             wiring.connect(m, self.scope_periph.plot_reqs[i], self.scope_plotter.ports[i+1])
-        
+
         # Connect control signals to scope plotter
         m.d.comb += [
             self.scope_plotter.enable.eq(self.fb.enable),

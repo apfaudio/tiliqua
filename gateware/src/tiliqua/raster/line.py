@@ -29,7 +29,7 @@ class LineStripCommand(enum.Enum, shape=unsigned(1)):
 class LineCommand(data.Struct):
     """Command structure for line point queue."""
     x:     signed(12)        # X coordinate
-    y:     signed(11)        # Y coordinate  
+    y:     signed(11)        # Y coordinate
     pixel: Pixel             # Color and intensity
     cmd:   LineStripCommand  # Line strip command
 
@@ -37,7 +37,7 @@ class LineCommand(data.Struct):
 class _LinePlotter(wiring.Component):
     """
     Private line plotting backend implementation.
-    
+
     This is the core line drawing engine that handles Bresenham line algorithm
     and generates PlotRequest streams. Use Peripheral for the public CSR API.
     """
@@ -78,7 +78,7 @@ class _LinePlotter(wiring.Component):
         e2 = Signal(signed(14))  # 2 * err
 
         with m.FSM() as fsm:
-            
+
             with m.State('IDLE'):
                 m.d.comb += cmd.ready.eq(self.enable)
                 # Wait for command from stream
@@ -86,7 +86,7 @@ class _LinePlotter(wiring.Component):
                     # Unpack command from stream using struct
                     new_cmd = Signal(LineCommand)
                     m.d.comb += new_cmd.eq(cmd.payload)
-                    
+
                     with m.If(has_prev_point):
                         # We have a previous point - draw line from prev to new point
                         # Keep current_pixel from previous point for line consistency
@@ -108,7 +108,7 @@ class _LinePlotter(wiring.Component):
                             has_prev_point.eq(new_cmd.cmd == LineStripCommand.CONTINUE),  # Set if continuing strip
                         ]
                         m.next = 'PLOT_SINGLE_POINT'
-            
+
             with m.State('PLOT_SINGLE_POINT'):
                 # Plot the single point (first point in strip or isolated point)
                 m.d.comb += [
@@ -119,7 +119,7 @@ class _LinePlotter(wiring.Component):
                     self.plot_req.payload.blend.eq(BlendMode.REPLACE),
                     self.plot_req.payload.offset.eq(OffsetMode.ABSOLUTE),
                 ]
-                
+
                 with m.If(self.plot_req.ready):
                     with m.If(end_strip):
                         m.d.sync += has_prev_point.eq(0)
@@ -138,7 +138,7 @@ class _LinePlotter(wiring.Component):
                         dx.eq(current_x - target_x),
                         sx.eq(-1),
                     ]
-                
+
                 with m.If(target_y >= current_y):
                     m.d.sync += [
                         dy.eq(target_y - current_y),
@@ -149,7 +149,7 @@ class _LinePlotter(wiring.Component):
                         dy.eq(current_y - target_y),
                         sy.eq(-1),
                     ]
-                
+
                 # Handle zero-length lines (same start and end point)
                 with m.If((target_x == current_x) & (target_y == current_y)):
                     # Skip drawing for zero-length lines, just update state
@@ -161,7 +161,7 @@ class _LinePlotter(wiring.Component):
                     m.next = 'IDLE'
                 with m.Else():
                     m.next = 'INIT_BRESENHAM'
-                
+
             with m.State('INIT_BRESENHAM'):
                 # Initialize error term: err = dx - dy
                 m.d.sync += err.eq(dx - dy)
@@ -177,7 +177,7 @@ class _LinePlotter(wiring.Component):
                     self.plot_req.payload.blend.eq(BlendMode.REPLACE),
                     self.plot_req.payload.offset.eq(OffsetMode.ABSOLUTE),
                 ]
-                
+
                 with m.If(self.plot_req.ready):
                     # Check if we've reached the target
                     with m.If((current_x == target_x) & (current_y == target_y)):
@@ -208,7 +208,7 @@ class _LinePlotter(wiring.Component):
                         current_x.eq(current_x + sx),
                     ]
                 m.next = 'BRESENHAM_UPDATE_Y'
-                
+
             with m.State('BRESENHAM_UPDATE_Y'):
                 # Update Y coordinate if needed
                 with m.If(e2 < dx):
@@ -225,14 +225,14 @@ class _LinePlotter(wiring.Component):
 class Peripheral(wiring.Component):
     """
     Hardware-accelerated line strip plotter with CSR command interface.
-    
+
     Builds connected line segments by enqueueing points sequentially.
     Each point connects to the previous point in the strip using
     Bresenham's line algorithm.
-    
+
     Command Interface:
     POINT: [x:12|y:12|pixel:8|end_strip:1] - Add point to current line strip
-    
+
     Features:
     - Sequential point enqueueing for continuous line strips
     - Bresenham line algorithm for pixel-perfect lines
@@ -256,17 +256,17 @@ class Peripheral(wiring.Component):
     def __init__(self, fifo_depth=16):
         """
         Initialize line plotter with configurable command FIFO depth.
-        
+
         Args:
             fifo_depth: Depth of command FIFO for queuing line operations
         """
         self.fifo_depth = fifo_depth
-        
+
         # Command FIFO to queue line points
         # Each command contains: [x:12|y:11|pixel:8|cmd:1]
         # Total: 32 bits per command
         self._cmd_fifo = fifo.SyncFIFOBuffered(width=LineCommand.as_shape().size, depth=fifo_depth)
-        
+
         # CSR registers
         regs = csr.Builder(addr_width=6, data_width=8)
         self._status = regs.add("status", self.StatusReg(), offset=0x00)
@@ -299,7 +299,7 @@ class Peripheral(wiring.Component):
 
         # Enqueue command when point register is written
         cmd_fifo_w = self._cmd_fifo.w_stream
-        
+
         # Build LineCommand from CSR fields
         line_cmd = Signal(LineCommand)
         m.d.comb += [
@@ -308,7 +308,7 @@ class Peripheral(wiring.Component):
             line_cmd.pixel.eq(self._point.f.pixel.w_data),
             line_cmd.cmd.eq(self._point.f.cmd.w_data),
         ]
-        
+
         with m.If(self._point.element.w_stb & cmd_fifo_w.ready):
             m.d.comb += [
                 cmd_fifo_w.valid.eq(1),

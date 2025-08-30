@@ -115,11 +115,11 @@ class XbeamSoc(TiliquaSoc):
             n_upsample=8)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
 
-        # 4-ch oscilloscope with CSR registers  
+        # 4-ch oscilloscope with CSR registers
         self.scope_periph = scope.ScopePeripheral(
             fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
-        
+
         # Note: Arbiter is now built into the FramebufferPlotter
 
         # Extra peripheral for some global control flags.
@@ -145,7 +145,7 @@ class XbeamSoc(TiliquaSoc):
         wiring.connect(m, self.vector_periph.plot_req, self.scope_plotter.ports[0])
         for i in range(4):
             wiring.connect(m, self.scope_periph.plot_reqs[i], self.scope_plotter.ports[i+1])
-        
+
         # Connect control signals to scope plotter
         m.d.comb += [
             self.scope_plotter.enable.eq(self.fb.enable),

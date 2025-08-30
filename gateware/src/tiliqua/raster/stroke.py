@@ -20,7 +20,7 @@ class Stroke(wiring.Component):
 
     """
     Read samples, upsample them, and generate pixel requests for a shared plotting backend.
-    
+
     This refactored version removes the direct framebuffer access and instead generates
     PlotRequest stream that can be fed to a shared FramebufferBackend. This allows
     multiple Stroke instances to share the same plotting hardware via round-robin
@@ -147,7 +147,7 @@ class Stroke(wiring.Component):
                     self.plot_req.payload.blend.eq(BlendMode.ADDITIVE),  # Stroke uses additive blending
                     self.plot_req.payload.offset.eq(OffsetMode.CENTER),  # Work relative to center
                 ]
-                
+
                 with m.If(self.plot_req.ready):
                     m.next = 'LATCH0'
 

@@ -194,7 +194,7 @@ class HyperPSRAM(wiring.Component):
                 with m.Else():
                     m.next = "HANDLE_LATENCY"
 
-                    # FIXME: our HyperRAM part has a fixed latency, but we could need to detect 
+                    # FIXME: our HyperRAM part has a fixed latency, but we could need to detect
                     # different variants from the configuration register in the future.
                     with m.If(extra_latency | 1):
                         m.d.sync += latency_clocks_remaining.eq(self.HIGH_LATENCY_CLOCKS)

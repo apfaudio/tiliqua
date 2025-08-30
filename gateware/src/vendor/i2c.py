@@ -391,7 +391,7 @@ class I2CRegisterInterface(wiring.Component):
                         m.next = "RD_START"
 
             # Write states
-            # These handle the transmission of the successive bytes in the 
+            # These handle the transmission of the successive bytes in the
             # current write request
 
             with m.State("WR_SEND_VALUE"):

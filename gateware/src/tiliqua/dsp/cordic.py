@@ -81,8 +81,8 @@ class RectToPolarCordic(wiring.Component):
             angle = atan(1.0 / (1<<i)) / pi
             atan_values.append(angle)
         m.submodules.atan_rom = atan_rom = memory.Memory(
-            shape=self.internal_shape, 
-            depth=self.iterations, 
+            shape=self.internal_shape,
+            depth=self.iterations,
             init=atan_values
         )
         atan_rd = atan_rom.read_port(domain='comb')

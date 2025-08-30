@@ -194,11 +194,11 @@ def scan_for_tiliqua():
             # Extract serial (16-char hex string) and product (contains "Tiliqua R#")
             serial_match = re.search(r'\b([A-F0-9]{16})\b', line)
             product_match = re.search(r'(Tiliqua\s+R\d+[^$]*)', line, re.IGNORECASE)
-            
+
             if serial_match and product_match:
                 serial = serial_match.group(1)
                 product = product_match.group(1).strip()
-                
+
                 hw_version_match = re.search(r'R(\d+)', product)
                 if hw_version_match:
                     hw_version = int(hw_version_match.group(1))
@@ -311,7 +311,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
         if manifest.hw_rev != hw_rev_major:
             print(f"Aborting: attached Tiliqua (hw=r{hw_rev_major}) does not match archive (hw=r{manifest.hw_rev}).")
             sys.exit(1)
-        
+
         # Validate slot configuration
         is_bootloader = loader.is_bootloader_archive()
         if is_bootloader and slot is not None:
@@ -321,7 +321,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
         elif not is_bootloader and slot is None:
             print("Error: Must specify slot for user bitstreams")
             sys.exit(1)
-        
+
         # Finalize addresses and promote to FlashableRegions
         flashable_regions = promote_to_flashable_regions(loader, slot)
 
@@ -355,7 +355,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
 def finalize_addresses(loader: ArchiveLoader, slot: Optional[int]) -> None:
     """
     Finalize addresses for bootloader or user slot and write manifest.
-    
+
     Args:
         loader: ArchiveLoader containing extracted archive and manifest
         slot: Slot number (None for bootloader, int for user slots)
@@ -363,16 +363,16 @@ def finalize_addresses(loader: ArchiveLoader, slot: Optional[int]) -> None:
     manifest = loader.get_manifest()
     tmpdir = loader.get_tmpdir()
     layout = SlotLayout.for_bootloader() if slot is None else SlotLayout.for_user_slot(slot)
-    
+
     if layout.is_bootloader:
         print("\nPreparing to flash bitstream to bootloader slot...")
     else:
         print(f"\nPreparing to flash bitstream to user slot {slot}...")
-    
+
     ramload_base = None
     if not layout.is_bootloader:
         ramload_base = layout.firmware_base
-    
+
     # Update all regions with proper addresses
     for region in manifest.regions:
         match region.region_type:

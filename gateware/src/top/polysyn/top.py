@@ -397,10 +397,10 @@ class PolySoc(TiliquaSoc):
         m.submodules += self.scope_plotter
 
         m.submodules.vector_periph = self.vector_periph
-        
+
         # Connect vector peripheral to plotter port
         wiring.connect(m, self.vector_periph.plot_req, self.scope_plotter.ports[0])
-        
+
         # Connect control signals to scope plotter
         m.d.comb += [
             self.scope_plotter.enable.eq(self.fb.enable),

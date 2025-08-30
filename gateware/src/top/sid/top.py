@@ -218,11 +218,11 @@ class SIDSoc(TiliquaSoc):
         self.scope_plotter = FramebufferPlotter(fb=self.fb, n_ports=4)
         self.psram_periph.add_master(self.scope_plotter.bus)
 
-        # Add scope peripheral 
+        # Add scope peripheral
         self.scope_periph = scope.ScopePeripheral(
             fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=0x1100, name="scope_periph")
-        
+
         # Note: Arbiter is now built into the FramebufferPlotter
 
         # Now finalize the CSR bridge
@@ -239,11 +239,11 @@ class SIDSoc(TiliquaSoc):
         m.submodules.sid = sid = SID()
         m.submodules.sid_periph = self.sid_periph
         m.submodules.scope_periph = self.scope_periph
-        
+
         # Connect scope periph channels to plotter ports
         for i in range(4):
             wiring.connect(m, self.scope_periph.plot_reqs[i], self.scope_plotter.ports[i])
-        
+
         # Connect control signals to scope plotter
         m.d.comb += [
             self.scope_plotter.enable.eq(self.fb.enable),

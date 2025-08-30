@@ -77,7 +77,7 @@ class Cache(wiring.Component):
     def __init__(self, fb, n_ports=1, cachesize_words=64):
         self.fb = fb
         self.n_ports = n_ports
-        
+
         # L2 cache
         self.cache = WishboneL2Cache(
             addr_width=fb.bus.addr_width,
@@ -98,7 +98,7 @@ class Cache(wiring.Component):
         self.arbiter.add(self.flusher.bus)
 
         super().__init__({
-            # Output to backing store 
+            # Output to backing store
             "bus": Out(wishbone.Signature(addr_width=self.cache.slave.addr_width,
                                         data_width=self.cache.slave.data_width,
                                         granularity=self.cache.slave.granularity,
@@ -113,7 +113,7 @@ class Cache(wiring.Component):
         m = Module()
 
         m.submodules.cache = self.cache
-        m.submodules.flusher = self.flusher  
+        m.submodules.flusher = self.flusher
         m.submodules.arbiter = self.arbiter
 
         wiring.connect(m, self.arbiter.bus, self.cache.master)

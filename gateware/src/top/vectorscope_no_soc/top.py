@@ -202,7 +202,7 @@ class VectorScopeTop(Elaboratable):
             wiring.connect(m, self.spectro.o, self.vector_periph.i)
         else:
             wiring.connect(m, self.pmod0.o_cal, self.vector_periph.i)
-        
+
         # Connect vector peripheral to plotter
         wiring.connect(m, self.vector_periph.plot_req, self.scope_plotter.ports[0])
 

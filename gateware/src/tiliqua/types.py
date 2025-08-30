@@ -50,10 +50,10 @@ class AudioClock(str, enum.Enum):
 class Rotation(amaranth_enum.Enum, shape=unsigned(2)):
     """
     Display rotation enumeration supporting all 90-degree orientations.
-    
+
     Values:
     - NORMAL: 0° rotation (no change)
-    - LEFT: 90° counter-clockwise rotation  
+    - LEFT: 90° counter-clockwise rotation
     - INVERTED: 180° rotation (upside down)
     - RIGHT: 90° clockwise rotation
     """
@@ -66,7 +66,7 @@ class Rotation(amaranth_enum.Enum, shape=unsigned(2)):
 class Pixel(data.Struct):
     """
     Standard pixel format used throughout the raster system.
-    
+
     Fields:
     - color: 4-bit color index (0-15)
     - intensity: 4-bit intensity/brightness (0-15)

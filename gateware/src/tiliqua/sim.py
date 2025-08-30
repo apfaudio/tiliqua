@@ -108,11 +108,11 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
             platform=sim_platform,
             ports=ports
             ))
-    
+
     # Check modeline requirement early
     if hasattr(fragment, "fb") and fragment.fb.fixed_modeline is None:
         raise ValueError("Simulation requires specifying a static video mode with `--modeline`")
-    
+
     has_soc = hasattr(fragment, "fw_location")
 
     # Generate bootinfo for simulation if it has an SoC
@@ -120,29 +120,29 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
 
         bootinfo_path = os.path.join(build_dst, "bootinfo.bin")
         manifest_path = os.path.join(build_dst, "manifest.json")
-        
+
         # Generate and write manifest JSON
         manifest = archiver.write_manifest()
         # Manually write to our custom path for simulation
         manifest.write_to_path(manifest_path)
-        
+
         # Generate bootinfo binary using our Rust tool
         dvi_clk_hz = clock_settings.frequencies.dvi
         h_active = fragment.fb.fixed_modeline.h_active
         v_active = fragment.fb.fixed_modeline.v_active
-        
+
         print(f"Generating bootinfo for simulation: {h_active}x{v_active}@{dvi_clk_hz}Hz")
         subprocess.check_call([
             "cargo", "run",
             "--manifest-path", "src/rs/bootinfo_gen/Cargo.toml",
-            "--", 
+            "--",
             "--manifest", manifest_path,
             "--h-active", str(h_active),
-            "--v-active", str(v_active), 
+            "--v-active", str(v_active),
             "--fixed-pclk-hz", str(dvi_clk_hz),
             "--output", bootinfo_path
         ], env=os.environ)
-        
+
         print(f"Generated bootinfo: {bootinfo_path}")
 
     # Write all additional files added with platform.add_file()
