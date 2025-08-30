@@ -35,13 +35,13 @@ from amaranth_future          import fixed
 
 from tiliqua.tiliqua_platform import *
 from tiliqua.periph      import eurorack_pmod
-from tiliqua                  import sim
+from tiliqua.build            import sim
 from tiliqua.video            import framebuffer, palette
 from tiliqua                  import dsp
 from tiliqua.dsp              import ASQ
 from tiliqua.periph      import psram
-from tiliqua.cli              import top_level_cli
-from tiliqua.sim              import FakeTiliquaDomainGenerator
+from tiliqua.build.cli              import top_level_cli
+from tiliqua.build.sim              import FakeTiliquaDomainGenerator
 from tiliqua.raster.persist import Persistance
 from tiliqua.raster import scope
 from tiliqua.raster.plot import FramebufferPlotter

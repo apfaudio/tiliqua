@@ -20,8 +20,8 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from fastcrc import crc32
 from typing import Optional, List
-from .types import *
-from .tiliqua_platform import TiliquaRevision
+from ..types import *
+from ..tiliqua_platform import TiliquaRevision
 
 from rs.manifest.src.lib import RegionType, MANIFEST_SIZE, FLASH_PAGE_SZ, BitstreamManifest
 

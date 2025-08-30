@@ -13,7 +13,7 @@ bitstreams in the SPI flash WITHOUT exhausting write cycles on the flash memory.
 
 from amaranth              import *
 from amaranth.build        import *
-from tiliqua.cli           import top_level_cli
+from tiliqua.build.cli           import top_level_cli
 
 class BootStubTop(Elaboratable):
     def elaborate(self, platform):

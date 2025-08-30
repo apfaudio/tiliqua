@@ -16,7 +16,7 @@ from amaranth.build        import *
 from amaranth.lib          import wiring
 from amaranth.lib.wiring   import In, Out
 
-from .types import FirmwareLocation
+from ..types import FirmwareLocation
 
 class FakeTiliquaDomainGenerator(Elaboratable):
     """ Fake Clock generator for Tiliqua platform. """

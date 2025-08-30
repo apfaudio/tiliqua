@@ -36,13 +36,14 @@ from amaranth.lib.fifo         import SyncFIFOBuffered
 from amaranth_soc              import csr
 
 
-from tiliqua                   import midi, sim
+from tiliqua import midi
+from tiliqua.build import sim
 from tiliqua                   import dsp
 from tiliqua.raster            import scope
 from tiliqua.raster.plot       import FramebufferPlotter
 from tiliqua.dsp               import ASQ
 from tiliqua.tiliqua_soc       import TiliquaSoc
-from tiliqua.cli               import top_level_cli
+from tiliqua.build.cli               import top_level_cli
 from tiliqua.usb_host          import SimpleUSBMIDIHost
 
 class Diffuser(wiring.Component):

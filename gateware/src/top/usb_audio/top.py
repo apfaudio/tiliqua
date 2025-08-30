@@ -7,7 +7,7 @@ Enumerates as a 4-in, 4-out 48kHz sound card.
 from amaranth                 import *
 from amaranth.lib             import cdc, wiring
 
-from tiliqua.cli              import top_level_cli
+from tiliqua.build.cli              import top_level_cli
 from tiliqua.periph       import eurorack_pmod
 from tiliqua                  import usb_audio
 from tiliqua.tiliqua_platform import RebootProvider

@@ -17,7 +17,7 @@ from vendor.psram_ospi    import OSPIPSRAM
 from vendor.psram_hyper   import HyperPSRAM
 from vendor.dqs_phy       import DQSPHY
 
-from tiliqua              import sim
+from tiliqua.build        import sim
 
 class Peripheral(wiring.Component):
 

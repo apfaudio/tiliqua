@@ -5,7 +5,7 @@
 import os
 
 from tiliqua.tiliqua_soc                 import TiliquaSoc
-from tiliqua.cli                         import top_level_cli
+from tiliqua.build.cli                         import top_level_cli
 
 if __name__ == "__main__":
     this_path = os.path.dirname(os.path.realpath(__file__))

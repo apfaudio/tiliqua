@@ -23,7 +23,7 @@ from amaranth.lib.cdc             import FFSynchronizer
 from tiliqua                      import midi
 from tiliqua.periph           import eurorack_pmod
 from tiliqua.usb_host             import *
-from tiliqua.cli                  import top_level_cli
+from tiliqua.build.cli                  import top_level_cli
 from tiliqua.tiliqua_platform     import RebootProvider
 from vendor.ila                   import AsyncSerialILA
 

@@ -8,7 +8,7 @@ from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from .. import sim
+from ..build import sim
 from . import tmds
 
 class DVITimingGen(wiring.Component):

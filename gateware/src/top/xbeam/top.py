@@ -22,12 +22,13 @@ from amaranth_soc                                import csr
 
 
 from tiliqua.periph                         import eurorack_pmod
-from tiliqua                                     import usb_audio, sim
+from tiliqua import usb_audio
+from tiliqua.build import sim
 from tiliqua                                     import dsp
 from tiliqua.raster                              import scope
 from tiliqua.raster.plot                         import FramebufferPlotter
 from tiliqua.tiliqua_soc                         import TiliquaSoc
-from tiliqua.cli                                 import top_level_cli
+from tiliqua.build.cli                                 import top_level_cli
 
 class XbeamPeripheral(wiring.Component):
 

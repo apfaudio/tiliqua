@@ -59,7 +59,8 @@ from .types import FirmwareLocation
 from .periph import psram, i2c, encoder, dtr, eurorack_pmod
 from .video import framebuffer, palette
 from .raster import plot, blit, persist, line
-from . import sim, tiliqua_pll
+from .build import sim
+from . import tiliqua_pll
 
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, ui_name, ui_sha, platform_class, clock_settings,

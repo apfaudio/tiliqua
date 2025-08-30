@@ -15,7 +15,7 @@ from amaranth_soc          import csr
 from tiliqua.raster        import scope
 from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc   import TiliquaSoc
-from tiliqua.cli           import top_level_cli
+from tiliqua.build.cli           import top_level_cli
 
 class SID(wiring.Component):
 

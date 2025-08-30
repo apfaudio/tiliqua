@@ -14,7 +14,7 @@ from amaranth.utils        import exact_log2
 
 from amaranth_soc          import wishbone, csr
 
-from .. import sim
+from ..build import sim
 from . import dvi
 
 from ..types import Rotation
