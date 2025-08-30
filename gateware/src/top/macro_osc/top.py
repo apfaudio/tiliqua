@@ -57,7 +57,7 @@ from amaranth_soc.memory  import MemoryMap
 
 from amaranth_future                             import fixed
 
-from tiliqua.peripherals                         import eurorack_pmod
+from tiliqua.periph                         import eurorack_pmod
 from tiliqua                                     import dsp, cache
 from tiliqua.raster                              import scope
 from tiliqua.raster.plot                         import FramebufferPlotter

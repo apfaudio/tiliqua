@@ -6,7 +6,7 @@ from amaranth              import *
 from amaranth.lib.fifo     import AsyncFIFOBuffered
 from amaranth.lib          import wiring, data, stream
 from amaranth.lib.wiring   import In, Out
-from ..peripherals.eurorack_pmod import I2STDM
+from ..periph.eurorack_pmod import I2STDM
 from ..dsp import ASQ
 
 class AudioToChannels(wiring.Component):

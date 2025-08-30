@@ -40,12 +40,12 @@ from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
-from tiliqua.peripherals      import eurorack_pmod
+from tiliqua.periph      import eurorack_pmod
 from tiliqua                  import sim, cache
 from tiliqua.video            import framebuffer, palette
 from tiliqua                  import dsp
 from tiliqua.dsp              import ASQ
-from tiliqua.peripherals      import psram
+from tiliqua.periph      import psram
 from tiliqua.cli              import top_level_cli
 from tiliqua.sim              import FakeTiliquaDomainGenerator
 from tiliqua.raster.persist import Persistance

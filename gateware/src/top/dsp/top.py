@@ -29,7 +29,7 @@ from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 
-from tiliqua.peripherals      import eurorack_pmod, psram
+from tiliqua.periph      import eurorack_pmod, psram
 from tiliqua                  import midi, tiliqua_pll, dsp
 from tiliqua.dsp              import ASQ
 from tiliqua.cli              import top_level_cli

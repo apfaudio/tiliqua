@@ -11,7 +11,7 @@ from amaranth.sim          import *
 from amaranth.lib          import wiring, data
 from amaranth.lib.memory   import Memory
 from amaranth.lib.fifo     import SyncFIFO
-from tiliqua.peripherals   import eurorack_pmod
+from tiliqua.periph   import eurorack_pmod
 from tiliqua.dsp import ASQ
 
 from amaranth_future       import fixed

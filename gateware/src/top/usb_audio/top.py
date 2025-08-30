@@ -10,7 +10,7 @@ from amaranth                 import *
 from amaranth.lib             import cdc, wiring
 
 from tiliqua.cli              import top_level_cli
-from tiliqua.peripherals       import eurorack_pmod
+from tiliqua.periph       import eurorack_pmod
 from tiliqua                  import usb_audio
 from tiliqua.tiliqua_platform import RebootProvider
 from vendor.ila               import AsyncSerialILA

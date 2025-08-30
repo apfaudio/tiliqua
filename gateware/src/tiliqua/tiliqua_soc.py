@@ -60,7 +60,7 @@ from vendor.vexiiriscv                           import VexiiRiscv
 from .tiliqua_platform import *
 from .types import FirmwareLocation
 
-from .peripherals import psram, i2c, encoder, dtr, eurorack_pmod
+from .periph import psram, i2c, encoder, dtr, eurorack_pmod
 from .video import framebuffer, palette
 from .raster import plot, blit, persist, line
 from . import sim, tiliqua_pll

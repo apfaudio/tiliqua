@@ -22,7 +22,7 @@ from amaranth.lib.cdc             import FFSynchronizer
 from amaranth_future              import fixed
 
 from tiliqua                      import midi
-from tiliqua.peripherals           import eurorack_pmod
+from tiliqua.periph           import eurorack_pmod
 from tiliqua.usb_host             import *
 from tiliqua.cli                  import top_level_cli
 from tiliqua.tiliqua_platform     import RebootProvider
