@@ -11,7 +11,8 @@ from amaranth.lib          import wiring
 from amaranth_future       import fixed
 
 from tiliqua.eurorack_pmod import ASQ
-from tiliqua               import dsp, fft
+from tiliqua               import dsp
+from tiliqua.dsp           import fft
 
 from parameterized         import parameterized
 import numpy as np

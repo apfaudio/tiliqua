@@ -18,7 +18,8 @@ from scipy                 import signal
 from parameterized         import parameterized
 
 from tiliqua.eurorack_pmod import ASQ
-from tiliqua               import dsp, mac, delay_line, delay
+from tiliqua               import dsp
+from tiliqua.dsp           import mac, delay_line, delay_effect
 
 class DSPTests(unittest.TestCase):
 
@@ -131,7 +132,7 @@ class DSPTests(unittest.TestCase):
             x = [v.as_float() for v in itertools.islice(stimulus_values(), n_samples)]
             # zero padding needed to align to the RTL outputs.
             x = [0]*n_pad + x
-            resampled = signal.resample_poly(x, dut.n_up, dut.m_down, window=dut.filt.taps_float)
+            resampled = signal.resample_poly(x, dut.n_up, dut.m_down, window=dut.fir.taps_float)
             aligned =  resampled[n_align:-10]
             return aligned
 
@@ -427,7 +428,7 @@ class DSPTests(unittest.TestCase):
 
     def test_boxcar(self):
 
-        boxcar = delay.Boxcar(n=32, hpf=True)
+        boxcar = delay_effect.Boxcar(n=32, hpf=True)
 
         async def testbench(ctx):
             for n in range(0, 1024):

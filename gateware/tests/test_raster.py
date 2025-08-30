@@ -9,7 +9,8 @@ import unittest
 from amaranth              import *
 from amaranth.sim          import *
 from amaranth.lib          import wiring
-from tiliqua               import test_util, eurorack_pmod, dma_framebuffer, dvi_modeline, palette
+from tiliqua               import test_util, eurorack_pmod
+from tiliqua.video         import framebuffer, modeline, palette
 from tiliqua.raster        import stroke, persist
 
 from amaranth_soc          import csr
@@ -19,12 +20,12 @@ from amaranth_future       import fixed
 
 class RasterTests(unittest.TestCase):
 
-    MODELINE = dvi_modeline.DVIModeline.all_timings()["1280x720p60"]
+    MODELINE = modeline.DVIModeline.all_timings()["1280x720p60"]
 
     def test_persist(self):
 
         m = Module()
-        fb = dma_framebuffer.DMAFramebuffer(
+        fb = framebuffer.DMAFramebuffer(
             fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
         dut = persist.Persistance(fb=fb)
         m.submodules += [dut, fb, fb.palette]
@@ -61,31 +62,36 @@ class RasterTests(unittest.TestCase):
     def test_stroke(self):
 
         m = Module()
-        fb = dma_framebuffer.DMAFramebuffer(
+        fb = framebuffer.DMAFramebuffer(
             fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
         dut = stroke.Stroke(fb=fb)
         m.submodules += [dut, fb, fb.palette]
 
         async def stimulus(ctx):
-            for n in range(0, sys.maxsize):
+            # Send a few sample points to the stroke
+            for n in range(8):
                 ctx.set(dut.i.valid, 1)
                 ctx.set(dut.i.payload, [0, 0, 0, 0])
                 await ctx.tick()
                 ctx.set(dut.i.valid, 0)
-                await ctx.tick().repeat(128)
+                await ctx.tick().repeat(4)
 
         async def testbench(ctx):
             ctx.set(dut.enable, 1)
             ctx.set(fb.enable, 1)
-            # Simulate some acks delayed from stb
-            for _ in range(16):
-                while not ctx.get(dut.bus.stb):
-                    await ctx.tick()
-                await ctx.tick().repeat(8)
-                ctx.set(dut.bus.ack, 1)
+            ctx.set(dut.plot_req.ready, 1)
+            
+            # Wait for a few plot requests to be generated
+            plot_requests_seen = 0
+            for _ in range(1000):
+                if ctx.get(dut.plot_req.valid & dut.plot_req.ready):
+                    plot_requests_seen += 1
+                    if plot_requests_seen >= 8:
+                        break
                 await ctx.tick()
-                ctx.set(dut.bus.ack, 0)
-                await ctx.tick()
+            
+            # Test passes if we saw some plot requests
+            assert plot_requests_seen > 0
 
         sim = Simulator(m)
         sim.add_clock(1e-6)

@@ -12,7 +12,8 @@ from amaranth              import *
 from amaranth.sim          import *
 from amaranth.lib          import wiring
 from amaranth.lib.wiring   import In, Out
-from tiliqua               import dsp, eurorack_pmod, cache, delay_line
+from tiliqua               import dsp, eurorack_pmod, cache
+from tiliqua.dsp           import delay_line
 from tiliqua.eurorack_pmod import ASQ
 
 from amaranth_soc          import csr

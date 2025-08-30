@@ -17,7 +17,7 @@ from amaranth.lib.cdc        import FFSynchronizer
 from amaranth_future         import fixed
 
 from .. import dsp
-from ..dma_framebuffer import DMAFramebuffer
+from ..video.framebuffer import DMAFramebuffer
 from ..types import Pixel
 from .plot import PlotRequest, BlendMode, OffsetMode
 from ..eurorack_pmod import ASQ

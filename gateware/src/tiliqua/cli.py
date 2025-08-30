@@ -15,7 +15,8 @@ import subprocess
 import sys
 import time
 
-from . import sim, dvi_modeline, tiliqua_pll
+from . import sim, tiliqua_pll
+from .video import modeline
 from .types import *
 from .tiliqua_platform import *
 from .tiliqua_soc import TiliquaSoc
@@ -150,7 +151,7 @@ def top_level_cli(
             if args.modeline is None:
                 # Default modeline (if no static modeline was set and dynamic modelines unsupported)
                 args.modeline = "1280x720p60"
-            modelines = dvi_modeline.DVIModeline.all_timings()
+            modelines = modeline.DVIModeline.all_timings()
             assert args.modeline in modelines, f"error: fixed `--modeline` must be one of {modelines.keys()}"
             kwargs["clock_settings"] = tiliqua_pll.ClockSettings(
                 audio_clock.to_192khz() if args.fs_192khz else audio_clock,

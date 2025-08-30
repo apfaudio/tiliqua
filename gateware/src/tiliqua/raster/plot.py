@@ -25,7 +25,7 @@ from amaranth_soc.memory   import MemoryMap
 
 from .cache                import Cache
 
-from ..dma_framebuffer import DMAFramebuffer
+from ..video.framebuffer import DMAFramebuffer
 from ..types import Rotation, Pixel
 
 class BlendMode(enum.Enum, shape=unsigned(1)):

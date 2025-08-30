@@ -40,7 +40,8 @@ from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, sim, cache, dma_framebuffer, palette
+from tiliqua                  import eurorack_pmod, sim, cache
+from tiliqua.video            import framebuffer, palette
 from tiliqua                  import dsp
 from tiliqua.eurorack_pmod    import ASQ
 from tiliqua                  import psram_peripheral
@@ -156,7 +157,7 @@ class VectorScopeTop(Elaboratable):
 
         # All of our DMA masters
         self.palette = palette.ColorPalette()
-        self.fb = dma_framebuffer.DMAFramebuffer(fixed_modeline=clock_settings.modeline,
+        self.fb = framebuffer.DMAFramebuffer(fixed_modeline=clock_settings.modeline,
                                                  palette=self.palette)
         self.psram_periph.add_master(self.fb.bus)
 

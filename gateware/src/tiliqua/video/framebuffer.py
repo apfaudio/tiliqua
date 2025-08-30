@@ -18,10 +18,11 @@ from amaranth.lib.memory   import Memory
 
 from amaranth_soc          import wishbone, csr
 
-from . import sim, dvi, palette
-from .dvi_modeline import DVIModeline
+from .. import sim
+from . import dvi, palette
+from .modeline import DVIModeline
 
-from .types import Rotation
+from ..types import Rotation
 
 class DMAFramebuffer(wiring.Component):
 
@@ -198,7 +199,7 @@ class Peripheral(wiring.Component):
 
     """
     CSR peripheral for tweaking framebuffer timing/palette parameters from an SoC.
-    Timing values follow the same format as DVIModeline in dvi_modeline.py.
+    Timing values follow the same format as DVIModeline in modeline.py.
     """
 
     class HTimingReg(csr.Register, access="w"):

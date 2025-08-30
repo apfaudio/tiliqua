@@ -60,7 +60,8 @@ from vendor.vexiiriscv                           import VexiiRiscv
 from .tiliqua_platform import *
 from .types import FirmwareLocation
 
-from . import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, palette
+from . import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral
+from .video import framebuffer, palette
 from .raster import plot, blit, persist, line
 from . import sim, eurorack_pmod, tiliqua_pll
 
@@ -223,14 +224,14 @@ class TiliquaSoc(Component):
                 self.palette_periph.bus, addr=self.palette_periph_base, name="palette_periph")
 
         # video PHY (DMAs from PSRAM starting at self.psram_base)
-        self.fb = dma_framebuffer.DMAFramebuffer(
+        self.fb = framebuffer.DMAFramebuffer(
                 palette=self.palette_periph.palette,
                 fb_base_default=self.psram_base,
                 fixed_modeline=self.clock_settings.modeline)
         self.psram_periph.add_master(self.fb.bus)
 
         # Timing CSRs for video PHY
-        self.framebuffer_periph = dma_framebuffer.Peripheral(fb=self.fb)
+        self.framebuffer_periph = framebuffer.Peripheral(fb=self.fb)
         self.csr_decoder.add(
                 self.framebuffer_periph.bus, addr=self.fb_periph_base, name="framebuffer_periph")
 

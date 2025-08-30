@@ -10,7 +10,7 @@ from amaranth             import *
 from amaranth.lib.cdc     import FFSynchronizer
 from amaranth.lib         import wiring
 from .types import *
-from .dvi_modeline import DVIModeline, DVIPLL
+from .video.modeline import DVIModeline, DVIPLL
 from dataclasses          import dataclass
 from typing               import List, Optional
 

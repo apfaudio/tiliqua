@@ -17,7 +17,7 @@ from amaranth.lib.cdc        import FFSynchronizer
 from amaranth_future         import fixed
 
 from .. import dsp
-from ..dma_framebuffer import DMAFramebuffer
+from ..video.framebuffer import DMAFramebuffer
 from ..eurorack_pmod import ASQ
 
 from amaranth_soc            import wishbone, csr
