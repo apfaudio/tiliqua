@@ -3,7 +3,7 @@
 #![no_std]
 #![no_main]
 
-use log::info;
+use log::{info, warn};
 use riscv_rt::entry;
 use core::cell::RefCell;
 use critical_section::Mutex;
@@ -225,9 +225,14 @@ fn main() -> ! {
     //
 
     let mut opts = Opts::default();
-    let mut flash_persist = FlashOptionsPersistence::new(
-        spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
-    flash_persist.load_options(&mut opts).unwrap();
+    let mut flash_persist_opt = if let Some(storage_window) = bootinfo.manifest.get_option_storage_window() {
+        let mut flash_persist = FlashOptionsPersistence::new(spiflash, storage_window);
+        flash_persist.load_options(&mut opts).unwrap();
+        Some(flash_persist)
+    } else {
+        warn!("No option storage region: disable persistent storage");
+        None
+    };
 
     //
     // Create App instance
@@ -323,14 +328,18 @@ fn main() -> ! {
             }
 
             if save_opts {
-                flash_persist.save_options(&opts).unwrap();
+                if let Some(ref mut flash_persist) = flash_persist_opt {
+                    flash_persist.save_options(&opts).unwrap();
+                }
             }
 
             if wipe_opts {
                 critical_section::with(|cs| {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = Opts::default();
-                    flash_persist.erase_all().unwrap();
+                    if let Some(ref mut flash_persist) = flash_persist_opt {
+                        flash_persist.erase_all().unwrap();
+                    }
                 });
             }
 

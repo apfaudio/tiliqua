@@ -280,18 +280,27 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
 }
 
 fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
+    // Skip regions without spiflash_src (e.g. during simulation)
+    let spiflash_src = match region.spiflash_src {
+        Some(addr) => addr,
+        None => {
+            info!("Skip region '{}' (no spiflash_src)", region.filename);
+            return Ok(());
+        }
+    };
+
     let spiflash_ptr = SPIFLASH_BASE as *mut u32;
-    let spiflash_offset_words = region.spiflash_src as isize / 4isize;
+    let spiflash_offset_words = spiflash_src as isize / 4isize;
     let size_words = region.size as isize / 4isize + 1;
 
     match region.region_type {
         RegionType::Bitstream | RegionType::XipFirmware | RegionType::RamLoad => {
             info!("Validate region '{}' at {:#x} (size: {} KiB) ...", 
-                  region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+                  region.filename, SPIFLASH_BASE + spiflash_src as usize, region.size / 1024);
         },
         _ => {
             info!("Skip region '{}' at {:#x} (size: {} KiB) ...", 
-                  region.filename, SPIFLASH_BASE + region.spiflash_src as usize, region.size / 1024);
+                  region.filename, SPIFLASH_BASE + spiflash_src as usize, region.size / 1024);
             return Ok(());
         }
     }

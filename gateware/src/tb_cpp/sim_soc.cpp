@@ -83,6 +83,17 @@ int main(int argc, char** argv) {
     fin.read((char*)psram_driver.psram_data + PSRAM_FW_OFFSET, psram_driver.psram_size_bytes);
 #endif
 
+#ifdef BOOTINFO_BIN_PATH
+    // Load bootinfo at the calculated offset in PSRAM
+    std::ifstream bootinfo_fin(BOOTINFO_BIN_PATH, std::ios::in | std::ios::binary);
+    if (bootinfo_fin) {
+        bootinfo_fin.read((char*)psram_driver.psram_data + BOOTINFO_OFFSET, 1024);
+        printf("Loaded bootinfo to PSRAM offset 0x%x\n", BOOTINFO_OFFSET);
+    } else {
+        printf("Warning: Could not load bootinfo from %s\n", BOOTINFO_BIN_PATH);
+    }
+#endif
+
 
     while (contextp->time() < sim_time && !contextp->gotFinish()) {
 

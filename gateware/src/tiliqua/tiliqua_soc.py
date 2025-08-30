@@ -89,6 +89,7 @@ class TiliquaSoc(Component):
         self.spiflash_size        = 0x01000000 # 128Mbit / 16MiB
         self.psram_base           = 0x20000000
         self.psram_size           = 0x01000000 # 128Mbit / 16MiB
+        self.bootinfo_base        = self.psram_base + self.psram_size - 4096
         self.csr_base             = 0xf0000000
         # offsets from csr_base
         self.spiflash_ctrl_base   = 0x00000100
@@ -467,8 +468,7 @@ class TiliquaSoc(Component):
             f.write(f"pub const SPIFLASH_SZ_BYTES: usize = 0x{self.spiflash_size:x};\n")
             f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base.init:x};\n")
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")
-            f.write(f"pub const BOOTINFO_SZ_BYTES: usize = 4096;\n")
-            f.write(f"pub const BOOTINFO_BASE: usize     = PSRAM_BASE + PSRAM_SZ_BYTES - BOOTINFO_SZ_BYTES;\n")
+            f.write(f"pub const BOOTINFO_BASE: usize     = 0x{self.bootinfo_base:x};\n")
             pmod_rev = TiliquaRevision.from_platform(self.platform_class).pmod_rev()
             f.write(f"pub const TOUCH_SENSOR_ORDER: [u8; 8] = {pmod_rev.touch_order()};\n")
             f.write(f"pub const PMOD_DEFAULT_CAL: [f32; 4] = {pmod_rev.default_calibration_rs()};\n")
