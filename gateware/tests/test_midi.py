@@ -10,7 +10,7 @@ from parameterized         import parameterized
 from amaranth              import *
 from amaranth.sim          import *
 from amaranth.lib          import wiring
-from tiliqua               import midi, test_util
+from tiliqua               import midi
 
 from amaranth_soc          import csr
 from amaranth_soc.csr      import wishbone

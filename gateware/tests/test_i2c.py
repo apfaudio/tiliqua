@@ -8,7 +8,7 @@ from amaranth              import *
 from amaranth.sim          import *
 from amaranth.lib          import wiring, data
 from amaranth.lib.memory   import Memory
-from tiliqua               import test_util
+from tiliqua               import test
 from tiliqua.periph   import i2c, eurorack_pmod
 from vendor                import i2c as vendor_i2c
 
@@ -31,11 +31,11 @@ class I2CTests(unittest.TestCase):
         async def test_stimulus(ctx):
 
             async def csr_write(ctx, value, register, field=None):
-                await test_util.wb_csr_w(
+                await test.csr.wb_csr_w(
                         ctx, dut.bus, bridge.wb_bus, value, register, field)
 
             async def csr_read(ctx, register, field=None):
-                return await test_util.wb_csr_r(
+                return await test.csr.wb_csr_r(
                         ctx, dut.bus, bridge.wb_bus, register, field)
 
             # set device address
