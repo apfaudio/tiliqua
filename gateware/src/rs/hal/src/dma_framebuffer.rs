@@ -244,49 +244,22 @@ macro_rules! impl_dma_framebuffer {
                         // Busy wait for all pending operations to complete
                     }
 
-                    // Get hardware spritesheet width from status register
+                    // Get hardware spritesheet parameters from status register
                     let status = self.registers_blitter.status().read();
-                    let hw_width_words = status.sheet_width_words().bits() as u32;
-                    let hw_width_pixels = hw_width_words * 32;
+                    let hw_column_words = status.column_words().bits() as u32;
+                    let hw_mem_words = status.mem_words().bits() as u32;
 
                     // Upload pixel data to blitter sprite memory
                     // ImageRaw<BinaryColor> data is already packed: 8 pixels per byte, 1 bit per pixel
                     let sprite_mem = self.blitter_mem_base;
                     let bytes_per_row = (width + 7) / 8;
 
-                    /*
-                    // Debug: Print first 32x32 section of original data
-                    log::info!("First 32x32 section of original embedded-graphics data:");
-                    for debug_y in 0..32.min(height) {
-                        let mut line = [0u8; 33]; // 32 chars + null terminator
-                        let row_start = (debug_y * bytes_per_row) as usize;
-                        for pixel_x in 0..32.min(width) {
-                            let byte_idx = row_start + (pixel_x / 8) as usize;
-                            let bit_idx = 7 - (pixel_x % 8); // MSB first within byte
-                            if byte_idx < pixels.len() {
-                                let byte_val = pixels[byte_idx];
-                                let bit = (byte_val >> bit_idx) & 1;
-                                line[pixel_x as usize] = if bit == 1 { b'#' } else { b'.' };
-                            } else {
-                                line[pixel_x as usize] = b'.';
-                            }
-                        }
-                        line[32] = 0; // null terminator
-                        if let Ok(line_str) = core::str::from_utf8(&line[..32]) {
-                            log::info!("{}", line_str);
-                        }
-                    }
-                    */
-
-                    // Debug: Store first 32 words for readback
-                    let mut debug_words = [0u32; 32];
-
                     for y in 0..height {
                         let row_start_byte = (y * bytes_per_row) as usize;
-                        let row_start_word = y * hw_width_words;
+                        let row_start_word = y * hw_column_words;
                         
                         // Process each word in the hardware row (may be wider than actual data)
-                        for word_in_row in 0..hw_width_words {
+                        for word_in_row in 0..hw_column_words {
                             let mut word_value = 0u32;
                             
                             // Only fill with data if we're within the actual image width
@@ -301,16 +274,13 @@ macro_rules! impl_dma_framebuffer {
                                     }
                                 }
                             }
+
                             // If word_in_row * 32 >= width, word_value stays 0 (padding)
                             
                             let word_offset = (row_start_word + word_in_row) as isize;
-                            // Bounds check against hardware memory size (2048 words)
-                            if word_offset >= 2048 {
-                                panic!("Sprite memory out of bounds: offset {} >= 2048", word_offset);
-                            }
-                            // Store first word of first 32 rows for debug
-                            if y < 32 && word_in_row == 0 {
-                                debug_words[y as usize] = word_value;
+                            // Bounds check against hardware memory size
+                            if word_offset >= hw_mem_words as isize {
+                                panic!("Sprite memory out of bounds: offset {} >= {}", word_offset, hw_mem_words);
                             }
                             
                             unsafe {
@@ -319,29 +289,6 @@ macro_rules! impl_dma_framebuffer {
                             }
                         }
                     }
-
-                    /*
-                    // Debug: Print first 32x32 section as ASCII art using stored data
-                    // Use the same bit ordering correction as hardware
-                    log::info!("First 32x32 section of uploaded spritesheet (hardware view):");
-                    for debug_y in 0..32 {
-                        let mut line = [0u8; 33]; // 32 chars + null terminator
-                        let word_data = debug_words[debug_y];
-                        // Extract each bit using hardware's corrected indexing
-                        for pixel_idx in 0..32 {
-                            // Apply same correction as hardware:
-                            let byte_in_word = pixel_idx / 8;  // Which byte (0-3)
-                            let bit_in_byte = pixel_idx % 8;   // Which bit in that byte (0-7)
-                            let corrected_bit_index = (byte_in_word * 8) + (7 - bit_in_byte);  // MSB-first within byte
-                            let bit = (word_data >> corrected_bit_index) & 1;
-                            line[pixel_idx] = if bit == 1 { b'#' } else { b'.' };
-                        }
-                        line[32] = 0; // null terminator
-                        if let Ok(line_str) = core::str::from_utf8(&line[..32]) {
-                            log::info!("{}", line_str);
-                        }
-                    }
-                    */
 
                     // Update the local key to indicate this spritesheet is loaded
                     self.current_spritesheet_key = key;

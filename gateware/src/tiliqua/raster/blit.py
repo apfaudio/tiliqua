@@ -48,7 +48,7 @@ class Peripheral(wiring.Component):
         busy: csr.Field(csr.action.R, unsigned(1))  # FIFO full (can't accept new commands)
         empty: csr.Field(csr.action.R, unsigned(1))  # FIFO empty (safe to change spritesheet)
         mem_words: csr.Field(csr.action.R, unsigned(15))  # Memory size in words
-        sheet_width_words: csr.Field(csr.action.R, unsigned(15))  # Spritesheet width in words
+        column_words: csr.Field(csr.action.R, unsigned(15))  # Spritesheet width in words
 
     class SrcReg(csr.Register, access="w"):
         src_x: csr.Field(csr.action.W, unsigned(8))
@@ -62,20 +62,20 @@ class Peripheral(wiring.Component):
         pixel: csr.Field(csr.action.W, Pixel)
         # Note: Writing to this register triggers the blit operation
 
-    def __init__(self, memory_words=2048, spritesheet_width_words=256//32, fifo_depth=16):  # Default 8KB for 64K pixels
+    def __init__(self, memory_words=1024, column_words=256//32, fifo_depth=16):  # Default 4KB for 32K pixels
         """
         Initialize blitter with configurable sprite memory size.
         
         Args:
             memory_words: Size of sprite memory in 32-bit words
                          Each word stores 32 pixels (1-bit each)
-                         Example: 2048 words = 65536 pixels = 256x256 sprite sheet
-            spritesheet_width_words: Width of spritesheet in 32-bit words
-                                   Example: 256 pixels = 8 words
+                         Example: 1024 words = 32768 pixels = 256x128 sprite sheet
+            column_words: Width of spritesheet in 32-bit words
+                        Example: 256 pixels = 8 words
             fifo_depth: Depth of command FIFO for queuing blit operations
         """
         self.memory_words = memory_words
-        self.spritesheet_width_words = spritesheet_width_words
+        self.column_words = column_words
         self.memory_addr_width = exact_log2(memory_words)
         self.fifo_depth = fifo_depth
         
@@ -186,7 +186,7 @@ class Peripheral(wiring.Component):
         sprite_pixel_index = Signal(16)  # Linear pixel index in sprite memory
         
         m.d.comb += [
-            sprite_pixel_index.eq((current_src_y + current_y) * (self.spritesheet_width_words * 32) + (current_src_x + current_x)),
+            sprite_pixel_index.eq((current_src_y + current_y) * (self.column_words * 32) + (current_src_x + current_x)),
             sprite_pixel_addr.eq(sprite_pixel_index >> 5),  # Divide by 32 (pixels per word)
             pixel_bit_index.eq(sprite_pixel_index[0:5]),    # Modulo 32 (bit within word)
         ]
@@ -198,7 +198,7 @@ class Peripheral(wiring.Component):
             # empty = FIFO is empty (safe to change spritesheet)
             self._status.f.empty.r_data.eq(~self._cmd_fifo.r_stream.valid),
             self._status.f.mem_words.r_data.eq(self.memory_words),
-            self._status.f.sheet_width_words.r_data.eq(self.spritesheet_width_words),
+            self._status.f.column_words.r_data.eq(self.column_words),
         ]
 
         m.d.comb += sprite_r_port.addr.eq(sprite_pixel_addr)
