@@ -115,8 +115,11 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
     if hasattr(fragment, "fb") and fragment.fb.fixed_modeline is None:
         raise ValueError("Simulation requires specifying a static video mode with `--modeline`")
     
-    # Generate bootinfo for simulation if archiver is provided
-    if archiver and hasattr(fragment, "fb"):
+    has_soc = hasattr(fragment, "fw_location")
+
+    # Generate bootinfo for simulation if it has an SoC
+    if archiver and has_soc:
+
         bootinfo_path = os.path.join(build_dst, "bootinfo.bin")
         manifest_path = os.path.join(build_dst, "manifest.json")
         
@@ -172,13 +175,11 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
         psram_cflags = []
 
     firmware_cflags = []
-    if hasattr(fragment, "fw_location"):
+    bootinfo_cflags = []
+    if has_soc:
         firmware_cflags += [
            "-CFLAGS", f"-DFIRMWARE_BIN_PATH=\\\"{fragment.firmware_bin_path}\\\"",
         ]
-    
-    bootinfo_cflags = []
-    if archiver and hasattr(fragment, "fb"):
         bootinfo_offset = fragment.bootinfo_base - fragment.psram_base
         bootinfo_cflags += [
             "-CFLAGS", f"-DBOOTINFO_BIN_PATH=\\\"{bootinfo_path}\\\"",
