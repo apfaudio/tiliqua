@@ -711,20 +711,13 @@ where
     D: DrawTarget<Color = TiliquaColor>,
 {
     let font_white = MonoTextStyle::new(&FONT_9X15_BOLD, TiliquaColor::new(hue, 15));
-    let font_grey = MonoTextStyle::new(&FONT_9X15, TiliquaColor::new(hue, 10));
-
-    Text::new(
-        "[benchmark mode]",
-        Point::new(pos_x as i32, pos_y as i32),
-        font_white,
-    ).draw(d)?;
 
     let mut refresh_text: String<32> = String::new();
     write!(refresh_text, "refresh: {}Hz", refresh_rate).ok();
     Text::new(
         &refresh_text,
         Point::new(pos_x as i32, (pos_y + 20) as i32),
-        font_grey,
+        font_white,
     ).draw(d)?;
 
     let mut frame_text: String<32> = String::new();
@@ -732,7 +725,7 @@ where
     Text::new(
         &frame_text,
         Point::new(pos_x as i32, (pos_y + 40) as i32),
-        font_grey,
+        font_white,
     ).draw(d)?;
 
     Ok(())

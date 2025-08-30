@@ -50,23 +50,6 @@ CPU_VARIANTS = {
         '--with-btb',
         '--relaxed-btb',
         '--with-late-alu',
-        #
-        '--with-gshare',
-        '--with-ras',
-        '--regfile-async',
-        '--with-aligner-buffer',
-        '--with-dispatcher-buffer',
-    ],
-    # special variant with big icache, necessary if
-    # the CPU is directly fetching instructions from spiflash
-    "tiliqua_rv32im_xip": CPU_BASE + [
-        '--lsu-l1-sets=16',
-        '--lsu-l1-ways=1',
-        '--fetch-l1-sets=32',
-        '--fetch-l1-ways=2',
-        '--with-btb',
-        '--relaxed-btb',
-        '--with-late-alu',
     ],
     # Most performant variant that reasonably fits on the
     # ECP5-25, consumes about half the LUTs and has FPU
