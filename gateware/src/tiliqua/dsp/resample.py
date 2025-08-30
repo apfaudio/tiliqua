@@ -73,25 +73,52 @@ class Resample(wiring.Component):
         self.m_down = m_down
         self.bw     = bw
 
-        # determine filter order
-        filter_order = order_mult*max(n_up, m_down)
-        if filter_order % n_up != 0:
-            filter_order = ((filter_order // n_up) + 1) * n_up
+        filter_order = order_mult*max(self.n_up, self.m_down)
+        if filter_order % self.n_up != 0:
+            # If the filter is not divisible by n_up, choose the next largest filter
+            # order that is, so that we can use FIR 'stride' (polyphase resampling
+            # optimization based on known zero padding).
+            filter_order = self.n_up * ((filter_order // self.n_up) + 1)
 
-        self.fir = FIR(
-            fs=fs_in * n_up,
-            filter_cutoff_hz=int(fs_in*bw/2),
+        self.filt = FIR(
+            fs=self.fs_in*self.n_up,
+            filter_cutoff_hz=min(self.fs_in*self.bw,
+                                 int((self.fs_in*self.bw)*(self.n_up/self.m_down))),
             filter_order=filter_order,
-            filter_type='lowpass',
-            prescale=n_up,
-            stride_i=n_up,
-            stride_o=m_down)
+            prescale=self.n_up,
+            stride_i=self.n_up,
+            stride_o=self.m_down)
 
         super().__init__()
 
     def elaborate(self, platform):
+
         m = Module()
-        m.submodules.fir = self.fir
-        wiring.connect(m, wiring.flipped(self.i), self.fir.i)
-        wiring.connect(m, self.fir.o, wiring.flipped(self.o))
+
+        m.submodules.filt = filt = self.filt
+
+        upsampled_signal  = Signal(ASQ)
+        upsample_counter  = Signal(range(self.n_up))
+
+        m.d.comb += [
+            self.i.ready.eq((upsample_counter == 0) & filt.i.ready),
+        ]
+
+        with m.If(filt.i.ready):
+            with m.If(self.i.valid & self.i.ready):
+                m.d.comb += [
+                    filt.i.payload.eq(self.i.payload),
+                    filt.i.valid.eq(1),
+                ]
+                m.d.sync += upsample_counter.eq(self.n_up - 1)
+            with m.Elif(upsample_counter > 0):
+                m.d.comb += [
+                    filt.i.payload.eq(0),
+                    filt.i.valid.eq(1),
+                ]
+                m.d.sync += upsample_counter.eq(upsample_counter - 1)
+
+
+        wiring.connect(m, filt.o, wiring.flipped(self.o))
+
         return m

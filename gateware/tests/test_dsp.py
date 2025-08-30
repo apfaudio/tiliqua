@@ -132,7 +132,7 @@ class DSPTests(unittest.TestCase):
             x = [v.as_float() for v in itertools.islice(stimulus_values(), n_samples)]
             # zero padding needed to align to the RTL outputs.
             x = [0]*n_pad + x
-            resampled = signal.resample_poly(x, dut.n_up, dut.m_down, window=dut.fir.taps_float)
+            resampled = signal.resample_poly(x, dut.n_up, dut.m_down, window=dut.filt.taps_float)
             aligned =  resampled[n_align:-10]
             return aligned
 
