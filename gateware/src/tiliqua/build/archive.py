@@ -20,11 +20,8 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from fastcrc import crc32
 from typing import Optional, List
-from ..types import *
-from .types import FirmwareLocation
-from ..tiliqua_platform import TiliquaRevision
-
-from rs.manifest.src.lib import RegionType, MANIFEST_SIZE, FLASH_PAGE_SZ, BitstreamManifest
+from .types import *
+from ..platform import TiliquaRevision
 
 @dataclass
 class ArchiveBuilder:

@@ -29,7 +29,7 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-from rs.manifest.src.lib import *
+from .types import *
 from .archive import ArchiveLoader
 
 class SlotLayout:

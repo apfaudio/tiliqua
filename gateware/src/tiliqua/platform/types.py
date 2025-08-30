@@ -4,11 +4,6 @@
 
 import enum
 
-# Re-export `tiliqua-manifest` types.
-from rs.manifest.src.lib import BitstreamManifest as BitstreamManifest  # noqa: F401
-from rs.manifest.src.lib import MemoryRegion as MemoryRegion  # noqa: F401
-from rs.manifest.src.lib import ExternalPLLConfig as ExternalPLLConfig  # noqa: F401
-
 
 class AudioClock(str, enum.Enum):
     FINE_48KHZ  = "fine_48khz"

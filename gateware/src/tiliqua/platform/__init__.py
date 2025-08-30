@@ -13,7 +13,7 @@ from amaranth_boards.resources   import *
 
 from luna.gateware.platform.core import LUNAPlatform
 
-from . import tiliqua_pll
+from . import pll as tiliqua_pll
 from .types import *
 
 class _SoldierCrabPlatform(LatticeECP5Platform):

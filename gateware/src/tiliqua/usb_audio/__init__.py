@@ -36,7 +36,7 @@ from .channels_to_usb_stream                  import ChannelsToUSBStream
 from .audio_to_channels                       import AudioToChannels
 
 from tiliqua.periph                      import eurorack_pmod
-from tiliqua                                  import types
+from tiliqua.platform                         import types
 
 
 class USB2AudioInterface(wiring.Component):

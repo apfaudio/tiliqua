@@ -4,6 +4,10 @@
 
 import enum
 
+# Re-export all `tiliqua-manifest` types and constants.
+from rs.manifest.src.lib import *
+
+
 class FirmwareLocation(str, enum.Enum):
     BRAM      = "bram"
     SPIFlash  = "spiflash"

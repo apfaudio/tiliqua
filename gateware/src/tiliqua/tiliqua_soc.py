@@ -53,14 +53,14 @@ from luna_soc.generate                           import rust, introspect, svd
 
 from vendor.vexiiriscv                           import VexiiRiscv
 
-from .tiliqua_platform import *
+from .platform import *
 from .build.types import FirmwareLocation
 
 from .periph import psram, i2c, encoder, dtr, eurorack_pmod
 from .video import framebuffer, palette
 from .raster import plot, blit, persist, line
 from .build import sim
-from . import tiliqua_pll
+from .platform import pll as tiliqua_pll
 
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, ui_name, ui_sha, platform_class, clock_settings,

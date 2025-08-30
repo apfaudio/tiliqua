@@ -17,7 +17,7 @@ from amaranth_soc               import csr
 from amaranth_future            import fixed
 
 from . import i2c
-from ..tiliqua_platform import TiliquaRevision, EurorackPmodRevision
+from ..platform import TiliquaRevision, EurorackPmodRevision
 from vendor                     import i2c as vendor_i2c
 
 from ..dsp import ASQ

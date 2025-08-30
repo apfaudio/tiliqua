@@ -24,7 +24,7 @@ from tiliqua                      import midi
 from tiliqua.periph           import eurorack_pmod
 from tiliqua.usb_host             import *
 from tiliqua.build.cli                  import top_level_cli
-from tiliqua.tiliqua_platform     import RebootProvider
+from tiliqua.platform     import RebootProvider
 from vendor.ila                   import AsyncSerialILA
 
 #

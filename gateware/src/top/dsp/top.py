@@ -28,7 +28,7 @@ from tiliqua.periph      import eurorack_pmod, psram
 from tiliqua                  import midi, dsp
 from tiliqua.dsp              import ASQ
 from tiliqua.build.cli              import top_level_cli
-from tiliqua.tiliqua_platform import RebootProvider
+from tiliqua.platform import RebootProvider
 
 # for sim
 from tiliqua.build import sim

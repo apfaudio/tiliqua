@@ -33,7 +33,7 @@ from amaranth.utils           import exact_log2
 
 from amaranth_future          import fixed
 
-from tiliqua.tiliqua_platform import *
+from tiliqua.platform import *
 from tiliqua.periph      import eurorack_pmod
 from tiliqua.build            import sim
 from tiliqua.video            import framebuffer, palette
