@@ -530,7 +530,7 @@ where
             .build();
 
      let stroke_white = PrimitiveStyleBuilder::new()
-            .stroke_color(TiliquaColor::WHITE)
+            .stroke_color(TiliquaColor::new(hue, 15))
             .stroke_width(1)
             .build();
 
