@@ -11,14 +11,13 @@ use tiliqua_pac as pac;
 use tiliqua_hal as hal;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
+use tiliqua_lib::color::TiliquaColor;
 use pac::constants::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::persist::Persist;
-use tiliqua_hal::dma_framebuffer::Rotate;
 
 use tiliqua_hal::embedded_graphics::{
     prelude::*,
-    pixelcolor::Gray8,
     mono_font::{MonoTextStyle, ascii::FONT_9X15_BOLD},
     text::Text,
 };
@@ -29,7 +28,7 @@ use hal::pca9635::Pca9635Driver;
 
 use micromath::F32Ext;
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
+pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
@@ -197,9 +196,10 @@ fn main() -> ! {
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
         peripherals.BLIT,
+        peripherals.PIXEL_PLOT,
+        peripherals.LINE,
         PSRAM_FB_BASE,
         modeline.clone(),
-        PIXEL_PLOT_MEM_BASE,
         BLIT_MEM_BASE,
     );
 
@@ -224,7 +224,7 @@ fn main() -> ! {
     let hue = 5u8;
 
     palette::ColorPalette::default().write_to_hardware(&mut display);
-    persist.set_persist(128);
+    persist.set_persist(64);
 
     handler!(timer0 = || timer0_handler(&app));
 
@@ -297,7 +297,7 @@ fn main() -> ! {
 
             // Draw channel labels
             {
-                let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xB0 + hue));
+                let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, TiliquaColor::new(hue, 0xB));
                 let hc = (h_active/2) as i16;
                 let vc = (v_active/2) as i16;
 
