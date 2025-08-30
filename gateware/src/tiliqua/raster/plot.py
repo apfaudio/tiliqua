@@ -70,7 +70,7 @@ class Peripheral(wiring.Component):
         pixel: csr.Field(csr.action.W, Pixel)
         # Note: Writing to this register triggers the plot operation
 
-    def __init__(self, fifo_depth=8):
+    def __init__(self, fifo_depth=32):
         self.fifo_depth = fifo_depth
         
         # Command FIFO for queuing plot operations
@@ -265,6 +265,8 @@ class _FramebufferBackend(wiring.Component):
         with m.FSM() as fsm:
             
             with m.State('IDLE'):
+                # Only assert ready when we're actually ready to accept and process a new request
+                m.d.comb += req.ready.eq(self.enable)
                 with m.If(self.enable & req.valid):
                     m.d.sync += current_req.eq(req.payload)
                     m.next = 'CHECK_BOUNDS'
@@ -285,8 +287,8 @@ class _FramebufferBackend(wiring.Component):
                         m.d.sync += bus.sel.eq(0xf)
                         m.next = 'READ'
                 with m.Else():
-                    # Skip out-of-bounds pixels
-                    m.d.comb += req.ready.eq(1)
+                    # Skip out-of-bounds pixels - go directly to IDLE
+                    # req.ready will be asserted by IDLE state
                     m.next = 'IDLE'
             
             with m.State('READ'):
@@ -355,8 +357,7 @@ class _FramebufferBackend(wiring.Component):
                 ]
                 
                 with m.If(bus.stb & bus.ack):
-                    # Request complete, get next one
-                    m.d.comb += req.ready.eq(1)
+                    # Bus transaction complete - return to IDLE to signal ready for next request
                     m.next = 'IDLE'
 
             with m.State('WRITE'):
@@ -369,8 +370,7 @@ class _FramebufferBackend(wiring.Component):
                 ]
                 
                 with m.If(bus.stb & bus.ack):
-                    # Request complete, get next one
-                    m.d.comb += req.ready.eq(1)
+                    # Bus transaction complete - return to IDLE to signal ready for next request
                     m.next = 'IDLE'
 
         return m
@@ -466,7 +466,8 @@ class PlotArbiter(wiring.Component):
         # Round-robin counter
         current_port = Signal(range(self.n_ports))
         
-        # Connect current port to output (using multiplexing)
+        # Connect current port to output (direct combinatorial connection)
+        # This is safe because we only switch ports when transactions are idle
         req_valid = Signal()
         req_payload = Signal(self.req.payload.shape())
         
@@ -491,19 +492,33 @@ class PlotArbiter(wiring.Component):
             with m.Else():
                 m.d.comb += self.ports[i].ready.eq(0)
         
-        # Round-robin: advance to next port when current completes or is invalid
-        with m.If(self.req.valid & self.req.ready):
-            # Move to next port
-            with m.If(current_port == (self.n_ports - 1)):
-                m.d.sync += current_port.eq(0)
-            with m.Else():
-                m.d.sync += current_port.eq(current_port + 1)
-        # If current port has no request, also move to next
-        with m.Elif(~req_valid):
-            with m.If(current_port == (self.n_ports - 1)):
-                m.d.sync += current_port.eq(0)
-            with m.Else():
-                m.d.sync += current_port.eq(current_port + 1)
+        # Round-robin: only advance ports when no transaction is active
+        # This prevents payload corruption by ensuring we only switch during idle periods
+        can_switch_port = Signal()
+        m.d.comb += can_switch_port.eq(~self.req.valid | (self.req.valid & self.req.ready))
+        
+        with m.If(can_switch_port):
+            # Safe to advance port - either idle or completing transfer this cycle
+            port_has_data = Signal()
+            
+            # Check if current port has valid data
+            with m.Switch(current_port):
+                for i in range(self.n_ports):
+                    with m.Case(i):
+                        m.d.comb += port_has_data.eq(self.ports[i].valid)
+            
+            # Advance to next port if current port completed transfer or has no data
+            advance_port = Signal()
+            m.d.comb += advance_port.eq(
+                (self.req.valid & self.req.ready) |  # Just completed a transfer
+                (~port_has_data)                     # Current port has no data
+            )
+            
+            with m.If(advance_port):
+                with m.If(current_port == (self.n_ports - 1)):
+                    m.d.sync += current_port.eq(0)
+                with m.Else():
+                    m.d.sync += current_port.eq(current_port + 1)
 
         return m
 

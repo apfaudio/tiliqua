@@ -91,12 +91,12 @@ class _LinePlotter(wiring.Component):
                     
                     with m.If(has_prev_point):
                         # We have a previous point - draw line from prev to new point
+                        # Keep current_pixel from previous point for line consistency
                         m.d.sync += [
                             current_x.eq(prev_x),
                             current_y.eq(prev_y),
                             target_x.eq(new_cmd.x),
                             target_y.eq(new_cmd.y),
-                            current_pixel.eq(new_cmd.pixel),
                             end_strip.eq(new_cmd.cmd == LineStripCommand.END),
                         ]
                         m.next = 'SETUP_BRESENHAM'
@@ -184,9 +184,11 @@ class _LinePlotter(wiring.Component):
                     # Check if we've reached the target
                     with m.If((current_x == target_x) & (current_y == target_y)):
                         # Line complete - update previous point for next line
+                        # Store the target point's pixel data for the next line segment
                         m.d.sync += [
                             prev_x.eq(target_x),
                             prev_y.eq(target_y),
+                            current_pixel.eq(cmd.payload.pixel),  # Update to new point's pixel for next line
                             has_prev_point.eq(~end_strip),  # Clear if ending strip
                         ]
                         m.next = 'IDLE'
