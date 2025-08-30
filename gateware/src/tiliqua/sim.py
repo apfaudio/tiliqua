@@ -56,8 +56,7 @@ class VerilatorPlatform():
         self.psram_registers = hw_platform.psram_registers
 
     def add_file(self, file_name, contents):
-        if not file_name.endswith('.svh'):
-            self.files[file_name] = contents
+        self.files[file_name] = contents
 
 def is_hw(platform):
     # assumption: anything that inherits from Platform is a
@@ -235,7 +234,7 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
                            f"{dst}",
                           ] + [
                                f for f in sim_platform.files
-                               if f.endswith(".svh") or f.endswith(".sv") or f.endswith(".v")
+                               if f.endswith(".sv") or f.endswith(".v")
                           ],
                           env=os.environ)
 
