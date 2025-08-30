@@ -23,7 +23,7 @@ from amaranth_soc          import wishbone, csr
 from .cache                import Cache
 
 from ..video.framebuffer import DMAFramebuffer
-from ..types import Rotation, Pixel
+from ..video.types import Rotation, Pixel
 
 class BlendMode(enum.Enum, shape=unsigned(1)):
     REPLACE  = 0  # Direct pixel replacement

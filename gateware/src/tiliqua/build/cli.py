@@ -15,6 +15,7 @@ import subprocess
 import sys
 
 from . import sim
+from .types import FirmwareLocation
 from .. import tiliqua_pll
 from ..video import modeline
 from ..types import *

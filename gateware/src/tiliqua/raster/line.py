@@ -16,7 +16,7 @@ from amaranth.lib.wiring   import In, Out
 
 from amaranth_soc          import csr
 
-from ..types import Pixel
+from ..video.types import Pixel
 
 from .plot import PlotRequest, BlendMode, OffsetMode
 

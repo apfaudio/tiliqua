@@ -17,7 +17,7 @@ from amaranth_soc          import wishbone, csr
 from ..build import sim
 from . import dvi
 
-from ..types import Rotation
+from .types import Rotation
 
 class DMAFramebuffer(wiring.Component):
 

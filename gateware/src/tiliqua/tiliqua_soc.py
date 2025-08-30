@@ -54,7 +54,7 @@ from luna_soc.generate                           import rust, introspect, svd
 from vendor.vexiiriscv                           import VexiiRiscv
 
 from .tiliqua_platform import *
-from .types import FirmwareLocation
+from .build.types import FirmwareLocation
 
 from .periph import psram, i2c, encoder, dtr, eurorack_pmod
 from .video import framebuffer, palette

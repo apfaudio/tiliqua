@@ -4,18 +4,10 @@
 
 import enum
 
-from amaranth import *
-from amaranth.lib import enum as amaranth_enum, data
-
 # Re-export `tiliqua-manifest` types.
 from rs.manifest.src.lib import BitstreamManifest as BitstreamManifest  # noqa: F401
 from rs.manifest.src.lib import MemoryRegion as MemoryRegion  # noqa: F401
 from rs.manifest.src.lib import ExternalPLLConfig as ExternalPLLConfig  # noqa: F401
-
-class FirmwareLocation(str, enum.Enum):
-    BRAM      = "bram"
-    SPIFlash  = "spiflash"
-    PSRAM     = "psram"
 
 
 class AudioClock(str, enum.Enum):
@@ -46,30 +38,3 @@ class AudioClock(str, enum.Enum):
             self.FINE_192KHZ,
             self.COARSE_192KHZ,
         ]
-
-class Rotation(amaranth_enum.Enum, shape=unsigned(2)):
-    """
-    Display rotation enumeration supporting all 90-degree orientations.
-
-    Values:
-    - NORMAL: 0° rotation (no change)
-    - LEFT: 90° counter-clockwise rotation
-    - INVERTED: 180° rotation (upside down)
-    - RIGHT: 90° clockwise rotation
-    """
-    NORMAL = 0
-    LEFT = 1
-    INVERTED = 2
-    RIGHT = 3
-
-
-class Pixel(data.Struct):
-    """
-    Standard pixel format used throughout the raster system.
-
-    Fields:
-    - color: 4-bit color index (0-15)
-    - intensity: 4-bit intensity/brightness (0-15)
-    """
-    color:     unsigned(4)
-    intensity: unsigned(4)

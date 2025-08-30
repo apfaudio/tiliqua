@@ -19,7 +19,7 @@ from amaranth.utils        import exact_log2
 from amaranth_soc          import wishbone, csr
 from amaranth_soc.memory   import MemoryMap
 
-from ..types import Pixel
+from ..video.types import Pixel
 
 from .plot import PlotRequest, BlendMode, OffsetMode
 
