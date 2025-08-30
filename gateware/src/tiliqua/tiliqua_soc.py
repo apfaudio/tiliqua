@@ -60,7 +60,7 @@ from vendor.vexiiriscv                           import VexiiRiscv
 from .tiliqua_platform import *
 from .types import FirmwareLocation
 
-from .peripherals import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, eurorack_pmod
+from .peripherals import psram, i2c, encoder, dtr, eurorack_pmod
 from .video import framebuffer, palette
 from .raster import plot, blit, persist, line
 from . import sim, tiliqua_pll
@@ -187,7 +187,7 @@ class TiliquaSoc(Component):
         self.csr_decoder.add(self.spiflash_periph.csr, addr=self.spiflash_ctrl_base, name="spiflash_ctrl")
 
         # psram peripheral
-        self.psram_periph = psram_peripheral.Peripheral(size=self.psram_size)
+        self.psram_periph = psram.Peripheral(size=self.psram_size)
         self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base,
                             name="psram")
         self.csr_decoder.add(self.psram_periph.csr_bus, addr=self.psram_csr_base, name="psram_csr")
@@ -210,7 +210,7 @@ class TiliquaSoc(Component):
         # pmod periph / audio interface (can be simulated)
         self.pmod0 = eurorack_pmod.EurorackPmod(
                 self.clock_settings.audio_clock)
-        self.pmod0_periph = eurorack_pmod_peripheral.Peripheral(
+        self.pmod0_periph = eurorack_pmod.Peripheral(
                 pmod=self.pmod0, poke_outputs=poke_outputs)
         self.csr_decoder.add(self.pmod0_periph.bus, addr=self.pmod0_periph_base, name="pmod0_periph")
 

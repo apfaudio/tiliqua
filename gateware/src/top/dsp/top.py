@@ -29,7 +29,7 @@ from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 
-from tiliqua.peripherals      import eurorack_pmod, psram_peripheral
+from tiliqua.peripherals      import eurorack_pmod, psram
 from tiliqua                  import midi, tiliqua_pll, dsp
 from tiliqua.dsp              import ASQ
 from tiliqua.cli              import top_level_cli
@@ -932,7 +932,7 @@ class CoreTop(Elaboratable):
         self.pmod0 = eurorack_pmod.EurorackPmod(clock_settings.audio_clock)
         # Only if this core uses PSRAM
         if hasattr(self.core, "bus"):
-            self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
+            self.psram_periph = psram.Peripheral(size=16*1024*1024)
 
         super().__init__()
 

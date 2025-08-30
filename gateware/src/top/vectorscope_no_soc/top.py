@@ -45,7 +45,7 @@ from tiliqua                  import sim, cache
 from tiliqua.video            import framebuffer, palette
 from tiliqua                  import dsp
 from tiliqua.dsp              import ASQ
-from tiliqua.peripherals      import psram_peripheral
+from tiliqua.peripherals      import psram
 from tiliqua.cli              import top_level_cli
 from tiliqua.sim              import FakeTiliquaDomainGenerator
 from tiliqua.raster.persist import Persistance
@@ -149,7 +149,7 @@ class VectorScopeTop(Elaboratable):
         self.clock_settings = clock_settings
 
         # One PSRAM with an internal arbiter to support multiple DMA masters.
-        self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
+        self.psram_periph = psram.Peripheral(size=16*1024*1024)
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
