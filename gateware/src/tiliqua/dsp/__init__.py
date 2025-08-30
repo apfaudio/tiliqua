@@ -4,8 +4,13 @@
 
 """Streaming DSP library with a strong focus on audio."""
 
+import os
 from amaranth.lib import stream
-from ..eurorack_pmod import ASQ  # hardware native fixed-point sample type
+from amaranth_future import fixed
+
+# Native 'Audio sample SQ': shape of audio samples from CODEC.
+# Signed fixed point, where -1 to +1 represents -8.192V to +8.192V.
+ASQ = fixed.SQ(1, int(os.environ.get('TILIQUA_ASQ_WIDTH', '16')) - 1)
 
 # Import basic/frequently used components from individual modules
 from .stream_util import *

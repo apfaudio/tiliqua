@@ -57,13 +57,14 @@ from amaranth_soc.memory  import MemoryMap
 
 from amaranth_future                             import fixed
 
-from tiliqua                                     import eurorack_pmod, dsp, cache
+from tiliqua.peripherals                         import eurorack_pmod
+from tiliqua                                     import dsp, cache
 from tiliqua.raster                              import scope
 from tiliqua.raster.plot                         import FramebufferPlotter
 from tiliqua.tiliqua_soc                         import TiliquaSoc
 from tiliqua.cli                                 import top_level_cli
 
-from tiliqua.eurorack_pmod                       import ASQ
+from tiliqua.dsp                                 import ASQ
 
 from vendor.vexiiriscv                           import VexiiRiscv
 

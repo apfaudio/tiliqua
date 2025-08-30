@@ -8,7 +8,7 @@ from amaranth import *
 from amaranth.lib import wiring, stream
 from amaranth.lib.wiring import In, Out
 
-from ..eurorack_pmod import ASQ
+from . import ASQ
 
 
 def named_submodules(m_submodules, elaboratables, override_name=None):

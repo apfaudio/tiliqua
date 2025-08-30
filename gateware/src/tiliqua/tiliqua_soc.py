@@ -60,10 +60,10 @@ from vendor.vexiiriscv                           import VexiiRiscv
 from .tiliqua_platform import *
 from .types import FirmwareLocation
 
-from . import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral
+from .peripherals import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, eurorack_pmod
 from .video import framebuffer, palette
 from .raster import plot, blit, persist, line
-from . import sim, eurorack_pmod, tiliqua_pll
+from . import sim, tiliqua_pll
 
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, ui_name, ui_sha, platform_class, clock_settings,

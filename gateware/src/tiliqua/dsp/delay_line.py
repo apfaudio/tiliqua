@@ -15,7 +15,7 @@ from amaranth_soc          import wishbone
 
 from luna_soc.gateware.core import blockram
 
-from ..eurorack_pmod import ASQ
+from . import ASQ
 from ..cache import WishboneL2Cache
 
 from . import *

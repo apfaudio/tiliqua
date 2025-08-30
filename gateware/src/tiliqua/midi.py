@@ -14,7 +14,7 @@ from amaranth.lib.memory   import Memory
 from amaranth_stdio.serial import AsyncSerialRX
 
 from amaranth_future       import fixed
-from .eurorack_pmod import ASQ # hardware native fixed-point sample type
+from .dsp import ASQ # hardware native fixed-point sample type
 
 MIDI_BAUD_RATE = 31250
 

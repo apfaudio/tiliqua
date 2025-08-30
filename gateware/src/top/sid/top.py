@@ -15,7 +15,8 @@ from amaranth_soc          import csr
 
 from amaranth_future       import fixed
 
-from tiliqua               import eurorack_pmod, dsp
+from tiliqua.peripherals    import eurorack_pmod
+from tiliqua               import dsp
 from tiliqua.raster        import scope
 from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc   import TiliquaSoc

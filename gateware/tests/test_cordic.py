@@ -9,7 +9,7 @@ from amaranth.lib          import wiring
 
 from amaranth_future       import fixed
 
-from tiliqua.eurorack_pmod import ASQ
+from tiliqua.dsp import ASQ
 from tiliqua.dsp           import cordic
 
 class CordicTests(unittest.TestCase):

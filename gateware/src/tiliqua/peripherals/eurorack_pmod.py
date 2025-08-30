@@ -16,16 +16,13 @@ from amaranth.lib.cdc           import FFSynchronizer
 from amaranth.lib.memory        import Memory
 from amaranth.utils             import exact_log2
 from amaranth_soc               import gpio
-
-from . import i2c
-from .tiliqua_platform import TiliquaRevision, EurorackPmodRevision
-from vendor                     import i2c as vendor_i2c
-
 from amaranth_future            import fixed
 
-# Native 'Audio sample SQ': shape of audio samples from CODEC.
-# Signed fixed point, where -1 to +1 represents -8.192V to +8.192V.
-ASQ = fixed.SQ(1, int(os.environ.get('TILIQUA_ASQ_WIDTH', '16')) - 1)
+from . import i2c
+from ..tiliqua_platform import TiliquaRevision, EurorackPmodRevision
+from vendor                     import i2c as vendor_i2c
+
+from ..dsp import ASQ
 
 class I2SSignature(wiring.Signature):
     """

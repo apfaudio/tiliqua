@@ -9,7 +9,8 @@ import unittest
 from amaranth              import *
 from amaranth.sim          import *
 from amaranth.lib          import wiring
-from tiliqua               import test_util, eurorack_pmod
+from tiliqua               import test_util
+from tiliqua.peripherals   import eurorack_pmod
 from tiliqua.video         import framebuffer, modeline, palette
 from tiliqua.raster        import stroke, persist
 

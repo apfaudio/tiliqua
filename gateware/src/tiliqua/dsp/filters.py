@@ -13,7 +13,7 @@ from amaranth.utils import exact_log2
 from scipy import signal
 from amaranth_future import fixed
 from . import mac
-from ..eurorack_pmod import ASQ
+from . import ASQ
 
 
 class SVF(wiring.Component):

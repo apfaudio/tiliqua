@@ -8,7 +8,7 @@ from amaranth import *
 from amaranth.lib import wiring, data, stream
 from amaranth.lib.wiring import In, Out
 
-from ..eurorack_pmod import ASQ
+from . import ASQ
 
 
 class Split(wiring.Component):

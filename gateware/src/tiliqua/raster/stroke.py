@@ -20,7 +20,7 @@ from .. import dsp
 from ..video.framebuffer import DMAFramebuffer
 from ..types import Pixel
 from .plot import PlotRequest, BlendMode, OffsetMode
-from ..eurorack_pmod import ASQ
+from ..dsp import ASQ
 
 from amaranth_soc            import wishbone, csr
 

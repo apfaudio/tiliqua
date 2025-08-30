@@ -17,7 +17,7 @@ from amaranth.lib          import wiring, data
 from scipy                 import signal
 from parameterized         import parameterized
 
-from tiliqua.eurorack_pmod import ASQ
+from tiliqua.dsp import ASQ
 from tiliqua               import dsp
 from tiliqua.dsp           import mac, delay_line, delay_effect
 

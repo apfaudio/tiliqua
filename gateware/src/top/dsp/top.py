@@ -29,9 +29,9 @@ from amaranth.lib.wiring      import In, Out
 from amaranth_soc             import wishbone
 from amaranth_future          import fixed
 
-from tiliqua                  import eurorack_pmod, midi, psram_peripheral, tiliqua_pll
-from tiliqua                  import dsp
-from tiliqua.eurorack_pmod    import ASQ
+from tiliqua.peripherals      import eurorack_pmod, psram_peripheral
+from tiliqua                  import midi, tiliqua_pll, dsp
+from tiliqua.dsp              import ASQ
 from tiliqua.cli              import top_level_cli
 from tiliqua.tiliqua_platform import RebootProvider
 

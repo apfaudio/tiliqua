@@ -9,7 +9,7 @@ from amaranth.lib import wiring, data, stream
 from amaranth.lib.wiring import In, Out
 
 from amaranth_future import fixed
-from ..eurorack_pmod import ASQ
+from . import ASQ
 
 
 class SawNCO(wiring.Component):

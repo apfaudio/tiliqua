@@ -18,7 +18,7 @@ from amaranth_future         import fixed
 
 from .. import dsp
 from ..video.framebuffer import DMAFramebuffer
-from ..eurorack_pmod import ASQ
+from ..dsp import ASQ
 
 from amaranth_soc            import wishbone, csr
 

@@ -12,7 +12,7 @@ from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
 from . import mac
-from ..eurorack_pmod import ASQ
+from . import ASQ
 
 
 class MatrixMix(wiring.Component):

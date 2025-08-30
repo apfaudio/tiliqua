@@ -10,7 +10,7 @@ from amaranth.lib import wiring, stream
 from amaranth.lib.wiring import In, Out
 
 from .filters import FIR
-from ..eurorack_pmod import ASQ
+from . import ASQ
 
 
 class Resample(wiring.Component):

@@ -14,7 +14,7 @@ from amaranth_soc                                import csr
 from .. import dsp
 from .stroke import Stroke
 from .plot import PlotRequest
-from ..eurorack_pmod import ASQ
+from ..dsp import ASQ
 
 class VectorPeripheral(wiring.Component):
 

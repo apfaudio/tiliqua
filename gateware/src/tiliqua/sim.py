@@ -16,7 +16,7 @@ from amaranth.build        import *
 from amaranth.lib          import wiring, data
 from amaranth.lib.wiring   import In, Out
 
-from .eurorack_pmod import ASQ
+from .dsp import ASQ
 from .types import FirmwareLocation
 
 class FakeTiliquaDomainGenerator(Elaboratable):

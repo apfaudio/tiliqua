@@ -8,7 +8,8 @@ from amaranth              import *
 from amaranth.sim          import *
 from amaranth.lib          import wiring, data
 from amaranth.lib.memory   import Memory
-from tiliqua               import i2c, test_util, eurorack_pmod
+from tiliqua               import test_util
+from tiliqua.peripherals   import i2c, eurorack_pmod
 from vendor                import i2c as vendor_i2c
 
 from amaranth_soc          import csr
