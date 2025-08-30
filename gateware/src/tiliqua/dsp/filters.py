@@ -8,7 +8,6 @@ from amaranth import *
 from amaranth.lib import wiring, data, stream
 from amaranth.lib.wiring import In, Out
 from amaranth.lib.memory import Memory
-from amaranth.utils import exact_log2
 
 from scipy import signal
 from amaranth_future import fixed

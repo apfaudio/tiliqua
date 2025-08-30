@@ -8,36 +8,29 @@ USB2 class-compliant audio interface.
 Some parts adapted from: https://github.com/hansfbaier/adat-usb2-audio-interface
 """
 
-import os
-
 from amaranth              import *
 from amaranth.build        import *
 from amaranth.lib          import wiring, data, stream
 from amaranth.lib.wiring   import In, Out
 from amaranth.lib.cdc      import FFSynchronizer
-from amaranth.lib.fifo     import SyncFIFO, AsyncFIFO, SyncFIFOBuffered
 
 from luna.usb2           import (USBDevice,
                                  USBIsochronousInEndpoint,
                                  USBIsochronousStreamOutEndpoint,
                                  USBIsochronousStreamInEndpoint,
-                                 USBStreamInEndpoint,
-                                 USBStreamOutEndpoint)
+                                 USBIsochronousStreamInEndpoint)
 
 from usb_protocol.types                       import USBRequestType, USBRequestRecipient, USBTransferType, USBSynchronizationType, USBUsageType, USBDirection, USBStandardRequests
 from usb_protocol.types.descriptors.uac2      import AudioClassSpecificRequestCodes
 from usb_protocol.emitters                    import DeviceDescriptorCollection
-from usb_protocol.emitters.descriptors        import uac2, standard, midi1
+from usb_protocol.emitters.descriptors        import uac2, standard
 
-from luna.gateware.platform                   import NullPin
 from luna.gateware.usb.usb2.device            import USBDevice
 from luna.gateware.usb.usb2.request           import USBRequestHandler, StallOnlyRequestHandler
 from luna.gateware.usb.stream                 import USBInStreamInterface
 from luna.gateware.stream.generator           import StreamSerializer
-from luna.gateware.stream                     import StreamInterface
-from luna.gateware.architecture.car           import PHYResetController
 
-from .util                                    import EdgeToPulse, connect_fifo_to_stream, connect_stream_to_fifo
+from .util                                    import EdgeToPulse
 from .usb_stream_to_channels                  import USBStreamToChannels
 from .channels_to_usb_stream                  import ChannelsToUSBStream
 from .audio_to_channels                       import AudioToChannels

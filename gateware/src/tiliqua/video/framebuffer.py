@@ -4,23 +4,18 @@
 
 """Implementation of PSRAM-backed framebuffer with a DVI PHY."""
 
-import colorsys
-import os
-
 from amaranth              import *
 from amaranth.build        import *
-from amaranth.lib          import wiring, data, stream
+from amaranth.lib          import wiring
 from amaranth.lib.wiring   import In, Out
 from amaranth.lib.fifo     import AsyncFIFOBuffered
 from amaranth.lib.cdc      import FFSynchronizer
 from amaranth.utils        import exact_log2
-from amaranth.lib.memory   import Memory
 
 from amaranth_soc          import wishbone, csr
 
 from .. import sim
-from . import dvi, palette
-from .modeline import DVIModeline
+from . import dvi
 
 from ..types import Rotation
 

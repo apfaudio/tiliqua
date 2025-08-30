@@ -5,9 +5,7 @@
 
 """Utilities for dealing with fixed-point complex numbers."""
 
-from amaranth import *
 from amaranth.lib import data
-from amaranth.lib.wiring import In, Out
 from amaranth_future import fixed
 
 from . import block

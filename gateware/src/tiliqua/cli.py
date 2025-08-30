@@ -13,7 +13,6 @@ import git
 import os
 import subprocess
 import sys
-import time
 
 from . import sim, tiliqua_pll
 from .video import modeline

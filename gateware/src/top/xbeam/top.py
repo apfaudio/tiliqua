@@ -12,17 +12,14 @@ In oscilloscope mode, all 4 input channels are plotted simultaneosly
 in classic oscilloscope fashion.
 """
 
-import logging
 import os
-import sys
 
 from amaranth                                    import *
 from amaranth.lib                                import wiring, data, stream, fifo
 from amaranth.lib.wiring                         import In, Out, flipped, connect
 
-from amaranth_soc                                import csr, wishbone
+from amaranth_soc                                import csr
 
-from amaranth_future                             import fixed
 
 from tiliqua.periph                         import eurorack_pmod
 from tiliqua                                     import usb_audio, sim

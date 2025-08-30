@@ -24,24 +24,18 @@ See 'xbeam' for SoC version of the scope with a menu system.
 
 import os
 import math
-import shutil
-import subprocess
-
 from amaranth                 import *
 from amaranth.build           import *
 from amaranth.lib             import wiring, data, stream
 from amaranth.lib.wiring      import In, Out
-from amaranth.lib.fifo        import AsyncFIFO, SyncFIFO
 from amaranth.lib.cdc         import FFSynchronizer
 from amaranth.utils           import exact_log2
-from amaranth.back            import verilog
 
 from amaranth_future          import fixed
-from amaranth_soc             import wishbone
 
 from tiliqua.tiliqua_platform import *
 from tiliqua.periph      import eurorack_pmod
-from tiliqua                  import sim, cache
+from tiliqua                  import sim
 from tiliqua.video            import framebuffer, palette
 from tiliqua                  import dsp
 from tiliqua.dsp              import ASQ
@@ -263,9 +257,7 @@ def colors():
     Render image of intensity/color palette used internally by DMAFramebuffer.
     This is useful for quickly tweaking it.
     """
-    import matplotlib
     import matplotlib.pyplot as plt
-    from matplotlib import colors
     import numpy as np
     rs, gs, bs = palette.compute_color_palette()
 

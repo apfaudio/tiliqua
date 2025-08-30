@@ -17,7 +17,6 @@ from amaranth             import *
 from amaranth.lib.wiring  import Component, In, Out
 
 from amaranth_soc         import wishbone
-from amaranth_soc.periph  import ConstantMap
 
 from dataclasses import dataclass
 

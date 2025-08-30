@@ -2,26 +2,20 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
-import logging
 import os
-import sys
 
 from amaranth              import *
 from amaranth.lib.fifo     import SyncFIFO
-from amaranth.lib          import wiring, data, stream
+from amaranth.lib          import wiring, data
 from amaranth.lib.wiring   import In, Out, flipped, connect
 
 from amaranth_soc          import csr
 
-from amaranth_future       import fixed
 
-from tiliqua.periph    import eurorack_pmod
-from tiliqua               import dsp
 from tiliqua.raster        import scope
 from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc   import TiliquaSoc
 from tiliqua.cli           import top_level_cli
-from tiliqua.raster.scope  import ScopePeripheral
 
 class SID(wiring.Component):
 

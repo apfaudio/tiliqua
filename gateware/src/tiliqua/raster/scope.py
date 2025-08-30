@@ -6,7 +6,7 @@ Multi-channel oscilloscope and vectorscope SoC peripherals.
 """
 
 from amaranth                                    import *
-from amaranth.lib                                import wiring, data, stream, fifo
+from amaranth.lib                                import wiring, data, stream
 from amaranth.lib.wiring                         import In, Out
 
 from amaranth_soc                                import csr

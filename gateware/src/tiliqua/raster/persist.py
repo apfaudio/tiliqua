@@ -4,21 +4,14 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
-import colorsys
-import os
-
 from amaranth                import *
 from amaranth.build          import *
-from amaranth.lib            import wiring, data, stream
+from amaranth.lib            import wiring, data
 from amaranth.lib.wiring     import In, Out
 from amaranth.lib.fifo       import SyncFIFOBuffered
-from amaranth.lib.cdc        import FFSynchronizer
 
-from amaranth_future         import fixed
 
-from .. import dsp
 from ..video.framebuffer import DMAFramebuffer
-from ..dsp import ASQ
 
 from amaranth_soc            import wishbone, csr
 

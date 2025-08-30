@@ -33,17 +33,13 @@ is usually hammered with video traffic).
 TODO: describe each peripheral in detail
 """
 
-import enum
 import shutil
 import subprocess
-import tempfile
 import os
 
 from amaranth                                    import *
-from amaranth.build                              import Attrs, Pins, PinsN, Platform, Resource, Subsignal
-from amaranth.hdl.rec                            import Record
-from amaranth.lib                                import wiring, data, cdc
-from amaranth.lib.wiring                         import Component, In, Out, flipped, connect
+from amaranth.lib                                import wiring, cdc
+from amaranth.lib.wiring                         import Component
 
 from amaranth_soc                                import csr, wishbone
 from amaranth_soc.csr.wishbone                   import WishboneCSRBridge

@@ -11,7 +11,7 @@ and blitting them to the shared PixelPlotBackend with configurable color and int
 
 from amaranth              import *
 from amaranth.build        import *
-from amaranth.lib          import wiring, data, stream, fifo
+from amaranth.lib          import wiring, stream, fifo
 from amaranth.lib.wiring   import In, Out
 from amaranth.lib.memory   import Memory
 from amaranth.utils        import exact_log2

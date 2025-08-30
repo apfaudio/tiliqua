@@ -8,7 +8,7 @@ Cache components, for accelerating memory accesses to a backing store.
 
 from amaranth                    import *
 from amaranth.lib                import data, wiring
-from amaranth.lib.wiring         import Component, In, Out, flipped, connect
+from amaranth.lib.wiring         import In, Out
 from amaranth.utils              import exact_log2
 from amaranth.lib.memory         import Memory
 

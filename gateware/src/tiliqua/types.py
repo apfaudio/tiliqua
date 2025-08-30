@@ -8,9 +8,9 @@ from amaranth import *
 from amaranth.lib import enum as amaranth_enum, data
 
 # Re-export `tiliqua-manifest` types.
-from rs.manifest.src.lib import BitstreamManifest as BitstreamManifest
-from rs.manifest.src.lib import MemoryRegion as MemoryRegion
-from rs.manifest.src.lib import ExternalPLLConfig as ExternalPLLConfig
+from rs.manifest.src.lib import BitstreamManifest as BitstreamManifest  # noqa: F401
+from rs.manifest.src.lib import MemoryRegion as MemoryRegion  # noqa: F401
+from rs.manifest.src.lib import ExternalPLLConfig as ExternalPLLConfig  # noqa: F401
 
 class FirmwareLocation(str, enum.Enum):
     BRAM      = "bram"

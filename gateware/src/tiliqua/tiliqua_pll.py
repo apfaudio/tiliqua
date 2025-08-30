@@ -12,7 +12,7 @@ from amaranth.lib         import wiring
 from .types import *
 from .video.modeline import DVIModeline, DVIPLL
 from dataclasses          import dataclass
-from typing               import List, Optional
+from typing               import Optional
 
 # Maximum allowed pixel clock that may be set by external PLL when `dynamic_modeline`
 # is used. Synthesis is performed using this frequency as a constraint, even if

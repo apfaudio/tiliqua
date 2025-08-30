@@ -25,22 +25,18 @@ A block diagram of the core components of this polysynth:
 
 """
 
-import logging
-import os
-import sys
 import math
+import os
 
 from amaranth                  import *
 from amaranth.lib              import wiring, data, stream
 from amaranth.lib.wiring       import In, Out, connect, flipped
 from amaranth.lib.fifo         import SyncFIFOBuffered
 
-from amaranth_soc              import csr, wishbone
+from amaranth_soc              import csr
 
-from amaranth_future           import fixed
 
-from tiliqua.periph       import eurorack_pmod
-from tiliqua                   import midi, sim, cache
+from tiliqua                   import midi, sim
 from tiliqua                   import dsp
 from tiliqua.raster            import scope
 from tiliqua.raster.plot       import FramebufferPlotter

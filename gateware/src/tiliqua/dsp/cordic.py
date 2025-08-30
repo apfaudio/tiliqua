@@ -6,9 +6,8 @@
 """Utilities for computing trigonometric functions in hardware."""
 
 from amaranth import *
-from amaranth.lib import wiring, data, stream, memory
+from amaranth.lib import wiring, stream, memory
 from amaranth.lib.wiring import In, Out
-from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
 

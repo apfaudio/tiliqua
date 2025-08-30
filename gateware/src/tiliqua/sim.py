@@ -13,10 +13,9 @@ import subprocess
 from amaranth              import *
 from amaranth.back         import verilog
 from amaranth.build        import *
-from amaranth.lib          import wiring, data
+from amaranth.lib          import wiring
 from amaranth.lib.wiring   import In, Out
 
-from .dsp import ASQ
 from .types import FirmwareLocation
 
 class FakeTiliquaDomainGenerator(Elaboratable):

@@ -13,16 +13,16 @@ from amaranth_future import fixed
 ASQ = fixed.SQ(1, int(os.environ.get('TILIQUA_ASQ_WIDTH', '16')) - 1)
 
 # Import basic/frequently used components from individual modules
-from .stream_util import *
-from .vca import *
-from .oscillators import *
-from .oneshot import *
-from .effects import *
-from .filters import *
-from .mix import *
-from .resample import *
-from .misc import *
-from .delay_line import *
+from .stream_util import *  # noqa: F401
+from .vca import *  # noqa: F401
+from .oscillators import *  # noqa: F401
+from .oneshot import *  # noqa: F401
+from .effects import *  # noqa: F401
+from .filters import *  # noqa: F401
+from .mix import *  # noqa: F401
+from .resample import *  # noqa: F401
+from .misc import *  # noqa: F401
+from .delay_line import *  # noqa: F401
 
 # Re-export specialized modules with qualified access
 from . import mac

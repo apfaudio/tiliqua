@@ -12,7 +12,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
-import io
 import os
 import sys
 import math
@@ -21,9 +20,8 @@ import subprocess
 
 from abc               import ABCMeta, abstractmethod
 
-from amaranth          import Signal, Module, Cat, Elaboratable, Memory, ClockDomain, DomainRenamer
+from amaranth          import Signal, Module, Cat, Elaboratable, Memory, DomainRenamer
 from amaranth.lib.cdc  import FFSynchronizer
-from amaranth.lib.fifo import AsyncFIFOBuffered
 
 from luna.gateware.debug.ila import ILAFrontend
 from luna.gateware.stream         import StreamInterface

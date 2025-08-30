@@ -42,9 +42,7 @@ Credits to Oliver Rockstedt for the Rust port of said firmware:
 The Rust port is what is running on this softcore.
 """
 
-import logging
 import os
-import sys
 
 from amaranth                                    import *
 from amaranth.lib                                import wiring, data, stream, fifo
@@ -55,10 +53,8 @@ from amaranth_soc                                import csr
 from amaranth_soc         import wishbone
 from amaranth_soc.memory  import MemoryMap
 
-from amaranth_future                             import fixed
 
-from tiliqua.periph                         import eurorack_pmod
-from tiliqua                                     import dsp, cache
+from tiliqua                                     import dsp
 from tiliqua.raster                              import scope
 from tiliqua.raster.plot                         import FramebufferPlotter
 from tiliqua.tiliqua_soc                         import TiliquaSoc

@@ -5,9 +5,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from amaranth                    import *
-from amaranth.lib                import wiring, data
-from amaranth.lib.wiring         import In, Out, flipped, connect
-from amaranth.lib.cdc            import FFSynchronizer
+from amaranth.lib                import wiring
+from amaranth.lib.wiring         import In, flipped, connect
 from amaranth_soc                import csr
 
 class Peripheral(wiring.Component):

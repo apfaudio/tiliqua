@@ -1,1 +1,1 @@
-from .vexiiriscv import *
+from .vexiiriscv import *  # noqa: F401

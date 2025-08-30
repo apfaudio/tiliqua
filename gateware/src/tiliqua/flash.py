@@ -25,11 +25,9 @@ import os
 import subprocess
 import sys
 import re
-import tarfile
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
-from dataclasses import dataclass
+from typing import Dict, List, Tuple, Optional
 
 from rs.manifest.src.lib import *
 from .archive import ArchiveLoader

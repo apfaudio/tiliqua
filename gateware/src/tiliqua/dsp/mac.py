@@ -42,7 +42,7 @@ with the 'server' DSP tile busy for N out of N+1 of those clocks.
 """
 
 from amaranth              import *
-from amaranth.lib          import wiring, data, stream, enum
+from amaranth.lib          import wiring, data, enum
 from amaranth.lib.wiring   import In, Out
 
 from . import ASQ

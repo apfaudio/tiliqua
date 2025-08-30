@@ -10,15 +10,12 @@ from amaranth                 import *
 from amaranth.build           import *
 from amaranth.lib             import wiring, data, stream
 from amaranth.lib.wiring      import In, Out
-from amaranth_soc             import wishbone
 from amaranth_future          import fixed
-from amaranth.utils           import exact_log2, ceil_log2
+from amaranth.utils           import exact_log2
 
-from .. import midi
 from . import delay_line
 from .mix import MatrixMix
 from .stream_util import Merge, Split, connect_feedback_kick
-from ..cache import WishboneL2Cache
 from . import ASQ
 
 class PingPongDelay(wiring.Component):

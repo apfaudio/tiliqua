@@ -15,7 +15,6 @@ import os
 import tarfile
 import json
 import tempfile
-import sys
 from pathlib import Path
 
 from dataclasses import dataclass, field

@@ -8,7 +8,7 @@
 from enum import Enum
 
 from amaranth import *
-from amaranth.lib import memory, wiring, data, stream, fifo
+from amaranth.lib import memory, wiring, stream, fifo
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 

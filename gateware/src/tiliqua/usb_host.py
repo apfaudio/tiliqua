@@ -10,7 +10,6 @@ from amaranth                      import *
 from amaranth.lib                  import data, enum, wiring, stream, fifo
 from amaranth.lib.wiring           import In, Out
 
-from luna.usb2                     import USBDevice
 from luna.gateware.interface.ulpi  import *
 from luna.gateware.interface.utmi  import *
 from luna.gateware.usb.usb2.packet import *

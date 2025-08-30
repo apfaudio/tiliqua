@@ -11,8 +11,7 @@ import os
 
 from amaranth                    import *
 from amaranth.build              import *
-from amaranth_soc                import csr, gpio, wishbone
-from amaranth.lib                import wiring
+from amaranth_soc                import gpio
 
 from tiliqua.tiliqua_soc         import TiliquaSoc
 from tiliqua.cli                 import top_level_cli

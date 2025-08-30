@@ -13,10 +13,8 @@ from amaranth              import *
 from amaranth.build        import *
 from amaranth.lib          import wiring, data, stream, fifo, enum
 from amaranth.lib.wiring   import In, Out
-from amaranth.utils        import exact_log2
 
-from amaranth_soc          import wishbone, csr
-from amaranth_soc.memory   import MemoryMap
+from amaranth_soc          import csr
 
 from ..types import Pixel
 

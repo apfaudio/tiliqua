@@ -6,11 +6,9 @@
 """PSRAM- or SRAM-backed streaming audio delay lines."""
 
 from amaranth              import *
-from amaranth.lib          import wiring, data, stream
+from amaranth.lib          import wiring, stream
 from amaranth.lib.wiring   import In, Out
 from amaranth.utils        import exact_log2
-
-from amaranth_future       import fixed
 from amaranth_soc          import wishbone
 
 from luna_soc.gateware.core import blockram

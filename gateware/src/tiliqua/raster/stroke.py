@@ -4,25 +4,17 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
-import colorsys
-import os
-
 from amaranth                import *
 from amaranth.build          import *
 from amaranth.lib            import wiring, data, stream
 from amaranth.lib.wiring     import In, Out
-from amaranth.lib.fifo       import SyncFIFOBuffered
-from amaranth.lib.cdc        import FFSynchronizer
 
-from amaranth_future         import fixed
 
-from .. import dsp
 from ..video.framebuffer import DMAFramebuffer
-from ..types import Pixel
 from .plot import PlotRequest, BlendMode, OffsetMode
 from ..dsp import ASQ
+from .. import dsp
 
-from amaranth_soc            import wishbone, csr
 
 class Stroke(wiring.Component):
 

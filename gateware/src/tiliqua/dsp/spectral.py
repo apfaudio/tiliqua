@@ -6,13 +6,10 @@
 """Spectral processing components."""
 
 from amaranth import *
-from amaranth.lib import wiring, data, stream, memory, fifo
+from amaranth.lib import wiring, stream, memory
 from amaranth.lib.wiring import In, Out
-from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
-
-from math import atan, pi, log2
 
 from . import mac, cordic, block
 from .stream_util import Merge, connect_remap

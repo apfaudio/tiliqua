@@ -11,7 +11,7 @@ from amaranth.lib          import wiring, data, stream
 from amaranth.lib.wiring   import In, Out
 from amaranth.lib.memory   import Memory
 
-from amaranth_soc          import wishbone, csr
+from amaranth_soc          import csr
 
 
 def compute_color_palette():

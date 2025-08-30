@@ -4,8 +4,6 @@
 Enumerates as a 4-in, 4-out 48kHz sound card.
 """
 
-import os
-
 from amaranth                 import *
 from amaranth.lib             import cdc, wiring
 

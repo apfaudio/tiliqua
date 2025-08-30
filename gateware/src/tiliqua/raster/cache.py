@@ -7,10 +7,8 @@ Cache components optimized for raster graphics operations.
 """
 
 from amaranth                    import *
-from amaranth.lib                import data, wiring
-from amaranth.lib.wiring         import Component, In, Out, flipped, connect
-from amaranth.utils              import exact_log2
-from amaranth.lib.memory         import Memory
+from amaranth.lib                import wiring
+from amaranth.lib.wiring         import In, Out
 
 from amaranth_soc                import wishbone
 

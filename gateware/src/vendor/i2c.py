@@ -8,8 +8,7 @@
 # I2C reference: https://www.nxp.com/docs/en/user-guide/UM10204.pdf
 
 from amaranth import *
-from amaranth.lib import wiring, data
-from amaranth.lib import io
+from amaranth.lib import wiring
 from amaranth.lib.cdc import FFSynchronizer
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import gpio

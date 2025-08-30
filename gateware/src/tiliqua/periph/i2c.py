@@ -11,7 +11,7 @@ from amaranth                    import *
 from amaranth.lib                import wiring, data, stream
 from amaranth.lib.wiring         import Component, In, Out, flipped
 from amaranth.lib.fifo           import SyncFIFOBuffered
-from amaranth_soc                import csr, gpio
+from amaranth_soc                import csr
 from vendor.i2c                  import I2CInitiator, I2CPinSignature
 
 class Provider(Component):

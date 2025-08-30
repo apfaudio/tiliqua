@@ -5,8 +5,6 @@
 
 """Low-level drivers and domain crossing logic for `eurorack-pmod` hardware."""
 
-import os
-
 from amaranth                   import *
 from amaranth.build             import *
 from amaranth.lib               import wiring, data, stream, io
@@ -15,7 +13,7 @@ from amaranth.lib.fifo          import AsyncFIFO
 from amaranth.lib.cdc           import FFSynchronizer
 from amaranth.lib.memory        import Memory
 from amaranth.utils             import exact_log2
-from amaranth_soc               import gpio, csr
+from amaranth_soc               import csr
 from amaranth_future            import fixed
 
 from . import i2c
@@ -1051,7 +1049,7 @@ class Peripheral(wiring.Component):
         m = Module()
         m.submodules.bridge = self._bridge
 
-        connect(m, flipped(self.bus), self._bridge.bus)
+        wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         m.d.comb += [
             self._touch_err.f.value.r_data.eq(self.pmod.touch_err),
