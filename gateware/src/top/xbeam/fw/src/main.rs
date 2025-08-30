@@ -19,7 +19,6 @@ use options::*;
 use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
 use tiliqua_hal::persist::Persist;
-use tiliqua_hal::dma_framebuffer::Rotate;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 

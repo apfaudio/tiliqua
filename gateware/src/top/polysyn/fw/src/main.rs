@@ -27,7 +27,6 @@ use tiliqua_hal::embedded_graphics::prelude::*;
 
 use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
-use hal::dma_framebuffer::Rotate;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
