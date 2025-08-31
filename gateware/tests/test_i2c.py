@@ -4,15 +4,16 @@
 
 import unittest
 
-from amaranth              import *
-from amaranth.sim          import *
-from amaranth.lib          import wiring, data
-from amaranth.lib.memory   import Memory
-from tiliqua               import i2c, test_util, eurorack_pmod
-from vendor                import i2c as vendor_i2c
+from amaranth import *
+from amaranth.lib import wiring
+from amaranth.sim import *
+from amaranth_soc import csr
+from amaranth_soc.csr import wishbone
 
-from amaranth_soc          import csr
-from amaranth_soc.csr      import wishbone
+from tiliqua import test as test_util
+from tiliqua.periph import eurorack_pmod, i2c
+from vendor import i2c as vendor_i2c
+
 
 class I2CTests(unittest.TestCase):
 
@@ -30,11 +31,11 @@ class I2CTests(unittest.TestCase):
         async def test_stimulus(ctx):
 
             async def csr_write(ctx, value, register, field=None):
-                await test_util.wb_csr_w(
+                await test_util.csr.wb_csr_w(
                         ctx, dut.bus, bridge.wb_bus, value, register, field)
 
             async def csr_read(ctx, register, field=None):
-                return await test_util.wb_csr_r(
+                return await test_util.csr.wb_csr_r(
                         ctx, dut.bus, bridge.wb_bus, register, field)
 
             # set device address

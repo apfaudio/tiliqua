@@ -1,11 +1,10 @@
 import unittest
-from parameterized import parameterized
 
 from amaranth import *
 from amaranth.sim import *
-from amaranth.lib import wiring
 
-from tiliqua.tmds import TMDSEncoder
+from tiliqua.video.tmds import TMDSEncoder
+
 
 class TMDSEncoderTests(unittest.TestCase):
 

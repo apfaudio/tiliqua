@@ -33,35 +33,31 @@ is usually hammered with video traffic).
 TODO: describe each peripheral in detail
 """
 
-import enum
+import os
 import shutil
 import subprocess
-import tempfile
-import os
 
-from amaranth                                    import *
-from amaranth.build                              import Attrs, Pins, PinsN, Platform, Resource, Subsignal
-from amaranth.hdl.rec                            import Record
-from amaranth.lib                                import wiring, data, cdc
-from amaranth.lib.wiring                         import Component, In, Out, flipped, connect
+from amaranth import *
+from amaranth.lib import cdc, wiring
+from amaranth.lib.wiring import Component
+from amaranth_soc import csr, wishbone
+from amaranth_soc.csr.wishbone import WishboneCSRBridge
+from luna_soc.gateware.core import blockram, spiflash, timer, uart
+from luna_soc.gateware.cpu import InterruptController
+from luna_soc.gateware.provider.cynthion import UARTProvider
+from luna_soc.generate import introspect, rust, svd
+from luna_soc.util import readbin
 
-from amaranth_soc                                import csr, wishbone
-from amaranth_soc.csr.wishbone                   import WishboneCSRBridge
+from vendor.vexiiriscv import VexiiRiscv
 
-from luna_soc.gateware.core                      import blockram, timer, uart, spiflash
-from luna_soc.gateware.cpu                       import InterruptController
-from luna_soc.gateware.provider.cynthion         import UARTProvider
-from amaranth_soc          import wishbone, csr
-from luna_soc.util                               import readbin
-from luna_soc.generate                           import rust, introspect, svd
+from . import pll
+from .build import sim
+from .build.types import FirmwareLocation
+from .periph import dtr, encoder, eurorack_pmod, i2c, psram
+from .platform import *
+from .raster import persist
+from .video import framebuffer, palette
 
-from vendor.vexiiriscv                           import VexiiRiscv
-
-from tiliqua.tiliqua_platform                    import *
-from tiliqua.types                               import FirmwareLocation
-
-from tiliqua                                     import psram_peripheral, i2c, encoder, dtr, eurorack_pmod_peripheral, dma_framebuffer, raster_persist, palette
-from tiliqua                                     import sim, eurorack_pmod, tiliqua_pll
 
 class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, ui_name, ui_sha, platform_class, clock_settings,
@@ -88,6 +84,7 @@ class TiliquaSoc(Component):
         self.spiflash_size        = 0x01000000 # 128Mbit / 16MiB
         self.psram_base           = 0x20000000
         self.psram_size           = 0x01000000 # 128Mbit / 16MiB
+        self.bootinfo_base        = self.psram_base + self.psram_size - 4096
         self.csr_base             = 0xf0000000
         # offsets from csr_base
         self.spiflash_ctrl_base   = 0x00000100
@@ -178,7 +175,7 @@ class TiliquaSoc(Component):
         self.csr_decoder.add(self.spiflash_periph.csr, addr=self.spiflash_ctrl_base, name="spiflash_ctrl")
 
         # psram peripheral
-        self.psram_periph = psram_peripheral.Peripheral(size=self.psram_size)
+        self.psram_periph = psram.Peripheral(size=self.psram_size)
         self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base,
                             name="psram")
         self.csr_decoder.add(self.psram_periph.csr_bus, addr=self.psram_csr_base, name="psram_csr")
@@ -201,7 +198,7 @@ class TiliquaSoc(Component):
         # pmod periph / audio interface (can be simulated)
         self.pmod0 = eurorack_pmod.EurorackPmod(
                 self.clock_settings.audio_clock)
-        self.pmod0_periph = eurorack_pmod_peripheral.Peripheral(
+        self.pmod0_periph = eurorack_pmod.Peripheral(
                 pmod=self.pmod0, poke_outputs=poke_outputs)
         self.csr_decoder.add(self.pmod0_periph.bus, addr=self.pmod0_periph_base, name="pmod0_periph")
 
@@ -215,22 +212,23 @@ class TiliquaSoc(Component):
                 self.palette_periph.bus, addr=self.palette_periph_base, name="palette_periph")
 
         # video PHY (DMAs from PSRAM starting at self.psram_base)
-        self.fb = dma_framebuffer.DMAFramebuffer(
+        self.fb = framebuffer.DMAFramebuffer(
                 palette=self.palette_periph.palette,
                 fb_base_default=self.psram_base,
                 fixed_modeline=self.clock_settings.modeline)
         self.psram_periph.add_master(self.fb.bus)
 
         # Timing CSRs for video PHY
-        self.framebuffer_periph = dma_framebuffer.Peripheral(fb=self.fb)
+        self.framebuffer_periph = framebuffer.Peripheral(fb=self.fb)
         self.csr_decoder.add(
                 self.framebuffer_periph.bus, addr=self.fb_periph_base, name="framebuffer_periph")
 
         # Video persistance DMA effect
-        self.persist_periph = raster_persist.Peripheral(
+        self.persist_periph = persist.Peripheral(
             fb=self.fb,
             bus_dma=self.psram_periph)
         self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
+
 
         self.permit_bus_traffic = Signal()
 
@@ -331,6 +329,7 @@ class TiliquaSoc(Component):
         # video periph / persist
         m.submodules.persist_periph = self.persist_periph
 
+
         # audio interface
         m.submodules.pmod0 = self.pmod0
         m.submodules.pmod0_periph = self.pmod0_periph
@@ -404,7 +403,7 @@ class TiliquaSoc(Component):
             f.write(f"pub const UI_NAME: &str            = \"{self.ui_name}\";\n")
             f.write(f"pub const UI_SHA: &str             = \"{self.ui_sha}\";\n")
             f.write(f"pub const HW_REV_MAJOR: u32        = {self.platform_class.version_major};\n")
-            use_external_pll = self.platform_class.clock_domain_generator == tiliqua_pll.TiliquaDomainGeneratorPLLExternal
+            use_external_pll = self.platform_class.clock_domain_generator == pll.TiliquaDomainGeneratorPLLExternal
             f.write(f"pub const USE_EXTERNAL_PLL: bool   = {str(use_external_pll).lower()};\n")
             f.write(f"pub const CLOCK_SYNC_HZ: u32       = {self.clock_settings.frequencies.sync};\n")
             f.write(f"pub const CLOCK_AUDIO_HZ: u32      = {self.clock_settings.frequencies.audio};\n")
@@ -421,11 +420,11 @@ class TiliquaSoc(Component):
             f.write(f"pub const SPIFLASH_SZ_BYTES: usize = 0x{self.spiflash_size:x};\n")
             f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base.init:x};\n")
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")
-            f.write(f"pub const BOOTINFO_SZ_BYTES: usize = 4096;\n")
-            f.write(f"pub const BOOTINFO_BASE: usize     = PSRAM_BASE + PSRAM_SZ_BYTES - BOOTINFO_SZ_BYTES;\n")
+            f.write(f"pub const BOOTINFO_BASE: usize     = 0x{self.bootinfo_base:x};\n")
             pmod_rev = TiliquaRevision.from_platform(self.platform_class).pmod_rev()
             f.write(f"pub const TOUCH_SENSOR_ORDER: [u8; 8] = {pmod_rev.touch_order()};\n")
             f.write(f"pub const PMOD_DEFAULT_CAL: [f32; 4] = {pmod_rev.default_calibration_rs()};\n")
+
             f.write("// Extra constants specified by an SoC subclass:\n")
             for l in self.extra_rust_constants:
                 f.write(l)

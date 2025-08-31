@@ -15,17 +15,16 @@ to the existing example (see docstring) in `top/dsp:MidiCVTop`.
 
 import sys
 
-from amaranth                     import *
-from amaranth.build               import *
-from amaranth.lib.cdc             import FFSynchronizer
+from amaranth import *
+from amaranth.build import *
+from amaranth.lib.cdc import FFSynchronizer
 
-from amaranth_future              import fixed
-
-from tiliqua                      import midi, eurorack_pmod
-from tiliqua.usb_host             import *
-from tiliqua.cli                  import top_level_cli
-from tiliqua.tiliqua_platform     import RebootProvider
-from vendor.ila                   import AsyncSerialILA
+from tiliqua import midi
+from tiliqua.build.cli import top_level_cli
+from tiliqua.periph import eurorack_pmod
+from tiliqua.platform import RebootProvider
+from tiliqua.usb_host import *
+from vendor.ila import AsyncSerialILA
 
 #
 # FIXME: hardcoded device properties

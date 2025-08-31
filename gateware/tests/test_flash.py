@@ -2,16 +2,16 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-import json
 import subprocess
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
 
-from tiliqua.flash import FlashCommandGenerator, promote_to_flashable_regions
-from tiliqua.archive import ArchiveBuilder, ArchiveLoader
-from tiliqua.types import FirmwareLocation
-from tiliqua.tiliqua_platform import TiliquaRevision
+from tiliqua.build.archive import ArchiveBuilder, ArchiveLoader
+from tiliqua.build.flash import (FlashCommandGenerator,
+                                 promote_to_flashable_regions)
+from tiliqua.build.types import FirmwareLocation
+from tiliqua.platform import TiliquaRevision
 
 
 class TestFlashCommandGenerator(unittest.TestCase):

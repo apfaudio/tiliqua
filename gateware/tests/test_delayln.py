@@ -6,19 +6,15 @@ import math
 import sys
 import unittest
 
+from amaranth import *
+from amaranth.sim import *
+from amaranth_soc import wishbone
 from parameterized import parameterized
 
-from amaranth              import *
-from amaranth.sim          import *
-from amaranth.lib          import wiring
-from amaranth.lib.wiring   import In, Out
-from tiliqua               import dsp, eurorack_pmod, cache, delay_line
-from tiliqua.eurorack_pmod import ASQ
+from amaranth_future import fixed
+from tiliqua import dsp
+from tiliqua.dsp import ASQ
 
-from amaranth_soc          import csr
-from amaranth_soc          import wishbone
-
-from amaranth_future       import fixed
 
 class DelayLineTests(unittest.TestCase):
 
@@ -39,7 +35,7 @@ class DelayLineTests(unittest.TestCase):
             "cachesize_words": cachesize_words,
         }
 
-        dut = delay_line.DelayLine(
+        dut = dsp.DelayLine(
             max_delay=max_delay,
             psram_backed=True,
             base=0x0,
@@ -156,7 +152,7 @@ class DelayLineTests(unittest.TestCase):
 
     def test_sram_delayln(self):
 
-        dut = delay_line.DelayLine(
+        dut = dsp.DelayLine(
             max_delay=256,
             write_triggers_read=False,
         )

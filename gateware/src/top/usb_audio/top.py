@@ -4,15 +4,15 @@
 Enumerates as a 4-in, 4-out 48kHz sound card.
 """
 
-import os
+from amaranth import *
+from amaranth.lib import cdc, wiring
 
-from amaranth                 import *
-from amaranth.lib             import cdc, wiring
+from tiliqua import usb_audio
+from tiliqua.build.cli import top_level_cli
+from tiliqua.periph import eurorack_pmod
+from tiliqua.platform import RebootProvider
+from vendor.ila import AsyncSerialILA
 
-from tiliqua.cli              import top_level_cli
-from tiliqua                  import eurorack_pmod, usb_audio
-from tiliqua.tiliqua_platform import RebootProvider
-from vendor.ila               import AsyncSerialILA
 
 class USBAudioTop(Elaboratable):
 

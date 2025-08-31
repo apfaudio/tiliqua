@@ -2,18 +2,15 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-import math
-import sys
 import unittest
 
-from amaranth              import *
-from amaranth.sim          import *
-
-from tiliqua.usb_host      import *
-
-from parameterized         import parameterized
-
+from amaranth import *
+from amaranth.sim import *
 from luna.gateware.test.contrib import usb_packet as testp
+from parameterized import parameterized
+
+from tiliqua.usb_host import *
+
 
 class UsbTests(unittest.TestCase):
 

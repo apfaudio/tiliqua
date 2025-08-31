@@ -8,41 +8,34 @@ USB2 class-compliant audio interface.
 Some parts adapted from: https://github.com/hansfbaier/adat-usb2-audio-interface
 """
 
-import os
+from amaranth import *
+from amaranth.build import *
+from amaranth.lib import data, stream, wiring
+from amaranth.lib.cdc import FFSynchronizer
+from amaranth.lib.wiring import In, Out
+from luna.gateware.stream.generator import StreamSerializer
+from luna.gateware.usb.stream import USBInStreamInterface
+from luna.gateware.usb.usb2.device import USBDevice
+from luna.gateware.usb.usb2.request import (StallOnlyRequestHandler,
+                                            USBRequestHandler)
+from luna.usb2 import (USBDevice, USBIsochronousInEndpoint,
+                       USBIsochronousStreamInEndpoint,
+                       USBIsochronousStreamOutEndpoint)
+from usb_protocol.emitters import DeviceDescriptorCollection
+from usb_protocol.emitters.descriptors import standard, uac2
+from usb_protocol.types import (USBDirection, USBRequestRecipient,
+                                USBRequestType, USBStandardRequests,
+                                USBSynchronizationType, USBTransferType,
+                                USBUsageType)
+from usb_protocol.types.descriptors.uac2 import AudioClassSpecificRequestCodes
 
-from amaranth              import *
-from amaranth.build        import *
-from amaranth.lib          import wiring, data, stream
-from amaranth.lib.wiring   import In, Out
-from amaranth.lib.cdc      import FFSynchronizer
-from amaranth.lib.fifo     import SyncFIFO, AsyncFIFO, SyncFIFOBuffered
+from tiliqua import pll
+from tiliqua.periph import eurorack_pmod
 
-from luna.usb2           import (USBDevice,
-                                 USBIsochronousInEndpoint,
-                                 USBIsochronousStreamOutEndpoint,
-                                 USBIsochronousStreamInEndpoint,
-                                 USBStreamInEndpoint,
-                                 USBStreamOutEndpoint)
-
-from usb_protocol.types                       import USBRequestType, USBRequestRecipient, USBTransferType, USBSynchronizationType, USBUsageType, USBDirection, USBStandardRequests
-from usb_protocol.types.descriptors.uac2      import AudioClassSpecificRequestCodes
-from usb_protocol.emitters                    import DeviceDescriptorCollection
-from usb_protocol.emitters.descriptors        import uac2, standard, midi1
-
-from luna.gateware.platform                   import NullPin
-from luna.gateware.usb.usb2.device            import USBDevice
-from luna.gateware.usb.usb2.request           import USBRequestHandler, StallOnlyRequestHandler
-from luna.gateware.usb.stream                 import USBInStreamInterface
-from luna.gateware.stream.generator           import StreamSerializer
-from luna.gateware.stream                     import StreamInterface
-from luna.gateware.architecture.car           import PHYResetController
-
-from .util                                    import EdgeToPulse, connect_fifo_to_stream, connect_stream_to_fifo
-from .usb_stream_to_channels                  import USBStreamToChannels
-from .channels_to_usb_stream                  import ChannelsToUSBStream
-from .audio_to_channels                       import AudioToChannels
-
-from tiliqua                                  import eurorack_pmod, types
+from .audio_to_channels import AudioToChannels
+from .channels_to_usb_stream import ChannelsToUSBStream
+from .usb_stream_to_channels import USBStreamToChannels
+from .util import EdgeToPulse
 
 
 class USB2AudioInterface(wiring.Component):
@@ -63,7 +56,7 @@ class USB2AudioInterface(wiring.Component):
 
     """ USB Audio Class v2 interface """
 
-    def __init__(self, *, audio_clock: types.AudioClock, nr_channels):
+    def __init__(self, *, audio_clock: pll.AudioClock, nr_channels):
         self.fs = 192000 if audio_clock.is_192khz() else 48000
         self.nr_channels = nr_channels
         self.max_packet_size = int(32 * (self.fs // 48000) * self.nr_channels)

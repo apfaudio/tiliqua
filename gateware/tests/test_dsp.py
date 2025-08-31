@@ -2,23 +2,21 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
+import itertools
+import math
 import sys
 import unittest
 
-import math
-import itertools
+from amaranth import *
+from amaranth.lib import wiring
+from amaranth.sim import *
+from parameterized import parameterized
+from scipy import signal
 
+from amaranth_future import fixed
+from tiliqua import dsp
+from tiliqua.dsp import ASQ, delay_effect, mac
 
-from amaranth              import *
-from amaranth.sim          import *
-from amaranth_future       import fixed
-from amaranth.lib          import wiring, data
-
-from scipy                 import signal
-from parameterized         import parameterized
-
-from tiliqua.eurorack_pmod import ASQ
-from tiliqua               import dsp, mac, delay_line, delay
 
 class DSPTests(unittest.TestCase):
 
@@ -190,7 +188,7 @@ class DSPTests(unittest.TestCase):
             case _:
                 macp = None
 
-        delayln = delay_line.DelayLine(max_delay=256, write_triggers_read=False)
+        delayln = dsp.DelayLine(max_delay=256, write_triggers_read=False)
         pitch_shift = dsp.PitchShift(tap=delayln.add_tap(), xfade=32, macp=macp)
         m.submodules += [delayln, pitch_shift]
 
@@ -427,7 +425,7 @@ class DSPTests(unittest.TestCase):
 
     def test_boxcar(self):
 
-        boxcar = delay.Boxcar(n=32, hpf=True)
+        boxcar = delay_effect.Boxcar(n=32, hpf=True)
 
         async def testbench(ctx):
             for n in range(0, 1024):

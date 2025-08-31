@@ -1,16 +1,12 @@
-import sys
 import math
 import unittest
 
-from amaranth              import *
-from amaranth.sim          import *
-from amaranth.utils        import exact_log2
-from amaranth.lib          import wiring
+from amaranth import *
+from amaranth.sim import *
 
-from amaranth_future       import fixed
+from amaranth_future import fixed
+from tiliqua.dsp import ASQ, cordic
 
-from tiliqua.eurorack_pmod import ASQ
-from tiliqua               import cordic
 
 class CordicTests(unittest.TestCase):
 

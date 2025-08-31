@@ -15,29 +15,23 @@ Designs demoing parts of the DSP library. Build any of them as follows:
 
 """
 
-import os
-import sys
-import subprocess
-
 import math
+import sys
 
-from amaranth                 import *
-from amaranth.build           import *
-from amaranth.lib             import wiring, data, stream
-from amaranth.lib.cdc         import FFSynchronizer
-from amaranth.lib.wiring      import In, Out
-from amaranth_soc             import wishbone
-from amaranth_future          import fixed
+from amaranth import *
+from amaranth.build import *
+from amaranth.lib import data, stream, wiring
+from amaranth.lib.cdc import FFSynchronizer
+from amaranth.lib.wiring import In, Out
+from amaranth_soc import wishbone
 
-from tiliqua                  import eurorack_pmod, dsp, midi, psram_peripheral, delay, tiliqua_pll, fft, spectral
-from tiliqua.eurorack_pmod    import ASQ
-from tiliqua.cli              import top_level_cli
-from tiliqua.delay_line       import DelayLine
-from tiliqua.tiliqua_platform import RebootProvider
+from tiliqua import dsp, midi
+from tiliqua.build import sim
+from tiliqua.build.cli import top_level_cli
+from tiliqua.dsp import ASQ
+from tiliqua.periph import eurorack_pmod, psram
+from tiliqua.platform import RebootProvider
 
-# for sim
-from amaranth.back            import verilog
-from tiliqua                  import sim
 
 class Mirror(wiring.Component):
 
@@ -339,7 +333,7 @@ class Pitch(wiring.Component):
         m.submodules.split4 = split4 = dsp.Split(n_channels=4)
         m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4)
 
-        m.submodules.delay_line = delay_line = DelayLine(
+        m.submodules.delay_line = delay_line = dsp.DelayLine(
             max_delay=0x8000,
             psram_backed=True,
             write_triggers_read=False,
@@ -494,14 +488,14 @@ class PSRAMPingPongDelay(wiring.Component):
 
         # 2 delay lines, backed by 2 different slices of PSRAM address space.
 
-        self.delayln1 = DelayLine(
+        self.delayln1 = dsp.DelayLine(
             max_delay=0x4000, # careful this doesn't collide with delayln2.base!
             psram_backed=True,
             addr_width_o=self.bus.addr_width,
             base=0x00000,
         )
 
-        self.delayln2 = DelayLine(
+        self.delayln2 = dsp.DelayLine(
             max_delay=0x4000,
             psram_backed=True,
             addr_width_o=self.bus.addr_width,
@@ -519,7 +513,7 @@ class PSRAMPingPongDelay(wiring.Component):
 
         # Create the PingPongCore using the above delay lines.
 
-        self.pingpong = delay.PingPongDelay(self.delayln1, self.delayln2)
+        self.pingpong = dsp.delay_effect.PingPongDelay(self.delayln1, self.delayln2)
 
     def elaborate(self, platform):
         m = Module()
@@ -554,12 +548,12 @@ class SRAMPingPongDelay(wiring.Component):
 
         # 2 delay lines, backed by independent slabs of internal SRAM.
 
-        self.delayln1 = DelayLine(max_delay=0x4000)
-        self.delayln2 = DelayLine(max_delay=0x4000)
+        self.delayln1 = dsp.DelayLine(max_delay=0x4000)
+        self.delayln2 = dsp.DelayLine(max_delay=0x4000)
 
         # Create the PingPongCore using the above delay lines.
 
-        self.pingpong = delay.PingPongDelay(self.delayln1, self.delayln2)
+        self.pingpong = dsp.delay_effect.PingPongDelay(self.delayln1, self.delayln2)
 
     def elaborate(self, platform):
         m = Module()
@@ -603,25 +597,25 @@ class PSRAMDiffuser(wiring.Component):
         # 4 delay lines, backed by 4 different slices of PSRAM address space.
 
         self.delay_lines = [
-            DelayLine(
+            dsp.DelayLine(
                 max_delay=0x10000,
                 psram_backed=True,
                 addr_width_o=self.bus.addr_width,
                 base=0x00000,
             ),
-            DelayLine(
+            dsp.DelayLine(
                 max_delay=0x10000,
                 psram_backed=True,
                 addr_width_o=self.bus.addr_width,
                 base=0x10000,
             ),
-            DelayLine(
+            dsp.DelayLine(
                 max_delay=0x10000,
                 psram_backed=True,
                 addr_width_o=self.bus.addr_width,
                 base=0x20000,
             ),
-            DelayLine(
+            dsp.DelayLine(
                 max_delay=0x10000,
                 psram_backed=True,
                 addr_width_o=self.bus.addr_width,
@@ -638,7 +632,7 @@ class PSRAMDiffuser(wiring.Component):
         for delayln in self.delay_lines:
             self._arbiter.add(delayln.bus)
 
-        self.diffuser = delay.Diffuser(self.delay_lines)
+        self.diffuser = dsp.delay_effect.Diffuser(self.delay_lines)
 
     def elaborate(self, platform):
         m = Module()
@@ -670,13 +664,13 @@ class SRAMDiffuser(wiring.Component):
         # 4 delay lines, backed by 4 independent SRAM banks.
 
         self.delay_lines = [
-            DelayLine(max_delay=2048),
-            DelayLine(max_delay=4096),
-            DelayLine(max_delay=8192),
-            DelayLine(max_delay=8192),
+            dsp.DelayLine(max_delay=2048),
+            dsp.DelayLine(max_delay=4096),
+            dsp.DelayLine(max_delay=8192),
+            dsp.DelayLine(max_delay=8192),
         ]
 
-        self.diffuser = delay.Diffuser(self.delay_lines)
+        self.diffuser = dsp.delay_effect.Diffuser(self.delay_lines)
 
     def elaborate(self, platform):
         m = Module()
@@ -740,7 +734,7 @@ class PSRAMMultiDiffuser(wiring.Component):
             for ix, _ in enumerate(self.delay_set[n]):
                 if psram_backed:
                     self.delay_lines[n].append(
-                        DelayLine(
+                        dsp.DelayLine(
                             max_delay=max_delay,
                             psram_backed=True,
                             addr_width_o=self.bus.addr_width,
@@ -749,7 +743,7 @@ class PSRAMMultiDiffuser(wiring.Component):
                     )
                 else:
                     self.delay_lines[n].append(
-                        DelayLine(
+                        dsp.DelayLine(
                             max_delay=sram_max_delay,
                             psram_backed=False,
                         )
@@ -766,7 +760,7 @@ class PSRAMMultiDiffuser(wiring.Component):
 
         self.diffusers = {}
         for n in self.delay_set:
-            self.diffusers[n] = delay.Diffuser(self.delay_lines[n], delays=self.delay_set[n])
+            self.diffusers[n] = dsp.delay_effect.Diffuser(self.delay_lines[n], delays=self.delay_set[n])
 
     def elaborate(self, platform):
         m = Module()
@@ -843,7 +837,7 @@ class STFTMirror(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.stft = stft = fft.STFTProcessor(
+        m.submodules.stft = stft = dsp.fft.STFTProcessor(
             sz=256, shape=ASQ)
         # Passthrough (resynthesize) in frequency domain.
         wiring.connect(m, stft.o_freq, stft.i_freq)
@@ -887,9 +881,9 @@ class Vocoder(wiring.Component):
         wiring.connect(m, merge4.o, wiring.flipped(self.o))
 
         fftsz = 256 # FFT block size
-        m.submodules.stft0 = stft0 = fft.STFTProcessor(shape=ASQ, sz=fftsz)
-        m.submodules.analyzer1 = analyzer1 = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
-        m.submodules.vocoder0 = vocoder0 = spectral.SpectralCrossSynthesis(shape=ASQ, sz=fftsz)
+        m.submodules.stft0 = stft0 = dsp.fft.STFTProcessor(shape=ASQ, sz=fftsz)
+        m.submodules.analyzer1 = analyzer1 = dsp.fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
+        m.submodules.vocoder0 = vocoder0 = dsp.spectral.SpectralCrossSynthesis(shape=ASQ, sz=fftsz)
 
         wiring.connect(m, stft0.o_freq, vocoder0.i_carrier)
         wiring.connect(m, analyzer1.o, vocoder0.i_modulator)
@@ -932,7 +926,7 @@ class CoreTop(Elaboratable):
         self.pmod0 = eurorack_pmod.EurorackPmod(clock_settings.audio_clock)
         # Only if this core uses PSRAM
         if hasattr(self.core, "bus"):
-            self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
+            self.psram_periph = psram.Peripheral(size=16*1024*1024)
 
         super().__init__()
 

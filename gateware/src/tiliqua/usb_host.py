@@ -6,14 +6,13 @@ Extremely bare-bones USB host logic intended for using Tiliqua as a USB MIDI hos
 Consider this EXPERIMENTAL. Error handling / retries are not finished.
 """
 
-from amaranth                      import *
-from amaranth.lib                  import data, enum, wiring, stream, fifo
-from amaranth.lib.wiring           import In, Out
-
-from luna.usb2                     import USBDevice
-from luna.gateware.interface.ulpi  import *
-from luna.gateware.interface.utmi  import *
+from amaranth import *
+from amaranth.lib import data, enum, fifo, stream, wiring
+from amaranth.lib.wiring import In, Out
+from luna.gateware.interface.ulpi import *
+from luna.gateware.interface.utmi import *
 from luna.gateware.usb.usb2.packet import *
+
 
 class TokenPID(enum.Enum, shape=unsigned(4)):
     OUT   = int(USBPacketID.OUT)

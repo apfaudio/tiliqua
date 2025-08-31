@@ -2,30 +2,26 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
-import math
 import sys
 import unittest
 
-from amaranth              import *
-from amaranth.sim          import *
-from amaranth.lib          import wiring
-from tiliqua               import raster_persist, raster_stroke, test_util, eurorack_pmod, dma_framebuffer, dvi_modeline, palette
+from amaranth import *
+from amaranth.sim import *
 
-from amaranth_soc          import csr
-from amaranth_soc.csr      import wishbone
+from tiliqua.raster import persist, stroke
+from tiliqua.video import framebuffer, modeline, palette
 
-from amaranth_future       import fixed
 
 class RasterTests(unittest.TestCase):
 
-    MODELINE = dvi_modeline.DVIModeline.all_timings()["1280x720p60"]
+    MODELINE = modeline.DVIModeline.all_timings()["1280x720p60"]
 
     def test_persist(self):
 
         m = Module()
-        fb = dma_framebuffer.DMAFramebuffer(
+        fb = framebuffer.DMAFramebuffer(
             fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
-        dut = raster_persist.Persistance(fb=fb)
+        dut = persist.Persistance(fb=fb)
         m.submodules += [dut, fb, fb.palette]
 
         # No actual FB backing store, just simulating WB transactions
@@ -60,9 +56,9 @@ class RasterTests(unittest.TestCase):
     def test_stroke(self):
 
         m = Module()
-        fb = dma_framebuffer.DMAFramebuffer(
+        fb = framebuffer.DMAFramebuffer(
             fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
-        dut = raster_stroke.Stroke(fb=fb)
+        dut = stroke.Stroke(fb=fb)
         m.submodules += [dut, fb, fb.palette]
 
         async def stimulus(ctx):

@@ -2,18 +2,13 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
-import math
-import sys
 import unittest
-from parameterized         import parameterized
 
-from amaranth              import *
-from amaranth.sim          import *
-from amaranth.lib          import wiring
-from tiliqua               import midi, test_util
+from amaranth import *
+from amaranth.sim import *
+from parameterized import parameterized
 
-from amaranth_soc          import csr
-from amaranth_soc.csr      import wishbone
+from tiliqua import midi
 
 
 class MidiTests(unittest.TestCase):

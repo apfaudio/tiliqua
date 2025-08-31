@@ -1,4 +1,4 @@
 Trigonometry / CORDIC
 ---------------------
 
-.. automodule:: tiliqua.cordic
+.. autoclass:: tiliqua.dsp.cordic.RectToPolarCordic
