@@ -1,12 +1,12 @@
 import unittest
 
-import math
-import itertools
+from amaranth import *
+from amaranth.sim import *
 
-from amaranth              import *
-from amaranth.sim          import *
-from amaranth_future       import fixed
-from amaranth_future.fixed import SQ, UQ, Const as FConst
+from amaranth_future import fixed
+from amaranth_future.fixed import SQ, UQ
+from amaranth_future.fixed import Const as FConst
+
 
 class TestFixedShape(unittest.TestCase):
 

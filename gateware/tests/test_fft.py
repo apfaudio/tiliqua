@@ -1,20 +1,15 @@
 import sys
 import unittest
+from math import cos, pi, sin
 
-from math import cos, sin, pi
-
-from amaranth              import *
-from amaranth.sim          import *
-from amaranth.utils        import exact_log2
-from amaranth.lib          import wiring
-
-from amaranth_future       import fixed
-
-from tiliqua.eurorack_pmod import ASQ
-from tiliqua               import dsp, fft
-
-from parameterized         import parameterized
 import numpy as np
+from amaranth import *
+from amaranth.lib import wiring
+from amaranth.sim import *
+from parameterized import parameterized
+
+from amaranth_future import fixed
+from tiliqua.dsp import fft
 
 FFT_SZ = 16
 

@@ -2,13 +2,12 @@
 #
 # SPDX-License-Identifier: BSD--3-Clause
 
-from amaranth             import *
-from amaranth.build       import Platform
-from amaranth.lib.fifo    import SyncFIFO
-from amaranth.lib         import stream
+from amaranth import *
+from amaranth.build import Platform
+from amaranth.lib import stream
+from amaranth.lib.fifo import SyncFIFO
 from luna.gateware.stream import StreamInterface
-from luna.gateware.stream.future import Packet
-from .util                import connect_fifo_to_stream
+
 
 class ChannelsToUSBStream(Elaboratable):
     def __init__(self, max_nr_channels=2, sample_width=24, max_packet_size=256):

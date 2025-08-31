@@ -42,28 +42,22 @@ Credits to Oliver Rockstedt for the Rust port of said firmware:
 The Rust port is what is running on this softcore.
 """
 
-import logging
 import os
-import sys
 
-from amaranth                                    import *
-from amaranth.lib                                import wiring, data, stream, fifo
-from amaranth.lib.wiring                         import In, Out, flipped, connect
-from amaranth.utils       import exact_log2
+from amaranth import *
+from amaranth.lib import data, fifo, stream, wiring
+from amaranth.lib.wiring import In, Out, connect, flipped
+from amaranth.utils import exact_log2
+from amaranth_soc import csr, wishbone
+from amaranth_soc.memory import MemoryMap
 
-from amaranth_soc                                import csr
-from amaranth_soc         import wishbone
-from amaranth_soc.memory  import MemoryMap
+from tiliqua import cache, dsp
+from tiliqua.build.cli import top_level_cli
+from tiliqua.dsp import ASQ
+from tiliqua.raster import scope
+from tiliqua.tiliqua_soc import TiliquaSoc
+from vendor.vexiiriscv import VexiiRiscv
 
-from amaranth_future                             import fixed
-
-from tiliqua                                     import eurorack_pmod, dsp, scope, cache
-from tiliqua.tiliqua_soc                         import TiliquaSoc
-from tiliqua.cli                                 import top_level_cli
-
-from tiliqua.eurorack_pmod                       import ASQ
-
-from vendor.vexiiriscv                           import VexiiRiscv
 
 # Simple 2-fifo DMA peripheral for writing glitch-free audio from a softcore.
 class AudioFIFOPeripheral(wiring.Component):

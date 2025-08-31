@@ -12,21 +12,20 @@ In oscilloscope mode, all 4 input channels are plotted simultaneosly
 in classic oscilloscope fashion.
 """
 
-import logging
 import os
-import sys
 
-from amaranth                                    import *
-from amaranth.lib                                import wiring, data, stream, fifo
-from amaranth.lib.wiring                         import In, Out, flipped, connect
+from amaranth import *
+from amaranth.lib import data, fifo, stream, wiring
+from amaranth.lib.wiring import In, Out, connect, flipped
+from amaranth_soc import csr
 
-from amaranth_soc                                import csr, wishbone
+from tiliqua import cache, dsp, usb_audio
+from tiliqua.build import sim
+from tiliqua.build.cli import top_level_cli
+from tiliqua.periph import eurorack_pmod
+from tiliqua.raster import scope
+from tiliqua.tiliqua_soc import TiliquaSoc
 
-from amaranth_future                             import fixed
-
-from tiliqua                                     import eurorack_pmod, dsp, scope, usb_audio, cache, sim, delay_line
-from tiliqua.tiliqua_soc                         import TiliquaSoc
-from tiliqua.cli                                 import top_level_cli
 
 class XbeamPeripheral(wiring.Component):
 
@@ -73,7 +72,7 @@ class XbeamPeripheral(wiring.Component):
         m.submodules.merge4 = merge4 = dsp.Merge(n_channels=4, sink=wiring.flipped(self.delay_o))
         delay = [Signal(16) for _ in range(4)]
         for ch in range(4):
-            delayln = delay_line.DelayLine(max_delay=512, write_triggers_read=False)
+            delayln = dsp.DelayLine(max_delay=512, write_triggers_read=False)
             split2 = dsp.Split(n_channels=2, source=split4.o[ch], replicate=True)
             m.submodules += [delayln, split2]
             tap = delayln.add_tap()

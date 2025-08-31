@@ -25,26 +25,23 @@ A block diagram of the core components of this polysynth:
 
 """
 
-import logging
-import os
-import sys
 import math
+import os
 
-from amaranth                  import *
-from amaranth.lib              import wiring, data, stream
-from amaranth.lib.wiring       import In, Out, connect, flipped
-from amaranth.lib.fifo         import SyncFIFOBuffered
+from amaranth import *
+from amaranth.lib import data, stream, wiring
+from amaranth.lib.fifo import SyncFIFOBuffered
+from amaranth.lib.wiring import In, Out, connect, flipped
+from amaranth_soc import csr
 
-from amaranth_soc              import csr, wishbone
+from tiliqua import cache, dsp, midi
+from tiliqua.build import sim
+from tiliqua.build.cli import top_level_cli
+from tiliqua.dsp import ASQ, mac
+from tiliqua.raster import scope
+from tiliqua.tiliqua_soc import TiliquaSoc
+from tiliqua.usb_host import SimpleUSBMIDIHost
 
-from amaranth_future           import fixed
-
-from tiliqua                   import eurorack_pmod, dsp, mac, midi, scope, sim, delay, cache
-from tiliqua.delay_line        import DelayLine
-from tiliqua.eurorack_pmod     import ASQ
-from tiliqua.tiliqua_soc       import TiliquaSoc
-from tiliqua.cli               import top_level_cli
-from tiliqua.usb_host          import SimpleUSBMIDIHost
 
 class Diffuser(wiring.Component):
 
@@ -57,13 +54,13 @@ class Diffuser(wiring.Component):
         # 4 delay lines, backed by 4 independent SRAM banks.
 
         self.delay_lines = [
-            DelayLine(max_delay=2048),
-            DelayLine(max_delay=4096),
-            DelayLine(max_delay=8192),
-            DelayLine(max_delay=8192),
+            dsp.DelayLine(max_delay=2048),
+            dsp.DelayLine(max_delay=4096),
+            dsp.DelayLine(max_delay=8192),
+            dsp.DelayLine(max_delay=8192),
         ]
 
-        self.diffuser = delay.Diffuser(self.delay_lines)
+        self.diffuser = dsp.delay_effect.Diffuser(self.delay_lines)
 
         # Coefficients of this are tweaked by the SoC
 

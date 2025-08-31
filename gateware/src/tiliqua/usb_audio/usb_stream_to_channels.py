@@ -2,11 +2,12 @@
 #
 # SPDX-License-Identifier: BSD--3-Clause
 
-from amaranth        import *
-from amaranth.build   import Platform
-from amaranth.lib         import stream
+from amaranth import *
+from amaranth.build import Platform
+from amaranth.lib import stream
 from luna.gateware.stream import StreamInterface
 from luna.gateware.stream.future import Packet
+
 
 class USBStreamToChannels(Elaboratable):
     def __init__(self, max_no_channels=2):

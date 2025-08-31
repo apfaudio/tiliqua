@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD--3-Clause
 
-from amaranth             import *
+from amaranth import *
 
 # some things lifted from `amlib`, given we don't need anyting else from there.
 

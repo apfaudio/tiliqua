@@ -22,33 +22,27 @@ See 'xbeam' for SoC version of the scope with a menu system.
 
 """
 
-import os
 import math
-import shutil
-import subprocess
+import os
 
-from amaranth                 import *
-from amaranth.build           import *
-from amaranth.lib             import wiring, data, stream
-from amaranth.lib.wiring      import In, Out
-from amaranth.lib.fifo        import AsyncFIFO, SyncFIFO
-from amaranth.lib.cdc         import FFSynchronizer
-from amaranth.utils           import exact_log2
-from amaranth.back            import verilog
+from amaranth import *
+from amaranth.build import *
+from amaranth.lib import data, stream, wiring
+from amaranth.lib.cdc import FFSynchronizer
+from amaranth.lib.wiring import In, Out
+from amaranth.utils import exact_log2
 
-from amaranth_future          import fixed
-from amaranth_soc             import wishbone
+from amaranth_future import fixed
+from tiliqua import cache, dsp
+from tiliqua.build import sim
+from tiliqua.build.cli import top_level_cli
+from tiliqua.dsp import ASQ
+from tiliqua.periph import eurorack_pmod, psram
+from tiliqua.platform import *
+from tiliqua.raster import persist, stroke
+from tiliqua.video import framebuffer, palette
+from vendor.ila import AsyncSerialILA
 
-from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, dsp, sim, cache, dma_framebuffer, palette, fft, spectral, block
-from tiliqua.eurorack_pmod    import ASQ
-from tiliqua                  import psram_peripheral
-from tiliqua.cli              import top_level_cli
-from tiliqua.sim              import FakeTiliquaDomainGenerator
-from tiliqua.raster_persist   import Persistance
-from tiliqua.raster_stroke    import Stroke
-
-from vendor.ila               import AsyncSerialILA
 
 class Spectro(wiring.Component):
 
@@ -84,15 +78,15 @@ class Spectro(wiring.Component):
 
         # Resample input down, so visible area is a fraction of the nyquist (e.g. 192khz/8 = 24kHz visual bandwidth)
         m.submodules.resample = resample = dsp.Resample(fs_in=self.fs, n_up=1, m_down=8 if self.fs > 48000 else 2)
-        m.submodules.analyzer = analyzer = fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
-        m.submodules.envelope = envelope = spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
+        m.submodules.analyzer = analyzer = dsp.fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
+        m.submodules.envelope = envelope = dsp.spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
         def log_lut(x):
             # map 0 - 1 (linear) to 0 - 1 (log representing -X dBr to 0dBr)
             # where -X (smallest value) represents 1 LSB of the fixed.SQ.
             max_v = 1 << ASQ.f_bits
             r = max(0, math.log2(max(1, x*max_v))/math.log2(max_v))
             return r
-        m.submodules.log = log = block.WrapCore(dsp.WaveShaper(
+        m.submodules.log = log = dsp.block.WrapCore(dsp.WaveShaper(
                 lut_function=log_lut, lut_size=512, continuous=False))
 
         wiring.connect(m, split4.o[0], resample.i)
@@ -145,7 +139,7 @@ class VectorScopeTop(Elaboratable):
         self.clock_settings = clock_settings
 
         # One PSRAM with an internal arbiter to support multiple DMA masters.
-        self.psram_periph = psram_peripheral.Peripheral(size=16*1024*1024)
+        self.psram_periph = psram.Peripheral(size=16*1024*1024)
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
@@ -154,15 +148,15 @@ class VectorScopeTop(Elaboratable):
 
         # All of our DMA masters
         self.palette = palette.ColorPalette()
-        self.fb = dma_framebuffer.DMAFramebuffer(fixed_modeline=clock_settings.modeline,
+        self.fb = framebuffer.DMAFramebuffer(fixed_modeline=clock_settings.modeline,
                                                  palette=self.palette)
         self.psram_periph.add_master(self.fb.bus)
 
-        self.persist = Persistance(fb=self.fb)
+        self.persist = persist.Persistance(fb=self.fb)
         self.psram_periph.add_master(self.persist.bus)
 
         self.spectrogram = spectrogram
-        self.stroke = Stroke(fb=self.fb, n_upsample=32 if self.spectrogram else 8, fs=clock_settings.audio_clock.fs())
+        self.stroke = stroke.Stroke(fb=self.fb, n_upsample=32 if self.spectrogram else 8, fs=clock_settings.audio_clock.fs())
         self.plotter_cache = cache.PlotterCache(fb=self.fb)
         self.psram_periph.add_master(self.plotter_cache.bus)
         self.plotter_cache.add(self.stroke.bus)
@@ -188,7 +182,7 @@ class VectorScopeTop(Elaboratable):
             wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
             m.d.comb += self.pmod0.codec_mute.eq(reboot.mute)
         else:
-            m.submodules.car = FakeTiliquaDomainGenerator()
+            m.submodules.car = sim.FakeTiliquaDomainGenerator()
 
         self.stroke.pmod0 = pmod0
 
@@ -253,9 +247,7 @@ def colors():
     Render image of intensity/color palette used internally by DMAFramebuffer.
     This is useful for quickly tweaking it.
     """
-    import matplotlib
     import matplotlib.pyplot as plt
-    from matplotlib import colors
     import numpy as np
     rs, gs, bs = palette.compute_color_palette()
 

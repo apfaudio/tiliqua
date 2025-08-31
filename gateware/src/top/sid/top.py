@@ -2,23 +2,19 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
-import logging
 import os
-import sys
 
-from amaranth              import *
-from amaranth.lib.fifo     import SyncFIFO
-from amaranth.lib          import wiring, data, stream
-from amaranth.lib.wiring   import In, Out, flipped, connect
+from amaranth import *
+from amaranth.lib import data, wiring
+from amaranth.lib.fifo import SyncFIFO
+from amaranth.lib.wiring import In, Out, connect, flipped
+from amaranth_soc import csr
 
-from amaranth_soc          import csr
+from tiliqua import cache
+from tiliqua.build.cli import top_level_cli
+from tiliqua.raster.scope import ScopeTracePeripheral
+from tiliqua.tiliqua_soc import TiliquaSoc
 
-from amaranth_future       import fixed
-
-from tiliqua               import eurorack_pmod, dsp, scope, cache
-from tiliqua.tiliqua_soc   import TiliquaSoc
-from tiliqua.cli           import top_level_cli
-from tiliqua.scope         import ScopeTracePeripheral
 
 class SID(wiring.Component):
 
@@ -221,7 +217,7 @@ class SIDSoc(TiliquaSoc):
         self.psram_periph.add_master(self.plotter_cache.bus)
 
         # Add scope peripheral 
-        self.scope_periph = scope.ScopeTracePeripheral(
+        self.scope_periph = ScopeTracePeripheral(
             fb=self.fb)
         self.csr_decoder.add(self.scope_periph.bus, addr=0x1100, name="scope_periph")
         for bus in self.scope_periph.bus_dma:

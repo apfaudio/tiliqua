@@ -9,16 +9,16 @@ hardware issues and for bringup.
 
 import os
 
-from amaranth                    import *
-from amaranth.build              import *
-from amaranth_soc                import csr, gpio, wishbone
-from amaranth.lib                import wiring
+from amaranth import *
+from amaranth.build import *
+from amaranth_soc import gpio
+from luna.gateware.applets.speed_test import (PRODUCT_ID, VENDOR_ID,
+                                              USBSpeedTestDevice)
 
-from tiliqua.tiliqua_soc         import TiliquaSoc
-from tiliqua.cli                 import top_level_cli
-from tiliqua                     import sim
+from tiliqua.build import sim
+from tiliqua.build.cli import top_level_cli
+from tiliqua.tiliqua_soc import TiliquaSoc
 
-from luna.gateware.applets.speed_test import USBSpeedTestDevice, VENDOR_ID, PRODUCT_ID
 
 class SelftestSoc(TiliquaSoc):
     brief = "Test & calibration utilities"

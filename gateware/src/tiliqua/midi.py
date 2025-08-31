@@ -5,16 +5,16 @@
 
 """Helpers for dealing with MIDI over serial or USB."""
 
-from amaranth              import *
-from amaranth.lib.fifo     import SyncFIFOBuffered
-from amaranth.lib          import wiring, data, enum, stream
-from amaranth.lib.wiring   import In, Out
-from amaranth.lib.memory   import Memory
-
+from amaranth import *
+from amaranth.lib import data, enum, stream, wiring
+from amaranth.lib.fifo import SyncFIFOBuffered
+from amaranth.lib.memory import Memory
+from amaranth.lib.wiring import In, Out
 from amaranth_stdio.serial import AsyncSerialRX
 
-from amaranth_future       import fixed
-from tiliqua.eurorack_pmod import ASQ # hardware native fixed-point sample type
+from amaranth_future import fixed
+
+from .dsp import ASQ  # hardware native fixed-point sample type
 
 MIDI_BAUD_RATE = 31250
 

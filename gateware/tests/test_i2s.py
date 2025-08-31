@@ -2,19 +2,16 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
+import math
 import unittest
 
-import math
+from amaranth import *
+from amaranth.sim import *
 
-from amaranth              import *
-from amaranth.sim          import *
-from amaranth.lib          import wiring, data
-from amaranth.lib.memory   import Memory
-from amaranth.lib.fifo     import SyncFIFO
-from tiliqua               import eurorack_pmod
-from tiliqua.eurorack_pmod import ASQ
+from amaranth_future import fixed
+from tiliqua.dsp import ASQ
+from tiliqua.periph import eurorack_pmod
 
-from amaranth_future       import fixed
 
 class I2STests(unittest.TestCase):
 

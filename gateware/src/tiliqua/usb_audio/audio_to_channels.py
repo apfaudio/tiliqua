@@ -2,11 +2,14 @@
 #
 # SPDX-License-Identifier: BSD--3-Clause
 
-from amaranth              import *
-from amaranth.lib.fifo     import AsyncFIFOBuffered
-from amaranth.lib          import wiring, data, stream
-from amaranth.lib.wiring   import In, Out
-from tiliqua.eurorack_pmod import I2STDM, ASQ
+from amaranth import *
+from amaranth.lib import data, stream, wiring
+from amaranth.lib.fifo import AsyncFIFOBuffered
+from amaranth.lib.wiring import In, Out
+
+from ..dsp import ASQ
+from ..periph.eurorack_pmod import I2STDM
+
 
 class AudioToChannels(wiring.Component):
 

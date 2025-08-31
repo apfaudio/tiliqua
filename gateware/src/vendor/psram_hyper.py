@@ -12,7 +12,7 @@ from amaranth import *
 from amaranth.lib        import wiring
 from amaranth.lib.wiring import In, Out
 
-from tiliqua.sim import FakePSRAMSimulationInterface, is_hw
+from tiliqua.build.sim import FakePSRAMSimulationInterface, is_hw
 from vendor.dqs_phy import DQSPHYSignature
 
 class HyperPSRAM(wiring.Component):
