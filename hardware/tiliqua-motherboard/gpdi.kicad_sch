@@ -1038,6 +1038,131 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Device:R_Small"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0.254)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "R"
+				(at 0 0 90)
+				(effects
+					(font
+						(size 1.016 1.016)
+					)
+				)
+			)
+			(property "Value" "R_Small"
+				(at 1.778 0 90)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Resistor, small symbol"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "R resistor"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "R_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "R_Small_0_1"
+				(rectangle
+					(start -0.762 1.778)
+					(end 0.762 -1.778)
+					(stroke
+						(width 0.2032)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "R_Small_1_1"
+				(pin passive line
+					(at 0 2.54 270)
+					(length 0.762)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -2.54 90)
+					(length 0.762)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Interface:PCA9306"
 			(pin_names
 				(offset 1.016)
@@ -2309,6 +2434,12 @@
 		(uuid "423e52e9-f50f-4cf7-b994-fe32458968e9")
 	)
 	(junction
+		(at 138.43 88.9)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "04f11760-84f4-40c7-97a9-142d9f2361a0")
+	)
+	(junction
 		(at 214.63 119.38)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -2319,6 +2450,18 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "0a3c6b6a-f737-46b6-8c75-fc2a62841431")
+	)
+	(junction
+		(at 143.51 81.28)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "138d794a-ecf2-4e3a-b435-f2d7b45a0a44")
+	)
+	(junction
+		(at 143.51 71.12)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "1966c8df-f43a-45d2-8c6a-e25eb8c70db4")
 	)
 	(junction
 		(at 179.07 116.84)
@@ -2333,10 +2476,22 @@
 		(uuid "2d3d0250-82d6-4bf6-b5da-e62c161ae0b8")
 	)
 	(junction
+		(at 138.43 73.66)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "304fd455-76ae-4563-bf01-8571efa07d84")
+	)
+	(junction
 		(at 115.57 87.63)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "354f38df-4eda-4a43-a3f2-7e7e209a1c40")
+	)
+	(junction
+		(at 138.43 78.74)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "4a96f5d7-e656-4f1c-be42-0995a7080ace")
 	)
 	(junction
 		(at 161.29 137.16)
@@ -2367,6 +2522,24 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "8a029fc5-6e98-4f37-b43b-9fdaccdd6c93")
+	)
+	(junction
+		(at 143.51 86.36)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "8c99c712-49d5-4f9a-aa48-b9d944b310c8")
+	)
+	(junction
+		(at 143.51 76.2)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "8ddd6618-300f-4d68-a94d-ff1df000db44")
+	)
+	(junction
+		(at 138.43 83.82)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "9af359e9-8688-4b75-86d7-10002cc3e1b3")
 	)
 	(junction
 		(at 175.26 52.07)
@@ -2439,6 +2612,16 @@
 			(type default)
 		)
 		(uuid "02f6f689-c771-4a26-9829-1ad9fb6fbdbd")
+	)
+	(wire
+		(pts
+			(xy 143.51 76.2) (xy 149.86 76.2)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "030683da-af56-48e0-9678-ae785aedc320")
 	)
 	(wire
 		(pts
@@ -2572,6 +2755,16 @@
 	)
 	(wire
 		(pts
+			(xy 138.43 86.36) (xy 143.51 86.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1b6ed9d1-5a5d-47fa-8578-5ca74d14f1eb")
+	)
+	(wire
+		(pts
 			(xy 191.77 76.2) (xy 196.85 76.2)
 		)
 		(stroke
@@ -2589,6 +2782,16 @@
 			(type default)
 		)
 		(uuid "1ea33691-4ad3-44c5-a994-c3374c4dea4b")
+	)
+	(wire
+		(pts
+			(xy 143.51 71.12) (xy 143.51 72.39)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1ef3f2ee-46e4-462d-8103-b8630a8031b5")
 	)
 	(wire
 		(pts
@@ -2619,6 +2822,16 @@
 			(type default)
 		)
 		(uuid "2a9ea70b-6518-46e9-bdee-25747da3ef04")
+	)
+	(wire
+		(pts
+			(xy 138.43 82.55) (xy 138.43 83.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2c16642d-56e5-4317-9d2c-31a1eb946b50")
 	)
 	(wire
 		(pts
@@ -2712,6 +2925,16 @@
 	)
 	(wire
 		(pts
+			(xy 143.51 71.12) (xy 149.86 71.12)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "37ca480f-15d4-4df4-a57f-fdabc446cb46")
+	)
+	(wire
+		(pts
 			(xy 134.62 110.49) (xy 134.62 109.22)
 		)
 		(stroke
@@ -2719,16 +2942,6 @@
 			(type default)
 		)
 		(uuid "3bc9cd65-461b-4ffa-ab48-823a4885a9bf")
-	)
-	(wire
-		(pts
-			(xy 142.24 78.74) (xy 149.86 78.74)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "3dfbee4a-0cba-4540-8648-cf0d1442b9e2")
 	)
 	(wire
 		(pts
@@ -2802,6 +3015,16 @@
 	)
 	(wire
 		(pts
+			(xy 138.43 81.28) (xy 143.51 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "43565874-70e8-4513-815f-dabdf44bac1c")
+	)
+	(wire
+		(pts
 			(xy 204.47 76.2) (xy 198.12 76.2)
 		)
 		(stroke
@@ -2809,6 +3032,26 @@
 			(type default)
 		)
 		(uuid "46142fc0-df2b-4cce-ac4a-9d41e4de4e7e")
+	)
+	(wire
+		(pts
+			(xy 138.43 87.63) (xy 138.43 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "46161f58-645d-4206-be17-66cff563f090")
+	)
+	(wire
+		(pts
+			(xy 138.43 78.74) (xy 149.86 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4a23d801-c146-4eb0-8995-47dce0392503")
 	)
 	(wire
 		(pts
@@ -2849,16 +3092,6 @@
 			(type default)
 		)
 		(uuid "5691308d-b76b-49ff-ba7a-f9769575f278")
-	)
-	(wire
-		(pts
-			(xy 142.24 71.12) (xy 149.86 71.12)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "583e1b01-1ea5-4ffd-9c31-e90ec5186013")
 	)
 	(wire
 		(pts
@@ -2909,6 +3142,16 @@
 			(type default)
 		)
 		(uuid "630fa89f-cb46-41c1-b00e-463d24740c55")
+	)
+	(wire
+		(pts
+			(xy 138.43 72.39) (xy 138.43 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "695bcd4d-e72a-423b-86bc-d397a25bff64")
 	)
 	(wire
 		(pts
@@ -2982,16 +3225,6 @@
 	)
 	(wire
 		(pts
-			(xy 142.24 73.66) (xy 149.86 73.66)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7fe9ab5f-6615-430a-a3a7-749c6c3ae8de")
-	)
-	(wire
-		(pts
 			(xy 212.09 58.42) (xy 214.63 58.42)
 		)
 		(stroke
@@ -3042,16 +3275,6 @@
 	)
 	(wire
 		(pts
-			(xy 142.24 88.9) (xy 149.86 88.9)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "827eaad8-90f4-470d-a62a-a1cc0b5c229b")
-	)
-	(wire
-		(pts
 			(xy 184.15 116.84) (xy 181.61 116.84)
 		)
 		(stroke
@@ -3072,13 +3295,23 @@
 	)
 	(wire
 		(pts
-			(xy 142.24 81.28) (xy 149.86 81.28)
+			(xy 143.51 81.28) (xy 149.86 81.28)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "955d74ad-f4df-4346-83eb-f978e1e54265")
+		(uuid "8f919d5a-a083-4d47-9d08-faf312cfd8fb")
+	)
+	(wire
+		(pts
+			(xy 138.43 88.9) (xy 149.86 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "91f7d5ef-e5b5-4c89-aa15-57f9e4f479f3")
 	)
 	(wire
 		(pts
@@ -3092,6 +3325,16 @@
 	)
 	(wire
 		(pts
+			(xy 138.43 77.47) (xy 138.43 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "96b160f5-5672-45e4-b824-445c31c2814f")
+	)
+	(wire
+		(pts
 			(xy 200.66 53.34) (xy 189.23 53.34)
 		)
 		(stroke
@@ -3099,16 +3342,6 @@
 			(type default)
 		)
 		(uuid "9703bdcf-069d-47b8-af0a-4f91a2ec7563")
-	)
-	(wire
-		(pts
-			(xy 142.24 83.82) (xy 149.86 83.82)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9785cbad-9ac4-4cf7-80d5-d5aba9046d3a")
 	)
 	(wire
 		(pts
@@ -3152,6 +3385,16 @@
 	)
 	(wire
 		(pts
+			(xy 143.51 86.36) (xy 143.51 87.63)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a1f2e98d-15bc-4d02-a3b8-4ed279575c5a")
+	)
+	(wire
+		(pts
 			(xy 209.55 58.42) (xy 209.55 57.15)
 		)
 		(stroke
@@ -3182,6 +3425,16 @@
 	)
 	(wire
 		(pts
+			(xy 138.43 83.82) (xy 149.86 83.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a5764a79-73f5-4cdf-9017-b25e0b685ff2")
+	)
+	(wire
+		(pts
 			(xy 115.57 87.63) (xy 115.57 95.25)
 		)
 		(stroke
@@ -3189,6 +3442,16 @@
 			(type default)
 		)
 		(uuid "a95fccd2-6f95-41ef-bc9e-f3af4adf7cfd")
+	)
+	(wire
+		(pts
+			(xy 143.51 76.2) (xy 143.51 77.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "aa422c5d-4f1d-42e8-baf3-343c300738ce")
 	)
 	(wire
 		(pts
@@ -3212,6 +3475,16 @@
 	)
 	(wire
 		(pts
+			(xy 138.43 73.66) (xy 149.86 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ae1f37e6-6ee8-4a85-8edd-18118a7dbd13")
+	)
+	(wire
+		(pts
 			(xy 189.23 53.34) (xy 189.23 52.07)
 		)
 		(stroke
@@ -3219,16 +3492,6 @@
 			(type default)
 		)
 		(uuid "b4d59dc3-d7ab-4ce5-8e1f-1a8ae990cb8d")
-	)
-	(wire
-		(pts
-			(xy 142.24 86.36) (xy 149.86 86.36)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b56c28c6-ef78-42d0-973e-eb23aa55398e")
 	)
 	(wire
 		(pts
@@ -3312,16 +3575,6 @@
 	)
 	(wire
 		(pts
-			(xy 142.24 76.2) (xy 149.86 76.2)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c85332f4-c1e3-4b44-a58e-eb860dbfaf41")
-	)
-	(wire
-		(pts
 			(xy 179.07 116.84) (xy 179.07 118.11)
 		)
 		(stroke
@@ -3329,6 +3582,26 @@
 			(type default)
 		)
 		(uuid "c9646eac-0bb6-4c43-94ee-336fddf1a9fb")
+	)
+	(wire
+		(pts
+			(xy 138.43 71.12) (xy 143.51 71.12)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cac1f274-9346-4d3b-b04c-24af677f29c8")
+	)
+	(wire
+		(pts
+			(xy 138.43 76.2) (xy 143.51 76.2)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cb349098-a34e-4b7a-b9f4-b956798ab9bb")
 	)
 	(wire
 		(pts
@@ -3412,6 +3685,16 @@
 	)
 	(wire
 		(pts
+			(xy 143.51 86.36) (xy 149.86 86.36)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "dec315af-63af-45e3-b884-a928a08bee79")
+	)
+	(wire
+		(pts
 			(xy 209.55 48.26) (xy 209.55 49.53)
 		)
 		(stroke
@@ -3479,6 +3762,16 @@
 			(type default)
 		)
 		(uuid "ef220c15-865f-4366-bfbd-e5fb52701c75")
+	)
+	(wire
+		(pts
+			(xy 143.51 81.28) (xy 143.51 82.55)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f13f4788-8436-4241-bcd8-44ac712eef35")
 	)
 	(wire
 		(pts
@@ -3683,7 +3976,7 @@
 	)
 	(hierarchical_label "GPDI_D2-"
 		(shape output)
-		(at 142.24 73.66 180)
+		(at 133.35 73.66 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -3694,7 +3987,7 @@
 	)
 	(hierarchical_label "GPDI_D2+"
 		(shape output)
-		(at 142.24 71.12 180)
+		(at 133.35 71.12 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -3705,7 +3998,7 @@
 	)
 	(hierarchical_label "GPDI_D1+"
 		(shape output)
-		(at 142.24 76.2 180)
+		(at 133.35 76.2 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -3716,7 +4009,7 @@
 	)
 	(hierarchical_label "GPDI_D1-"
 		(shape output)
-		(at 142.24 78.74 180)
+		(at 133.35 78.74 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -3738,7 +4031,7 @@
 	)
 	(hierarchical_label "GPDI_D0+"
 		(shape output)
-		(at 142.24 81.28 180)
+		(at 133.35 81.28 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -3749,7 +4042,7 @@
 	)
 	(hierarchical_label "GPDI_CK+"
 		(shape output)
-		(at 142.24 86.36 180)
+		(at 133.35 86.36 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -3782,7 +4075,7 @@
 	)
 	(hierarchical_label "GPDI_CK-"
 		(shape output)
-		(at 142.24 88.9 180)
+		(at 133.35 88.9 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -3793,7 +4086,7 @@
 	)
 	(hierarchical_label "GPDI_D0-"
 		(shape output)
-		(at 142.24 83.82 180)
+		(at 133.35 83.82 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -4045,6 +4338,140 @@
 			(project "tiliqua-motherboard"
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "#PWR0103")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 135.89 88.9 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "0d2c1aa3-80f8-4b70-802f-86f94082cba4")
+		(property "Reference" "R57"
+			(at 132.588 87.63 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "93R1"
+			(at 135.89 88.9 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 135.89 88.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 135.89 88.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 135.89 88.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "9eba4253-79a2-4f8e-b06e-318f0fa703de")
+		)
+		(pin "1"
+			(uuid "f758da35-fd07-4f51-8aca-8cd705c3533c")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R57")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 135.89 76.2 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "15c0ae5f-057b-43d0-821f-1a74914b019e")
+		(property "Reference" "R52"
+			(at 132.588 74.93 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "93R1"
+			(at 135.89 76.2 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 135.89 76.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 135.89 76.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 135.89 76.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "c723ed9b-9667-444e-9684-6ceb6eb4de41")
+		)
+		(pin "1"
+			(uuid "16695548-b53c-4088-a90e-9c4fe7eea6d8")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R52")
 					(unit 1)
 				)
 			)
@@ -4433,6 +4860,73 @@
 			(project "tiliqua-motherboard"
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "C45")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 140.97 82.55 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "246f743a-1f6e-4eb6-bc4c-28d6d6c882da")
+		(property "Reference" "R60"
+			(at 140.97 81.026 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "196R"
+			(at 140.97 82.55 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 140.97 82.55 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 140.97 82.55 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 140.97 82.55 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "75a6fe2a-feb6-4137-909c-9d15f4f9bf65")
+		)
+		(pin "1"
+			(uuid "02f033c2-3208-4c65-abc7-18913b984d4c")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R60")
 					(unit 1)
 				)
 			)
@@ -5697,6 +6191,274 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R_Small")
+		(at 135.89 83.82 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "6eb13f12-54ae-419a-bf7a-dd8259614aea")
+		(property "Reference" "R55"
+			(at 132.588 82.55 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "93R1"
+			(at 135.89 83.82 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 135.89 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 135.89 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 135.89 83.82 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "57ffccce-7ab7-4dc0-b5b9-845f006444d4")
+		)
+		(pin "1"
+			(uuid "2bc01a60-5c31-45ad-b25e-8526aff6312e")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R55")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 140.97 87.63 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "759de945-b016-4f0e-ba38-9719b5d80b0a")
+		(property "Reference" "R61"
+			(at 140.97 86.106 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "196R"
+			(at 140.97 87.63 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 140.97 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 140.97 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 140.97 87.63 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "9e4ec542-eafc-4c67-9a9f-d25994333fd7")
+		)
+		(pin "1"
+			(uuid "ae09451a-1eee-4300-895d-d191ab7ec666")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R61")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 140.97 77.47 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "76f6a086-47b2-4627-8556-1082009fb85c")
+		(property "Reference" "R59"
+			(at 140.97 75.946 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "196R"
+			(at 140.97 77.47 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 140.97 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 140.97 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 140.97 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "508f4153-6901-40eb-a2c3-f70c409c60c6")
+		)
+		(pin "1"
+			(uuid "d854dbdb-a057-420f-8426-3968fa4938b3")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R59")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 135.89 81.28 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "7ba053b7-faae-4b24-a97f-7c2b4a5a20c0")
+		(property "Reference" "R54"
+			(at 132.588 80.01 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "93R1"
+			(at 135.89 81.28 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 135.89 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 135.89 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 135.89 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "e174712f-de5f-43b6-958a-0045fe42aa0e")
+		)
+		(pin "1"
+			(uuid "60bc95fa-ebdf-4430-bfeb-583e65eeb425")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R54")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:C_Small")
 		(at 152.4 78.74 90)
 		(unit 1)
@@ -5863,6 +6625,73 @@
 			(project "tiliqua-motherboard"
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "#PWR073")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 135.89 86.36 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "93ba2344-5158-4dcc-87a3-bdd444b75bc6")
+		(property "Reference" "R56"
+			(at 132.588 85.09 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "93R1"
+			(at 135.89 86.36 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 135.89 86.36 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 135.89 86.36 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 135.89 86.36 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "fb2096d3-8196-43d0-9a21-23a8a4a8b0a3")
+		)
+		(pin "1"
+			(uuid "fbed7cb1-7742-4c33-a113-01aba780f5b3")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R56")
 					(unit 1)
 				)
 			)
@@ -6814,6 +7643,73 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R_Small")
+		(at 140.97 72.39 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "d39a098a-088a-4229-8ad1-969716c22af8")
+		(property "Reference" "R58"
+			(at 140.97 70.866 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "196R"
+			(at 140.97 72.39 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 140.97 72.39 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 140.97 72.39 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 140.97 72.39 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "88a5b8aa-1ba6-403a-92ee-5f341ab08309")
+		)
+		(pin "1"
+			(uuid "59f5fdfe-fc04-4fb7-a689-bd449603266d")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R58")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 175.26 52.07 0)
 		(mirror x)
@@ -6988,6 +7884,73 @@
 			(project "tiliqua-motherboard"
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "C44")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 135.89 71.12 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "d9bcd5e9-190b-463b-a552-3bf5addb098c")
+		(property "Reference" "R43"
+			(at 132.588 69.85 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "93R1"
+			(at 135.89 71.12 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 135.89 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 135.89 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 135.89 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "758d606d-d16f-4b19-a12e-7f0b567a3239")
+		)
+		(pin "1"
+			(uuid "ddff52e4-4654-4208-97ee-e200de243716")
+		)
+		(instances
+			(project ""
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R43")
 					(unit 1)
 				)
 			)
@@ -7250,6 +8213,73 @@
 			(project "tiliqua-motherboard"
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "#PWR098")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 135.89 73.66 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "e7e2f0e7-2ce2-45b5-8b9c-8fd258b16227")
+		(property "Reference" "R51"
+			(at 132.588 72.39 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "93R1"
+			(at 135.89 73.66 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 135.89 73.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 135.89 73.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 135.89 73.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "067cb2a5-44e5-4ded-983b-6ecbf71ff341")
+		)
+		(pin "1"
+			(uuid "10fe0810-6d25-47f4-a021-eef7c6f416c1")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R51")
 					(unit 1)
 				)
 			)
@@ -7754,6 +8784,73 @@
 			(project "tiliqua-motherboard"
 				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
 					(reference "C46")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R_Small")
+		(at 135.89 78.74 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "f9c6e46a-d33a-4e89-b91a-86d8f15b7b3b")
+		(property "Reference" "R53"
+			(at 132.588 77.47 90)
+			(effects
+				(font
+					(size 1.016 1.016)
+				)
+			)
+		)
+		(property "Value" "93R1"
+			(at 135.89 78.74 90)
+			(effects
+				(font
+					(size 0.762 0.762)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 135.89 78.74 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 135.89 78.74 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor, small symbol"
+			(at 135.89 78.74 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "f4187fe7-7697-4357-a561-96d94fcdd2e1")
+		)
+		(pin "1"
+			(uuid "6d24f01e-8d44-4f64-9627-825ea6485144")
+		)
+		(instances
+			(project "tiliqua-motherboard"
+				(path "/df6062c3-a570-4505-924c-c7fe32df3670/fab2810c-846b-4fd3-91f6-29ac3e93c045"
+					(reference "R53")
 					(unit 1)
 				)
 			)
