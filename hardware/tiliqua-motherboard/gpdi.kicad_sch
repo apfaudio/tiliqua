@@ -2615,7 +2615,7 @@
 	)
 	(wire
 		(pts
-			(xy 143.51 76.2) (xy 149.86 76.2)
+			(xy 143.51 76.2) (xy 153.67 76.2)
 		)
 		(stroke
 			(width 0)
@@ -2655,7 +2655,7 @@
 	)
 	(wire
 		(pts
-			(xy 154.94 83.82) (xy 166.37 83.82)
+			(xy 158.75 83.82) (xy 166.37 83.82)
 		)
 		(stroke
 			(width 0)
@@ -2695,7 +2695,7 @@
 	)
 	(wire
 		(pts
-			(xy 154.94 78.74) (xy 166.37 78.74)
+			(xy 158.75 78.74) (xy 166.37 78.74)
 		)
 		(stroke
 			(width 0)
@@ -2745,7 +2745,7 @@
 	)
 	(wire
 		(pts
-			(xy 154.94 86.36) (xy 166.37 86.36)
+			(xy 158.75 86.36) (xy 166.37 86.36)
 		)
 		(stroke
 			(width 0)
@@ -2875,7 +2875,7 @@
 	)
 	(wire
 		(pts
-			(xy 154.94 76.2) (xy 166.37 76.2)
+			(xy 158.75 76.2) (xy 166.37 76.2)
 		)
 		(stroke
 			(width 0)
@@ -2925,7 +2925,7 @@
 	)
 	(wire
 		(pts
-			(xy 143.51 71.12) (xy 149.86 71.12)
+			(xy 143.51 71.12) (xy 153.67 71.12)
 		)
 		(stroke
 			(width 0)
@@ -3045,7 +3045,7 @@
 	)
 	(wire
 		(pts
-			(xy 138.43 78.74) (xy 149.86 78.74)
+			(xy 138.43 78.74) (xy 153.67 78.74)
 		)
 		(stroke
 			(width 0)
@@ -3295,7 +3295,7 @@
 	)
 	(wire
 		(pts
-			(xy 143.51 81.28) (xy 149.86 81.28)
+			(xy 143.51 81.28) (xy 153.67 81.28)
 		)
 		(stroke
 			(width 0)
@@ -3305,7 +3305,7 @@
 	)
 	(wire
 		(pts
-			(xy 138.43 88.9) (xy 149.86 88.9)
+			(xy 138.43 88.9) (xy 153.67 88.9)
 		)
 		(stroke
 			(width 0)
@@ -3425,7 +3425,7 @@
 	)
 	(wire
 		(pts
-			(xy 138.43 83.82) (xy 149.86 83.82)
+			(xy 138.43 83.82) (xy 153.67 83.82)
 		)
 		(stroke
 			(width 0)
@@ -3475,7 +3475,7 @@
 	)
 	(wire
 		(pts
-			(xy 138.43 73.66) (xy 149.86 73.66)
+			(xy 138.43 73.66) (xy 153.67 73.66)
 		)
 		(stroke
 			(width 0)
@@ -3675,7 +3675,7 @@
 	)
 	(wire
 		(pts
-			(xy 154.94 73.66) (xy 166.37 73.66)
+			(xy 158.75 73.66) (xy 166.37 73.66)
 		)
 		(stroke
 			(width 0)
@@ -3685,7 +3685,7 @@
 	)
 	(wire
 		(pts
-			(xy 143.51 86.36) (xy 149.86 86.36)
+			(xy 143.51 86.36) (xy 153.67 86.36)
 		)
 		(stroke
 			(width 0)
@@ -3705,7 +3705,7 @@
 	)
 	(wire
 		(pts
-			(xy 154.94 81.28) (xy 166.37 81.28)
+			(xy 158.75 81.28) (xy 166.37 81.28)
 		)
 		(stroke
 			(width 0)
@@ -3735,7 +3735,7 @@
 	)
 	(wire
 		(pts
-			(xy 154.94 88.9) (xy 166.37 88.9)
+			(xy 158.75 88.9) (xy 166.37 88.9)
 		)
 		(stroke
 			(width 0)
@@ -3805,7 +3805,7 @@
 	)
 	(wire
 		(pts
-			(xy 154.94 71.12) (xy 166.37 71.12)
+			(xy 158.75 71.12) (xy 166.37 71.12)
 		)
 		(stroke
 			(width 0)
@@ -3822,6 +3822,16 @@
 			(type default)
 		)
 		(uuid "fc998caf-9309-4f03-b3a9-548ccd79a18b")
+	)
+	(label "PECL_D1-"
+		(at 143.51 78.74 0)
+		(effects
+			(font
+				(size 0.508 0.508)
+			)
+			(justify left bottom)
+		)
+		(uuid "004d3767-e02e-44aa-aaba-5f8ae133e1ef")
 	)
 	(label "SCL_Sink"
 		(at 194.31 99.06 0)
@@ -3843,6 +3853,16 @@
 		)
 		(uuid "0ac67635-fd23-4d14-9b58-499688d4231b")
 	)
+	(label "PECL_D1+"
+		(at 143.51 76.2 0)
+		(effects
+			(font
+				(size 0.508 0.508)
+			)
+			(justify left bottom)
+		)
+		(uuid "1d7ec458-8922-4f6d-b1cd-1de25b474556")
+	)
 	(label "HPD_Sink"
 		(at 194.31 109.22 0)
 		(effects
@@ -3862,6 +3882,26 @@
 			(justify left bottom)
 		)
 		(uuid "2f0df83a-47d6-4f7e-9143-92d4d4360eb4")
+	)
+	(label "PECL_CK+"
+		(at 143.51 86.36 0)
+		(effects
+			(font
+				(size 0.508 0.508)
+			)
+			(justify left bottom)
+		)
+		(uuid "45e86eac-9d05-4cd0-b81a-18bff030ab84")
+	)
+	(label "PECL_D0+"
+		(at 143.51 81.28 0)
+		(effects
+			(font
+				(size 0.508 0.508)
+			)
+			(justify left bottom)
+		)
+		(uuid "4a49b146-c3e4-4842-85d7-60562cd90794")
 	)
 	(label "SDA_Sink"
 		(at 194.31 101.6 0)
@@ -3893,6 +3933,16 @@
 		)
 		(uuid "5e855b6e-3a80-4a81-be37-dc1b73e3ed23")
 	)
+	(label "PECL_CK-"
+		(at 143.51 88.9 0)
+		(effects
+			(font
+				(size 0.508 0.508)
+			)
+			(justify left bottom)
+		)
+		(uuid "635cf379-ae5d-4875-a7b2-889487e5c895")
+	)
 	(label "CONN_D1-"
 		(at 201.93 78.74 0)
 		(effects
@@ -3922,6 +3972,36 @@
 			(justify left bottom)
 		)
 		(uuid "8ba7010b-b83a-484a-82cf-d2388bfa1be0")
+	)
+	(label "PECL_D2+"
+		(at 143.51 71.12 0)
+		(effects
+			(font
+				(size 0.508 0.508)
+			)
+			(justify left bottom)
+		)
+		(uuid "8e093523-def7-4c4a-8f56-51cd0cdd1abb")
+	)
+	(label "PECL_D0-"
+		(at 143.51 83.82 0)
+		(effects
+			(font
+				(size 0.508 0.508)
+			)
+			(justify left bottom)
+		)
+		(uuid "9498dcb1-1c0f-459f-a3e6-cb7359745d6c")
+	)
+	(label "PECL_D2-"
+		(at 143.51 73.66 0)
+		(effects
+			(font
+				(size 0.508 0.508)
+			)
+			(justify left bottom)
+		)
+		(uuid "b50a9413-e76d-4138-826c-47c328b5f6a3")
 	)
 	(label "CONN_D1+"
 		(at 201.93 76.2 0)
@@ -4649,7 +4729,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 152.4 88.9 90)
+		(at 156.21 88.9 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -4657,7 +4737,7 @@
 		(dnp no)
 		(uuid "2090b415-f1f3-445e-80fc-23741916d3e8")
 		(property "Reference" "C53"
-			(at 157.226 87.884 90)
+			(at 161.036 87.884 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4666,7 +4746,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 151.384 87.884 90)
+			(at 155.194 87.884 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4675,7 +4755,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
-			(at 152.4 88.9 0)
+			(at 156.21 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4684,7 +4764,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
-			(at 152.4 88.9 0)
+			(at 156.21 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4693,7 +4773,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 152.4 88.9 0)
+			(at 156.21 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4702,7 +4782,7 @@
 			)
 		)
 		(property "lcsc#" ""
-			(at 152.4 88.9 0)
+			(at 156.21 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4711,7 +4791,7 @@
 			)
 		)
 		(property "mfg#" ""
-			(at 152.4 88.9 0)
+			(at 156.21 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4720,7 +4800,7 @@
 			)
 		)
 		(property "Tol" ""
-			(at 152.4 88.9 0)
+			(at 156.21 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4729,7 +4809,7 @@
 			)
 		)
 		(property "LCSC" "C76934"
-			(at 154.432 88.646 0)
+			(at 158.242 88.646 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5203,7 +5283,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 152.4 73.66 90)
+		(at 156.21 73.66 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -5211,7 +5291,7 @@
 		(dnp no)
 		(uuid "31521e5f-469c-40e3-98a3-b2e2dc96f939")
 		(property "Reference" "C47"
-			(at 157.226 72.644 90)
+			(at 161.036 72.644 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5220,7 +5300,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 151.384 72.644 90)
+			(at 155.194 72.644 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5229,7 +5309,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
-			(at 152.4 73.66 0)
+			(at 156.21 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5238,7 +5318,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
-			(at 152.4 73.66 0)
+			(at 156.21 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5247,7 +5327,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 152.4 73.66 0)
+			(at 156.21 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5256,7 +5336,7 @@
 			)
 		)
 		(property "lcsc#" ""
-			(at 152.4 73.66 0)
+			(at 156.21 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5265,7 +5345,7 @@
 			)
 		)
 		(property "mfg#" ""
-			(at 152.4 73.66 0)
+			(at 156.21 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5274,7 +5354,7 @@
 			)
 		)
 		(property "Tol" ""
-			(at 152.4 73.66 0)
+			(at 156.21 73.66 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5283,7 +5363,7 @@
 			)
 		)
 		(property "LCSC" "C76934"
-			(at 154.432 73.406 0)
+			(at 158.242 73.406 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5668,7 +5748,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 152.4 86.36 90)
+		(at 156.21 86.36 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -5676,7 +5756,7 @@
 		(dnp no)
 		(uuid "59bfd448-fe49-4ffa-b86b-e6ee9afd3cc1")
 		(property "Reference" "C52"
-			(at 157.226 85.344 90)
+			(at 161.036 85.344 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5685,7 +5765,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 151.384 85.344 90)
+			(at 155.194 85.344 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5694,7 +5774,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
-			(at 152.4 86.36 0)
+			(at 156.21 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5703,7 +5783,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
-			(at 152.4 86.36 0)
+			(at 156.21 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5712,7 +5792,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 152.4 86.36 0)
+			(at 156.21 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5721,7 +5801,7 @@
 			)
 		)
 		(property "lcsc#" ""
-			(at 152.4 86.36 0)
+			(at 156.21 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5730,7 +5810,7 @@
 			)
 		)
 		(property "mfg#" ""
-			(at 152.4 86.36 0)
+			(at 156.21 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5739,7 +5819,7 @@
 			)
 		)
 		(property "Tol" ""
-			(at 152.4 86.36 0)
+			(at 156.21 86.36 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5748,7 +5828,7 @@
 			)
 		)
 		(property "LCSC" "C76934"
-			(at 154.432 86.106 0)
+			(at 158.242 86.106 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5868,7 +5948,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 152.4 83.82 90)
+		(at 156.21 83.82 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -5876,7 +5956,7 @@
 		(dnp no)
 		(uuid "633ea497-35ef-4cea-a0b9-731bb4d16032")
 		(property "Reference" "C51"
-			(at 157.226 82.804 90)
+			(at 161.036 82.804 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5885,7 +5965,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 151.384 82.804 90)
+			(at 155.194 82.804 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5894,7 +5974,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
-			(at 152.4 83.82 0)
+			(at 156.21 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5903,7 +5983,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
-			(at 152.4 83.82 0)
+			(at 156.21 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5912,7 +5992,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 152.4 83.82 0)
+			(at 156.21 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5921,7 +6001,7 @@
 			)
 		)
 		(property "lcsc#" ""
-			(at 152.4 83.82 0)
+			(at 156.21 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5930,7 +6010,7 @@
 			)
 		)
 		(property "mfg#" ""
-			(at 152.4 83.82 0)
+			(at 156.21 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5939,7 +6019,7 @@
 			)
 		)
 		(property "Tol" ""
-			(at 152.4 83.82 0)
+			(at 156.21 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5948,7 +6028,7 @@
 			)
 		)
 		(property "LCSC" "C76934"
-			(at 154.432 83.566 0)
+			(at 158.242 83.566 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6460,7 +6540,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 152.4 78.74 90)
+		(at 156.21 78.74 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -6468,7 +6548,7 @@
 		(dnp no)
 		(uuid "87795b89-7400-4ff5-a57e-1e03dda5f074")
 		(property "Reference" "C49"
-			(at 157.226 77.724 90)
+			(at 161.036 77.724 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6477,7 +6557,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 151.384 77.724 90)
+			(at 155.194 77.724 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6486,7 +6566,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
-			(at 152.4 78.74 0)
+			(at 156.21 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6495,7 +6575,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
-			(at 152.4 78.74 0)
+			(at 156.21 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6504,7 +6584,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 152.4 78.74 0)
+			(at 156.21 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6513,7 +6593,7 @@
 			)
 		)
 		(property "lcsc#" ""
-			(at 152.4 78.74 0)
+			(at 156.21 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6522,7 +6602,7 @@
 			)
 		)
 		(property "mfg#" ""
-			(at 152.4 78.74 0)
+			(at 156.21 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6531,7 +6611,7 @@
 			)
 		)
 		(property "Tol" ""
-			(at 152.4 78.74 0)
+			(at 156.21 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6540,7 +6620,7 @@
 			)
 		)
 		(property "LCSC" "C76934"
-			(at 154.432 78.486 0)
+			(at 158.242 78.486 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6699,7 +6779,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 152.4 76.2 90)
+		(at 156.21 76.2 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -6707,7 +6787,7 @@
 		(dnp no)
 		(uuid "95e792f5-3a6b-49ff-bc8c-47790a750df3")
 		(property "Reference" "C48"
-			(at 157.226 75.184 90)
+			(at 161.036 75.184 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6716,7 +6796,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 151.384 75.184 90)
+			(at 155.194 75.184 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6725,7 +6805,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
-			(at 152.4 76.2 0)
+			(at 156.21 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6734,7 +6814,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
-			(at 152.4 76.2 0)
+			(at 156.21 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6743,7 +6823,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 152.4 76.2 0)
+			(at 156.21 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6752,7 +6832,7 @@
 			)
 		)
 		(property "lcsc#" ""
-			(at 152.4 76.2 0)
+			(at 156.21 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6761,7 +6841,7 @@
 			)
 		)
 		(property "mfg#" ""
-			(at 152.4 76.2 0)
+			(at 156.21 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6770,7 +6850,7 @@
 			)
 		)
 		(property "Tol" ""
-			(at 152.4 76.2 0)
+			(at 156.21 76.2 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6779,7 +6859,7 @@
 			)
 		)
 		(property "LCSC" "C76934"
-			(at 154.432 75.946 0)
+			(at 158.242 75.946 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7425,7 +7505,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 152.4 81.28 90)
+		(at 156.21 81.28 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -7433,7 +7513,7 @@
 		(dnp no)
 		(uuid "ceca15b4-c93c-4df5-90d2-e9907b6ca445")
 		(property "Reference" "C50"
-			(at 157.226 80.264 90)
+			(at 161.036 80.264 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7442,7 +7522,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 151.384 80.264 90)
+			(at 155.194 80.264 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7451,7 +7531,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
-			(at 152.4 81.28 0)
+			(at 156.21 81.28 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7460,7 +7540,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
-			(at 152.4 81.28 0)
+			(at 156.21 81.28 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7469,7 +7549,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 152.4 81.28 0)
+			(at 156.21 81.28 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7478,7 +7558,7 @@
 			)
 		)
 		(property "lcsc#" ""
-			(at 152.4 81.28 0)
+			(at 156.21 81.28 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7487,7 +7567,7 @@
 			)
 		)
 		(property "mfg#" ""
-			(at 152.4 81.28 0)
+			(at 156.21 81.28 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7496,7 +7576,7 @@
 			)
 		)
 		(property "Tol" ""
-			(at 152.4 81.28 0)
+			(at 156.21 81.28 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7505,7 +7585,7 @@
 			)
 		)
 		(property "LCSC" "C76934"
-			(at 154.432 81.026 0)
+			(at 158.242 81.026 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8686,7 +8766,7 @@
 	)
 	(symbol
 		(lib_id "Device:C_Small")
-		(at 152.4 71.12 90)
+		(at 156.21 71.12 90)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -8694,7 +8774,7 @@
 		(dnp no)
 		(uuid "ef170fe1-fe16-412b-96d3-b51d45b6e858")
 		(property "Reference" "C46"
-			(at 157.226 70.104 90)
+			(at 161.036 70.104 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8703,7 +8783,7 @@
 			)
 		)
 		(property "Value" "100nF"
-			(at 151.384 70.104 90)
+			(at 155.194 70.104 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8712,7 +8792,7 @@
 			)
 		)
 		(property "Footprint" "Capacitor_SMD:C_0201_0603Metric"
-			(at 152.4 71.12 0)
+			(at 156.21 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8721,7 +8801,7 @@
 			)
 		)
 		(property "Datasheet" "https://datasheet.lcsc.com/lcsc/1912111437_TDK-C1608X7R1E104KT000N_C338036.pdf"
-			(at 152.4 71.12 0)
+			(at 156.21 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8730,7 +8810,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 152.4 71.12 0)
+			(at 156.21 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8739,7 +8819,7 @@
 			)
 		)
 		(property "lcsc#" ""
-			(at 152.4 71.12 0)
+			(at 156.21 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8748,7 +8828,7 @@
 			)
 		)
 		(property "mfg#" ""
-			(at 152.4 71.12 0)
+			(at 156.21 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8757,7 +8837,7 @@
 			)
 		)
 		(property "Tol" ""
-			(at 152.4 71.12 0)
+			(at 156.21 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8766,7 +8846,7 @@
 			)
 		)
 		(property "LCSC" "C76934"
-			(at 154.432 70.866 0)
+			(at 158.242 70.866 0)
 			(effects
 				(font
 					(size 1.27 1.27)
