@@ -9,6 +9,7 @@ from amaranth.sim import *
 from parameterized import parameterized
 
 from tiliqua import midi
+from tiliqua.test import stream
 
 
 class MidiTests(unittest.TestCase):
@@ -22,17 +23,12 @@ class MidiTests(unittest.TestCase):
         dut = midi.MidiDecode(usb=is_usb)
 
         async def testbench(ctx):
-            ctx.set(dut.i.valid,   1)
             if is_usb:
-                ctx.set(dut.i.payload, 0x00)
-                await ctx.tick()
-            ctx.set(dut.i.payload, 0x92)
-            await ctx.tick()
-            ctx.set(dut.i.payload, 0x48)
-            await ctx.tick()
-            ctx.set(dut.i.payload, 0x96)
-            await ctx.tick()
-            p = ctx.get(dut.o.payload)
+                await stream.put(ctx, dut.i, 0x00)
+            await stream.put(ctx, dut.i, 0x92)
+            await stream.put(ctx, dut.i, 0x48)
+            await stream.put(ctx, dut.i, 0x96)
+            p = await stream.get(ctx, dut.o)
             self.assertEqual(p.midi_type, midi.MessageType.NOTE_ON)
             self.assertEqual(p.midi_channel, 2)
             self.assertEqual(p.midi_payload.note_on.note, 0x48)
@@ -53,27 +49,30 @@ class MidiTests(unittest.TestCase):
         async def stimulus_notes(ctx):
             """Send some MIDI NOTE_ON events."""
             for note in note_range:
-                # FIXME: valid before ready in TBs EVERYWHERE!
-                ctx.set(dut.i.valid, 1)
-                ctx.set(dut.i.payload.midi_type, midi.MessageType.NOTE_ON)
-                ctx.set(dut.i.payload.midi_channel, 1)
-                ctx.set(dut.i.payload.midi_payload.note_on.note, note)
-                ctx.set(dut.i.payload.midi_payload.note_on.velocity, 0x60)
-                await ctx.tick().until(dut.i.ready)
-                ctx.set(dut.i.valid, 0)
-                await ctx.tick()
+                await stream.put(ctx, dut.i, {
+                    'midi_type': midi.MessageType.NOTE_ON,
+                    'midi_channel': 1,
+                    'midi_payload': {
+                        'note_on': {
+                            'note': note,
+                            'velocity': 0x60
+                        }
+                    }
+                })
 
             await ctx.tick().repeat(50)
 
             for note in note_range:
-                ctx.set(dut.i.valid, 1)
-                ctx.set(dut.i.payload.midi_type, midi.MessageType.NOTE_OFF)
-                ctx.set(dut.i.payload.midi_channel, 1)
-                ctx.set(dut.i.payload.midi_payload.note_off.note, note)
-                ctx.set(dut.i.payload.midi_payload.note_off.velocity, 0x30)
-                await ctx.tick().until(dut.i.ready)
-                ctx.set(dut.i.valid, 0)
-                await ctx.tick()
+                await stream.put(ctx, dut.i, {
+                    'midi_type': midi.MessageType.NOTE_OFF,
+                    'midi_channel': 1,
+                    'midi_payload': {
+                        'note_off': {
+                            'note': note,
+                            'velocity': 0x30
+                        }
+                    }
+                })
 
         async def testbench(ctx):
             """Check that the NOTE_ON / OFF events correspond to voice slots."""

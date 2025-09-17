@@ -11,6 +11,7 @@ from amaranth.sim import *
 from amaranth_future import fixed
 from tiliqua.dsp import ASQ
 from tiliqua.periph import eurorack_pmod
+from tiliqua.test import stream
 
 
 class I2STests(unittest.TestCase):
@@ -40,15 +41,10 @@ class I2STests(unittest.TestCase):
         m = DomainRenamer({"audio": "sync"})(m)
 
         async def process(ctx):
+            ctx.set(dut.o_cal.ready, 1)
             for n in range(0, 100):
-                await ctx.tick().until(dut.i_cal.ready)
                 x = fixed.Const(math.sin(n*0.10), shape=ASQ)
-                ctx.set(dut.i_cal.payload, [x, 0, 0, 0])
-                ctx.set(dut.i_cal.valid, 1)
-                ctx.set(dut.o_cal.ready, 1)
-                await ctx.tick()
-                ctx.set(dut.i_cal.valid, 0)
-                ctx.set(dut.o_cal.ready, 0)
+                await stream.put(ctx, dut.i_cal, [x, 0, 0, 0])
 
         sim = Simulator(m)
         sim.add_clock(1e-6)

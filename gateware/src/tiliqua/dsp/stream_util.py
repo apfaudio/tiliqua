@@ -136,6 +136,33 @@ class Merge(wiring.Component):
             wiring.connect(m, stream.Signature(self.shape, always_valid=True).create(),
                            self.i[n])
 
+class Arbiter(wiring.Component):
+    """
+    Round-robin arbiter for multiple streams.
+    """
+    def __init__(self, n_channels: int, shape):
+        self.n_channels = n_channels
+        super().__init__({
+            "i": In(stream.Signature(shape)).array(n_channels),
+            "o": Out(stream.Signature(shape)),
+        })
+    def elaborate(self, platform) -> Module:
+        m = Module()
+        grant = Signal(range(self.n_channels))
+        # Connect granted stream directly
+        with m.Switch(grant):
+            for n in range(self.n_channels):
+                with m.Case(n):
+                    wiring.connect(m, wiring.flipped(self.i[n]), wiring.flipped(self.o))
+        # Permit switching on the end of a transaction, or if there is no pending
+        # valid (we are not allowed to deassert valid, but we may deassert ready)
+        transaction_complete = self.o.valid & self.o.ready
+        with m.If(transaction_complete | ~self.o.valid):
+            with m.If(grant == (self.n_channels - 1)):
+                m.d.sync += grant.eq(0)
+            with m.Else():
+                m.d.sync += grant.eq(grant + 1)
+        return m
 
 def connect_remap(m, stream_o, stream_i, mapping):
     """

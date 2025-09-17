@@ -15,7 +15,8 @@ from scipy import signal
 
 from amaranth_future import fixed
 from tiliqua import dsp
-from tiliqua.dsp import ASQ, delay_effect, mac
+from tiliqua.dsp import ASQ, delay_effect, mac, stream_util
+from tiliqua.test import stream
 
 
 class DSPTests(unittest.TestCase):
@@ -60,12 +61,7 @@ class DSPTests(unittest.TestCase):
             """Send `stimulus_values` to the DUT."""
             s = stimulus_values()
             while True:
-                await ctx.tick().until(dut.i.ready)
-                ctx.set(dut.i.valid, 1)
-                ctx.set(dut.i.payload, next(s))
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
-                await ctx.tick()
+                await stream.put(ctx, dut.i, next(s))
 
         async def testbench(ctx):
             """Observe and measure FIR filter outputs."""
@@ -137,11 +133,7 @@ class DSPTests(unittest.TestCase):
             """Send `stimulus_values` to the DUT."""
             s = stimulus_values()
             while True:
-                await ctx.tick().until(dut.i.ready)
-                ctx.set(dut.i.valid, 1)
-                ctx.set(dut.i.payload, next(s))
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
+                await stream.put(ctx, dut.i, next(s))
                 await ctx.tick()
 
         async def testbench(ctx):
@@ -198,26 +190,15 @@ class DSPTests(unittest.TestCase):
 
         async def stimulus_i(ctx):
             """Send `stimulus_values` to the DUT."""
-
-            ctx.set(pitch_shift.i.payload.pitch,
-                fixed.Const(0.5, shape=pitch_shift.dtype))
-            ctx.set(pitch_shift.i.payload.grain_sz,
-                delayln.max_delay//2)
-
             s = stimulus_values()
             while True:
-                ctx.set(delayln.i.valid, 1)
                 # First clock a sample into the delay line
-                await ctx.tick().until(delayln.i.ready)
-                ctx.set(delayln.i.payload, next(s))
-                await ctx.tick()
-                ctx.set(delayln.i.valid, 0)
+                await stream.put(ctx, delayln.i, next(s))
                 # Now clock a sample into the pitch shifter
-                await ctx.tick().until(pitch_shift.i.ready)
-                ctx.set(pitch_shift.i.valid, 1)
-                await ctx.tick()
-                ctx.set(pitch_shift.i.valid, 0)
-                await ctx.tick()
+                await stream.put(ctx, pitch_shift.i, {
+                    'pitch': fixed.Const(0.5, shape=pitch_shift.dtype),
+                    'grain_sz': delayln.max_delay//2,
+                })
 
         async def testbench(ctx):
             n_samples_in = 0
@@ -259,20 +240,16 @@ class DSPTests(unittest.TestCase):
             for n in range(0, 200):
                 x = fixed.Const(0.4*(math.sin(n*0.2) + math.sin(n)), shape=ASQ)
                 y = fixed.Const(0.8*(math.sin(n*0.1)), shape=ASQ)
-                ctx.set(dut.i.valid, 1)
-                ctx.set(dut.i.payload.x, x)
-                ctx.set(dut.i.payload.cutoff, y)
-                ctx.set(dut.i.payload.resonance, fixed.Const(0.1, shape=ASQ))
-                await ctx.tick().until(dut.i.ready)
-                ctx.set(dut.i.valid, 0)
+                await stream.put(ctx, dut.i, {
+                    'x': x,
+                    'cutoff': y,
+                    'resonance': fixed.Const(0.1, shape=ASQ)
+                })
 
         async def testbench(ctx):
-            ctx.set(dut.o.ready, 1)
             while True:
-                await ctx.tick().until(dut.o.valid)
-                out0 = ctx.get(dut.o.payload.hp)
-                out1 = ctx.get(dut.o.payload.lp)
-                out2 = ctx.get(dut.o.payload.bp)
+                _ = await stream.get(ctx, dut.o)
+                # TODO spectral analysis
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
@@ -291,21 +268,17 @@ class DSPTests(unittest.TestCase):
                           [    0, 0,   0,  1]])
 
         async def testbench(ctx):
-            ctx.set(matrix.i.payload[0], fixed.Const(0.2, shape=ASQ))
-            ctx.set(matrix.i.payload[1], fixed.Const(-0.4,  shape=ASQ))
-            ctx.set(matrix.i.payload[2], fixed.Const(0.6,  shape=ASQ))
-            ctx.set(matrix.i.payload[3], fixed.Const(-0.8,  shape=ASQ))
-            ctx.set(matrix.i.valid, 1)
-            await ctx.tick()
-            ctx.set(matrix.i.valid, 0)
-            await ctx.tick()
-            ctx.set(matrix.o.ready, 1)
-            while ctx.get(matrix.o.valid) != 1:
-                await ctx.tick()
-            self.assertAlmostEqual(ctx.get(matrix.o.payload[0]).as_float(),  0.3, places=4)
-            self.assertAlmostEqual(ctx.get(matrix.o.payload[1]).as_float(), -0.4, places=4)
-            self.assertAlmostEqual(ctx.get(matrix.o.payload[2]).as_float(), -0.9, places=4)
-            self.assertAlmostEqual(ctx.get(matrix.o.payload[3]).as_float(), -0.8, places=4)
+            await stream.put(ctx, matrix.i, [
+                fixed.Const(0.2, shape=ASQ),
+                fixed.Const(-0.4, shape=ASQ),
+                fixed.Const(0.6, shape=ASQ),
+                fixed.Const(-0.8, shape=ASQ)
+            ])
+            result = await stream.get(ctx, matrix.o)
+            self.assertAlmostEqual(result[0].as_float(),  0.3, places=4)
+            self.assertAlmostEqual(result[1].as_float(), -0.4, places=4)
+            self.assertAlmostEqual(result[2].as_float(), -0.9, places=4)
+            self.assertAlmostEqual(result[3].as_float(), -0.8, places=4)
 
         sim = Simulator(matrix)
         sim.add_clock(1e-6)
@@ -333,17 +306,10 @@ class DSPTests(unittest.TestCase):
                 m.submodules.waveshaper = dut = dsp.WaveShaper(lut_function=scaled_tanh, lut_size=16)
 
         async def testbench(ctx):
-            await ctx.tick()
             for n in range(0, 100):
                 x = fixed.Const(math.sin(n*0.10), shape=ASQ)
-                ctx.set(dut.i.payload, x)
-                ctx.set(dut.i.valid, 1)
-                ctx.set(dut.o.ready, 1)
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
-                while ctx.get(dut.o.valid) != 1:
-                    await ctx.tick()
-                await ctx.tick()
+                await stream.put(ctx, dut.i, x)
+                result = await stream.get(ctx, dut.o)
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
@@ -357,29 +323,14 @@ class DSPTests(unittest.TestCase):
             return math.tanh(3.0*x)
 
         m = Module()
-        vca = dsp.VCA()
-        waveshaper = dsp.WaveShaper(lut_function=scaled_tanh)
-
-        m.submodules += [vca, waveshaper]
-
-        m.d.sync += [
-            waveshaper.i.payload.eq(vca.o.payload),
-        ]
+        m.submodules.vca = vca = dsp.VCA()
 
         async def testbench(ctx):
-            await ctx.tick()
             for n in range(0, 100):
-                x = fixed.Const(0.8*math.sin(n*0.3), shape=ASQ)
-                gain = fixed.Const(3.0*math.sin(n*0.1), shape=vca.i.payload[0].shape())
-                ctx.set(vca.i.payload[0], x)
-                ctx.set(vca.i.payload[1], gain)
-                ctx.set(vca.i.valid, 1)
-                ctx.set(vca.o.ready, 1)
-                await ctx.tick()
-                ctx.set(vca.i.valid, 0)
-                while ctx.get(vca.o.valid) != 1:
-                    await ctx.tick()
-                await ctx.tick()
+                x = fixed.Const(0.8*math.sin(n*0.3), shape=mac.SQNative)
+                gain = fixed.Const(3.0*math.sin(n*0.1), shape=mac.SQNative)
+                await stream.put(ctx, vca.i, [x, gain])
+                _ = await stream.get(ctx, vca.o)
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
@@ -403,19 +354,13 @@ class DSPTests(unittest.TestCase):
         wiring.connect(m, nco.o, waveshaper.i)
 
         async def testbench(ctx):
-            ctx.set(waveshaper.o.ready, 1)
-            await ctx.tick()
             for n in range(0, 400):
                 phase = fixed.Const(0.1*math.sin(n*0.10), shape=ASQ)
-                ctx.set(nco.i.payload.freq_inc, 0.66)
-                ctx.set(nco.i.payload.phase, phase)
-                ctx.set(nco.i.valid, 1)
-                await ctx.tick()
-                ctx.set(nco.i.valid, 0)
-                await ctx.tick()
-                while ctx.get(waveshaper.o.valid) != 1:
-                    await ctx.tick()
-                await ctx.tick()
+                await stream.put(ctx, nco.i, {
+                    'freq_inc': 0.66,
+                    'phase': phase
+                })
+                result = await stream.get(ctx, waveshaper.o)
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
@@ -430,16 +375,8 @@ class DSPTests(unittest.TestCase):
         async def testbench(ctx):
             for n in range(0, 1024):
                 x = fixed.Const(0.1+0.4*(math.sin(n*0.2) + math.sin(n)), shape=ASQ)
-                ctx.set(boxcar.i.payload, x)
-                ctx.set(boxcar.i.valid, 1)
-                await ctx.tick()
-                while ctx.get(boxcar.i.ready) != 1:
-                    await ctx.tick()
-                ctx.set(boxcar.i.valid, 0)
-                await ctx.tick()
-                ctx.set(boxcar.o.ready, 1)
-                while ctx.get(boxcar.o.ready) != 1:
-                    await ctx.tick()
+                await stream.put(ctx, boxcar.i, x)
+                _ = await stream.get(ctx, boxcar.o)
 
         sim = Simulator(boxcar)
         sim.add_clock(1e-6)
@@ -454,19 +391,38 @@ class DSPTests(unittest.TestCase):
         async def testbench(ctx):
             for n in range(0, 1024*20):
                 x = fixed.Const(0.2+0.001*(math.sin(n*0.2) + math.sin(n)), shape=ASQ)
-                ctx.set(dut.i.payload, x)
-                ctx.set(dut.i.valid, 1)
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
-                await ctx.tick()
-                ctx.set(dut.o.ready, 1)
-                while ctx.get(dut.o.ready) != 1:
-                    await ctx.tick()
-                while ctx.get(dut.i.ready) != 1:
-                    await ctx.tick()
+                await stream.put(ctx, dut.i, x)
+                _ = await stream.get(ctx, dut.o)
 
         sim = Simulator(dut)
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_dcblock.vcd", "w")):
+            sim.run()
+
+    def test_stream_arbiter(self):
+
+        n_channels = 3
+        n_elements = 5
+        dut = stream_util.Arbiter(n_channels=n_channels, shape=unsigned(8))
+        def mk_stimulus(n):
+            async def stimulus(ctx):
+                for z in range(n_elements):
+                    await stream.put(ctx, dut.i[n], 10*n + z)
+                    await ctx.tick().repeat(n+1)
+            return stimulus
+
+        async def testbench(ctx):
+            result = []
+            expect = [10*n+z for z in range(n_elements) for n in range(n_channels)]
+            for n in range(n_channels*n_elements):
+                result.append(await stream.get(ctx, dut.o))
+            self.assertEqual(sorted(result), sorted(expect))
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        for n in range(n_channels):
+            sim.add_process(mk_stimulus(n))
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open("test_stream_arbiter.vcd", "w")):
             sim.run()
