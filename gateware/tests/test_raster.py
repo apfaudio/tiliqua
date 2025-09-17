@@ -7,10 +7,12 @@ import unittest
 from amaranth import *
 from amaranth.sim import *
 
-from tiliqua.test import wishbone, stream
-from tiliqua.raster import persist, stroke, plot
+from tiliqua.test import wishbone, stream, csr as csr_util
+from tiliqua.raster import persist, stroke, plot, blit
 from tiliqua.video import framebuffer, modeline, palette
 
+from amaranth_soc import csr
+from amaranth_soc.csr import wishbone as csr_wishbone
 
 class RasterTests(unittest.TestCase):
 
@@ -160,4 +162,52 @@ class RasterTests(unittest.TestCase):
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_plot_backend.vcd", "w")):
+            sim.run()
+
+    def test_blit_peripheral(self):
+
+        m = Module()
+        dut = blit.Peripheral()
+        decoder = csr.Decoder(addr_width=28, data_width=8)
+        decoder.add(dut.csr_bus, addr=0, name="dut")
+        bridge = csr_wishbone.WishboneCSRBridge(decoder.bus, data_width=32)
+        m.submodules += [dut, decoder, bridge]
+
+        async def test_stimulus(ctx):
+
+            async def csr_write(ctx, value, register, field=None):
+                await csr_util.wb_csr_w(
+                        ctx, dut.csr_bus, bridge.wb_bus, value, register, field)
+
+            async def csr_read(ctx, register, field=None):
+                return await csr_util.wb_csr_r(
+                        ctx, dut.csr_bus, bridge.wb_bus, register, field)
+
+            ctx.set(dut.enable, 1)
+
+            # write something to the spritesheet
+            await wishbone.classic_wr(ctx, dut.sprite_mem_bus, adr=0, dat_w=0x0f)
+
+            # issue a blit
+            # width=8, height=4, x=0, y=0
+            await csr_write(ctx, 0x04080000, "src")
+            # pixel=0xab, x=0, y=0
+            await csr_write(ctx, 0xab<<(12*2), "blit")
+
+            await ctx.tick().repeat(200)
+
+        async def test_response(ctx):
+            ctx.set(dut.plot_req.ready, 1)
+            while True:
+                if ctx.get(dut.plot_req.valid):
+                    p_x = ctx.get(dut.plot_req.payload.x)
+                    p_y = ctx.get(dut.plot_req.payload.y)
+                    print(f"plot_req x={p_x}, y={p_y}")
+                await ctx.tick()
+
+        sim = Simulator(m)
+        sim.add_clock(1e-6)
+        sim.add_testbench(test_stimulus)
+        sim.add_testbench(test_response, background=True)
+        with sim.write_vcd(vcd_file=open("test_blit_peripheral.vcd", "w")):
             sim.run()

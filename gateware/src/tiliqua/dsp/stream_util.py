@@ -5,7 +5,7 @@
 """Utilities for splitting, merging, remapping streams."""
 
 from amaranth import *
-from amaranth.lib import data, stream, wiring
+from amaranth.lib import data, stream, wiring, fifo
 from amaranth.lib.wiring import In, Out
 
 from . import ASQ
@@ -182,7 +182,7 @@ class SyncFIFOBuffered(wiring.Component):
         output (stream): Output stream.
     '''
 
-    def __init__(self, *, shape: ShapeLike, depth: int):
+    def __init__(self, *, shape, depth: int):
         super().__init__({
             'i': wiring.In(stream.Signature(shape)),
             'o': wiring.Out(stream.Signature(shape)),
@@ -197,14 +197,14 @@ class SyncFIFOBuffered(wiring.Component):
 
         m.d.comb += [
             # Input
-            self.input.ready.eq(self.fifo.w_rdy),
-            self.fifo.w_en.eq(self.input.valid),
-            self.fifo.w_data.eq(self.input.payload),
+            self.i.ready.eq(self.fifo.w_rdy),
+            self.fifo.w_en.eq(self.i.valid),
+            self.fifo.w_data.eq(self.i.payload),
 
             # Output
-            self.output.valid.eq(self.fifo.r_rdy),
-            self.output.payload.eq(self.fifo.r_data),
-            self.fifo.r_en.eq(self.output.ready),
+            self.o.valid.eq(self.fifo.r_rdy),
+            self.o.payload.eq(self.fifo.r_data),
+            self.fifo.r_en.eq(self.o.ready),
         ]
 
         return m

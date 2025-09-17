@@ -78,15 +78,15 @@ class Peripheral(wiring.Component):
         kind: Kind
         params: data.UnionLayout({
             "src": data.StructLayout({
-                "src_x": unsigned(8)
-                "src_y": unsigned(8)
-                "width": unsigned(8)
-                "height": unsigned(8)
+                "src_x": unsigned(8),
+                "src_y": unsigned(8),
+                "width": unsigned(8),
+                "height": unsigned(8),
             }),
             "blit": data.StructLayout({
-                "dst_x": signed(12)
-                "dst_y": signed(12)
-                "pixel": Pixel
+                "dst_x": signed(12),
+                "dst_y": signed(12),
+                "pixel": Pixel,
             }),
         })
 
@@ -106,7 +106,7 @@ class Peripheral(wiring.Component):
         self.fifo_depth = fifo_depth
 
         self._sprite_mem = Memory(shape=unsigned(32), depth=memory_words, init=[])
-        self._cmd_fifo = stream_util.SyncFIFOBuffered(shape=BlitCmd, depth=fifo_depth)
+        self._cmd_fifo = stream_util.SyncFIFOBuffered(shape=self.BlitCmd, depth=fifo_depth)
 
         regs = csr.Builder(addr_width=6, data_width=8)
         self._status = regs.add("status", self.StatusReg(), offset=0x00)
@@ -153,18 +153,18 @@ class Peripheral(wiring.Component):
         with m.If(self._src.element.w_stb):
             m.d.comb += [
                 cmd_fifo.i.valid.eq(1),
-                cmd_fifo.i.payload.kind.eq(BlitCmd.Kind.SRC),
-                cmd_fifo.i.payload.params.src.src_x.eq(self._blit.f.src_x.w_data),
-                cmd_fifo.i.payload.params.src.src_y.eq(self._blit.f.src_y.w_data),
-                cmd_fifo.i.payload.params.src.width.eq(self._blit.f.width.w_data),
-                cmd_fifo.i.payload.params.src.height.eq(self._blit.f.height.w_data),
+                cmd_fifo.i.payload.kind.eq(self.BlitCmd.Kind.SRC),
+                cmd_fifo.i.payload.params.src.src_x.eq(self._src.f.src_x.w_data),
+                cmd_fifo.i.payload.params.src.src_y.eq(self._src.f.src_y.w_data),
+                cmd_fifo.i.payload.params.src.width.eq(self._src.f.width.w_data),
+                cmd_fifo.i.payload.params.src.height.eq(self._src.f.height.w_data),
             ]
 
         # Enqueue command on 'blit' register write
-        with m.If(self._blit.element.w_stb & cmd_fifo_w.ready):
+        with m.If(self._blit.element.w_stb & cmd_fifo.i.ready):
             m.d.comb += [
                 cmd_fifo.i.valid.eq(1),
-                cmd_fifo.i.payload.kind.eq(BlitCmd.Kind.BLIT),
+                cmd_fifo.i.payload.kind.eq(self.BlitCmd.Kind.BLIT),
                 cmd_fifo.i.payload.params.blit.dst_x.eq(self._blit.f.dst_x.w_data),
                 cmd_fifo.i.payload.params.blit.dst_y.eq(self._blit.f.dst_y.w_data),
                 cmd_fifo.i.payload.params.blit.pixel.eq(self._blit.f.pixel.w_data),
@@ -197,9 +197,9 @@ class Peripheral(wiring.Component):
         # Status register
         m.d.comb += [
             # busy = FIFO is full (can't accept new commands)
-            self._status.f.busy.r_data.eq(~cmd_fifo_w.ready),
+            self._status.f.busy.r_data.eq(~cmd_fifo.i.ready),
             # empty = FIFO is empty (safe to change spritesheet)
-            self._status.f.empty.r_data.eq(~self._cmd_fifo.r_stream.valid),
+            self._status.f.empty.r_data.eq(~cmd_fifo.o.valid),
             self._status.f.mem_words.r_data.eq(self.memory_words),
             self._status.f.column_words.r_data.eq(self.column_words),
         ]
@@ -213,7 +213,7 @@ class Peripheral(wiring.Component):
                 with m.If(self.enable & cmd_fifo.o.valid):
                     m.d.comb += cmd_fifo.o.ready.eq(1)
                     with m.Switch(cmd_fifo.o.payload.kind):
-                        with m.Case(BlitCmd.Kind.SRC):
+                        with m.Case(self.BlitCmd.Kind.SRC):
                             m.d.sync += [
                                 current_src_x .eq(cmd_fifo.o.payload.params.src.src_x),
                                 current_src_y .eq(cmd_fifo.o.payload.params.src.src_y),
@@ -221,13 +221,13 @@ class Peripheral(wiring.Component):
                                 current_width .eq(cmd_fifo.o.payload.params.src.width),
                             ]
                             # Stay in 'IDLE' state on source changes.
-                        with m.Case(BlitCmd.Kind.BLIT):
+                        with m.Case(self.BlitCmd.Kind.BLIT):
                             m.d.sync += [
                                 plot_x.eq(0),
                                 plot_y.eq(0),
                                 current_dst_x.eq(cmd_fifo.o.payload.params.blit.dst_x),
-                                current_dst_y.eq(cmd_fifo.o.payload.params.blit.dst_y)
-                                current_pixel.eq(cmd_fifo.o.payload.params.blit.pixel)
+                                current_dst_y.eq(cmd_fifo.o.payload.params.blit.dst_y),
+                                current_pixel.eq(cmd_fifo.o.payload.params.blit.pixel),
                             ]
                             m.next = 'READ_SPRITE_DATA'
 
