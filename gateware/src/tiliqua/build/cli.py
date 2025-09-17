@@ -273,7 +273,7 @@ def top_level_cli(
 
     if args.action == CliAction.Simulate:
         sim.simulate(fragment, sim_ports(fragment), sim_harness,
-                     hw_platform, kwargs["clock_settings"], args.trace_fst)
+                     hw_platform, kwargs["clock_settings"], args.trace_fst, archiver)
         sys.exit(0)
 
     if ila_supported and args.ila:

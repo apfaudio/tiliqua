@@ -93,7 +93,7 @@ def soc_simulation_ports(fragment):
         "dvi_b":          (fragment.fb.simif.b,                     None),
     }
 
-def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=False):
+def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=False, archiver=None):
 
     build_dst = "build"
     dst = f"{build_dst}/tiliqua_soc.v"
@@ -109,6 +109,38 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
             ports=ports
             ))
 
+    # Check modeline requirement early
+    if hasattr(fragment, "fb") and fragment.fb.fixed_modeline is None:
+        raise ValueError("Simulation requires specifying a static video mode with `--modeline`")
+
+    has_soc = hasattr(fragment, "fw_location")
+
+    if archiver and has_soc:
+        # Generate fake `bootinfo` (expected by user bitstreams with an SoC, the
+        # bootloader creates and saves this at a defined position in PSRAM)
+
+        bootinfo_path = os.path.join(build_dst, "bootinfo.bin")
+        manifest_path = os.path.join(build_dst, "manifest.json")
+
+        manifest = archiver.write_manifest()
+        manifest.write_to_path(manifest_path)
+
+        print(f"Generating bootinfo for simulation: {h_active}x{v_active}@{dvi_clk_hz}Hz")
+        dvi_clk_hz = clock_settings.frequencies.dvi
+        h_active = fragment.fb.fixed_modeline.h_active
+        v_active = fragment.fb.fixed_modeline.v_active
+        subprocess.check_call([
+            "cargo", "run",
+            "--manifest-path", "src/rs/bootinfo_gen/Cargo.toml",
+            "--",
+            "--manifest", manifest_path,
+            "--h-active", str(h_active),
+            "--v-active", str(v_active),
+            "--fixed-pclk-hz", str(dvi_clk_hz),
+            "--output", bootinfo_path
+        ], env=os.environ)
+        print(f"Generated bootinfo: {bootinfo_path}")
+
     # Write all additional files added with platform.add_file()
     # to build/ directory, so verilator build can find them.
     for file in sim_platform.files:
@@ -118,8 +150,6 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
     tracing_flags = ["--trace-fst", "--trace-structs"] if tracing else []
 
     if hasattr(fragment, "fb"):
-        if fragment.fb.fixed_modeline is None:
-            raise ValueError("Simulation requires specifying a static video mode with `--modeline`")
         dvi_clk_hz = clock_settings.frequencies.dvi
         dvi_h_active = fragment.fb.fixed_modeline.h_active
         dvi_v_active = fragment.fb.fixed_modeline.v_active
@@ -140,9 +170,14 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
 
     firmware_cflags = []
     bootinfo_cflags = []
-    if hasattr(fragment, "fw_location"):
+    if has_soc:
         firmware_cflags += [
            "-CFLAGS", f"-DFIRMWARE_BIN_PATH=\\\"{fragment.firmware_bin_path}\\\"",
+        ]
+        bootinfo_offset = fragment.bootinfo_base - fragment.psram_base
+        bootinfo_cflags += [
+            "-CFLAGS", f"-DBOOTINFO_BIN_PATH=\\\"{bootinfo_path}\\\"",
+            "-CFLAGS", f"-DBOOTINFO_OFFSET={hex(bootinfo_offset)}",
         ]
         match fragment.fw_location:
             case FirmwareLocation.PSRAM:
@@ -189,7 +224,7 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
                            "-CFLAGS", f"-DSYNC_CLK_HZ={clock_sync_hz}",
                            "-CFLAGS", f"-DAUDIO_CLK_HZ={audio_clk_hz}",
                            "-CFLAGS", f"-DFAST_CLK_HZ={fast_clk_hz}",
-                          ] + video_cflags + psram_cflags + firmware_cflags + [
+                          ] + video_cflags + psram_cflags + firmware_cflags + bootinfo_cflags + [
                            harness,
                            f"{dst}",
                           ] + [

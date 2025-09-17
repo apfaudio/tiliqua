@@ -43,7 +43,7 @@ pub enum RegionType {
 pub struct MemoryRegion {
     pub filename: String<16>,
     pub region_type: RegionType,
-    pub spiflash_src: u32,
+    pub spiflash_src: Option<u32>,
     pub psram_dst: Option<u32>,
     pub size: u32,
     pub crc: Option<u32>,
@@ -90,7 +90,11 @@ impl BitstreamManifest {
         for (i, region) in self.regions.iter().enumerate() {
             info!("\tmemory_region[{}] = {{", i);
             info!("\t\tfilename:     '{}'", region.filename);
-            info!("\t\tspiflash_src: {:#x}", region.spiflash_src);
+            if let Some(spiflash_src) = region.spiflash_src {
+                info!("\t\tspiflash_src: {:#x}", spiflash_src);
+            } else {
+                info!("\t\tspiflash_src: None");
+            }
             if let Some(psram_dst) = region.psram_dst {
                 info!("\t\tpsram_dst:    {:#x} (copyto)", psram_dst);
             }
@@ -151,7 +155,9 @@ impl BitstreamManifest {
     pub fn get_option_storage_window(&self) -> Option<core::ops::Range<u32>> {
         for region in self.regions.iter() {
             if region.region_type == RegionType::OptionStorage {
-                return Some(region.spiflash_src..(region.spiflash_src+region.size))
+                if let Some(spiflash_src) = region.spiflash_src {
+                    return Some(spiflash_src..(spiflash_src+region.size));
+                }
             }
         }
         None
