@@ -12,30 +12,27 @@ from amaranth.lib.wiring import In, Out
 from amaranth_soc import csr, wishbone
 
 from ..video.framebuffer import DMAFramebuffer
+from ..video.types import Pixel
 
 
 class Persistance(wiring.Component):
 
     """
     Read pixels from a framebuffer in PSRAM and apply gradual intensity reduction to simulate oscilloscope glow.
-    Pixels are DMA'd from PSRAM as a wishbone master in bursts of 'fifo_depth // 2' in the 'sync' clock domain.
+    Pixels are DMA'd from PSRAM as a wishbone master in bursts of 'fifo_depth' in the 'sync' clock domain.
     The block of pixels has its intensity reduced and is then DMA'd back to the bus.
 
     'holdoff' is used to keep this core from saturating the bus between bursts.
     """
 
     def __init__(self, *, fb: DMAFramebuffer,
-                 fifo_depth=32, holdoff_default=256):
+                 fifo_depth=16, holdoff_default=256):
 
         self.fb = fb
         self.fifo_depth = fifo_depth
 
         # FIFO to cache pixels from PSRAM.
-        self.fifo = SyncFIFOBuffered(width=32, depth=fifo_depth)
-
-        # Current addresses in the framebuffer (read and write sides)
-        self.dma_addr_in = Signal(32, init=0)
-        self.dma_addr_out = Signal(32)
+        self.fifo = SyncFIFOBuffered(width=fb.bus.data_width, depth=fifo_depth)
 
         super().__init__({
             # Tweakables
@@ -50,107 +47,124 @@ class Persistance(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        # Length of framebuffer in 32-bit words
-        fb_len_words = (self.fb.timings.active_pixels * self.fb.bytes_per_pixel) // 4
-
-        holdoff_count = Signal(32)
-        pnext = Signal(32)
-        wr_source = Signal(32)
-
         m.submodules.fifo = self.fifo
         bus = self.bus
-        dma_addr_in = self.dma_addr_in
-        dma_addr_out = self.dma_addr_out
 
-        decay_latch = Signal(4)
+        # Length of framebuffer in bus words
+        fb_len_words = ((self.fb.timings.active_pixels * self.fb.bytes_per_pixel) //
+                        (self.fb.bus.data_width // Pixel.as_shape().size))
 
-        # Persistance state machine in 'sync' domain.
+        # Track framebuffer position by tracking fifo reads/writes
+        dma_offs_in = Signal(self.fb.bus.addr_width, init=0)
+        with m.If(self.fifo.w_en & self.fifo.w_rdy):
+            with m.If(dma_offs_in < (fb_len_words-1)):
+                m.d.sync += dma_offs_in.eq(dma_offs_in + 1)
+            with m.Else():
+                m.d.sync += dma_offs_in.eq(0)
+
+        dma_offs_out = Signal.like(dma_offs_in)
+        with m.If(self.fifo.r_en & self.fifo.r_rdy):
+            with m.If(dma_offs_out < (fb_len_words-1)):
+                m.d.sync += dma_offs_out.eq(dma_offs_out + 1)
+            with m.Else():
+                m.d.sync += dma_offs_out.eq(0)
+
+        # Latched version of decay speed control input
+        decay_latch = Signal.like(self.decay)
+        # Track delay between read/write bursts
+        holdoff_count = Signal(32)
+        # Incoming pixel array (read from FIFO)
+        pixels_r = Signal(data.ArrayLayout(Pixel, 4))
+
+        m.d.comb += self.fifo.w_data.eq(bus.dat_r)
+
+        # Used for fastpath when all pixels are zero
+        any_nonzero_reads = Signal()
+        pixels_peek = Signal(data.ArrayLayout(Pixel, 4))
+        m.d.comb += pixels_peek.eq(self.fifo.w_data)
+        with m.If(self.fifo.w_en):
+            with m.If((pixels_peek[0].intensity != 0) |
+                      (pixels_peek[1].intensity != 0) |
+                      (pixels_peek[2].intensity != 0) |
+                      (pixels_peek[3].intensity != 0)):
+                m.d.sync += any_nonzero_reads.eq(1)
+
         with m.FSM() as fsm:
             with m.State('OFF'):
                 with m.If(self.enable):
                     m.next = 'BURST-IN'
 
             with m.State('BURST-IN'):
-                m.d.sync += holdoff_count.eq(0)
                 m.d.sync += decay_latch.eq(self.decay)
                 m.d.comb += [
                     bus.stb.eq(1),
                     bus.cyc.eq(1),
                     bus.we.eq(0),
                     bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.adr.eq(self.fb.fb_base + dma_addr_in),
+                    bus.adr.eq(self.fb.fb_base + dma_offs_in),
                     self.fifo.w_en.eq(bus.ack),
-                    self.fifo.w_data.eq(bus.dat_r),
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST),
                 ]
-                with m.If(self.fifo.w_level >= (self.fifo_depth-1)):
+                with m.If(self.fifo.w_level == (self.fifo_depth-1)):
                     m.d.comb += bus.cti.eq(
                             wishbone.CycleType.END_OF_BURST)
-                with m.If(bus.stb & bus.ack & self.fifo.w_rdy): # WARN: drops last word
-                    with m.If(dma_addr_in < (fb_len_words-1)):
-                        m.d.sync += dma_addr_in.eq(dma_addr_in + 1)
-                    with m.Else():
-                        m.d.sync += dma_addr_in.eq(0)
-                with m.Elif(~self.fifo.w_rdy):
-                    m.next = 'WAIT1'
+                    m.next = 'PREFETCH'
 
-            with m.State('WAIT1'):
-                m.d.sync += holdoff_count.eq(holdoff_count + 1)
-                with m.If(holdoff_count > self.holdoff):
-                    m.d.sync += pnext.eq(self.fifo.r_data)
-                    m.d.comb += self.fifo.r_en.eq(1)
-                    m.next = 'BURST-OUT'
+            with m.State('PREFETCH'):
+                # Do not permit bus arbitration between burst in and out.
+                m.d.comb += bus.cyc.eq(1)
+                m.d.comb += self.fifo.w_en.eq(bus.ack)
+                m.d.sync += holdoff_count.eq(0)
+                with m.If(~bus.ack):
+                    with m.If(any_nonzero_reads):
+                        # Prefetch first FIFO entry before burst
+                        m.d.comb += self.fifo.r_en.eq(1)
+                        m.d.sync += pixels_r.eq(self.fifo.r_data)
+                        m.next = 'BURST-OUT'
+                    with m.Else():
+                        # Fastpath: all pixels have zero intensity -
+                        # no write is needed, skip it. This saves a lot
+                        # of bandwidth as the screen is mostly black.
+                        m.next = 'DRAIN'
 
             with m.State('BURST-OUT'):
-                m.d.sync += holdoff_count.eq(0)
-
-                # Incoming pixel array (read from FIFO)
-                pixa = Signal(data.ArrayLayout(unsigned(8), 4))
-                # Outgoing pixel array (write to bus)
-                pixb = Signal(data.ArrayLayout(unsigned(8), 4))
-
-                m.d.sync += [
-                    pixa.eq(wr_source),
-                ]
-
                 # The actual persistance calculation. 4 pixels at a time.
+                pixels_w = Signal(data.ArrayLayout(Pixel, 4))
                 for n in range(4):
                     # color
-                    m.d.comb += pixb[n][0:4].eq(pixa[n][0:4])
+                    m.d.comb += pixels_w[n].color.eq(pixels_r[n].color)
                     # intensity
-                    with m.If(pixa[n][4:8] >= decay_latch):
-                        m.d.comb += pixb[n][4:8].eq(pixa[n][4:8] - decay_latch)
+                    with m.If(pixels_r[n].intensity >= decay_latch):
+                        m.d.comb += pixels_w[n].intensity.eq(pixels_r[n].intensity - decay_latch)
                     with m.Else():
-                        m.d.comb += pixb[n][4:8].eq(0)
-
+                        m.d.comb += pixels_w[n].intensity.eq(0)
 
                 m.d.comb += [
                     bus.stb.eq(1),
                     bus.cyc.eq(1),
                     bus.we.eq(1),
                     bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.adr.eq(self.fb.fb_base + dma_addr_out),
-                    wr_source.eq(pnext),
-                    bus.dat_w.eq(pixb),
+                    bus.adr.eq(self.fb.fb_base + dma_offs_out - 1),
+                    bus.dat_w.eq(pixels_w),
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST)
                 ]
-                with m.If(bus.stb & bus.ack):
+                with m.If(bus.ack):
                     m.d.comb += self.fifo.r_en.eq(1)
-                    m.d.comb += wr_source.eq(self.fifo.r_data),
-                    with m.If(dma_addr_out < (fb_len_words-1)):
-                        m.d.sync += dma_addr_out.eq(dma_addr_out + 1)
-                        m.d.comb += bus.adr.eq(self.fb.fb_base + dma_addr_out + 1),
-                    with m.Else():
-                        m.d.sync += dma_addr_out.eq(0)
-                        m.d.comb += bus.adr.eq(self.fb.fb_base + 0),
+                    m.d.sync += pixels_r.eq(self.fifo.r_data)
                 with m.If(~self.fifo.r_rdy):
                     m.d.comb += bus.cti.eq(
                             wishbone.CycleType.END_OF_BURST)
-                    m.next = 'WAIT2'
+                    m.next = 'HOLDOFF'
 
-            with m.State('WAIT2'):
+            with m.State('DRAIN'):
+                m.d.comb += self.fifo.r_en.eq(1)
+                with m.If(~self.fifo.r_rdy):
+                    m.next = 'HOLDOFF'
+
+            with m.State('HOLDOFF'):
+                m.d.sync += any_nonzero_reads.eq(0)
                 m.d.sync += holdoff_count.eq(holdoff_count + 1)
                 with m.If(holdoff_count > self.holdoff):
                     m.next = 'BURST-IN'
