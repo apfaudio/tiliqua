@@ -164,6 +164,51 @@ class Arbiter(wiring.Component):
                 m.d.sync += grant.eq(grant + 1)
         return m
 
+class SyncFIFOBuffered(wiring.Component):
+    '''Stream-friendly wrapper around [amaranth.lib.fifo.SyncFIFOBuffered][].
+
+    Unlike the other cores around here, this one is lifted from:
+
+    URL: https://github.com/zyp/katsuo-stream
+    License: MIT
+    Author: Vegard Storheil Eriksen <zyp@jvnv.net>
+
+    Args:
+        shape: Shape of the stream.
+        depth: Depth of the FIFO.
+
+    Attributes:
+        input (stream): Input stream.
+        output (stream): Output stream.
+    '''
+
+    def __init__(self, *, shape: ShapeLike, depth: int):
+        super().__init__({
+            'i': wiring.In(stream.Signature(shape)),
+            'o': wiring.Out(stream.Signature(shape)),
+        })
+        self.shape = shape
+        self.depth = depth
+        self.fifo = fifo.SyncFIFOBuffered(width = Shape.cast(self.shape).width, depth = self.depth)
+
+    def elaborate(self, platform):
+        m = Module()
+        m.submodules.fifo = self.fifo
+
+        m.d.comb += [
+            # Input
+            self.input.ready.eq(self.fifo.w_rdy),
+            self.fifo.w_en.eq(self.input.valid),
+            self.fifo.w_data.eq(self.input.payload),
+
+            # Output
+            self.output.valid.eq(self.fifo.r_rdy),
+            self.output.payload.eq(self.fifo.r_data),
+            self.fifo.r_en.eq(self.output.ready),
+        ]
+
+        return m
+
 def connect_remap(m, stream_o, stream_i, mapping):
     """
     Connect 2 streams, bypassing normal wiring.connect() checks

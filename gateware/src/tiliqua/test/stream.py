@@ -1,3 +1,11 @@
+# Helpers for Amaranth tests that heavily use streams.
+#
+# These were lifted from:
+# URL: https://github.com/zyp/katsuo-stream
+# License: MIT
+# Author: Vegard Storheil Eriksen <zyp@jvnv.net>
+#
+
 from amaranth.lib import stream
 from amaranth.sim import SimulatorContext
 
