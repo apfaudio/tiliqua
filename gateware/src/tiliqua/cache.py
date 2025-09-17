@@ -146,7 +146,7 @@ class WishboneL2Cache(wiring.Component):
             tag_di.tag.eq(adr_tag)
         ]
 
-        m.d.comb += slave.adr.eq(Cat(Const(0).replicate(offsetbits), adr_line, tag_do.tag))
+        m.d.comb += slave.adr.eq(Cat(burst_offset, adr_line, tag_do.tag))
 
         m.d.sync += master.ack.eq(0)
 
@@ -171,6 +171,7 @@ class WishboneL2Cache(wiring.Component):
                     m.next = "WAIT"
                 with m.Else():
                     with m.If(tag_do.dirty):
+                        m.d.comb += rd_port.addr.eq(Cat(burst_offset_lookahead, adr_line)),
                         m.next = "EVICT"
                     with m.Else():
                         # Write the tag to set the slave address for the cache refill.

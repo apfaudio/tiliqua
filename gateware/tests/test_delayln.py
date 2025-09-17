@@ -7,6 +7,7 @@ import sys
 import unittest
 
 from amaranth import *
+from amaranth.lib import wiring
 from amaranth.sim import *
 from amaranth_soc import wishbone
 from parameterized import parameterized
@@ -14,7 +15,7 @@ from parameterized import parameterized
 from amaranth_future import fixed
 from tiliqua import dsp
 from tiliqua.dsp import ASQ
-
+from tiliqua.test import wishbone, psram, stream
 
 class DelayLineTests(unittest.TestCase):
 
@@ -35,7 +36,8 @@ class DelayLineTests(unittest.TestCase):
             "cachesize_words": cachesize_words,
         }
 
-        dut = dsp.DelayLine(
+        m = Module()
+        m.submodules.dut = dut = dsp.DelayLine(
             max_delay=max_delay,
             psram_backed=True,
             base=0x0,
@@ -43,6 +45,9 @@ class DelayLineTests(unittest.TestCase):
             write_triggers_read=True,
             cache_kwargs=cache_kwargs,
         )
+        m.submodules.psram_c = wishbone.BusChecker(dut.bus)
+        m.submodules.psram = _psram = psram.FakePSRAM(storage_words=dut.max_delay)
+        wiring.connect(m, dut.bus, _psram.bus)
 
         tap1 = dut.add_tap(fixed_delay=tap1_delay)
         tap2 = dut.add_tap(fixed_delay=tap2_delay)
@@ -51,57 +56,24 @@ class DelayLineTests(unittest.TestCase):
             for n in range(0, sys.maxsize):
                 yield fixed.Const(0.8*math.sin(n*0.2), shape=ASQ)
 
-
         async def stimulus_i(ctx):
             """Send `stimulus_values` to the DUT."""
             s = stimulus_values()
             while True:
-                await ctx.tick().until(dut.i.ready)
-                ctx.set(dut.i.valid, 1)
-                ctx.set(dut.i.payload, next(s))
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
+                await ctx.tick().until(dut.i.ready) # TODO: remove. bug?
+                await stream.put(ctx, dut.i, next(s))
 
         def validate_tap(tap):
             """Verify tap outputs exactly match a delayed stimulus."""
             async def _validate_tap(ctx):
                 s = stimulus_values()
                 n_samples_o = 0
-                ctx.set(tap.o.ready, 1)
                 while True:
-                    await ctx.tick().until(tap.o.valid)
                     expected_payload = next(s) if n_samples_o >= tap.fixed_delay else fixed.Const(0, shape=ASQ)
-                    assert ctx.get(tap.o.payload == expected_payload)
+                    tap_out = await stream.get(ctx, tap.o)
+                    assert ctx.get(tap_out == expected_payload)
                     n_samples_o += 1
             return _validate_tap
-
-        async def psram_simulation(ctx):
-            """Simulate a fake PSRAM bus."""
-            mem = [0] * dut.max_delay
-            membus = dut.bus
-            # Respond to memory transactions forever
-            while True:
-                await ctx.tick().until(membus.stb)
-                adr = adr_start = ctx.get(membus.adr)
-                # Simulate ACKs delayed from stb (like real memory)
-                await ctx.tick().repeat(8)
-                # warn: only whole-word transactions are simulated
-                if ctx.get(membus.we):
-                    while ctx.get(membus.cti == wishbone.CycleType.INCR_BURST):
-                        await ctx.tick()
-                        mem[adr] = ctx.get(membus.dat_w)
-                        ctx.set(membus.ack, 1)
-                        adr += 1
-                    await ctx.tick()
-                else:
-                    ctx.set(membus.ack, 1)
-                    while ctx.get(membus.stb):
-                        ctx.set(membus.dat_r, mem[adr])
-                        await ctx.tick()
-                        adr += 1
-                assert adr - adr_start == dut._cache.burst_len
-                ctx.set(membus.ack, 0)
-                await ctx.tick()
 
         async def testbench(ctx):
             """Top-level testbench."""
@@ -117,8 +89,10 @@ class DelayLineTests(unittest.TestCase):
                 n_samples_in    += ctx.get(dut.i.valid & dut.i.ready)
                 n_samples_tap1  += ctx.get(tap1.o.valid & tap1.o.ready)
                 n_samples_tap2  += ctx.get(tap2.o.valid & tap2.o.ready)
-                n_write_bursts  += ctx.get(dut.bus.we  & (dut.bus.cti == wishbone.CycleType.END_OF_BURST))
-                n_read_bursts   += ctx.get(~dut.bus.we & (dut.bus.cti == wishbone.CycleType.END_OF_BURST))
+                n_write_bursts  += ctx.get(
+                    dut.bus.we & (dut.bus.cti == wishbone.CycleType.END_OF_BURST))
+                n_read_bursts   += ctx.get(
+                    ~dut.bus.we & (dut.bus.cti == wishbone.CycleType.END_OF_BURST))
                 await ctx.tick()
 
             print()
@@ -140,12 +114,11 @@ class DelayLineTests(unittest.TestCase):
                 # arbitrarily chosen based on current cache performance
                 assert samples_per_burst > 2 * cache_burst_len
 
-        sim = Simulator(dut)
+        sim = Simulator(m)
         sim.add_clock(1e-6)
         sim.add_process(stimulus_i)
         sim.add_testbench(validate_tap(tap1), background=True)
         sim.add_testbench(validate_tap(tap2), background=True)
-        sim.add_testbench(psram_simulation,   background=True)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open(f"test_psram_delayln_{name}.vcd", "w")):
             sim.run()
@@ -162,30 +135,18 @@ class DelayLineTests(unittest.TestCase):
 
         async def stimulus_wr(ctx):
             for n in range(0, sys.maxsize):
-                ctx.set(dut.i.valid, 1)
-                ctx.set(dut.i.payload,
-                        fixed.Const(0.8*math.sin(n*0.2), shape=ASQ))
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
+                await stream.put(ctx, dut.i, fixed.Const(0.8*math.sin(n*0.2), shape=ASQ))
                 await ctx.tick().repeat(30)
 
         async def stimulus_rd1(ctx):
-            ctx.set(tap1.o.ready, 1)
-            for n in range(0, sys.maxsize):
-                ctx.set(tap1.i.valid, 1)
-                ctx.set(tap1.i.payload, 4)
-                await ctx.tick()
-                ctx.set(tap1.i.valid, 0)
-                await ctx.tick().repeat(30)
+            while True:
+                await stream.put(ctx, tap1.i, 4)
+                _ = await stream.get(ctx, tap1.o)
 
         async def stimulus_rd2(ctx):
-            ctx.set(tap2.o.ready, 1)
-            for n in range(0, sys.maxsize):
-                ctx.set(tap2.i.valid, 1)
-                ctx.set(tap2.i.payload, 10)
-                await ctx.tick()
-                ctx.set(tap2.i.valid, 0)
-                await ctx.tick().repeat(30)
+            while True:
+                await stream.put(ctx, tap2.i, 10)
+                _ = await stream.get(ctx, tap2.o)
 
         async def testbench(ctx):
             n_rd1 = 0
