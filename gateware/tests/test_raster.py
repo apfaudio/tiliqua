@@ -8,7 +8,7 @@ from amaranth import *
 from amaranth.sim import *
 
 from tiliqua.test import wishbone, stream
-from tiliqua.raster import persist, stroke
+from tiliqua.raster import persist, stroke, plot
 from tiliqua.video import framebuffer, modeline, palette
 
 
@@ -77,11 +77,87 @@ class RasterTests(unittest.TestCase):
             ctx.set(fb.enable, 1)
             for _ in range(N):
                 # Test passes if we got something
-                _ = await wishbone.classic_ack(ctx, dut.bus)
+                _ = await stream.get(ctx, dut.plot_req)
+                await ctx.tick()
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         sim.add_process(stimulus)
         with sim.write_vcd(vcd_file=open("test_stroke.vcd", "w")):
+            sim.run()
+
+    def test_plot_backend(self):
+
+        m = Module()
+        fb = framebuffer.DMAFramebuffer(
+            fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
+        dut = plot._FramebufferBackend(fb=fb)
+        check = wishbone.BusChecker(dut.bus, prefix='[bus] ')
+        m.submodules += [dut, fb, fb.palette, check]
+
+        async def testbench(ctx):
+            ctx.set(dut.enable, 1)
+            ctx.set(fb.enable, 1)
+
+            # Absolute positioning with replacement
+            await stream.put(ctx, dut.req, {
+                'x': 1,
+                'y': 0,
+                'pixel': {
+                    'color': 0xa,
+                    'intensity': 0xb,
+                },
+                'blend': plot.BlendMode.REPLACE,
+                'offset': plot.OffsetMode.ABSOLUTE,
+            })
+            result = await wishbone.classic_ack(ctx, dut.bus)
+            self.assertEqual(result.adr, 0x0)
+            self.assertEqual(result.dat_w, 0xbabababa)
+            self.assertEqual(result.sel, 0b0010)
+
+            # Center positioning with replacement
+            await stream.put(ctx, dut.req, {
+                'x': 1,
+                'y': 0,
+                'pixel': {
+                    'color': 0xa,
+                    'intensity': 0xb,
+                },
+                'blend': plot.BlendMode.REPLACE,
+                'offset': plot.OffsetMode.CENTER,
+            })
+            result = await wishbone.classic_ack(ctx, dut.bus)
+            self.assertEqual(
+                result.adr,
+                int(self.MODELINE.h_active/4*(self.MODELINE.v_active/2 + 1/2)))
+            self.assertEqual(result.dat_w, 0xbabababa)
+            self.assertEqual(result.sel, 0b0010)
+
+            # Absolute positioning, additive blending
+            await stream.put(ctx, dut.req, {
+                'x': 1,
+                'y': 0,
+                'pixel': {
+                    'color': 0xa,
+                    'intensity': 0xb,
+                },
+                'blend': plot.BlendMode.ADDITIVE,
+                'offset': plot.OffsetMode.ABSOLUTE,
+            })
+            # Read cycle (get current pixel value)
+            ctx.set(dut.bus.dat_r, 0x00009100)
+            result = await wishbone.classic_ack(ctx, dut.bus)
+            self.assertEqual(result.adr, 0x0)
+            self.assertEqual(result.sel, 0b0010)
+            # Write cycle (put newly calculated pixel value)
+            result = await wishbone.classic_ack(ctx, dut.bus)
+            self.assertEqual(result.adr, 0x0)
+            self.assertEqual(result.sel, 0b0010)
+            self.assertEqual(result.dat_w, 0xfafafafa)
+
+        sim = Simulator(m)
+        sim.add_clock(1e-6)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open("test_plot_backend.vcd", "w")):
             sim.run()
