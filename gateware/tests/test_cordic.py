@@ -6,7 +6,7 @@ from amaranth.sim import *
 
 from amaranth_future import fixed
 from tiliqua.dsp import ASQ, cordic
-
+from tiliqua.test import stream
 
 class CordicTests(unittest.TestCase):
 
@@ -16,32 +16,18 @@ class CordicTests(unittest.TestCase):
 
         dut = cordic.RectToPolarCordic(self.SHAPE)
 
-        async def send_complex(ctx, real, imag):
-            ctx.set(dut.i.payload.real, fixed.Const(real, shape=self.SHAPE, clamp=True))
-            ctx.set(dut.i.payload.imag, fixed.Const(imag, shape=self.SHAPE, clamp=True))
-            ctx.set(dut.i.valid, 1)
-            while not ctx.get(dut.i.ready):
-                await ctx.tick()
-            await ctx.tick()
-            ctx.set(dut.i.valid, 0)
-
-        async def receive_result(ctx):
-            while not ctx.get(dut.o.valid):
-                await ctx.tick()
-            mag = ctx.get(dut.o.payload.magnitude).as_float()
-            phase = ctx.get(dut.o.payload.phase).as_float()
-            ctx.set(dut.o.ready, 1)
-            await ctx.tick()
-            ctx.set(dut.o.ready, 0)
-            return mag, phase
-
         async def test_case(ctx, real, imag, name=""):
             # Calculate expected values
             expected_mag = math.sqrt(real**2 + imag**2)
             expected_phase = math.atan2(imag, real)/math.pi
             # Send stimulus, wait for result
-            await send_complex(ctx, real, imag)
-            mag, phase = await receive_result(ctx)
+            await stream.put(ctx, dut.i, {
+                'real': fixed.Const(real, shape=self.SHAPE, clamp=True),
+                'imag': fixed.Const(imag, shape=self.SHAPE, clamp=True),
+            })
+            result = await stream.get(ctx, dut.o)
+            mag = result.magnitude.as_float()
+            phase = result.phase.as_float()
             # Calculate and print errors
             mag_error = abs(mag - expected_mag)
             phase_error = abs(phase - expected_phase)
@@ -50,7 +36,7 @@ class CordicTests(unittest.TestCase):
             print(f"  Expected: mag={expected_mag:.4f}, phase={expected_phase:.4f} * pi")
             print(f"  Got:      mag={mag:.4f}, phase={phase:.4f} * pi")
             print(f"  Error:    mag={mag_error:.6f}, phase={phase_error:.6f} * pi")
-            # Check for reasonable accuracy (considering fixed-point limitations)
+            # Check for reasonable error
             self.assertLess(mag_error, 0.01, f"Magnitude error too large for {name}")
             self.assertLess(phase_error, 0.01, f"Phase error too large for {name}")
             return mag, phase

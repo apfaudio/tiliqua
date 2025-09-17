@@ -10,6 +10,7 @@ from parameterized import parameterized
 
 from amaranth_future import fixed
 from tiliqua.dsp import fft
+from tiliqua.test import stream
 
 FFT_SZ = 16
 
@@ -74,16 +75,15 @@ class FFTTests(unittest.TestCase):
         async def stimulus_i(ctx):
             s = stimulus_values()
             while True:
-                ctx.set(dut.i.payload.first, 1)
-                for _ in range(sz):
-                    await ctx.tick().until(dut.i.ready)
+                for n in range(sz):
                     real, imag = next(s)
-                    ctx.set(dut.i.valid, 1)
-                    ctx.set(dut.i.payload.sample.real, real)
-                    ctx.set(dut.i.payload.sample.imag, imag)
-                    await ctx.tick()
-                    ctx.set(dut.i.valid, 0)
-                    ctx.set(dut.i.payload.first, 0)
+                    await stream.put(ctx, dut.i, {
+                        'first': 1 if n == 0 else 0,
+                        'sample': {
+                            'real': real,
+                            'imag': imag
+                        }
+                    })
                     await ctx.tick()
 
         async def testbench(ctx):
@@ -163,11 +163,7 @@ class FFTTests(unittest.TestCase):
         async def stimulus_i(ctx):
             s = stimulus_values()
             while True:
-                await ctx.tick().until(dut.i.ready)
-                ctx.set(dut.i.valid, 1)
-                ctx.set(dut.i.payload, next(s))
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
+                await stream.put(ctx, dut.i, next(s))
                 await ctx.tick()
 
         async def testbench(ctx):
