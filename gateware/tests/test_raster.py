@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
+import struct
 import unittest
 
 from amaranth import *
@@ -185,29 +186,58 @@ class RasterTests(unittest.TestCase):
 
             ctx.set(dut.enable, 1)
 
-            # write something to the spritesheet
-            await wishbone.classic_wr(ctx, dut.sprite_mem_bus, adr=0, dat_w=0x0f)
+            # Write a font sheet to hardware memory
+            with open('tests/data/font_9x15.raw', 'rb') as f:
+                sheet_bytes = f.read()
+            sheet_sx = 144  # sheet .raw data width
+            sheet_sy = 90   # sheet .raw data height
+            bytes_per_row = (sheet_sx + 7) // 8
+            for y in range(sheet_sy):
+                row_start_byte = y * bytes_per_row
+                row_start_word = y * dut.column_words
+                for word_in_row in range(dut.column_words):
+                    word_value = 0
+                    # Only fill with data if we're within the actual image width
+                    if word_in_row * 32 < sheet_sx:
+                        # Pack 4 bytes (32 pixels) into one 32-bit word
+                        for byte_in_word in range(4):
+                            byte_idx = row_start_byte + (word_in_row * 4 + byte_in_word)
+                            if byte_idx < len(sheet_bytes):
+                                word_value |= sheet_bytes[byte_idx] << (byte_in_word * 8)
+                        word_offset = row_start_word + word_in_row
+                        await wishbone.classic_wr(ctx, dut.sprite_mem_bus, adr=word_offset, dat_w=word_value)
 
-            # issue a blit
-            # width=8, height=4, x=0, y=0
-            await csr_write(ctx, 0x04080000, "src")
-            # pixel=0xab, x=0, y=0
-            await csr_write(ctx, 0xab<<(12*2), "blit")
+            # Issue a blit
+            # width=0x28, height=0x24, x=0, y=0
+            await csr_write(ctx, 0x24280000, "src")
+            # pixel=0xab, x=5, y=3
+            await csr_write(ctx, (0xab<<24) | (0x3<<12) | 0x5, "blit")
 
-            await ctx.tick().repeat(200)
+            while True:
+                await ctx.tick()
 
         async def test_response(ctx):
+            # Collect all the blitted points into an ASCII grid, and print it
             ctx.set(dut.plot_req.ready, 1)
-            while True:
+            points = set()
+            for _ in range(10000):
                 if ctx.get(dut.plot_req.valid):
                     p_x = ctx.get(dut.plot_req.payload.x)
                     p_y = ctx.get(dut.plot_req.payload.y)
-                    print(f"plot_req x={p_x}, y={p_y}")
+                    points.add((p_x, p_y))
                 await ctx.tick()
+            for y in range(60):
+                row = ''
+                for x in range(60):
+                    if (x, y) in points:
+                        row = row+'#'
+                    else:
+                        row = row+'.'
+                print(row)
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
-        sim.add_testbench(test_stimulus)
-        sim.add_testbench(test_response, background=True)
+        sim.add_testbench(test_stimulus, background=True)
+        sim.add_testbench(test_response)
         with sim.write_vcd(vcd_file=open("test_blit_peripheral.vcd", "w")):
             sim.run()
