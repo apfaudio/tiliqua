@@ -15,6 +15,8 @@ from tiliqua.video import framebuffer, modeline, palette
 from amaranth_soc import csr
 from amaranth_soc.csr import wishbone as csr_wishbone
 
+
+
 class RasterTests(unittest.TestCase):
 
     MODELINE = modeline.DVIModeline.all_timings()["1280x720p60"]
@@ -167,6 +169,11 @@ class RasterTests(unittest.TestCase):
 
     def test_blit_peripheral(self):
 
+        """
+        Write a spritesheet to the blitter and blit a sub-rectangle of it, recording
+        the plotted points into an ASCII grid for inspection.
+        """
+
         m = Module()
         dut = blit.Peripheral()
         decoder = csr.Decoder(addr_width=28, data_width=8)
@@ -186,26 +193,24 @@ class RasterTests(unittest.TestCase):
 
             ctx.set(dut.enable, 1)
 
-            # Write a font sheet to hardware memory
+            # Write spritesheet to the blitter - read 32-bit words from file in the same
+            # way that a RISCV32 would memcpy a raw spritesheet to sprite memory.
+            word_addr = 0
             with open('tests/data/font_9x15.raw', 'rb') as f:
-                sheet_bytes = f.read()
-            sheet_sx = 144  # sheet .raw data width
-            sheet_sy = 90   # sheet .raw data height
-            bytes_per_row = (sheet_sx + 7) // 8
-            for y in range(sheet_sy):
-                row_start_byte = y * bytes_per_row
-                row_start_word = y * dut.column_words
-                for word_in_row in range(dut.column_words):
-                    word_value = 0
-                    # Only fill with data if we're within the actual image width
-                    if word_in_row * 32 < sheet_sx:
-                        # Pack 4 bytes (32 pixels) into one 32-bit word
-                        for byte_in_word in range(4):
-                            byte_idx = row_start_byte + (word_in_row * 4 + byte_in_word)
-                            if byte_idx < len(sheet_bytes):
-                                word_value |= sheet_bytes[byte_idx] << (byte_in_word * 8)
-                        word_offset = row_start_word + word_in_row
-                        await wishbone.classic_wr(ctx, dut.sprite_mem_bus, adr=word_offset, dat_w=word_value)
+                while True:
+                    word_bytes = f.read(4)
+                    if not word_bytes:
+                        break
+                    if len(word_bytes) < 4:
+                        word_bytes += b'\x00' * (4 - len(word_bytes))
+                    word_data = struct.unpack('<I', word_bytes)[0]
+                    await wishbone.classic_wr(ctx, dut.sprite_mem_bus, adr=word_addr, dat_w=word_data)
+                    word_addr += 1
+
+            # Set spritesheet width so core can index it properly
+            sheet_width = 144
+            sheet_height = 90 # (width*height)//32 must fit in the sprite mem
+            await csr_write(ctx, sheet_width, "sheet_width")
 
             # Issue a blit
             # width=0x28, height=0x24, x=0, y=0
@@ -220,7 +225,7 @@ class RasterTests(unittest.TestCase):
             # Collect all the blitted points into an ASCII grid, and print it
             ctx.set(dut.plot_req.ready, 1)
             points = set()
-            for _ in range(10000):
+            for _ in range(5000):
                 if ctx.get(dut.plot_req.valid):
                     p_x = ctx.get(dut.plot_req.payload.x)
                     p_y = ctx.get(dut.plot_req.payload.y)

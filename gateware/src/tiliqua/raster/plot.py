@@ -15,21 +15,23 @@ In general, a ``raster`` system may look like this:
 
 .. code-block:: text
 
-    SoC requests ----> [plot.Peripheral()] \\
-                  \--> [line.Peripheral()] |
-                   \-> [blit.Peripheral()] |---> FramebufferPlotter -> PSRAM
-                                           |
-    RTL requests ---->   [stroke.Stroke()] /
+    SoC requests ────► [plot.Peripheral()] ─╮
+              ╰──────► [line.Peripheral()] ─┼───► FramebufferPlotter ─► PSRAM
+             ╰───────► [blit.Peripheral()] ─┤
+                                            │
+    RTL requests ────►   [stroke.Stroke()] ─╯
 
 All pixel ``PlotRequest``s are streams, arbitered in a round-robin fashion by the
 ``FramebufferPlotter`` into a single (internal) ``PlotRequest``, which is fed into
-the ``_FramebufferBackend`` to perform blending and coordinate transformation. The
+the ``_FramebufferBackend`` to perform blending (and handle screen rotation). The
 resulting memory accesses go through a  cache ``raster.cache.Cache``, before eventually
 issuing requests on the PSRAM bus.
 
 If higher pixel throughput is needed, one can instantiate multiple hardware accelerators
 and ``FramebufferPlotters`` on the same (shared) PSRAM bus, at least as many as you
-want until you run out of memory bandwidth or FPGA resources :).
+want until you run out of memory bandwidth or FPGA resources :). For the best performance,
+it makes sense to share ``FramebufferPlotter``s between components that want to draw to
+the same part of the screen, to avoid cache thrashing.
 """
 
 from amaranth import *
