@@ -13,6 +13,7 @@ from amaranth.lib import data, enum, fifo, stream, wiring
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import csr
 
+from ..dsp import stream_util
 from ..video.types import Pixel
 from .plot import BlendMode, OffsetMode, PlotRequest
 
@@ -42,17 +43,11 @@ class _LinePlotter(wiring.Component):
     stream of (many more) ``PlotRequest``s, using Bresenham's algorithm.
     """
 
-    def __init__(self):
-        super().__init__({
-            "cmd": In(stream.Signature(LineCmd)),
-            "plot_req": Out(stream.Signature(PlotRequest)),
-            "enable": In(1),
-        })
+    i: In(stream.Signature(LineCmd))
+    o: Out(stream.Signature(PlotRequest))
 
     def elaborate(self, platform) -> Module:
         m = Module()
-
-        cmd = self.cmd
 
         # Previous line segment
         prev_x = Signal(signed(12))
@@ -78,40 +73,40 @@ class _LinePlotter(wiring.Component):
         with m.FSM() as fsm:
 
             with m.State('IDLE'):
-                m.d.comb += cmd.ready.eq(self.enable)
-                with m.If(cmd.ready & cmd.valid):
+                m.d.comb += self.i.ready.eq(1)
+                with m.If(self.i.valid):
                     with m.If(has_prev_point):
                         # Draw line from previous to new point
                         m.d.sync += [
                             current_x.eq(prev_x),
                             current_y.eq(prev_y),
-                            target_x.eq(cmd.payload.x),
-                            target_y.eq(cmd.payload.y),
-                            end_strip.eq(cmd.payload.cmd == LineStripCmd.END),
+                            target_x.eq(self.i.payload.x),
+                            target_y.eq(self.i.payload.y),
+                            end_strip.eq(self.i.payload.cmd == LineStripCmd.END),
                         ]
                         m.next = 'SETUP_BRESENHAM'
                     with m.Else():
                         # First point in strip - store it and plot single point
                         m.d.sync += [
-                            prev_x.eq(cmd.payload.x),
-                            prev_y.eq(cmd.payload.y),
-                            current_pixel.eq(cmd.payload.pixel),
-                            end_strip.eq(cmd.payload.cmd == LineStripCmd.END),
-                            has_prev_point.eq(cmd.payload.cmd == LineStripCmd.CONTINUE),
+                            prev_x.eq(self.i.payload.x),
+                            prev_y.eq(self.i.payload.y),
+                            current_pixel.eq(self.i.payload.pixel),
+                            end_strip.eq(self.i.payload.cmd == LineStripCmd.END),
+                            has_prev_point.eq(self.i.payload.cmd == LineStripCmd.CONTINUE),
                         ]
                         m.next = 'PLOT_SINGLE_POINT'
 
             with m.State('PLOT_SINGLE_POINT'):
                 # First point in strip, or isolated point in zero-length line
                 m.d.comb += [
-                    self.plot_req.valid.eq(1),
-                    self.plot_req.payload.x.eq(prev_x),
-                    self.plot_req.payload.y.eq(prev_y),
-                    self.plot_req.payload.pixel.eq(current_pixel),
-                    self.plot_req.payload.blend.eq(BlendMode.REPLACE),
-                    self.plot_req.payload.offset.eq(OffsetMode.ABSOLUTE),
+                    self.o.valid.eq(1),
+                    self.o.payload.x.eq(prev_x),
+                    self.o.payload.y.eq(prev_y),
+                    self.o.payload.pixel.eq(current_pixel),
+                    self.o.payload.blend.eq(BlendMode.REPLACE),
+                    self.o.payload.offset.eq(OffsetMode.ABSOLUTE),
                 ]
-                with m.If(self.plot_req.ready):
+                with m.If(self.o.ready):
                     with m.If(end_strip):
                         m.d.sync += has_prev_point.eq(0)
                     m.next = 'IDLE'
@@ -158,22 +153,22 @@ class _LinePlotter(wiring.Component):
 
             with m.State('DRAW_LINE'):
                 m.d.comb += [
-                    self.plot_req.valid.eq(1),
-                    self.plot_req.payload.x.eq(current_x),
-                    self.plot_req.payload.y.eq(current_y),
-                    self.plot_req.payload.pixel.eq(current_pixel),
-                    self.plot_req.payload.blend.eq(BlendMode.REPLACE),
-                    self.plot_req.payload.offset.eq(OffsetMode.ABSOLUTE),
+                    self.o.valid.eq(1),
+                    self.o.payload.x.eq(current_x),
+                    self.o.payload.y.eq(current_y),
+                    self.o.payload.pixel.eq(current_pixel),
+                    self.o.payload.blend.eq(BlendMode.REPLACE),
+                    self.o.payload.offset.eq(OffsetMode.ABSOLUTE),
                 ]
 
-                with m.If(self.plot_req.ready):
+                with m.If(self.o.ready):
                     # Are we done?
                     with m.If((current_x == target_x) & (current_y == target_y)):
                         # Line complete - update previous point for next line
                         m.d.sync += [
                             prev_x.eq(target_x),
                             prev_y.eq(target_y),
-                            current_pixel.eq(cmd.payload.pixel),
+                            current_pixel.eq(self.i.payload.pixel),
                             has_prev_point.eq(~end_strip),
                         ]
                         m.next = 'IDLE'
@@ -235,7 +230,7 @@ class Peripheral(wiring.Component):
         self.fifo_depth = fifo_depth
 
         # FIFO of line strip commands in flight.
-        self._cmd_fifo = fifo.SyncFIFOBuffered(width=LineCmd.as_shape().size, depth=fifo_depth)
+        self._cmd_fifo = stream_util.SyncFIFOBuffered(shape=LineCmd, depth=fifo_depth)
 
         regs = csr.Builder(addr_width=6, data_width=8)
         self._status = regs.add("status", self.StatusReg(), offset=0x00)
@@ -244,8 +239,7 @@ class Peripheral(wiring.Component):
 
         super().__init__({
             "csr_bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            "plot_req": Out(stream.Signature(PlotRequest)),
-            "enable": In(1),
+            "o": Out(stream.Signature(PlotRequest)),
         })
 
         self.csr_bus.memory_map = self._bridge.bus.memory_map
@@ -254,37 +248,28 @@ class Peripheral(wiring.Component):
         m = Module()
 
         m.submodules.bridge = self._bridge
-        m.submodules._cmd_fifo = self._cmd_fifo
+        m.submodules._cmd_fifo = cmd_fifo = self._cmd_fifo
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
         m.submodules.line_plotter = line_plotter = _LinePlotter()
 
-        # Connect enable signal
-        m.d.comb += line_plotter.enable.eq(self.enable)
-
-        # Build LineCmd from CSR fields
-        line_cmd = Signal(LineCmd)
         m.d.comb += [
-            line_cmd.x.eq(self._point.f.x.w_data),
-            line_cmd.y.eq(self._point.f.y.w_data),
-            line_cmd.pixel.eq(self._point.f.pixel.w_data),
-            line_cmd.cmd.eq(self._point.f.cmd.w_data),
+            cmd_fifo.i.payload.x.eq(self._point.f.x.w_data),
+            cmd_fifo.i.payload.y.eq(self._point.f.y.w_data),
+            cmd_fifo.i.payload.pixel.eq(self._point.f.pixel.w_data),
+            cmd_fifo.i.payload.cmd.eq(self._point.f.cmd.w_data),
         ]
 
-        cmd_fifo_w = self._cmd_fifo.w_stream
-        with m.If(self._point.element.w_stb & cmd_fifo_w.ready):
-            m.d.comb += [
-                cmd_fifo_w.valid.eq(1),
-                cmd_fifo_w.payload.eq(line_cmd),
-            ]
+        with m.If(self._point.element.w_stb & cmd_fifo.i.ready):
+            m.d.comb += cmd_fifo.i.valid.eq(1),
 
         m.d.comb += [
-            self._status.f.full.r_data.eq(~cmd_fifo_w.ready),
-            self._status.f.empty.r_data.eq(~self._cmd_fifo.r_stream.valid),
+            self._status.f.full.r_data.eq(~cmd_fifo.i.ready),
+            self._status.f.empty.r_data.eq(~cmd_fifo.o.valid),
         ]
 
-        wiring.connect(m, self._cmd_fifo.r_stream, line_plotter.cmd)
+        wiring.connect(m, cmd_fifo.o, line_plotter.i)
 
-        wiring.connect(m, line_plotter.plot_req, wiring.flipped(self.plot_req))
+        wiring.connect(m, line_plotter.o, wiring.flipped(self.o))
 
         return m
