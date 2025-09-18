@@ -73,6 +73,13 @@ async def wb_csr_w(ctx, mmap_bus, wb_bus, value, register_name, field_name=None)
     adr, sel, shift, _ = wb_register(mmap_bus, register_name, field_name)
     return await wb_transaction(ctx, wb_bus, adr, 1, sel, dat_w=value<<shift)
 
+async def wb_csr_w_dict(ctx, mmap_bus, wb_bus, register_name, fields):
+    dat_w = 0
+    for field_name in fields:
+        adr, _, shift, _ = wb_register(mmap_bus, register_name, field_name)
+        dat_w = dat_w | (fields[field_name]<<shift)
+    return await wb_transaction(ctx, wb_bus, adr, 1, 0b1111, dat_w=dat_w)
+
 async def wb_csr_r(ctx, mmap_bus, wb_bus, register_name, field_name=None):
     adr, sel, shift, w_bits = wb_register(mmap_bus, register_name, field_name)
     value_32b = await wb_transaction(ctx, wb_bus, adr, 0, sel)

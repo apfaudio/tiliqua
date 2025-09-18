@@ -9,12 +9,11 @@ from amaranth import *
 from amaranth.sim import *
 
 from tiliqua.test import wishbone, stream, csr as csr_util
-from tiliqua.raster import persist, stroke, plot, blit
+from tiliqua.raster import persist, stroke, plot, blit, line
 from tiliqua.video import framebuffer, modeline, palette
 
 from amaranth_soc import csr
 from amaranth_soc.csr import wishbone as csr_wishbone
-
 
 
 class RasterTests(unittest.TestCase):
@@ -183,13 +182,9 @@ class RasterTests(unittest.TestCase):
 
         async def test_stimulus(ctx):
 
-            async def csr_write(ctx, value, register, field=None):
-                await csr_util.wb_csr_w(
-                        ctx, dut.csr_bus, bridge.wb_bus, value, register, field)
-
-            async def csr_read(ctx, register, field=None):
-                return await csr_util.wb_csr_r(
-                        ctx, dut.csr_bus, bridge.wb_bus, register, field)
+            async def csr_write(ctx, register, fields):
+                await csr_util.wb_csr_w_dict(
+                        ctx, dut.csr_bus, bridge.wb_bus, register, fields)
 
             ctx.set(dut.enable, 1)
 
@@ -210,13 +205,23 @@ class RasterTests(unittest.TestCase):
             # Set spritesheet width so core can index it properly
             sheet_width = 144
             sheet_height = 90 # (width*height)//32 must fit in the sprite mem
-            await csr_write(ctx, sheet_width, "sheet_width")
+            await csr_write(ctx, "sheet_width", {
+                "width": sheet_width,
+            })
 
             # Issue a blit
-            # width=0x28, height=0x24, x=0, y=0
-            await csr_write(ctx, 0x24280000, "src")
-            # pixel=0xab, x=5, y=3
-            await csr_write(ctx, (0xab<<24) | (0x3<<12) | 0x5, "blit")
+            await csr_write(ctx, "src", {
+                "src_x": 0,
+                "src_y": 0,
+                "width": 0x28,
+                "height": 0x24,
+            })
+
+            await csr_write(ctx, "blit", {
+                "pixel": 0xab,
+                "dst_x": 5,
+                "dst_y": 3,
+            })
 
             while True:
                 await ctx.tick()
@@ -231,9 +236,10 @@ class RasterTests(unittest.TestCase):
                     p_y = ctx.get(dut.plot_req.payload.y)
                     points.add((p_x, p_y))
                 await ctx.tick()
-            for y in range(60):
+            print()
+            for y in range(40):
                 row = ''
-                for x in range(60):
+                for x in range(50):
                     if (x, y) in points:
                         row = row+'#'
                     else:
@@ -245,4 +251,102 @@ class RasterTests(unittest.TestCase):
         sim.add_testbench(test_stimulus, background=True)
         sim.add_testbench(test_response)
         with sim.write_vcd(vcd_file=open("test_blit_peripheral.vcd", "w")):
+            sim.run()
+
+    def test_line_peripheral(self):
+
+        """
+        Draw lines using the line plotter, recording the plotted points into
+        an ASCII grid for inspection.
+        """
+
+        m = Module()
+        dut = line.Peripheral()
+        decoder = csr.Decoder(addr_width=28, data_width=8)
+        decoder.add(dut.csr_bus, addr=0, name="dut")
+        bridge = csr_wishbone.WishboneCSRBridge(decoder.bus, data_width=32)
+        m.submodules += [dut, decoder, bridge]
+
+        async def test_stimulus(ctx):
+
+            async def csr_write(ctx, register, fields):
+                await csr_util.wb_csr_w_dict(
+                        ctx, dut.csr_bus, bridge.wb_bus, register, fields)
+
+            ctx.set(dut.enable, 1)
+
+            # Draw a closed triangle line strip
+
+            await csr_write(ctx, "point", {
+                "cmd": 0,
+                "pixel": 0xff,
+                "x": 10,
+                "y": 5,
+            })
+
+            await csr_write(ctx, "point", {
+                "cmd": 0,
+                "pixel": 0xff,
+                "x": 30,
+                "y": 5,
+            })
+
+            await csr_write(ctx, "point", {
+                "cmd": 0,
+                "pixel": 0xff,
+                "x": 20,
+                "y": 20,
+            })
+
+            await csr_write(ctx, "point", {
+                "cmd": 1, # end
+                "pixel": 0xff,
+                "x": 10,
+                "y": 5,
+            })
+
+            # Draw a single isolated line.
+
+            await csr_write(ctx, "point", {
+                "cmd": 0,
+                "pixel": 0xff,
+                "x": 4,
+                "y": 5,
+            })
+
+            await csr_write(ctx, "point", {
+                "cmd": 1, # end
+                "pixel": 0xff,
+                "x": 12,
+                "y": 20,
+            })
+
+            while True:
+                await ctx.tick()
+
+        async def test_response(ctx):
+            # Collect all the plotted points into an ASCII grid
+            ctx.set(dut.plot_req.ready, 1)
+            points = set()
+            for _ in range(5000):
+                if ctx.get(dut.plot_req.valid):
+                    p_x = ctx.get(dut.plot_req.payload.x)
+                    p_y = ctx.get(dut.plot_req.payload.y)
+                    points.add((p_x, p_y))
+                await ctx.tick()
+            print()
+            for y in range(25):
+                row = ''
+                for x in range(40):
+                    if (x, y) in points:
+                        row = row+'#'
+                    else:
+                        row = row+'.'
+                print(row)
+
+        sim = Simulator(m)
+        sim.add_clock(1e-6)
+        sim.add_testbench(test_stimulus, background=True)
+        sim.add_testbench(test_response)
+        with sim.write_vcd(vcd_file=open("test_line_peripheral.vcd", "w")):
             sim.run()
