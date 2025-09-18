@@ -186,8 +186,6 @@ class RasterTests(unittest.TestCase):
                 await csr_util.wb_csr_w_dict(
                         ctx, dut.csr_bus, bridge.wb_bus, register, fields)
 
-            ctx.set(dut.enable, 1)
-
             # Write spritesheet to the blitter - read 32-bit words from file in the same
             # way that a RISCV32 would memcpy a raw spritesheet to sprite memory.
             word_addr = 0
@@ -228,12 +226,12 @@ class RasterTests(unittest.TestCase):
 
         async def test_response(ctx):
             # Collect all the blitted points into an ASCII grid, and print it
-            ctx.set(dut.plot_req.ready, 1)
+            ctx.set(dut.o.ready, 1)
             points = set()
             for _ in range(5000):
-                if ctx.get(dut.plot_req.valid):
-                    p_x = ctx.get(dut.plot_req.payload.x)
-                    p_y = ctx.get(dut.plot_req.payload.y)
+                if ctx.get(dut.o.valid):
+                    p_x = ctx.get(dut.o.payload.x)
+                    p_y = ctx.get(dut.o.payload.y)
                     points.add((p_x, p_y))
                 await ctx.tick()
             print()

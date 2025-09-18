@@ -126,9 +126,7 @@ class Peripheral(wiring.Component):
             "csr_bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
             "sprite_mem_bus": In(wishbone.Signature(addr_width=self.memory_addr_width,
                                                     data_width=32, granularity=8)),
-            # Output to shared plot backend
-            "plot_req": Out(stream.Signature(PlotRequest)),
-            "enable": In(1),
+            "o": Out(stream.Signature(PlotRequest)),
         })
 
         self.csr_bus.memory_map = self._bridge.bus.memory_map
@@ -239,11 +237,11 @@ class Peripheral(wiring.Component):
         ]
 
         m.d.comb += [
-            self.plot_req.payload.x.eq(current_dst_x + plot_x),
-            self.plot_req.payload.y.eq(current_dst_y + plot_y),
-            self.plot_req.payload.pixel.eq(current_pixel),
-            self.plot_req.payload.blend.eq(BlendMode.REPLACE),
-            self.plot_req.payload.offset.eq(OffsetMode.ABSOLUTE),
+            self.o.payload.x.eq(current_dst_x + plot_x),
+            self.o.payload.y.eq(current_dst_y + plot_y),
+            self.o.payload.pixel.eq(current_pixel),
+            self.o.payload.blend.eq(BlendMode.REPLACE),
+            self.o.payload.offset.eq(OffsetMode.ABSOLUTE),
         ]
 
         m.d.comb += sprite_r_port.addr.eq(sprite_memory_addr)
@@ -251,9 +249,8 @@ class Peripheral(wiring.Component):
         with m.FSM() as fsm:
 
             with m.State('IDLE'):
-                # Wait for command from FIFO
-                with m.If(self.enable & cmd_fifo.o.valid):
-                    m.d.comb += cmd_fifo.o.ready.eq(1)
+                m.d.comb += cmd_fifo.o.ready.eq(1)
+                with m.If(cmd_fifo.o.valid):
                     with m.Switch(cmd_fifo.o.payload.kind):
                         with m.Case(self.BlitCmd.Kind.SRC):
                             m.d.sync += [
@@ -279,8 +276,8 @@ class Peripheral(wiring.Component):
             with m.State('CHECK_PIXEL'):
                 with m.If(draw_pixel):
                     # Send request to plotting backend, wait until it is accepted.
-                    m.d.comb += self.plot_req.valid.eq(1),
-                    with m.If(self.plot_req.ready):
+                    m.d.comb += self.o.valid.eq(1),
+                    with m.If(self.o.ready):
                         m.next = 'NEXT_PIXEL'
                 with m.Else():
                     # Pixel is transparent - skip to next
