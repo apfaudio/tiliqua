@@ -15,7 +15,7 @@ from amaranth_soc import csr, wishbone
 
 from ..build import sim
 from . import dvi
-from .types import Rotation
+from .types import Pixel, Rotation
 
 
 class DMAFramebuffer(wiring.Component):
@@ -28,7 +28,23 @@ class DMAFramebuffer(wiring.Component):
     Framebuffer storage: currently fixed at 1byte/pix: 4-bit intensity, 4-bit color.
     """
 
-    class FramebufferSimulationInterface(wiring.Signature):
+    class Properties(wiring.Signature):
+        """
+        Dynamic information required by other cores in order to be able to plot to the framebuffer.
+        Current base address, video mode, rotation and so on.
+        """
+        def __init__(self):
+            super().__init__({
+                # Base address of framebuffer in PSRAM
+                "base": Out(22),
+                # Must be updated on timing changes
+                "timings": Out(dvi.DVITimingGen.TimingProperties()),
+                # Not directly used by this core but shared between every core that uses DMAFramebuffer.
+                "enable": Out(1), # Framebuffer is being sent to screen
+                "rotation": Out(Rotation),
+            })
+
+    class SimulationInterface(wiring.Signature):
         """
         Enough information for simulation to plot the output of this core to bitmaps.
         """
@@ -42,37 +58,32 @@ class DMAFramebuffer(wiring.Component):
                 "b": Out(8),
             })
 
-    def __init__(self, *, palette, fb_base_default=0, addr_width=22,
-                 fifo_depth=512, bytes_per_pixel=1, burst_threshold_words=128,
-                 fixed_modeline=None):
+    def __init__(self, *, palette, addr_width=22, fifo_depth=512,
+                 burst_threshold_words=128, fixed_modeline=None):
 
         self.fifo_depth = fifo_depth
-        self.bytes_per_pixel = bytes_per_pixel
+        assert (Pixel.as_shape().size % 8) == 0
+        self.bytes_per_pixel = Pixel.as_shape().size // 8
         self.burst_threshold_words = burst_threshold_words
         self.fixed_modeline = fixed_modeline
-
         self.palette = palette
 
         super().__init__({
-            # Start of framebuffer
-            "fb_base": In(32, init=fb_base_default),
-            # We are a DMA master
+            # Backing store
             "bus":  Out(wishbone.Signature(addr_width=addr_width, data_width=32, granularity=8,
                                            features={"cti", "bte"})),
-            # Kick this to start the core
-            "enable": In(1),
-            # Must be updated on timing changes
-            "timings": In(dvi.DVITimingGen.TimingProperties()),
+            # Dynamic timing / modeline information shared with other cores.
+            "fbp": In(self.Properties()),
             # Enough information to plot the output of this core to images
-            "simif": Out(self.FramebufferSimulationInterface())
+            "simif": Out(self.SimulationInterface())
         })
 
     def elaborate(self, platform) -> Module:
         m = Module()
 
         if self.fixed_modeline is not None:
-            for member in self.timings.signature.members:
-                m.d.comb += getattr(self.timings, member).eq(getattr(self.fixed_modeline, member))
+            for member in self.fbp.timings.signature.members:
+                m.d.comb += getattr(self.fbp.timings, member).eq(getattr(self.fixed_modeline, member))
 
         m.submodules.fifo = fifo = AsyncFIFOBuffered(
                 width=32, depth=self.fifo_depth, r_domain='dvi', w_domain='sync')
@@ -80,7 +91,7 @@ class DMAFramebuffer(wiring.Component):
         m.submodules.dvi_tgen = dvi_tgen = dvi.DVITimingGen()
 
         # TODO: FFSync needed? (sync -> dvi crossing, but should always be in reset when changed).
-        wiring.connect(m, wiring.flipped(self.timings), dvi_tgen.timings)
+        wiring.connect(m, wiring.flipped(self.fbp.timings), dvi_tgen.timings)
 
         # Create a VSync signal in the 'sync' domain. Decoupled from display VSync inversion!
         phy_vsync_sync = Signal()
@@ -97,8 +108,7 @@ class DMAFramebuffer(wiring.Component):
         # DMA bus master -> FIFO state machine
         # Burst until FIFO is full, then wait until half empty.
 
-        fb_size_words = (self.timings.active_pixels * self.bytes_per_pixel) // 4
-
+        fb_size_words = (self.fbp.timings.active_pixels * self.bytes_per_pixel) // 4
 
         # Read to FIFO in sync domain
         with m.FSM() as fsm:
@@ -112,7 +122,7 @@ class DMAFramebuffer(wiring.Component):
                     bus.cyc.eq(1),
                     bus.we.eq(0),
                     bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.adr.eq(self.fb_base + dma_addr),
+                    bus.adr.eq(self.fbp.base + dma_addr),
                     fifo.w_en.eq(bus.ack),
                     fifo.w_data.eq(bus.dat_r),
                     bus.cti.eq(
@@ -228,10 +238,10 @@ class Peripheral(wiring.Component):
         # DVI hot plug detect
         hpd: csr.Field(csr.action.R, unsigned(1))
 
-    def __init__(self, fb):
-        self.fb = fb
-
+    def __init__(self, fixed_modeline=False):
         regs = csr.Builder(addr_width=6, data_width=8)
+
+        self.fixed_modeline = fixed_modeline
 
         self._h_timing     = regs.add("h_timing",     self.HTimingReg(),     offset=0x00)
         self._h_timing2    = regs.add("h_timing2",    self.HTimingReg2(),    offset=0x04)
@@ -246,7 +256,7 @@ class Peripheral(wiring.Component):
 
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            "rotation": Out(Rotation),
+            "fbp": Out(DMAFramebuffer.Properties),
         })
 
         self.bus.memory_map = self._bridge.bus.memory_map
@@ -258,29 +268,29 @@ class Peripheral(wiring.Component):
 
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
-        if not self.fb.fixed_modeline:
+        if not self.fixed_modeline:
             with m.If(self._h_timing.element.w_stb):
-                m.d.sync += self.fb.timings.h_active.eq(self._h_timing.f.h_active.w_data)
-                m.d.sync += self.fb.timings.h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
+                m.d.sync += self.fbp.timings.h_active.eq(self._h_timing.f.h_active.w_data)
+                m.d.sync += self.fbp.timings.h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
             with m.If(self._h_timing2.element.w_stb):
-                m.d.sync += self.fb.timings.h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
-                m.d.sync += self.fb.timings.h_total.eq(self._h_timing2.f.h_total.w_data)
+                m.d.sync += self.fbp.timings.h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
+                m.d.sync += self.fbp.timings.h_total.eq(self._h_timing2.f.h_total.w_data)
             with m.If(self._v_timing.element.w_stb):
-                m.d.sync += self.fb.timings.v_active.eq(self._v_timing.f.v_active.w_data)
-                m.d.sync += self.fb.timings.v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
+                m.d.sync += self.fbp.timings.v_active.eq(self._v_timing.f.v_active.w_data)
+                m.d.sync += self.fbp.timings.v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
             with m.If(self._v_timing2.element.w_stb):
-                m.d.sync += self.fb.timings.v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
-                m.d.sync += self.fb.timings.v_total.eq(self._v_timing2.f.v_total.w_data)
+                m.d.sync += self.fbp.timings.v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
+                m.d.sync += self.fbp.timings.v_total.eq(self._v_timing2.f.v_total.w_data)
             with m.If(self._hv_timing.element.w_stb):
-                m.d.sync += self.fb.timings.h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
-                m.d.sync += self.fb.timings.v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
-                m.d.sync += self.fb.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
+                m.d.sync += self.fbp.timings.h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
+                m.d.sync += self.fbp.timings.v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
+                m.d.sync += self.fbp.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
         with m.If(self._flags.f.enable.w_stb):
-            m.d.sync += self.fb.enable.eq(self._flags.f.enable.w_data)
+            m.d.sync += self.fbp.enable.eq(self._flags.f.enable.w_data)
         with m.If(self._flags.f.rotation.w_stb):
             m.d.sync += self.rotation.eq(self._flags.f.rotation.w_data)
         with m.If(self._fb_base.f.fb_base.w_stb):
-            m.d.sync += self.fb.fb_base.eq(self._fb_base.f.fb_base.w_data)
+            m.d.sync += self.fbp.base.eq(self._fb_base.f.fb_base.w_data)
 
         if sim.is_hw(platform):
             m.d.comb += self._hpd.f.hpd.r_data.eq(platform.request("dvi_hpd").i)

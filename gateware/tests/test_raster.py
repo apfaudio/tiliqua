@@ -7,6 +7,7 @@ import unittest
 
 from amaranth import *
 from amaranth.sim import *
+from amaranth.lib import wiring
 
 from tiliqua.test import wishbone, stream, csr as csr_util
 from tiliqua.raster import persist, stroke, plot, blit, line
@@ -25,15 +26,15 @@ class RasterTests(unittest.TestCase):
         m = Module()
         fb = framebuffer.DMAFramebuffer(
             fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
-        dut = persist.Persistance(fb=fb)
+        dut = persist.Persistance(bus_signature=fb.bus.signature)
+        wiring.connect(m, wiring.flipped(fb.fbp), dut.fbp)
         check = wishbone.BusChecker(dut.bus, prefix='[bus] ')
         m.submodules += [dut, fb, fb.palette, check]
 
         # No actual FB backing store, just simulating WB transactions
 
         async def testbench(ctx):
-            ctx.set(dut.enable, 1)
-            ctx.set(fb.enable, 1)
+            ctx.set(fb.fbp.enable, 1)
             # Simulate N burst accesses
             for _ in range(4):
                 ix = 0
@@ -71,14 +72,13 @@ class RasterTests(unittest.TestCase):
         N = 8
 
         async def stimulus(ctx):
+            ctx.set(fb.fbp.enable, 1)
             # Send a few sample points to the stroke
             for n in range(N):
                 await stream.put(ctx, dut.i, [0, 0, 0, 0])
                 await ctx.tick().repeat(4)
 
         async def testbench(ctx):
-            ctx.set(dut.enable, 1)
-            ctx.set(fb.enable, 1)
             for _ in range(N):
                 # Test passes if we got something
                 _ = await stream.get(ctx, dut.plot_req)
@@ -96,16 +96,17 @@ class RasterTests(unittest.TestCase):
         m = Module()
         fb = framebuffer.DMAFramebuffer(
             fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
-        dut = plot._FramebufferBackend(fb=fb)
+        dut = plot._FramebufferBackend(
+            wishbone.Signature(addr_width=fb.bus.addr_width, data_width=32, granularity=8)
+        )
+        wiring.connect(m, wiring.flipped(fb.fbp), dut.fbp)
         check = wishbone.BusChecker(dut.bus, prefix='[bus] ')
         m.submodules += [dut, fb, fb.palette, check]
 
         async def testbench(ctx):
-            ctx.set(dut.enable, 1)
-            ctx.set(fb.enable, 1)
-
+            ctx.set(fb.fbp.enable, 1)
             # Absolute positioning with replacement
-            await stream.put(ctx, dut.req, {
+            await stream.put(ctx, dut.i, {
                 'x': 1,
                 'y': 0,
                 'pixel': {
@@ -121,7 +122,7 @@ class RasterTests(unittest.TestCase):
             self.assertEqual(result.sel, 0b0010)
 
             # Center positioning with replacement
-            await stream.put(ctx, dut.req, {
+            await stream.put(ctx, dut.i, {
                 'x': 1,
                 'y': 0,
                 'pixel': {
@@ -139,7 +140,7 @@ class RasterTests(unittest.TestCase):
             self.assertEqual(result.sel, 0b0010)
 
             # Absolute positioning, additive blending
-            await stream.put(ctx, dut.req, {
+            await stream.put(ctx, dut.i, {
                 'x': 1,
                 'y': 0,
                 'pixel': {

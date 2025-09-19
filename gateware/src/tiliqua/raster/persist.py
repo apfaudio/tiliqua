@@ -25,37 +25,36 @@ class Persistance(wiring.Component):
     'holdoff' is used to keep this core from saturating the bus between bursts.
     """
 
-    def __init__(self, *, fb: DMAFramebuffer,
+    def __init__(self, *, bus_signature,
                  fifo_depth=16, holdoff_default=256):
-
-        self.fb = fb
         self.fifo_depth = fifo_depth
-
-        # FIFO to cache pixels from PSRAM.
-        self.fifo = SyncFIFOBuffered(width=fb.bus.data_width, depth=fifo_depth)
-
         super().__init__({
             # Tweakables
             "holdoff": In(16, init=holdoff_default),
             "decay": In(4, init=1),
-            # We are a DMA master
-            "bus":  Out(fb.bus.signature),
-            # Kick this to start the core
-            "enable": In(1),
+            # DMA bus / fb
+            "bus":  Out(bus_signature),
+            "fbp": In(DMAFramebuffer.Properties()),
         })
 
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        m.submodules.fifo = self.fifo
+        # FIFO to cache pixels from PSRAM.
+        m.submodules.fifo = self.fifo = SyncFIFOBuffered(
+            width=self.bus.signature.data_width, depth=self.fifo_depth)
+
         bus = self.bus
 
+        pixel_bits = Pixel.as_shape().size
+        pixel_bytes = pixel_bits // 8
+
         # Length of framebuffer in bus words
-        fb_len_words = ((self.fb.timings.active_pixels * self.fb.bytes_per_pixel) //
-                        (self.fb.bus.data_width // Pixel.as_shape().size))
+        fb_len_words = ((self.fbp.timings.active_pixels * pixel_bytes) //
+                        (self.bus.data_width // pixel_bits))
 
         # Track framebuffer position by tracking fifo reads/writes
-        dma_offs_in = Signal(self.fb.bus.addr_width, init=0)
+        dma_offs_in = Signal(self.bus.addr_width, init=0)
         with m.If(self.fifo.w_en & self.fifo.w_rdy):
             with m.If(dma_offs_in < (fb_len_words-1)):
                 m.d.sync += dma_offs_in.eq(dma_offs_in + 1)
@@ -90,9 +89,6 @@ class Persistance(wiring.Component):
                 m.d.sync += any_nonzero_reads.eq(1)
 
         with m.FSM() as fsm:
-            with m.State('OFF'):
-                with m.If(self.enable):
-                    m.next = 'BURST-IN'
 
             with m.State('BURST-IN'):
                 m.d.sync += decay_latch.eq(self.decay)
@@ -101,7 +97,7 @@ class Persistance(wiring.Component):
                     bus.cyc.eq(1),
                     bus.we.eq(0),
                     bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.adr.eq(self.fb.fb_base + dma_offs_in),
+                    bus.adr.eq(self.fbp.base + dma_offs_in),
                     self.fifo.w_en.eq(bus.ack),
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST),
@@ -145,7 +141,7 @@ class Persistance(wiring.Component):
                     bus.cyc.eq(1),
                     bus.we.eq(1),
                     bus.sel.eq(2**(bus.data_width//8)-1),
-                    bus.adr.eq(self.fb.fb_base + dma_offs_out - 1),
+                    bus.adr.eq(self.fbp.base + dma_offs_out - 1),
                     bus.dat_w.eq(pixels_w),
                     bus.cti.eq(
                         wishbone.CycleType.INCR_BURST)
@@ -169,7 +165,7 @@ class Persistance(wiring.Component):
                 with m.If(holdoff_count > self.holdoff):
                     m.next = 'BURST-IN'
 
-        return ResetInserter({'sync': ~self.fb.enable})(m)
+        return ResetInserter({'sync': ~self.fbp.enable})(m)
 
 class Peripheral(wiring.Component):
 
@@ -181,8 +177,7 @@ class Peripheral(wiring.Component):
 
     def __init__(self, fb, bus_dma):
         self.en = Signal()
-        self.fb = fb
-        self.persist = Persistance(fb=self.fb)
+        self.persist = Persistance(bus_signature=self.fb.bus.signature)
         bus_dma.add_master(self.persist.bus)
 
         regs = csr.Builder(addr_width=5, data_width=8)
@@ -202,8 +197,6 @@ class Peripheral(wiring.Component):
         m.submodules.bridge = self._bridge
         m.submodules.persist = self.persist
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
-
-        m.d.comb += self.persist.enable.eq(self.fb.enable)
 
         with m.If(self._persist.f.persist.w_stb):
             m.d.sync += self.persist.holdoff.eq(self._persist.f.persist.w_data)

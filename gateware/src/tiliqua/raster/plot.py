@@ -43,7 +43,7 @@ from amaranth_soc import csr, wishbone
 from ..video.framebuffer import DMAFramebuffer
 from ..video.types import Pixel, Rotation
 from ..dsp import stream_util
-from .cache import Cache
+from ..cache import WishboneL2Cache
 
 
 class BlendMode(enum.Enum, shape=unsigned(1)):
@@ -103,7 +103,7 @@ class Peripheral(wiring.Component):
         self.fifo_depth = fifo_depth
 
         # Command FIFO for enqueued pixel writes
-        self._cmd_fifo = fifo.SyncFIFOBuffered(width=PlotRequest.as_shape().size, depth=fifo_depth)
+        self._cmd_fifo = stream_util.SyncFIFOBuffered(shape=PlotRequest, depth=fifo_depth)
 
         regs = csr.Builder(addr_width=6, data_width=8)
         self._status = regs.add("status", self.StatusReg(), offset=0x00)
@@ -112,9 +112,7 @@ class Peripheral(wiring.Component):
 
         super().__init__({
             "csr_bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            # Output to shared plot backend
-            "plot_req": Out(stream.Signature(PlotRequest)),
-            "enable": In(1),
+            "o": Out(stream.Signature(PlotRequest)),
         })
 
         self.csr_bus.memory_map = self._bridge.bus.memory_map
@@ -123,40 +121,28 @@ class Peripheral(wiring.Component):
         m = Module()
 
         m.submodules.bridge = self._bridge
-        m.submodules._cmd_fifo = self._cmd_fifo
+        m.submodules._cmd_fifo = cmd_fifo = self._cmd_fifo
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
-        # Enqueue command when plot register is written
-        cmd_fifo_w = self._cmd_fifo.w_stream
-
         # Build PlotRequest from CSR fields, commit on register write.
-        plot_request = Signal(PlotRequest)
         m.d.comb += [
-            plot_request.x.eq(self._plot.f.x.w_data),
-            plot_request.y.eq(self._plot.f.y.w_data),
-            plot_request.pixel.eq(self._plot.f.pixel.w_data),
-            plot_request.blend.eq(BlendMode.REPLACE),
-            plot_request.offset.eq(OffsetMode.ABSOLUTE),
+            cmd_fifo.i.payload.x.eq(self._plot.f.x.w_data),
+            cmd_fifo.i.payload.y.eq(self._plot.f.y.w_data),
+            cmd_fifo.i.payload.pixel.eq(self._plot.f.pixel.w_data),
+            cmd_fifo.i.payload.blend.eq(BlendMode.REPLACE),
+            cmd_fifo.i.payload.offset.eq(OffsetMode.ABSOLUTE),
         ]
-        with m.If(self._plot.element.w_stb & cmd_fifo_w.ready):
-            m.d.comb += [
-                cmd_fifo_w.valid.eq(1),
-                cmd_fifo_w.payload.eq(plot_request),
-            ]
+        with m.If(self._plot.element.w_stb & cmd_fifo.i.ready):
+            m.d.comb += cmd_fifo.i.valid.eq(1)
 
         # Status register fields
         m.d.comb += [
-            self._status.f.fifo_level.r_data.eq(self._cmd_fifo.level),
-            self._status.f.busy.r_data.eq(~cmd_fifo_w.ready),  # Busy when FIFO full
+            self._status.f.fifo_level.r_data.eq(cmd_fifo.level),
+            self._status.f.busy.r_data.eq(~cmd_fifo.i.ready), # Busy when FIFO full
         ]
 
-        # Send plot requests to shared plotting backend on `plot_req`
-        rstream = self._cmd_fifo.r_stream
-        m.d.comb += [
-            self.plot_req.valid.eq(self.enable & rstream.valid),
-            self.plot_req.payload.eq(rstream.payload),
-            rstream.ready.eq(self.plot_req.ready),
-        ]
+        # Send plot requests to shared plotting backend on `o`
+        wiring.connect(m, cmd_fifo.o, wiring.flipped(self.o))
 
         return m
 
@@ -176,27 +162,23 @@ class _FramebufferBackend(wiring.Component):
     ``BlendMode.ADDITIVE`` performs a READ-BLEND-WRITE operation, which is slower.
     """
 
-    def __init__(self, fb: DMAFramebuffer, data_width=32, granularity=8):
-        self.fb = fb
+    def __init__(self, bus_signature):
         self.pixel_bits = Pixel.as_shape().size
-        self.pixels_per_word = data_width // self.pixel_bits
+        self.pixel_bytes = self.pixel_bits // 8
+        self.pixels_per_word = bus_signature.data_width // self.pixel_bits
         super().__init__({
             # Incoming plot request stream
-            "req": In(stream.Signature(PlotRequest)),
+            "i": In(stream.Signature(PlotRequest)),
             # DMA bus for framebuffer access
-            "bus": Out(wishbone.Signature(
-                addr_width=fb.bus.addr_width, data_width=data_width,
-                granularity=granularity)),
-            # Control signals. Rotation can be changed at any time.
-            "enable": In(1),
-            "rotation": In(Rotation),
+            "bus": Out(bus_signature),
+            # Dynamic attributes of framebuffer needed for plotting.
+            "fbp": In(DMAFramebuffer.Properties()),
         })
 
     def elaborate(self, platform) -> Module:
         m = Module()
 
         bus = self.bus
-        req = self.req
 
         # Current request being processed
         current_req = Signal(PlotRequest)
@@ -208,18 +190,18 @@ class _FramebufferBackend(wiring.Component):
         # Maybe convert absolute coordinates to center-relative, which depends
         # on the current rotation settings.
         with m.If(current_req.offset == OffsetMode.CENTER):
-            with m.Switch(self.rotation):
+            with m.Switch(self.fbp.rotation):
                 # Landscape centering
                 with m.Case(Rotation.NORMAL, Rotation.INVERTED):
                     m.d.comb += [
-                        abs_x.eq(current_req.x + (self.fb.timings.h_active >> 1)),
-                        abs_y.eq(current_req.y + (self.fb.timings.v_active >> 1)),
+                        abs_x.eq(current_req.x + (self.fbp.timings.h_active >> 1)),
+                        abs_y.eq(current_req.y + (self.fbp.timings.v_active >> 1)),
                     ]
                 # Portrait centering
                 with m.Case(Rotation.LEFT, Rotation.RIGHT):
                     m.d.comb += [
-                        abs_x.eq(current_req.x + (self.fb.timings.v_active >> 1)),
-                        abs_y.eq(current_req.y + (self.fb.timings.h_active >> 1)),
+                        abs_x.eq(current_req.x + (self.fbp.timings.v_active >> 1)),
+                        abs_y.eq(current_req.y + (self.fbp.timings.h_active >> 1)),
                     ]
         with m.Else():
             m.d.comb += [
@@ -230,7 +212,7 @@ class _FramebufferBackend(wiring.Component):
         # Handle rotation and pixel addressing
         final_x = Signal(signed(16))
         final_y = Signal(signed(16))
-        with m.Switch(self.rotation):
+        with m.Switch(self.fbp.rotation):
             with m.Case(Rotation.NORMAL):
                 m.d.comb += [
                     final_x.eq(abs_x),
@@ -238,18 +220,18 @@ class _FramebufferBackend(wiring.Component):
                 ]
             with m.Case(Rotation.LEFT):
                 m.d.comb += [
-                    final_x.eq(self.fb.timings.h_active - 1 - abs_y),
+                    final_x.eq(self.fbp.timings.h_active - 1 - abs_y),
                     final_y.eq(abs_x),
                 ]
             with m.Case(Rotation.INVERTED):
                 m.d.comb += [
-                    final_x.eq(self.fb.timings.h_active - 1 - abs_x),
-                    final_y.eq(self.fb.timings.v_active - 1 - abs_y),
+                    final_x.eq(self.fbp.timings.h_active - 1 - abs_x),
+                    final_y.eq(self.fbp.timings.v_active - 1 - abs_y),
                 ]
             with m.Case(Rotation.RIGHT):
                 m.d.comb += [
                     final_x.eq(abs_y),
-                    final_y.eq(self.fb.timings.v_active - 1 - abs_x),
+                    final_y.eq(self.fbp.timings.v_active - 1 - abs_x),
                 ]
 
 
@@ -265,10 +247,10 @@ class _FramebufferBackend(wiring.Component):
             x_offs.eq(final_x >> 2),
             y_offs.eq(final_y),
         ]
-        fb_hwords = ((self.fb.timings.h_active * self.fb.bytes_per_pixel)
+        fb_hwords = ((self.fbp.timings.h_active * self.pixel_bytes)
                      // self.pixels_per_word)
         m.d.comb += pixel_addr.eq(
-                self.fb.fb_base + y_offs*fb_hwords + x_offs)
+                self.fbp.base + y_offs*fb_hwords + x_offs)
 
         # Pixel data latched during read-modify-write / blending
         pixel_read = Signal(Pixel)
@@ -277,9 +259,9 @@ class _FramebufferBackend(wiring.Component):
         with m.FSM() as fsm:
 
             with m.State('IDLE'):
-                m.d.comb += req.ready.eq(self.enable)
-                with m.If(self.enable & req.valid):
-                    m.d.sync += current_req.eq(req.payload)
+                m.d.comb += self.i.ready.eq(1)
+                with m.If(self.i.valid):
+                    m.d.sync += current_req.eq(self.i.payload)
                     m.next = 'CHECK-BOUNDS'
 
             with m.State('CHECK-BOUNDS'):
@@ -288,7 +270,7 @@ class _FramebufferBackend(wiring.Component):
                     bus.sel.eq(1 << pixel_index)
                 ]
                 with m.If((x_offs < fb_hwords) &
-                          (y_offs < self.fb.timings.v_active)):
+                          (y_offs < self.fbp.timings.v_active)):
                     with m.Switch(current_req.blend):
                         with m.Case(BlendMode.ADDITIVE):
                             m.next = 'BLEND-READ'
@@ -332,7 +314,7 @@ class _FramebufferBackend(wiring.Component):
                 with m.If(bus.stb & bus.ack):
                     m.next = 'IDLE'
 
-        return ResetInserter({'sync': ~self.fb.enable})(m)
+        return ResetInserter({'sync': ~self.fbp.enable})(m)
 
 
 class FramebufferPlotter(wiring.Component):
@@ -340,48 +322,43 @@ class FramebufferPlotter(wiring.Component):
     Combined cache, arbiter, and plotting logic.
     Takes (one or many) streams of pixels to plot, and DMAs them to a framebuffer.
     """
-    def __init__(self, fb: DMAFramebuffer, n_ports: int = 1, cachesize_words: int = 64):
-        self.fb = fb
+    def __init__(self, bus_signature, n_ports: int = 1, cachesize_words: int = 64):
         self.n_ports = n_ports
         self.cachesize_words = cachesize_words
         super().__init__({
-            # Incoming plot request streams
-            "ports": In(stream.Signature(PlotRequest)).array(n_ports),
+            # One (or many) incoming plot request streams
+            "i": In(stream.Signature(PlotRequest)).array(n_ports),
             # Framebuffer DMA bus
-            "bus": Out(wishbone.Signature(addr_width=fb.bus.addr_width,
-                                        data_width=32, granularity=8,
-                                        features={"cti", "bte"})),
-            "enable": In(1),
-            "rotation": In(Rotation),
+            "bus": Out(bus_signature),
+            # Dynamic attributes of framebuffer needed for plotting.
+            "fbp": In(DMAFramebuffer.Properties),
         })
 
     def elaborate(self, platform) -> Module:
         m = Module()
 
         # Internal components
-        backend = _FramebufferBackend(self.fb)
-        cache = Cache(self.fb, cachesize_words=self.cachesize_words)
-        arbiter = stream_util.Arbiter(n_channels=self.n_ports, shape=PlotRequest)
+        m.submodules.cache = cache = WishboneL2Cache(
+            addr_width=self.bus.addr_width,
+            cachesize_words=self.cachesize_words,
+            autoflush=True)
+        m.submodules.backend = backend = _FramebufferBackend(
+            bus_signature=cache.master.signature)
+        m.submodules.arbiter = arbiter = stream_util.Arbiter(
+            n_channels=self.n_ports, shape=PlotRequest)
 
-        m.submodules.backend = backend
-        m.submodules.cache = cache
-        m.submodules.arbiter = arbiter
+        # Framebuffer properties
+        wiring.connect(m, wiring.flipped(self.fbp), backend.fbp)
 
         # Plot requests -> arbiter
         for n in range(self.n_ports):
-            wiring.connect(m, wiring.flipped(self.ports[n]), arbiter.i[n])
+            wiring.connect(m, wiring.flipped(self.i[n]), arbiter.i[n])
         # Arbiter -> plotting backend
-        wiring.connect(m, arbiter.o, backend.req)
+        wiring.connect(m, arbiter.o, backend.i)
         # Backend -> cache
         cache.add_port(backend.bus)
         # Cache -> exposed for connecting to PSRAM DMA
         wiring.connect(m, cache.bus, wiring.flipped(self.bus))
-
-        # Forward control signals
-        m.d.comb += [
-            backend.enable.eq(self.enable),
-            backend.rotation.eq(self.rotation),
-        ]
 
         return m
 

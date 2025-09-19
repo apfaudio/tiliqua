@@ -53,8 +53,6 @@ class Stroke(wiring.Component):
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
             # Plot request output to shared backend
             "plot_req": Out(stream.Signature(PlotRequest)),
-            # Kick this to start the core
-            "enable": In(1),
             # Internal point stream, upsampled from self.i (TODO no need to expose this)
             "point_stream": In(stream.Signature(data.ArrayLayout(ASQ, 4)))
         })
@@ -114,10 +112,6 @@ class Stroke(wiring.Component):
             m.d.comb += sample_intensity.eq(0)
 
         with m.FSM() as fsm:
-
-            with m.State('OFF'):
-                with m.If(self.enable):
-                    m.next = 'LATCH0'
 
             with m.State('LATCH0'):
                 m.d.comb += self.point_stream.ready.eq(1)
