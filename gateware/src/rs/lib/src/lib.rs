@@ -1,5 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 
+pub mod color;
 pub mod draw;
 pub mod logger;
 pub mod palette;

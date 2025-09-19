@@ -11,9 +11,10 @@ use core::fmt::Write;
 
 use embedded_hal::i2c::{I2c, Operation};
 use embedded_hal::delay::DelayNs;
-use embedded_graphics::prelude::*;
+use tiliqua_hal::embedded_graphics::prelude::*;
 
 use heapless::String;
+use fastrand::Rng;
 
 use tiliqua_pac as pac;
 use tiliqua_fw::*;
@@ -49,7 +50,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         let opts_ro = app.ui.opts.clone();
 
-        if opts_ro.autocal.autozero.value == EnAutoZero::Run {
+        if opts_ro.autocal.autozero.value == StopRun::Run {
             let stimulus_raw = 4000 * opts_ro.autocal.volts.value as i16;
             let sample_i = app.ui.pmod.sample_i();
             let mut deltas = [0i16; 4];
@@ -407,6 +408,7 @@ fn main() -> ! {
     let dtr = peripherals.DTR0;
 
     let mut startup_report = ReportString::new();
+
     psram_memtest(&mut startup_report, &mut timer);
     spiflash_memtest(&mut startup_report, &mut timer);
     tusb322i_id_test(&mut startup_report, &mut i2cdev);
@@ -417,8 +419,8 @@ fn main() -> ! {
     timer.disable();
     timer.delay_ns(0);
 
-    let mut opts = Opts::default();
 
+    let mut opts = Opts::default();
     let cal_default = DefaultCalibrationConstants::from_array(
         &PMOD_DEFAULT_CAL, pmod.f_bits());
     if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
@@ -427,6 +429,7 @@ fn main() -> ! {
     } else {
         write!(startup_report, "FAIL: load calibration from EEPROM").ok();
     }
+
     info!("STARTUP REPORT: {}", startup_report);
 
     let app = Mutex::new(RefCell::new(App::new(opts)));
@@ -435,8 +438,12 @@ fn main() -> ! {
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
+        peripherals.BLIT,
+        peripherals.PIXEL_PLOT,
+        peripherals.LINE,
         PSRAM_FB_BASE,
         modeline.clone(),
+        BLIT_MEM_BASE,
     );
 
     handler!(timer0 = || timer0_handler(&app));
@@ -444,6 +451,8 @@ fn main() -> ! {
     let psram = peripherals.PSRAM_CSR;
 
     let mut last_hpd = display.get_hpd();
+
+    let mut benchmark_rng = Rng::with_seed(0);
 
     use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
     let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
@@ -540,6 +549,37 @@ fn main() -> ! {
                 pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(stimulus_raw as u16) } );
             }
 
+            if opts.tracker.page.value == Page::Benchmark {
+                let fps = {
+                    // TODO: use the dedicated timer instead of abusing the PSRAM stats
+                    // collection timer :)
+                    psram.ctrl().write(|w| w.collect().bit(false));
+                    let cycles_elapsed: u32 = psram.stats0().read().cycles_elapsed().bits();
+                    psram.ctrl().write(|w| w.collect().bit(true));
+                    sysclk / (cycles_elapsed+1)
+                };
+                let mut ops_per_loop = 0u32;
+                if opts.benchmark.enabled.value == StopRun::Run {
+                    use options::BenchmarkType;
+                    match opts.benchmark.test_type.value {
+                        BenchmarkType::Lines => {
+                            ops_per_loop = 150;
+                            draw::draw_benchmark_lines(&mut display, ops_per_loop, &mut benchmark_rng).ok();
+                        },
+                        BenchmarkType::Text => {
+                            ops_per_loop = 150;
+                            draw::draw_benchmark_text(&mut display, ops_per_loop, &mut benchmark_rng).ok();
+                        },
+                        BenchmarkType::Pixels => {
+                            ops_per_loop = 10000;
+                            draw::draw_benchmark_pixels(&mut display, ops_per_loop, &mut benchmark_rng).ok();
+                        },
+                    }
+                }
+                draw::draw_benchmark_stats(&mut display, h_active/2-50, v_active-50, hue,
+                                           fps, fps*ops_per_loop).ok();
+            }
+
             //
             // Push calibration constants to audio interface
             //
@@ -580,7 +620,7 @@ fn main() -> ! {
                 });
             }
 
-            if opts.tracker.page.value != Page::Report {
+            if opts.tracker.page.value != Page::Report && opts.tracker.page.value != Page::Benchmark {
                 draw::draw_cal(&mut display, h_active/2-128, v_active/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
                                &pmod.sample_i()).ok();

@@ -24,6 +24,7 @@ pub mod eeprom;
 pub use embedded_hal as hal;
 pub use embedded_hal_nb as hal_nb;
 pub use embedded_storage::nor_flash;
+pub use embedded_graphics;
 
 #[macro_use]
 extern crate bitflags;
@@ -65,6 +66,9 @@ macro_rules! impl_tiliqua_soc_pac {
         tiliqua_hal::impl_dma_framebuffer! {
             DMAFramebuffer0: tiliqua_pac::FRAMEBUFFER_PERIPH,
             Palette0: tiliqua_pac::PALETTE_PERIPH,
+            Blit0: tiliqua_pac::BLIT,
+            PixelPlot0: tiliqua_pac::PIXEL_PLOT,
+            Line0: tiliqua_pac::LINE,
         }
 
         tiliqua_hal::impl_spiflash! {

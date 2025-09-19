@@ -22,12 +22,14 @@ embedded-hal-nb = "=1.0.0"
 log = { version = "0.4.*", optional = true }
 nb = "=1.1.0"
 riscv = { version = "=0.11.1", features = ["critical-section-single-hart"] }
-embedded-graphics = "0.8.1"
+embedded-graphics = { git = "https://github.com/vk2seb/embedded-graphics.git", branch = "seb/fast-draw" }
 bitflags = "2.6.0"
 micromath = "2.1.0"
 embedded-storage = "0.3.1"
 serde = { version="1.0.219", default-features=false }
 serde_derive = "1.0.219"
+strum_macros = "0.26.4"
+strum = {version = "0.25.0", features = ["derive"], default-features=false}
 
 [dev-dependencies]
 critical-section = { version = "1.1.2", features = ["std"] }

@@ -21,7 +21,7 @@ where
     encoder: EncoderT,
     pub pca9635: Pca9635Driver<MoboI2CT>,
     pub pmod: PmodT,
-    uptime_ms: u32,
+    pub uptime_ms: u32,
     time_since_encoder_touched: u32,
     time_since_midi_activity: u32,
     toggle_leds: bool,
