@@ -52,8 +52,6 @@ class Stroke(wiring.Component):
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
             # Plot request output to shared backend
             "o": Out(stream.Signature(PlotRequest)),
-            # Internal point stream, upsampled from self.i (TODO no need to expose this)
-            "point_stream": In(stream.Signature(data.ArrayLayout(ASQ, 4)))
         })
 
 
@@ -82,10 +80,10 @@ class Stroke(wiring.Component):
             wiring.connect(m, resample2.o, merge.i[2])
             wiring.connect(m, resample3.o, merge.i[3])
 
-            wiring.connect(m, merge.o, self.point_stream)
+            self.point_stream = merge.o
         else:
             # No upsampling.
-            wiring.connect(m, wiring.flipped(self.i), self.point_stream)
+            self.point_stream = self.i
 
         # last sample
         sample_x = Signal(signed(16))

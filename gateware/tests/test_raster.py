@@ -64,15 +64,12 @@ class RasterTests(unittest.TestCase):
     def test_stroke(self):
 
         m = Module()
-        fb = framebuffer.DMAFramebuffer(
-            fixed_modeline=self.MODELINE, palette=palette.ColorPalette())
-        dut = stroke.Stroke(fb=fb)
-        m.submodules += [dut, fb, fb.palette]
+        dut = stroke.Stroke()
+        m.submodules += [dut]
 
         N = 8
 
         async def stimulus(ctx):
-            ctx.set(fb.fbp.enable, 1)
             # Send a few sample points to the stroke
             for n in range(N):
                 await stream.put(ctx, dut.i, [0, 0, 0, 0])
@@ -81,7 +78,7 @@ class RasterTests(unittest.TestCase):
         async def testbench(ctx):
             for _ in range(N):
                 # Test passes if we got something
-                _ = await stream.get(ctx, dut.plot_req)
+                _ = await stream.get(ctx, dut.o)
                 await ctx.tick()
 
         sim = Simulator(m)
