@@ -22,7 +22,6 @@ See 'xbeam' for SoC version of the scope with a menu system.
 
 """
 
-import math
 import os
 
 from amaranth import *
@@ -30,9 +29,7 @@ from amaranth.build import *
 from amaranth.lib import data, stream, wiring
 from amaranth.lib.cdc import FFSynchronizer
 from amaranth.lib.wiring import In, Out
-from amaranth.utils import exact_log2
 
-from amaranth_future import fixed
 from tiliqua import dsp
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
@@ -45,91 +42,6 @@ from tiliqua.raster.persist import Persistance
 from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.video import framebuffer, palette
 from vendor.ila import AsyncSerialILA
-
-
-class Spectro(wiring.Component):
-
-    """
-    Simple spectrogram drawing logic.
-
-    Take input channel 0, run an FFT/STFT on it, take the logarithm and
-    emit the log-magnitude on X (0), frequency index on Y (1), and a
-    pen-lift on 2 (to avoid interpolation artifacts).
-
-    Designed to connect to Stroke - that is, use a vectorscope as
-    a spectrum analyzer visualization.
-    """
-
-    def __init__(self, fs):
-        self.fs = fs
-        super().__init__({
-            # In on channel 0
-            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
-            # Out on channels 0 (y), 1 (x), 2 (intensity)
-            "o": Out(stream.Signature(data.ArrayLayout(ASQ, 4))),
-        })
-
-    def elaborate(self, platform):
-        m = Module()
-
-        m.submodules.split4 = split4 = dsp.Split(4)
-        m.submodules.merge4 = merge4 = dsp.Merge(4)
-        wiring.connect(m, wiring.flipped(self.i), split4.i)
-        wiring.connect(m, merge4.o, wiring.flipped(self.o))
-
-        fftsz=512
-
-        # Resample input down, so visible area is a fraction of the nyquist (e.g. 192khz/8 = 24kHz visual bandwidth)
-        m.submodules.resample = resample = dsp.Resample(fs_in=self.fs, n_up=1, m_down=8 if self.fs > 48000 else 2)
-        m.submodules.analyzer = analyzer = dsp.fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
-        m.submodules.envelope = envelope = dsp.spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
-        def log_lut(x):
-            # map 0 - 1 (linear) to 0 - 1 (log representing -X dBr to 0dBr)
-            # where -X (smallest value) represents 1 LSB of the fixed.SQ.
-            max_v = 1 << ASQ.f_bits
-            r = max(0, math.log2(max(1, x*max_v))/math.log2(max_v))
-            return r
-        m.submodules.log = log = dsp.block.WrapCore(dsp.WaveShaper(
-                lut_function=log_lut, lut_size=512, continuous=False))
-
-        wiring.connect(m, split4.o[0], resample.i)
-        wiring.connect(m, resample.o, analyzer.i)
-        wiring.connect(m, analyzer.o, envelope.i)
-        wiring.connect(m, envelope.o, log.i)
-
-        # Increasing X axis counter for frequency bins
-        f_axis = Signal(ASQ)
-        with m.If(log.o.valid & log.o.ready):
-            with m.If(log.o.payload.first):
-                m.d.sync += f_axis.eq(fixed.Const(-0.5))
-            with m.Else():
-                m.d.sync += f_axis.eq(f_axis+(fixed.Const(1)>>exact_log2(fftsz)))
-
-        # Pen lift when we get to the mirrored half of the spectrum.
-        with m.If(f_axis < fixed.Const(0)):
-            m.d.comb += merge4.i[2].payload.eq(ASQ.max())
-        with m.Else():
-            m.d.comb += merge4.i[2].payload.eq(0)
-
-        m.d.comb += [
-            # Connect log magnitude to ch0 output (offset to center)
-            merge4.i[0].payload.eq(log.o.payload.sample - fixed.Const(0.25)),
-            merge4.i[0].valid.eq(log.o.valid),
-            log.o.ready.eq(merge4.i[0].ready),
-
-            # Connect frequency bin / index to ch1 output (offset to center)
-            merge4.i[1].valid.eq(1),
-            merge4.i[1].payload.eq((f_axis<<1) - fixed.Const(0.5)),
-
-            # Pen lift always valid
-            merge4.i[2].valid.eq(1),
-        ]
-
-        # Unused channels
-        split4.wire_ready(m, [1, 2, 3])
-        merge4.wire_valid(m, [3])
-
-        return m
 
 class VectorScopeTop(Elaboratable):
 
@@ -177,7 +89,7 @@ class VectorScopeTop(Elaboratable):
         self.vector_periph = scope.VectorPeripheral(
             n_upsample=32 if self.spectrogram else 8, fs=clock_settings.audio_clock.fs())
         if self.spectrogram:
-            self.spectro = Spectro(fs=clock_settings.audio_clock.fs())
+            self.spectro = scope.Spectrogram(fs=clock_settings.audio_clock.fs())
 
         super().__init__()
 
