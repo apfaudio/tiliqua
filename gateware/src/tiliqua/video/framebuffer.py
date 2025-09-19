@@ -238,10 +238,8 @@ class Peripheral(wiring.Component):
         # DVI hot plug detect
         hpd: csr.Field(csr.action.R, unsigned(1))
 
-    def __init__(self, fixed_modeline=False):
+    def __init__(self):
         regs = csr.Builder(addr_width=6, data_width=8)
-
-        self.fixed_modeline = fixed_modeline
 
         self._h_timing     = regs.add("h_timing",     self.HTimingReg(),     offset=0x00)
         self._h_timing2    = regs.add("h_timing2",    self.HTimingReg2(),    offset=0x04)
@@ -256,7 +254,7 @@ class Peripheral(wiring.Component):
 
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            "fbp": Out(DMAFramebuffer.Properties),
+            "fbp": Out(DMAFramebuffer.Properties()),
         })
 
         self.bus.memory_map = self._bridge.bus.memory_map
@@ -268,27 +266,26 @@ class Peripheral(wiring.Component):
 
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
-        if not self.fixed_modeline:
-            with m.If(self._h_timing.element.w_stb):
-                m.d.sync += self.fbp.timings.h_active.eq(self._h_timing.f.h_active.w_data)
-                m.d.sync += self.fbp.timings.h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
-            with m.If(self._h_timing2.element.w_stb):
-                m.d.sync += self.fbp.timings.h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
-                m.d.sync += self.fbp.timings.h_total.eq(self._h_timing2.f.h_total.w_data)
-            with m.If(self._v_timing.element.w_stb):
-                m.d.sync += self.fbp.timings.v_active.eq(self._v_timing.f.v_active.w_data)
-                m.d.sync += self.fbp.timings.v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
-            with m.If(self._v_timing2.element.w_stb):
-                m.d.sync += self.fbp.timings.v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
-                m.d.sync += self.fbp.timings.v_total.eq(self._v_timing2.f.v_total.w_data)
-            with m.If(self._hv_timing.element.w_stb):
-                m.d.sync += self.fbp.timings.h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
-                m.d.sync += self.fbp.timings.v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
-                m.d.sync += self.fbp.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
+        with m.If(self._h_timing.element.w_stb):
+            m.d.sync += self.fbp.timings.h_active.eq(self._h_timing.f.h_active.w_data)
+            m.d.sync += self.fbp.timings.h_sync_start.eq(self._h_timing.f.h_sync_start.w_data)
+        with m.If(self._h_timing2.element.w_stb):
+            m.d.sync += self.fbp.timings.h_sync_end.eq(self._h_timing2.f.h_sync_end.w_data)
+            m.d.sync += self.fbp.timings.h_total.eq(self._h_timing2.f.h_total.w_data)
+        with m.If(self._v_timing.element.w_stb):
+            m.d.sync += self.fbp.timings.v_active.eq(self._v_timing.f.v_active.w_data)
+            m.d.sync += self.fbp.timings.v_sync_start.eq(self._v_timing.f.v_sync_start.w_data)
+        with m.If(self._v_timing2.element.w_stb):
+            m.d.sync += self.fbp.timings.v_sync_end.eq(self._v_timing2.f.v_sync_end.w_data)
+            m.d.sync += self.fbp.timings.v_total.eq(self._v_timing2.f.v_total.w_data)
+        with m.If(self._hv_timing.element.w_stb):
+            m.d.sync += self.fbp.timings.h_sync_invert.eq(self._hv_timing.f.h_sync_invert.w_data)
+            m.d.sync += self.fbp.timings.v_sync_invert.eq(self._hv_timing.f.v_sync_invert.w_data)
+            m.d.sync += self.fbp.timings.active_pixels.eq(self._hv_timing.f.active_pixels.w_data)
         with m.If(self._flags.f.enable.w_stb):
             m.d.sync += self.fbp.enable.eq(self._flags.f.enable.w_data)
         with m.If(self._flags.f.rotation.w_stb):
-            m.d.sync += self.rotation.eq(self._flags.f.rotation.w_data)
+            m.d.sync += self.fbp.rotation.eq(self._flags.f.rotation.w_data)
         with m.If(self._fb_base.f.fb_base.w_stb):
             m.d.sync += self.fbp.base.eq(self._fb_base.f.fb_base.w_data)
 

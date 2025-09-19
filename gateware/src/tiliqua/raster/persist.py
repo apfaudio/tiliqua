@@ -90,6 +90,15 @@ class Persistance(wiring.Component):
 
         with m.FSM() as fsm:
 
+            with m.State('INIT'):
+                # Don't hold bus in INIT state, as we may have a ResetInserter
+                # holding us in reset across framebuffer size changes.
+                m.d.comb += [
+                    bus.stb.eq(0),
+                    bus.cyc.eq(0),
+                ]
+                m.next = 'BURST-IN'
+
             with m.State('BURST-IN'):
                 m.d.sync += decay_latch.eq(self.decay)
                 m.d.comb += [
@@ -175,9 +184,9 @@ class Peripheral(wiring.Component):
     class DecayReg(csr.Register, access="w"):
         decay: csr.Field(csr.action.W, unsigned(8))
 
-    def __init__(self, fb, bus_dma):
+    def __init__(self, bus_dma):
         self.en = Signal()
-        self.persist = Persistance(bus_signature=self.fb.bus.signature)
+        self.persist = Persistance(bus_signature=bus_dma.bus.signature.flip())
         bus_dma.add_master(self.persist.bus)
 
         regs = csr.Builder(addr_width=5, data_width=8)
@@ -189,6 +198,7 @@ class Peripheral(wiring.Component):
 
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            "fbp": In(DMAFramebuffer.Properties()),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -196,7 +206,9 @@ class Peripheral(wiring.Component):
         m = Module()
         m.submodules.bridge = self._bridge
         m.submodules.persist = self.persist
+
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
+        wiring.connect(m, wiring.flipped(self.fbp), self.persist.fbp)
 
         with m.If(self._persist.f.persist.w_stb):
             m.d.sync += self.persist.holdoff.eq(self._persist.f.persist.w_data)

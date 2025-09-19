@@ -55,7 +55,7 @@ from .build import sim
 from .build.types import FirmwareLocation
 from .periph import dtr, encoder, eurorack_pmod, i2c, psram
 from .platform import *
-from .raster import persist
+from .raster import blit, line, persist, plot
 from .video import framebuffer, palette
 
 
@@ -100,6 +100,11 @@ class TiliquaSoc(Component):
         self.palette_periph_base  = 0x00000A00
         self.fb_periph_base       = 0x00000B00
         self.psram_csr_base       = 0x00000C00
+        self.pixel_plot_csr_base  = 0x00000D00
+        self.blit_csr_base        = 0x00000E00
+        self.line_csr_base        = 0x00000F00
+
+        self.blit_mem_base        = 0xc0000000
 
         # Some settings depend on whether code is in block RAM or SPI flash
         self.fw_location = fw_location
@@ -126,6 +131,7 @@ class TiliquaSoc(Component):
                 VexiiRiscv.MemoryRegion(base=self.spiflash_base, size=self.spiflash_size, cacheable=True, executable=True),
                 VexiiRiscv.MemoryRegion(base=self.psram_base, size=self.psram_size, cacheable=True, executable=True),
                 VexiiRiscv.MemoryRegion(base=self.csr_base, size=0x10000, cacheable=False, executable=False),
+                VexiiRiscv.MemoryRegion(base=self.blit_mem_base, size=0x2000, cacheable=False, executable=False),
             ] + extra_cpu_regions,
             variant=cpu_variant,
             reset_addr=self.reset_addr,
@@ -214,23 +220,36 @@ class TiliquaSoc(Component):
         # video PHY (DMAs from PSRAM starting at self.psram_base)
         self.fb = framebuffer.DMAFramebuffer(
                 palette=self.palette_periph.palette,
-                fb_base_default=self.psram_base,
                 fixed_modeline=self.clock_settings.modeline)
         self.psram_periph.add_master(self.fb.bus)
 
         # Timing CSRs for video PHY
-        self.framebuffer_periph = framebuffer.Peripheral(fb=self.fb)
+        self.framebuffer_periph = framebuffer.Peripheral()
         self.csr_decoder.add(
                 self.framebuffer_periph.bus, addr=self.fb_periph_base, name="framebuffer_periph")
 
         # Video persistance DMA effect
         self.persist_periph = persist.Peripheral(
-            fb=self.fb,
             bus_dma=self.psram_periph)
         self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
 
+        # Hardware-accelerated pixel plotting (integrated solution)
+        self.framebuffer_plotter = plot.FramebufferPlotter(
+            bus_signature=self.psram_periph.bus.signature.flip(), n_ports=3)
+        self.psram_periph.add_master(self.framebuffer_plotter.bus)
 
-        self.permit_bus_traffic = Signal()
+        # Pixel plotter peripheral
+        self.pixel_plot = plot.Peripheral()
+        self.csr_decoder.add(self.pixel_plot.csr_bus, addr=self.pixel_plot_csr_base, name="pixel_plot")
+
+        # Blitter peripheral
+        self.blit = blit.Peripheral()
+        self.csr_decoder.add(self.blit.csr_bus, addr=self.blit_csr_base, name="blit")
+        self.wb_decoder.add(self.blit.sprite_mem_bus, addr=self.blit_mem_base, name="blit")
+
+        # Line plotter peripheral
+        self.line = line.Peripheral()
+        self.csr_decoder.add(self.line.csr_bus, addr=self.line_csr_base, name="line")
 
         self.extra_rust_constants = []
 
@@ -319,16 +338,43 @@ class TiliquaSoc(Component):
 
         # video PHY
         m.submodules.palette_periph = self.palette_periph
-        # Bring fb.enable into dvi clock domain for graceful PHY shutdown.
+        # Bring fbp.enable into dvi clock domain for graceful PHY shutdown.
         reset_dvi = Signal()
         m.submodules.en_ff = cdc.FFSynchronizer(
-                i=~self.fb.enable, o=reset_dvi, o_domain="dvi", reset=1)
-        m.submodules.fb = ResetInserter({'sync': ~self.fb.enable, 'dvi': reset_dvi, 'dvi5x': reset_dvi})(self.fb)
+                i=~self.fb.fbp.enable, o=reset_dvi, o_domain="dvi", reset=1)
+        m.submodules.fb = ResetInserter({'sync': ~self.fb.fbp.enable, 'dvi': reset_dvi, 'dvi5x': reset_dvi})(self.fb)
         m.submodules.framebuffer_periph = self.framebuffer_periph
 
         # video periph / persist
         m.submodules.persist_periph = self.persist_periph
 
+        # hardware-accelerated pixel plotting
+        m.submodules.pixel_plot = self.pixel_plot
+        m.submodules.framebuffer_plotter = self.framebuffer_plotter
+        m.submodules.blit = self.blit
+        m.submodules.line = self.line
+
+        # Connect peripherals to plotter ports
+        wiring.connect(m, self.pixel_plot.o, self.framebuffer_plotter.i[0])
+        wiring.connect(m, self.blit.o, self.framebuffer_plotter.i[1])
+        wiring.connect(m, self.line.o, self.framebuffer_plotter.i[2])
+
+        # Connect static/dynamic framebuffer properties to components that need them
+        if self.clock_settings.modeline:
+            # Modeline is fixed and comes internally from framebuffer.
+            # So we only forward framebuffer peripheral elements that are not fixed.
+            m.d.comb += [
+                self.fb.fbp.enable.eq(self.framebuffer_periph.fbp.enable),
+                self.fb.fbp.rotation.eq(self.framebuffer_periph.fbp.rotation),
+                self.fb.fbp.base.eq(self.framebuffer_periph.fbp.base),
+            ]
+            wiring.connect(m, wiring.flipped(self.fb.fbp), self.framebuffer_plotter.fbp)
+            wiring.connect(m, wiring.flipped(self.fb.fbp), self.persist_periph.fbp)
+        else:
+            # Modeline is dynamic and comes from framebuffer peripheral CSRs
+            wiring.connect(m, self.framebuffer_periph.fbp, self.fb.fbp)
+            wiring.connect(m, self.framebuffer_periph.fbp, self.framebuffer_plotter.fbp)
+            wiring.connect(m, self.framebuffer_periph.fbp, self.persist_periph.fbp)
 
         # audio interface
         m.submodules.pmod0 = self.pmod0
@@ -371,8 +417,6 @@ class TiliquaSoc(Component):
         with m.If(on_delay < 0xFFFFF):
             m.d.comb += self.cpu.ext_reset.eq(1)
             m.d.sync += on_delay.eq(on_delay+1)
-        with m.Else():
-            m.d.sync += self.permit_bus_traffic.eq(1)
 
         return m
 
@@ -418,12 +462,13 @@ class TiliquaSoc(Component):
             f.write(f"pub const PSRAM_SZ_WORDS: usize    = PSRAM_SZ_BYTES / 4;\n")
             f.write(f"pub const SPIFLASH_BASE: usize     = 0x{self.spiflash_base:x};\n")
             f.write(f"pub const SPIFLASH_SZ_BYTES: usize = 0x{self.spiflash_size:x};\n")
-            f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.fb.fb_base.init:x};\n")
+            f.write(f"pub const PSRAM_FB_BASE: usize     = 0x{self.psram_base:x};\n")
             f.write(f"pub const N_BITSTREAMS: usize      = 8;\n")
             f.write(f"pub const BOOTINFO_BASE: usize     = 0x{self.bootinfo_base:x};\n")
             pmod_rev = TiliquaRevision.from_platform(self.platform_class).pmod_rev()
             f.write(f"pub const TOUCH_SENSOR_ORDER: [u8; 8] = {pmod_rev.touch_order()};\n")
             f.write(f"pub const PMOD_DEFAULT_CAL: [f32; 4] = {pmod_rev.default_calibration_rs()};\n")
+            f.write(f"pub const BLIT_MEM_BASE: usize = 0x{self.blit_mem_base:x};\n")
 
             f.write("// Extra constants specified by an SoC subclass:\n")
             for l in self.extra_rust_constants:

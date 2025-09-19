@@ -137,7 +137,7 @@ class Peripheral(wiring.Component):
 
         # Status register fields
         m.d.comb += [
-            self._status.f.fifo_level.r_data.eq(cmd_fifo.level),
+            self._status.f.fifo_level.r_data.eq(cmd_fifo.fifo.level),
             self._status.f.busy.r_data.eq(~cmd_fifo.i.ready), # Busy when FIFO full
         ]
 
@@ -259,6 +259,8 @@ class _FramebufferBackend(wiring.Component):
         with m.FSM() as fsm:
 
             with m.State('IDLE'):
+                # Note: if a ResetInserter is holding us in reset, we drain
+                # all incoming points and don't draw them anywhere.
                 m.d.comb += self.i.ready.eq(1)
                 with m.If(self.i.valid):
                     m.d.sync += current_req.eq(self.i.payload)
