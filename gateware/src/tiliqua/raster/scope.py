@@ -33,9 +33,9 @@ class VectorPeripheral(wiring.Component):
     class Position(csr.Register, access="w"):
         value: csr.Field(csr.action.W, unsigned(16))
 
-    def __init__(self, fb, **kwargs):
+    def __init__(self, **kwargs):
 
-        self.stroke = Stroke(fb=fb, **kwargs)
+        self.stroke = Stroke(**kwargs)
 
         regs = csr.Builder(addr_width=6, data_width=8)
 
@@ -51,15 +51,12 @@ class VectorPeripheral(wiring.Component):
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
-        self.soc_en = Signal(init=1)
-
         super().__init__({
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
-            "en": In(1),
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
             # Plot request output to shared backend
-            "plot_req": Out(stream.Signature(PlotRequest)),
+            "o": Out(stream.Signature(PlotRequest)),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -69,10 +66,8 @@ class VectorPeripheral(wiring.Component):
         m.submodules += self.stroke
 
         wiring.connect(m, wiring.flipped(self.i), self.stroke.i)
-        wiring.connect(m, self.stroke.plot_req, wiring.flipped(self.plot_req))
+        wiring.connect(m, self.stroke.o, wiring.flipped(self.o))
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
-
-        m.d.comb += self.stroke.enable.eq(self.en & self.soc_en)
 
         with m.If(self._hue.f.hue.w_stb):
             m.d.sync += self.stroke.hue.eq(self._hue.f.hue.w_data)
@@ -98,8 +93,12 @@ class VectorPeripheral(wiring.Component):
         with m.If(self._cscale.f.scale.w_stb):
             m.d.sync += self.stroke.scale_c.eq(self._cscale.f.scale.w_data)
 
+        soc_en = Signal(init=1)
         with m.If(self._flags.f.enable.w_stb):
-            m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
+            m.d.sync += soc_en.eq(self._flags.f.enable.w_data)
+
+        with m.If(~soc_en):
+            m.d.comb += self.i.ready.eq(0)
 
         return m
 

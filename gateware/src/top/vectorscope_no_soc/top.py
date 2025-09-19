@@ -33,13 +33,16 @@ from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
-from tiliqua import cache, dsp
+from tiliqua import dsp
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.sim import FakeTiliquaDomainGenerator
 from tiliqua.dsp import ASQ
 from tiliqua.periph import eurorack_pmod, psram
 from tiliqua.platform import *
-from tiliqua.raster import persist, stroke
+from tiliqua.raster import scope
+from tiliqua.raster.persist import Persistance
+from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.video import framebuffer, palette
 from vendor.ila import AsyncSerialILA
 
@@ -136,31 +139,43 @@ class VectorScopeTop(Elaboratable):
 
     def __init__(self, *, clock_settings, spectrogram):
 
-        self.clock_settings = clock_settings
+        if not clock_settings.modeline:
+            # No SoC / EDID reading here: user must specify video mode.
+            raise ValueError("This design requires a fixed modeline: use `--modeline`.")
 
-        # One PSRAM with an internal arbiter to support multiple DMA masters.
+        self.clock_settings = clock_settings
+        self.spectrogram = spectrogram
+
+        # PSRAM with an internal arbiter to support multiple DMA masters.
         self.psram_periph = psram.Peripheral(size=16*1024*1024)
 
+        # Audio interface
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
-        if not clock_settings.modeline:
-            raise ValueError("This design requires a fixed modeline, use `--modeline`.")
+        #
+        # Create all the DMA initiators
+        #
 
-        # All of our DMA masters
+        # Initiator 1: Framebuffer / video PHY (streams framebuffer out video port)
         self.palette = palette.ColorPalette()
-        self.fb = framebuffer.DMAFramebuffer(fixed_modeline=clock_settings.modeline,
-                                                 palette=self.palette)
+        self.fb = framebuffer.DMAFramebuffer(
+            fixed_modeline=clock_settings.modeline, palette=self.palette)
         self.psram_periph.add_master(self.fb.bus)
 
-        self.persist = persist.Persistance(fb=self.fb)
+        # Initiator 2: Persistance / phosphor decay (decays framebuffer intensity)
+        self.persist = Persistance(bus_signature=self.fb.bus.signature)
         self.psram_periph.add_master(self.persist.bus)
 
-        self.spectrogram = spectrogram
-        self.stroke = stroke.Stroke(fb=self.fb, n_upsample=32 if self.spectrogram else 8, fs=clock_settings.audio_clock.fs())
-        self.plotter_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.plotter_cache.bus)
-        self.plotter_cache.add(self.stroke.bus)
+        # Initiator 3: Plotting backend (internal cache, blend writes to framebuffer)
+        self.fb_plot = FramebufferPlotter(bus_signature=self.fb.bus.signature, n_ports=1)
+        self.psram_periph.add_master(self.fb_plot.bus)
 
+        #
+        # Create the plotting logic itself
+        #
+
+        self.vector_periph = scope.VectorPeripheral(
+            n_upsample=32 if self.spectrogram else 8, fs=clock_settings.audio_clock.fs())
         if self.spectrogram:
             self.spectro = Spectro(fs=clock_settings.audio_clock.fs())
 
@@ -171,7 +186,7 @@ class VectorScopeTop(Elaboratable):
 
         m.submodules.pmod0 = pmod0 = self.pmod0
 
-        m.submodules.plotter_cache = self.plotter_cache
+        m.submodules.fb_plot = self.fb_plot
 
         if sim.is_hw(platform):
             m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
@@ -182,30 +197,34 @@ class VectorScopeTop(Elaboratable):
             wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
             m.d.comb += self.pmod0.codec_mute.eq(reboot.mute)
         else:
-            m.submodules.car = sim.FakeTiliquaDomainGenerator()
-
-        self.stroke.pmod0 = pmod0
+            m.submodules.car = FakeTiliquaDomainGenerator()
 
         m.submodules.palette = self.palette
         m.submodules.fb = self.fb
         m.submodules.persist = self.persist
-        m.submodules.stroke = self.stroke
+        m.submodules.vector_periph = self.vector_periph
+
+        # Hook up framebuffer properties to decay and plotter (they need to know
+        # what the current modeline is)
+        wiring.connect(m, wiring.flipped(self.fb.fbp), self.persist.fbp)
+        wiring.connect(m, wiring.flipped(self.fb.fbp), self.fb_plot.fbp)
 
         if self.spectrogram:
             m.submodules.spectro = self.spectro
             wiring.connect(m, self.pmod0.o_cal, self.spectro.i)
-            wiring.connect(m, self.spectro.o, self.stroke.i)
+            wiring.connect(m, self.spectro.o, self.vector_periph.i)
         else:
-            wiring.connect(m, self.pmod0.o_cal, self.stroke.i)
+            wiring.connect(m, self.pmod0.o_cal, self.vector_periph.i)
+
+        # Connect vector peripheral to plotter
+        wiring.connect(m, self.vector_periph.o, self.fb_plot.i[0])
 
         # Memory controller hangs if we start making requests to it straight away.
         on_delay = Signal(32)
         with m.If(on_delay < 0xFFFF):
             m.d.sync += on_delay.eq(on_delay+1)
         with m.Else():
-            m.d.sync += self.fb.enable.eq(1)
-            m.d.sync += self.persist.enable.eq(1)
-            m.d.sync += self.stroke.enable.eq(1)
+            m.d.sync += self.fb.fbp.enable.eq(1)
 
         # Optional ILA, very useful for low-level PSRAM debugging...
         if not platform.ila:

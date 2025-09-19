@@ -331,7 +331,7 @@ class FramebufferPlotter(wiring.Component):
             # Framebuffer DMA bus
             "bus": Out(bus_signature),
             # Dynamic attributes of framebuffer needed for plotting.
-            "fbp": In(DMAFramebuffer.Properties),
+            "fbp": In(DMAFramebuffer.Properties()),
         })
 
     def elaborate(self, platform) -> Module:
@@ -340,10 +340,9 @@ class FramebufferPlotter(wiring.Component):
         # Internal components
         m.submodules.cache = cache = WishboneL2Cache(
             addr_width=self.bus.addr_width,
-            cachesize_words=self.cachesize_words,
-            autoflush=True)
+            cachesize_words=self.cachesize_words)
         m.submodules.backend = backend = _FramebufferBackend(
-            bus_signature=cache.master.signature)
+            bus_signature=cache.master.signature.flip())
         m.submodules.arbiter = arbiter = stream_util.Arbiter(
             n_channels=self.n_ports, shape=PlotRequest)
 
@@ -356,9 +355,9 @@ class FramebufferPlotter(wiring.Component):
         # Arbiter -> plotting backend
         wiring.connect(m, arbiter.o, backend.i)
         # Backend -> cache
-        cache.add_port(backend.bus)
+        wiring.connect(m, backend.bus, cache.master)
         # Cache -> exposed for connecting to PSRAM DMA
-        wiring.connect(m, cache.bus, wiring.flipped(self.bus))
+        wiring.connect(m, cache.slave, wiring.flipped(self.bus))
 
         return m
 

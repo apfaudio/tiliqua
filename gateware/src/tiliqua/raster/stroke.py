@@ -31,10 +31,9 @@ class Stroke(wiring.Component):
     an SoC to scale or shift the waveforms around.
     """
 
-    def __init__(self, *, fb: DMAFramebuffer, fs=192000, n_upsample=None,
+    def __init__(self, *, fs=192000, n_upsample=None,
                  default_hue=10, default_x=0, default_y=0):
 
-        self.fb = fb
         self.fs = fs
         self.n_upsample = n_upsample
 
@@ -52,7 +51,7 @@ class Stroke(wiring.Component):
             # 4 channels: x, y, intensity, color
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
             # Plot request output to shared backend
-            "plot_req": Out(stream.Signature(PlotRequest)),
+            "o": Out(stream.Signature(PlotRequest)),
             # Internal point stream, upsampled from self.i (TODO no need to expose this)
             "point_stream": In(stream.Signature(data.ArrayLayout(ASQ, 4)))
         })
@@ -111,6 +110,16 @@ class Stroke(wiring.Component):
         with m.Else():
             m.d.comb += sample_intensity.eq(0)
 
+        # Generate pixel request for the shared `PlotRequest` backend
+        m.d.comb += [
+            self.o.payload.x.eq(sample_x),
+            self.o.payload.y.eq(sample_y),
+            self.o.payload.pixel.color.eq(new_color),
+            self.o.payload.pixel.intensity.eq(sample_intensity),
+            self.o.payload.blend.eq(BlendMode.ADDITIVE),  # CRT sim uses additive blending
+            self.o.payload.offset.eq(OffsetMode.CENTER),  # Scope plots are centered
+        ]
+
         with m.FSM() as fsm:
 
             with m.State('LATCH0'):
@@ -127,18 +136,8 @@ class Stroke(wiring.Component):
                     m.next = 'SEND_PIXEL'
 
             with m.State('SEND_PIXEL'):
-                # Generate pixel request for the shared `PlotRequest` backend
-                m.d.comb += [
-                    self.plot_req.valid.eq(1),
-                    self.plot_req.payload.x.eq(sample_x),
-                    self.plot_req.payload.y.eq(sample_y),
-                    self.plot_req.payload.pixel.color.eq(new_color),
-                    self.plot_req.payload.pixel.intensity.eq(sample_intensity),
-                    self.plot_req.payload.blend.eq(BlendMode.ADDITIVE),  # CRT sim uses additive blending
-                    self.plot_req.payload.offset.eq(OffsetMode.CENTER),  # Scope plots are centered
-                ]
-
-                with m.If(self.plot_req.ready):
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
                     m.next = 'LATCH0'
 
         return m
