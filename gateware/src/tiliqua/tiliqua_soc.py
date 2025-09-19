@@ -78,6 +78,7 @@ class TiliquaSoc(Component):
 
         self.platform_class = platform_class
 
+        # Memory map of CPU
         self.mainram_base         = 0x00000000
         self.mainram_size         = mainram_size
         self.spiflash_base        = 0x10000000
@@ -86,7 +87,9 @@ class TiliquaSoc(Component):
         self.psram_size           = 0x01000000 # 128Mbit / 16MiB
         self.bootinfo_base        = self.psram_base + self.psram_size - 4096
         self.csr_base             = 0xf0000000
-        # offsets from csr_base
+        self.blit_mem_base        = 0xc0000000
+
+        # Offsets from `self.csr_base` of peripheral CSRs
         self.spiflash_ctrl_base   = 0x00000100
         self.uart0_base           = 0x00000200
         self.timer0_base          = 0x00000300
@@ -103,8 +106,6 @@ class TiliquaSoc(Component):
         self.pixel_plot_csr_base  = 0x00000D00
         self.blit_csr_base        = 0x00000E00
         self.line_csr_base        = 0x00000F00
-
-        self.blit_mem_base        = 0xc0000000
 
         # Some settings depend on whether code is in block RAM or SPI flash
         self.fw_location = fw_location
@@ -124,8 +125,9 @@ class TiliquaSoc(Component):
                 self.fw_max_size = 0x50000 # 320KiB
 
 
-        # cpu
+        # VexiiRiscv CPU instance
         self.cpu = VexiiRiscv(
+            # Writing outside these regions will cause CPU traps.
             regions = [
                 VexiiRiscv.MemoryRegion(base=self.mainram_base, size=self.mainram_size, cacheable=True, executable=False),
                 VexiiRiscv.MemoryRegion(base=self.spiflash_base, size=self.spiflash_size, cacheable=True, executable=True),
