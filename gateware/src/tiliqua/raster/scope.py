@@ -61,6 +61,7 @@ class VectorPeripheral(wiring.Component):
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
             # Plot request output to shared backend
             "o": Out(stream.Signature(PlotRequest)),
+            "soc_en": Out(unsigned(1), init=1),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -97,11 +98,10 @@ class VectorPeripheral(wiring.Component):
         with m.If(self._cscale.f.scale.w_stb):
             m.d.sync += self.stroke.scale_c.eq(self._cscale.f.scale.w_data)
 
-        soc_en = Signal(init=1)
         with m.If(self._flags.f.enable.w_stb):
-            m.d.sync += soc_en.eq(self._flags.f.enable.w_data)
+            m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
 
-        with m.If(~soc_en):
+        with m.If(~self.soc_en):
             m.d.comb += self.i.ready.eq(0)
 
         return m
