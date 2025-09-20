@@ -10,9 +10,9 @@ from amaranth.lib.fifo import SyncFIFO
 from amaranth.lib.wiring import In, Out, connect, flipped
 from amaranth_soc import csr
 
-from tiliqua import cache
 from tiliqua.build.cli import top_level_cli
-from tiliqua.raster.scope import ScopeTracePeripheral
+from tiliqua.raster import scope
+from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc import TiliquaSoc
 
 
@@ -213,15 +213,16 @@ class SIDSoc(TiliquaSoc):
         self.sid_periph = SIDPeripheral()
         self.csr_decoder.add(self.sid_periph.bus, addr=0x1000, name="sid_periph")
 
-        self.plotter_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.plotter_cache.bus)
+        # Dedicated framebuffer plotter for scope (4 channels)
+        self.plotter = FramebufferPlotter(
+            bus_signature=self.psram_periph.bus.signature.flip(), n_ports=4)
+        self.psram_periph.add_master(self.plotter.bus)
 
-        # Add scope peripheral 
-        self.scope_periph = ScopeTracePeripheral(
-            fb=self.fb)
+        # Add scope peripheral
+        self.scope_periph = scope.ScopePeripheral()
         self.csr_decoder.add(self.scope_periph.bus, addr=0x1100, name="scope_periph")
-        for bus in self.scope_periph.bus_dma:
-            self.plotter_cache.add(bus)
+
+        # Note: Arbiter is now built into the FramebufferPlotter
 
         # Now finalize the CSR bridge
         self.finalize_csr_bridge()
@@ -230,11 +231,21 @@ class SIDSoc(TiliquaSoc):
 
         m = Module()
 
-        m.submodules += self.plotter_cache
+        # Scope plotting infrastructure
+        m.submodules.plotter = self.plotter
 
+        # Main components
         m.submodules.sid = sid = SID()
-        m.submodules += self.sid_periph
-        m.submodules += self.scope_periph
+        m.submodules.sid_periph = self.sid_periph
+        m.submodules.scope_periph = self.scope_periph
+
+        # Connect scope periph channels to plotter ports
+        for n in range(4):
+            wiring.connect(m, self.scope_periph.o[n], self.plotter.i[n])
+
+        # Connect framebuffer propreties to plotter backend
+        wiring.connect(m, wiring.flipped(self.fb.fbp), self.plotter.fbp)
+
         m.submodules += super().elaborate(platform)
 
         pmod0 = self.pmod0_periph.pmod
@@ -256,10 +267,6 @@ class SIDSoc(TiliquaSoc):
             self.scope_periph.i.payload[2].eq(pmod0.i_cal.payload[1]),
             self.scope_periph.i.payload[3].eq(pmod0.i_cal.payload[2]),
         ]
-
-        # Memory controller hangs if we start making requests to it straight away.
-        with m.If(self.permit_bus_traffic):
-            m.d.sync += self.scope_periph.en.eq(1)
 
         return m
 
