@@ -99,7 +99,7 @@ class Peripheral(wiring.Component):
         y: csr.Field(csr.action.W, signed(12))
         pixel: csr.Field(csr.action.W, Pixel)
 
-    def __init__(self, fifo_depth=32):
+    def __init__(self, fifo_depth=8):
         self.fifo_depth = fifo_depth
 
         # Command FIFO for enqueued pixel writes

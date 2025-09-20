@@ -106,7 +106,7 @@ class Peripheral(wiring.Component):
             }),
         })
 
-    def __init__(self, memory_words=1024, fifo_depth=16):
+    def __init__(self, memory_words=512, fifo_depth=8):
 
         self.memory_words = memory_words
         self.memory_addr_width = exact_log2(memory_words)

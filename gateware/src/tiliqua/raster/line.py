@@ -226,7 +226,7 @@ class Peripheral(wiring.Component):
         pixel: csr.Field(csr.action.W, Pixel)
         cmd: csr.Field(csr.action.W, LineStripCmd)
 
-    def __init__(self, fifo_depth=16):
+    def __init__(self, fifo_depth=8):
         self.fifo_depth = fifo_depth
 
         # FIFO of line strip commands in flight.
