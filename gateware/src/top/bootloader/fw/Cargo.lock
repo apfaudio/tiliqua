@@ -53,9 +53,9 @@ dependencies = [
 
 [[package]]
 name = "crc"
-version = "3.2.1"
+version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69e6e4d7b33a94f0991c26729976b10ebde1d34c3ee82408fb536164fa10d636"
+checksum = "9710d3b3739c2e349eb44fe848ad0b7c8cb1e42bd87ee49371df2f7acaf3e675"
 dependencies = [
  "crc-catalog",
 ]
@@ -127,24 +127,21 @@ dependencies = [
 [[package]]
 name = "embedded-graphics"
 version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0649998afacf6d575d126d83e68b78c0ab0e00ca2ac7e9b3db11b4cbe8274ef0"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#a90a1363783aab3b1db27aa315bf729ca7561b47"
 dependencies = [
  "az",
- "byteorder",
  "embedded-graphics-core",
  "float-cmp",
+ "integer-sqrt",
  "micromath",
 ]
 
 [[package]]
 name = "embedded-graphics-core"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba9ecd261f991856250d2207f6d8376946cd9f412a2165d3b75bc87a0bc7a044"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#a90a1363783aab3b1db27aa315bf729ca7561b47"
 dependencies = [
  "az",
- "byteorder",
 ]
 
 [[package]]
@@ -318,6 +315,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "integer-sqrt"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "276ec31bcb4a9ee45f58bec6f9ec700ae4cf4f4f8f2fa7e06cb406bd5ffdd770"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "irq"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -482,9 +488,9 @@ checksum = "0e819f2bc632f285be6d7cd36e25940d45b2391dd6d9b939e79de557f7014248"
 
 [[package]]
 name = "ryu"
-version = "1.0.18"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
+checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "sequential-storage"
@@ -605,7 +611,6 @@ dependencies = [
  "amaranth-soc-isr",
  "crc",
  "critical-section",
- "embedded-graphics",
  "embedded-hal 1.0.0",
  "fastrand",
  "heapless",
@@ -640,6 +645,8 @@ dependencies = [
  "riscv",
  "serde",
  "serde_derive",
+ "strum",
+ "strum_macros 0.26.4",
 ]
 
 [[package]]
@@ -647,8 +654,8 @@ name = "tiliqua-lib"
 version = "0.1.0"
 dependencies = [
  "crc",
- "embedded-graphics",
  "embedded-hal 1.0.0",
+ "fastrand",
  "fixed",
  "heapless",
  "log",
