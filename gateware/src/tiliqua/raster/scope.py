@@ -136,10 +136,10 @@ class ScopePeripheral(wiring.Component):
     class YPosition(csr.Register, access="w"):
         ypos: csr.Field(csr.action.W, unsigned(16))
 
-    def __init__(self, fb, n_channels=4, **kwargs):
+    def __init__(self, n_channels=4, **kwargs):
 
         self.n_channels = n_channels
-        self.strokes = [Stroke(fb=fb, **kwargs)
+        self.strokes = [Stroke(**kwargs)
                         for _ in range(self.n_channels)]
 
         regs = csr.Builder(addr_width=6, data_width=8)
@@ -157,12 +157,11 @@ class ScopePeripheral(wiring.Component):
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
             "i": In(stream.Signature(data.ArrayLayout(ASQ, self.n_channels))),
-            "en": In(1),
-            "soc_en": In(1),
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
             # Pixel request outputs, one for each channel
-            "plot_reqs": Out(stream.Signature(PlotRequest)).array(self.n_channels),
+            "o": Out(stream.Signature(PlotRequest)).array(self.n_channels),
+            "soc_en": Out(unsigned(1), init=1),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -182,9 +181,8 @@ class ScopePeripheral(wiring.Component):
 
         m.submodules += self.strokes
 
-        for i, s in enumerate(self.strokes):
-            m.d.comb += s.enable.eq(self.en & self.soc_en)
-            wiring.connect(m, s.plot_req, wiring.flipped(self.plot_reqs[i]))
+        for n, s in enumerate(self.strokes):
+            wiring.connect(m, s.o, wiring.flipped(self.o[n]))
 
         # Scope and trigger
         # Ch0 is routed through trigger, the rest are not.
@@ -232,9 +230,6 @@ class ScopePeripheral(wiring.Component):
 
         asq_extra_bits = ASQ.f_bits - 15
 
-        with m.If(self._flags.f.enable.w_stb):
-            m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
-
         with m.If(self._flags.f.trigger_always.w_stb):
             m.d.sync += trigger_always.eq(self._flags.f.trigger_always.w_data)
 
@@ -267,6 +262,12 @@ class ScopePeripheral(wiring.Component):
         for i, ypos_reg in enumerate(self._ypos):
             with m.If(ypos_reg.f.ypos.w_stb):
                 m.d.sync += self.strokes[i].y_offset.eq(ypos_reg.f.ypos.w_data)
+
+        with m.If(self._flags.f.enable.w_stb):
+            m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
+
+        with m.If(~self.soc_en):
+            m.d.comb += self.i.ready.eq(0)
 
         return m
 
