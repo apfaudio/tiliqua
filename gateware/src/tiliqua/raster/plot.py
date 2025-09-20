@@ -342,7 +342,8 @@ class FramebufferPlotter(wiring.Component):
         # Internal components
         m.submodules.cache = cache = WishboneL2Cache(
             addr_width=self.bus.addr_width,
-            cachesize_words=self.cachesize_words)
+            cachesize_words=self.cachesize_words,
+            autoflush=True)
         m.submodules.backend = backend = _FramebufferBackend(
             bus_signature=cache.master.signature.flip())
         m.submodules.arbiter = arbiter = stream_util.Arbiter(
