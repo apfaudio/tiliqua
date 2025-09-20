@@ -7,9 +7,9 @@
 famous Eurorack module (credits below), on a softcore, to demonstrate the
 compute capabilities available if you do everything in software.
 
-All 24 engines are available for tweaking and patching via the UI.
+Most engines are available for tweaking and patching via the UI.
 A couple of engines use a bit more compute and may cause the UI to
-slow down, however you should never get audio glitches.
+slow down or audio to glitch, so these ones are disabled.
 A scope and vectorscope is included and hooked up to the oscillator
 outputs so you can visualize exactly what the softcore is spitting out.
 
@@ -17,8 +17,8 @@ The original module was designed to run at 48kHz. Here, we instantiate
 a powerful (rv32imafc) softcore (this one includes an FPU), which
 is enough to run most engines at ~24kHz-48kHz, however with the video
 and menu system running simultaneously, it's necessary to clock
-this down to 12kHz. Surprisingly, most engines still sound reasonable.
-The resampling from 12kHz <-> 48kHz is performed in hardware below.
+this down to 24kHz. Surprisingly, most engines still sound reasonable.
+The resampling from 24kHz <-> 48kHz is performed in hardware below.
 
 Jack mapping:
 
@@ -30,9 +30,8 @@ Jack mapping:
     - Out3: 'aux' output
 
 There is quite some heavy compute here and RAM usage, as a result,
-the firmware and buffers are too big to fit in BRAM. In this demo,
-the firmware is in memory-mapped SPI flash and the DSP buffers are
-allocated from external PSRAM.
+the audio buffers are too big to fit in BRAM. In this demo,
+both the firmware and the DSP buffers are allocated from external PSRAM.
 
 Credits to Emilie Gillet for the original Plaits module and firmware.
 
@@ -149,7 +148,6 @@ class MacroOscSoc(TiliquaSoc):
 
     def __init__(self, **kwargs):
 
-        # WARN: TiliquaSoc ends at 0x00000900
         self.vector_periph_base  = 0x00001000
         self.scope_periph_base   = 0x00001100
         self.audio_fifo_csr_base = 0x00001200
