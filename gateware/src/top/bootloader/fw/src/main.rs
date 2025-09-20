@@ -27,13 +27,13 @@ use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 use tiliqua_manifest::*;
 use opts::OptionString;
 
-use embedded_graphics::{
+use tiliqua_hal::embedded_graphics::{
     mono_font::{ascii::FONT_9X15, ascii::FONT_9X15_BOLD, MonoTextStyle},
     prelude::*,
     primitives::{PrimitiveStyleBuilder, Line},
     text::{Alignment, Text},
-    pixelcolor::Gray8,
 };
+use tiliqua_lib::color::HI8;
 
 use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;
@@ -125,9 +125,9 @@ impl App {
 
 fn print_rebooting<D>(d: &mut D, rng: &mut fastrand::Rng)
 where
-    D: DrawTarget<Color = Gray8> + OriginDimensions,
+    D: DrawTarget<Color = HI8> + OriginDimensions,
 {
-    let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
+    let style = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::WHITE);
     let h_active = d.size().width as i32;
     let v_active = d.size().height as i32;
     Text::with_alignment(
@@ -141,9 +141,9 @@ where
 
 fn print_autoboot_countdown<D>(d: &mut D, countdown_ms: u32, slot: usize, target: &OptionString)
 where
-    D: DrawTarget<Color = Gray8> + OriginDimensions,
+    D: DrawTarget<Color = HI8> + OriginDimensions,
 {
-    let style = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::WHITE);
+    let style = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::WHITE);
     let h_active = d.size().width as i32;
     let v_active = d.size().height as i32;
 
@@ -165,11 +165,11 @@ fn draw_summary<D>(d: &mut D,
                    startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
-    D: DrawTarget<Color = Gray8> + OriginDimensions,
+    D: DrawTarget<Color = HI8> + OriginDimensions,
 {
     let h_active = d.size().width as i32;
     let v_active = d.size().height as i32;
-    let norm = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xB0 + hue));
+    let norm = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 11));
     if let Some(bitstream) = bitstream_manifest {
         Text::with_alignment(
             "brief:".into(),
@@ -776,8 +776,12 @@ fn main() -> ! {
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
+        peripherals.BLIT,
+        peripherals.PIXEL_PLOT,
+        peripherals.LINE,
         PSRAM_FB_BASE,
         modeline.clone(),
+        BLIT_MEM_BASE,
     );
 
     handler!(timer0 = || timer0_handler(&app));
@@ -790,7 +794,7 @@ fn main() -> ! {
         persist.set_persist(256);
 
         let stroke = PrimitiveStyleBuilder::new()
-            .stroke_color(Gray8::new(0xB0))
+            .stroke_color(HI8::new(0, 11))
             .stroke_width(1)
             .build();
 
@@ -858,8 +862,12 @@ fn main() -> ! {
                         display = DMAFramebuffer0::new(
                             peripherals.FRAMEBUFFER_PERIPH,
                             peripherals.PALETTE_PERIPH,
+                            peripherals.BLIT,
+                            peripherals.PIXEL_PLOT,
+                            peripherals.LINE,
                             PSRAM_FB_BASE,
-                            new_modeline.clone()
+                            new_modeline.clone(),
+                            BLIT_MEM_BASE,
                         );
                         app.modeline = new_modeline;
                     }
@@ -893,7 +901,8 @@ fn main() -> ! {
                 }
             }
 
-            for _ in 0..5 {
+            const LINES_PER_LOOP: usize = 2;
+            for _ in 0..LINES_PER_LOOP {
                 let _ = draw::draw_boot_logo(&mut display,
                                              (h_active/2) as i32,
                                              150 as i32,

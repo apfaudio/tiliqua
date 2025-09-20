@@ -19,11 +19,12 @@ from amaranth.lib import data, fifo, stream, wiring
 from amaranth.lib.wiring import In, Out, connect, flipped
 from amaranth_soc import csr
 
-from tiliqua import cache, dsp, usb_audio
+from tiliqua import dsp, usb_audio
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
 from tiliqua.periph import eurorack_pmod
 from tiliqua.raster import scope
+from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc import TiliquaSoc
 
 
@@ -98,28 +99,23 @@ class XbeamSoc(TiliquaSoc):
         # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
         super().__init__(finalize_csr_bridge=False, **kwargs)
 
-        # WARN: TiliquaSoc ends at 0x00000900
         self.vector_periph_base = 0x00001000
         self.scope_periph_base  = 0x00001100
         self.xbeam_periph_base  = 0x00001200
 
-        # Small localized write-back cache for plotting operations.
-        self.plotter_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.plotter_cache.bus)
+        # Dedicated framebuffer plotter for scope peripherals (5 ports: 1 vector + 4 scope channels)
+        self.plotter = FramebufferPlotter(
+            bus_signature=self.psram_periph.bus.signature.flip(), n_ports=5)
+        self.psram_periph.add_master(self.plotter.bus)
 
         # Vectorscope with upsampling and CSR registers
-        self.vector_periph = scope.VectorTracePeripheral(
-            fb=self.fb,
+        self.vector_periph = scope.VectorPeripheral(
             n_upsample=8)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
-        self.plotter_cache.add(self.vector_periph.bus_dma)
 
         # 4-ch oscilloscope with CSR registers
-        self.scope_periph = scope.ScopeTracePeripheral(
-            fb=self.fb)
+        self.scope_periph = scope.ScopePeripheral()
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
-        for bus in self.scope_periph.bus_dma:
-            self.plotter_cache.add(bus)
 
         # Extra peripheral for some global control flags.
         self.xbeam_periph = XbeamPeripheral()
@@ -132,14 +128,23 @@ class XbeamSoc(TiliquaSoc):
 
         m = Module()
 
-        m.submodules += self.plotter_cache
+        # Scope plotting infrastructure
+        m.submodules.plotter = self.plotter
 
-        m.submodules += self.vector_periph
+        # Scope peripherals
+        m.submodules.vector_periph = self.vector_periph
+        m.submodules.scope_periph = self.scope_periph
+        m.submodules.xbeam_periph = self.xbeam_periph
 
-        m.submodules += self.scope_periph
+        # Connect vector/scope pixel requests to plotter channels
+        wiring.connect(m, self.vector_periph.o, self.plotter.i[0])
+        for n in range(4):
+            wiring.connect(m, self.scope_periph.o[n], self.plotter.i[n+1])
 
-        m.submodules += self.xbeam_periph
+        # Connect framebuffer propreties to plotter backend
+        wiring.connect(m, wiring.flipped(self.fb.fbp), self.plotter.fbp)
 
+        # FIXME: bit of a hack so we can pluck out peripherals from `tiliqua_soc`
         m.submodules += super().elaborate(platform)
 
         pmod0 = self.pmod0_periph.pmod
@@ -171,11 +176,6 @@ class XbeamSoc(TiliquaSoc):
             wiring.connect(m, plot_fifo.r_stream, self.scope_periph.i)
         with m.Else():
             wiring.connect(m, plot_fifo.r_stream, self.vector_periph.i)
-
-        # Memory controller hangs if we start making requests to it straight away.
-        with m.If(self.permit_bus_traffic):
-            m.d.sync += self.vector_periph.en.eq(1)
-            m.d.sync += self.scope_periph.en.eq(1)
 
         return m
 

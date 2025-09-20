@@ -251,24 +251,21 @@ dependencies = [
 [[package]]
 name = "embedded-graphics"
 version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0649998afacf6d575d126d83e68b78c0ab0e00ca2ac7e9b3db11b4cbe8274ef0"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#62560fd0b714934e23255123314690d68ea15983"
 dependencies = [
  "az",
- "byteorder",
  "embedded-graphics-core",
  "float-cmp",
+ "integer-sqrt",
  "micromath",
 ]
 
 [[package]]
 name = "embedded-graphics-core"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba9ecd261f991856250d2207f6d8376946cd9f412a2165d3b75bc87a0bc7a044"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#62560fd0b714934e23255123314690d68ea15983"
 dependencies = [
  "az",
- "byteorder",
 ]
 
 [[package]]
@@ -374,6 +371,12 @@ dependencies = [
  "smallvec",
  "zune-inflate",
 ]
+
+[[package]]
+name = "fastrand"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "fdeflate"
@@ -534,6 +537,15 @@ dependencies = [
  "png",
  "qoi",
  "tiff",
+]
+
+[[package]]
+name = "integer-sqrt"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "276ec31bcb4a9ee45f58bec6f9ec700ae4cf4f4f8f2fa7e06cb406bd5ffdd770"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -954,6 +966,8 @@ dependencies = [
  "riscv",
  "serde",
  "serde_derive",
+ "strum",
+ "strum_macros 0.26.4",
 ]
 
 [[package]]
@@ -962,9 +976,9 @@ version = "0.1.0"
 dependencies = [
  "crc",
  "critical-section",
- "embedded-graphics",
  "embedded-hal 1.0.0",
  "env_logger",
+ "fastrand",
  "fixed",
  "heapless",
  "image",

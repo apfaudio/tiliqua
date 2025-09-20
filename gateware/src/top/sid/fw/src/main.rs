@@ -2,7 +2,7 @@
 #![no_main]
 
 use critical_section::Mutex;
-use log::info;
+use log::{info, warn};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -11,14 +11,13 @@ use tiliqua_pac as pac;
 use tiliqua_hal as hal;
 use tiliqua_fw::*;
 use tiliqua_lib::*;
+use tiliqua_lib::color::HI8;
 use pac::constants::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::persist::Persist;
-use tiliqua_hal::dma_framebuffer::Rotate;
 
-use embedded_graphics::{
+use tiliqua_hal::embedded_graphics::{
     prelude::*,
-    pixelcolor::Gray8,
     mono_font::{MonoTextStyle, ascii::FONT_9X15_BOLD},
     text::Text,
 };
@@ -29,7 +28,7 @@ use hal::pca9635::Pca9635Driver;
 
 use micromath::F32Ext;
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
+pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
 struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
@@ -196,8 +195,12 @@ fn main() -> ! {
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
         peripherals.PALETTE_PERIPH,
+        peripherals.BLIT,
+        peripherals.PIXEL_PLOT,
+        peripherals.LINE,
         PSRAM_FB_BASE,
         modeline.clone(),
+        BLIT_MEM_BASE,
     );
 
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
@@ -209,9 +212,14 @@ fn main() -> ! {
     //
 
     let mut opts = options::Opts::default();
-    let mut flash_persist = FlashOptionsPersistence::new(
-        spiflash, bootinfo.manifest.get_option_storage_window().unwrap());
-    flash_persist.load_options(&mut opts).unwrap();
+    let mut flash_persist_opt = if let Some(storage_window) = bootinfo.manifest.get_option_storage_window() {
+        let mut flash_persist = FlashOptionsPersistence::new(spiflash, storage_window);
+        flash_persist.load_options(&mut opts).unwrap();
+        Some(flash_persist)
+    } else {
+        warn!("No option storage region: disable persistent storage");
+        None
+    };
 
     //
     // Create App instance
@@ -221,7 +229,7 @@ fn main() -> ! {
     let hue = 5u8;
 
     palette::ColorPalette::default().write_to_hardware(&mut display);
-    persist.set_persist(128);
+    persist.set_persist(64);
 
     handler!(timer0 = || timer0_handler(&app));
 
@@ -246,14 +254,18 @@ fn main() -> ! {
             });
 
             if save_opts {
-                flash_persist.save_options(&opts).unwrap();
+                if let Some(ref mut flash_persist) = flash_persist_opt {
+                    flash_persist.save_options(&opts).unwrap();
+                }
             }
 
             if wipe_opts {
                 critical_section::with(|cs| {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = options::Opts::default();
-                    flash_persist.erase_all().unwrap();
+                    if let Some(ref mut flash_persist) = flash_persist_opt {
+                        flash_persist.erase_all().unwrap();
+                    }
                 });
             }
 
@@ -294,7 +306,7 @@ fn main() -> ! {
 
             // Draw channel labels
             {
-                let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xB0 + hue));
+                let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 0xB));
                 let hc = (h_active/2) as i16;
                 let vc = (v_active/2) as i16;
 
@@ -347,7 +359,6 @@ fn main() -> ! {
 
             scope.flags().write(
                 |w| { w.enable().bit(true);
-                      w.rotate_left().bit(modeline.rotate == Rotate::Left);
                       w.trigger_always().bit(opts.scope.trig_mode.value == options::TriggerMode::Always)
                 } );
         }

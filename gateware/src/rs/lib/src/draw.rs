@@ -1,25 +1,27 @@
-use embedded_graphics::{
-    pixelcolor::{Gray8, GrayColor},
+use tiliqua_hal::embedded_graphics::{
     primitives::{PrimitiveStyleBuilder, Line, Ellipse, Rectangle, Circle},
     mono_font::{ascii::FONT_9X15, ascii::FONT_9X15_BOLD, MonoTextStyle},
     text::{Alignment, Text},
     prelude::*,
 };
 
+use crate::color::HI8;
+
 use opts::Options;
 use crate::logo_coords;
 
 use heapless::String;
 use core::fmt::Write;
+use fastrand::Rng;
 
 pub fn draw_options<D, O>(d: &mut D, opts: &O,
                        pos_x: u32, pos_y: u32, hue: u8) -> Result<(), D::Error>
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = HI8>,
     O: Options
 {
-    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
-    let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
+    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 15));
+    let font_small_grey = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
 
     let opts_view = opts.view().options();
 
@@ -81,7 +83,7 @@ where
     }
 
     let stroke = PrimitiveStyleBuilder::new()
-        .stroke_color(Gray8::new(0xA0 + hue))
+        .stroke_color(HI8::new(hue, 10))
         .stroke_width(1)
         .build();
     Line::new(Point::new(vx-3, vy as i32 - 10),
@@ -116,13 +118,13 @@ fn midi_note_name<const N: usize>(s: &mut String<N>, note: u8) {
 
 pub fn draw_voice<D>(d: &mut D, sx: i32, sy: u32, note: u8, cutoff: u8, hue: u8) -> Result<(), D::Error>
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = HI8>,
 {
-    let font_small_white = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xF0 + hue));
+    let font_small_white = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 15));
 
 
     let mut stroke_gain = PrimitiveStyleBuilder::new()
-        .stroke_color(Gray8::new(0x1))
+        .stroke_color(HI8::new(0, 1))
         .stroke_width(1)
         .build();
 
@@ -132,7 +134,7 @@ where
     if cutoff > 0 {
         midi_note_name(&mut s, note);
         stroke_gain = PrimitiveStyleBuilder::new()
-            .stroke_color(Gray8::new(0xA0 + hue))
+            .stroke_color(HI8::new(hue, 10))
             .stroke_width(1)
             .build();
     }
@@ -176,11 +178,11 @@ where
 
 pub fn draw_boot_logo<D>(d: &mut D, sx: i32, sy: i32, ix: u32) -> Result<(), D::Error>
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = HI8>,
 {
     use logo_coords::BOOT_LOGO_COORDS;
     let stroke_white = PrimitiveStyleBuilder::new()
-        .stroke_color(Gray8::WHITE)
+        .stroke_color(HI8::WHITE)
         .stroke_width(1)
         .build();
     let p = ((ix % ((BOOT_LOGO_COORDS.len() as u32)-1)) + 1) as usize;
@@ -198,10 +200,10 @@ where
 use tiliqua_hal::dma_framebuffer::DVIModeline;
 pub fn draw_name<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, name: &str, sha: &str, modeline: &DVIModeline) -> Result<(), D::Error>
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = HI8>,
 {
-    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
-    let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
+    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 15));
+    let font_small_grey = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
 
     Text::with_alignment(
         name,
@@ -235,16 +237,16 @@ where
 
 pub fn draw_cal<D>(d: &mut D, x: u32, y: u32, hue: u8, dac: &[i16; 4], adc: &[i16; 4]) -> Result<(), D::Error>
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = HI8>,
 {
-    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
-    let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
+    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 15));
+    let font_small_grey = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
     let stroke_grey = PrimitiveStyleBuilder::new()
-           .stroke_color(Gray8::new(0xA0 + hue))
+           .stroke_color(HI8::new(hue, 10))
            .stroke_width(1)
            .build();
     let stroke_white = PrimitiveStyleBuilder::new()
-           .stroke_color(Gray8::new(0xF0 + hue))
+           .stroke_color(HI8::new(hue, 15))
            .stroke_width(2)
            .build();
 
@@ -314,9 +316,9 @@ pub fn draw_cal_constants<D>(
     dac_zero:  &[i32; 4]
     ) -> Result<(), D::Error>
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = HI8>,
 {
-    let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
+    let font_small_grey = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
 
     let spacing = 30;
     let width   = 256;
@@ -357,15 +359,15 @@ where
 pub fn draw_tiliqua<D>(d: &mut D, x: u32, y: u32, hue: u8,
                        str_l: [&str; 8], str_r: [&str; 6], text_title: &str, text_desc: &str) -> Result<(), D::Error>
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = HI8>,
 {
      let stroke_grey = PrimitiveStyleBuilder::new()
-            .stroke_color(Gray8::new(0xA0 + hue))
+            .stroke_color(HI8::new(hue, 10))
             .stroke_width(1)
             .build();
 
-    let font_small_grey = MonoTextStyle::new(&FONT_9X15, Gray8::new(0xA0 + hue));
-    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xF0 + hue));
+    let font_small_grey = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
+    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 15));
 
     let line = |disp: &mut D, x1: u32, y1: u32, x2: u32, y2: u32| {
         Line::new(Point::new((x+x1) as i32, (y+y1) as i32),
@@ -461,6 +463,13 @@ where
     for n in 0..text_l.len() { text_l[n][0] = 45 };
 
     Text::with_alignment(
+        text_title,
+        Point::new((x + 80) as i32, (y-10) as i32),
+        font_small_white,
+        Alignment::Center
+    ).draw(d)?;
+
+    Text::with_alignment(
         "touch  jack".into(),
         Point::new((x+45-15) as i32, (y+15+5) as i32),
         font_small_white,
@@ -495,13 +504,6 @@ where
     }
 
     Text::with_alignment(
-        text_title,
-        Point::new((x + 80) as i32, (y-10) as i32),
-        font_small_white,
-        Alignment::Center
-    ).draw(d)?;
-
-    Text::with_alignment(
         text_desc,
         Point::new((x - 120) as i32, (y + 180) as i32),
         font_small_grey,
@@ -520,15 +522,15 @@ pub fn draw_sid<D>(d: &mut D, x: u32, y: u32, hue: u8,
                    filter_types: [bool; 3],
                    ) -> Result<(), D::Error>
 where
-    D: DrawTarget<Color = Gray8>,
+    D: DrawTarget<Color = HI8>,
 {
      let stroke_grey = PrimitiveStyleBuilder::new()
-            .stroke_color(Gray8::new(0xB0 + hue))
+            .stroke_color(HI8::new(hue, 11))
             .stroke_width(1)
             .build();
 
      let stroke_white = PrimitiveStyleBuilder::new()
-            .stroke_color(Gray8::WHITE)
+            .stroke_color(HI8::new(hue, 15))
             .stroke_width(1)
             .build();
 
@@ -552,7 +554,7 @@ where
                     .draw(disp).ok()
     };
 
-    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, Gray8::new(0xB0 + hue));
+    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 11));
     Text::new(
         "MOS 6581",
         Point::new((x+20) as i32, (y-10) as i32),
@@ -639,6 +641,92 @@ where
     Ok(())
 }
 
+pub fn draw_benchmark_lines<D>(
+    d: &mut D, count: u32, rng: &mut Rng) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    let size = d.bounding_box().size;
+    let stroke = PrimitiveStyleBuilder::new()
+        .stroke_color(HI8::WHITE.with_hue_offset(rng.u8(0..16)))
+        .stroke_width(1)
+        .build();
+    for _ in 0..count {
+        let x1 = rng.u32(0..size.width);
+        let y1 = rng.u32(0..size.height);
+        let x2 = rng.u32(0..size.width);
+        let y2 = rng.u32(0..size.height);
+        Line::new(Point::new(x1 as i32, y1 as i32),
+                  Point::new(x2 as i32, y2 as i32))
+                  .into_styled(stroke)
+                  .draw(d)?;
+    }
+    Ok(())
+}
+
+pub fn draw_benchmark_text<D>(
+    d: &mut D, count: u32, rng: &mut Rng) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    let size = d.bounding_box().size;
+    let font_style = MonoTextStyle::new(
+        &FONT_9X15, HI8::WHITE.with_hue_offset(rng.u8(0..16)));
+    const STRINGS: &[&str] = &[
+        "SYNTHESIZER", "OSCILLATOR", "FILTER", "1234567890", "ADSR",
+        "RESONANCE", "ENVELOPE", "LFO", "REVERB", "DELAY",
+        "FPGA", "DSP", "CODEC", "BITSTREAM", "AMARANTH", "~!@#$%^&*()_+",
+    ];
+    for _ in 0..count {
+        let x = rng.u32(0..size.width.saturating_sub(80)) as i32;
+        let y = rng.u32(15..size.height) as i32;
+        let text = STRINGS[rng.usize(0..STRINGS.len())];
+        Text::new(text, Point::new(x, y), font_style).draw(d)?;
+    }
+    Ok(())
+}
+
+pub fn draw_benchmark_pixels<D>(
+    d: &mut D, count: u32, rng: &mut Rng) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    let size = d.bounding_box().size;
+    let color = HI8::WHITE.with_hue_offset(rng.u8(0..16));
+    for _ in 0..count {
+        let x = rng.u32(0..size.width);
+        let y = rng.u32(0..size.height);
+        d.draw_iter([Pixel(Point::new(x as i32, y as i32), color)])?;
+    }
+    Ok(())
+}
+
+pub fn draw_benchmark_stats<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, 
+                              refresh_rate: u32, frame_count: u32) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    let font_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 15));
+
+    let mut refresh_text: String<32> = String::new();
+    write!(refresh_text, "refresh: {}Hz", refresh_rate).ok();
+    Text::new(
+        &refresh_text,
+        Point::new(pos_x as i32, (pos_y + 20) as i32),
+        font_white,
+    ).draw(d)?;
+
+    let mut frame_text: String<32> = String::new();
+    write!(frame_text, "ops/sec: {}", frame_count).ok();
+    Text::new(
+        &frame_text,
+        Point::new(pos_x as i32, (pos_y + 40) as i32),
+        font_white,
+    ).draw(d)?;
+
+    Ok(())
+}
+
 
 #[cfg(test)]
 mod test_data {
@@ -691,7 +779,7 @@ mod tests {
     }
 
     impl DrawTarget for FakeDisplay {
-        type Color = Gray8;
+        type Color = HI8;
         type Error = core::convert::Infallible;
 
         fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
@@ -700,10 +788,11 @@ mod tests {
         {
             for Pixel(coord, color) in pixels.into_iter() {
                 if let Ok((x @ 0..=H_ACTIVE, y @ 0..=V_ACTIVE)) = coord.try_into() {
+                    let raw = color.to_raw();
                     *self.img.get_pixel_mut(x, y) = Rgb([
-                        color.luma(),
-                        color.luma(),
-                        color.luma()
+                        raw,
+                        raw,
+                        raw
                     ]);
                 }
             }
@@ -722,7 +811,7 @@ mod tests {
         let mut disp = FakeDisplay {
             img: ImageBuffer::new(H_ACTIVE, V_ACTIVE)
         };
-        disp.clear(Gray8::BLACK).ok();
+        disp.clear(HI8::BLACK).ok();
         disp
     }
 

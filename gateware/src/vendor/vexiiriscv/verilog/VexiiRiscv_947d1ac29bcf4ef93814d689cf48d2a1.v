@@ -560,8 +560,8 @@ module VexiiRiscv (
   wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault;
   wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault_1;
   wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault_2;
-  wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault_3;
-  wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault_4;
+  wire                _zz_LsuPlugin_logic_onPma_io_rsp_fault_3;
+  wire                _zz_LsuPlugin_logic_onPma_io_rsp_fault_4;
   wire       [0:0]    _zz_LsuPlugin_logic_onPma_io_rsp_io;
   wire       [12:0]   _zz_late0_BranchPlugin_logic_jumpLogic_history_shifter_1;
   wire       [12:0]   _zz_late0_BranchPlugin_logic_jumpLogic_history_shifter_2;
@@ -7182,8 +7182,8 @@ module VexiiRiscv (
   assign _zz_LsuPlugin_logic_onPma_io_rsp_fault = 32'hffff0000;
   assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_1 = (LsuPlugin_pmaBuilder_io_addressBits & 32'hffff0000);
   assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_2 = 32'h0;
-  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_3 = (LsuPlugin_pmaBuilder_io_addressBits & 32'hfffffff8);
-  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_4 = 32'ha0000000;
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_3 = ((LsuPlugin_pmaBuilder_io_addressBits & 32'hffffe000) == 32'hc0000000);
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_4 = ((LsuPlugin_pmaBuilder_io_addressBits & 32'hfffffff8) == 32'ha0000000);
   assign _zz_execute_lane0_api_hartsInflight = (! execute_ctrl8_down_COMPLETED_lane0);
   assign _zz_execute_lane0_api_hartsInflight_1 = (execute_ctrl7_up_LANE_SEL_lane0 && (! execute_ctrl7_down_COMPLETED_lane0));
   assign _zz_execute_lane0_api_hartsInflight_2 = 1'b1;
@@ -13470,7 +13470,7 @@ module VexiiRiscv (
   assign LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit = _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit[0];
   assign LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit = (|((LsuPlugin_pmaBuilder_io_argsBits & 3'b000) == 3'b000));
   assign LsuPlugin_pmaBuilder_io_onTransfers_0_hit = (LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit && LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit);
-  assign LsuPlugin_logic_onPma_io_rsp_fault = (! ((|{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h10000000),{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h20000000),{((LsuPlugin_pmaBuilder_io_addressBits & _zz_LsuPlugin_logic_onPma_io_rsp_fault) == 32'hf0000000),{(_zz_LsuPlugin_logic_onPma_io_rsp_fault_1 == _zz_LsuPlugin_logic_onPma_io_rsp_fault_2),(_zz_LsuPlugin_logic_onPma_io_rsp_fault_3 == _zz_LsuPlugin_logic_onPma_io_rsp_fault_4)}}}}) && (|LsuPlugin_pmaBuilder_io_onTransfers_0_hit)));
+  assign LsuPlugin_logic_onPma_io_rsp_fault = (! ((|{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h10000000),{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h20000000),{((LsuPlugin_pmaBuilder_io_addressBits & _zz_LsuPlugin_logic_onPma_io_rsp_fault) == 32'hf0000000),{(_zz_LsuPlugin_logic_onPma_io_rsp_fault_1 == _zz_LsuPlugin_logic_onPma_io_rsp_fault_2),{_zz_LsuPlugin_logic_onPma_io_rsp_fault_3,_zz_LsuPlugin_logic_onPma_io_rsp_fault_4}}}}}) && (|LsuPlugin_pmaBuilder_io_onTransfers_0_hit)));
   assign LsuPlugin_logic_onPma_io_rsp_io = (! _zz_LsuPlugin_logic_onPma_io_rsp_io[0]);
   assign _zz_execute_ctrl1_up_FpuFlagsWritebackPlugin_logic_FLAGS_lane0_NX = FpuCmpPlugin_logic_ffwb_ats[0];
   assign execute_ctrl1_up_FpuFlagsWritebackPlugin_logic_FLAGS_lane0_NX = (FpuCmpPlugin_logic_ffwb_flags_NX && _zz_execute_ctrl1_up_FpuFlagsWritebackPlugin_logic_FLAGS_lane0_NX);

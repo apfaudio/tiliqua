@@ -96,7 +96,10 @@ module VexiiRiscv (
   reg        [31:0]   LsuL1Plugin_logic_writeback_victimBuffer_spinal_port1;
   reg        [49:0]   BtbPlugin_logic_mem_spinal_port1;
   reg        [31:0]   FetchL1Plugin_logic_banks_0_mem_spinal_port1;
-  reg        [23:0]   FetchL1Plugin_logic_ways_0_mem_spinal_port1;
+  reg        [31:0]   FetchL1Plugin_logic_banks_1_mem_spinal_port1;
+  reg        [22:0]   FetchL1Plugin_logic_ways_0_mem_spinal_port1;
+  reg        [22:0]   FetchL1Plugin_logic_ways_1_mem_spinal_port1;
+  reg        [0:0]    FetchL1Plugin_logic_plru_mem_spinal_port1;
   reg        [31:0]   CsrRamPlugin_logic_mem_spinal_port1;
   wire                early0_DivPlugin_logic_processing_div_io_cmd_ready;
   wire                early0_DivPlugin_logic_processing_div_io_rsp_valid;
@@ -173,10 +176,10 @@ module VexiiRiscv (
   wire       [0:0]    _zz_LsuL1Plugin_logic_writeback_write_wordIndex_1;
   wire       [0:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_refillWayNeedWriteback;
   wire       [0:0]    _zz_LsuL1Plugin_logic_lsu_ctrl_doWrite;
-  reg        [0:0]    _zz_22;
-  wire       [0:0]    _zz_23;
-  reg        [1:0]    _zz_24;
-  wire       [2:0]    _zz_25;
+  reg        [0:0]    _zz_30;
+  wire       [0:0]    _zz_31;
+  reg        [1:0]    _zz_32;
+  wire       [2:0]    _zz_33;
   wire       [0:0]    _zz_when;
   wire       [0:0]    _zz_LsuL1Plugin_logic_shared_write_payload_data_dirty;
   wire       [32:0]   _zz_execute_ctrl2_down_MUL_SRC1_lane0;
@@ -232,10 +235,13 @@ module VexiiRiscv (
   wire       [0:0]    _zz_late0_BarrelShifterPlugin_logic_shift_patched_5;
   wire       [9:0]    _zz_late0_BarrelShifterPlugin_logic_shift_patched_6;
   wire       [49:0]   _zz_BtbPlugin_logic_mem_port;
-  wire       [23:0]   _zz_FetchL1Plugin_logic_ways_0_mem_port;
+  wire       [22:0]   _zz_FetchL1Plugin_logic_ways_0_mem_port;
   wire                _zz_FetchL1Plugin_logic_ways_0_mem_port_1;
+  wire       [22:0]   _zz_FetchL1Plugin_logic_ways_1_mem_port;
+  wire                _zz_FetchL1Plugin_logic_ways_1_mem_port_1;
   wire                _zz_when_1;
   wire       [0:0]    _zz_FetchL1Plugin_logic_ctrl_dataAccessFault;
+  wire       [0:0]    _zz_FetchL1Plugin_logic_plru_write_payload_data_0;
   wire       [63:0]   _zz_WhiteboxerPlugin_logic_decodes_0_pc;
   wire       [0:0]    _zz_FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit;
   wire       [0:0]    _zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io_1;
@@ -276,6 +282,9 @@ module VexiiRiscv (
   wire       [0:0]    _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit;
   wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault;
   wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault_1;
+  wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault_2;
+  wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault_3;
+  wire       [31:0]   _zz_LsuPlugin_logic_onPma_io_rsp_fault_4;
   wire       [0:0]    _zz_LsuPlugin_logic_onPma_io_rsp_io;
   wire       [0:0]    _zz_decode_ctrls_1_down_RS1_ENABLE_0;
   wire       [0:0]    _zz_decode_ctrls_1_down_RS2_ENABLE_0;
@@ -860,19 +869,26 @@ module VexiiRiscv (
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HIT;
   reg        [31:0]   fetch_logic_ctrls_2_up_MMU_TRANSLATED;
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_0;
+  reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_1;
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_HAZARD;
   reg        [31:0]   fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_0;
+  reg        [31:0]   fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_1;
+  reg        [0:0]    fetch_logic_ctrls_2_up_FetchL1Plugin_logic_PLRU_BYPASSED_0;
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
   reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_error;
-  reg        [21:0]   fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  reg        [20:0]   fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+  reg                 fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+  reg        [20:0]   fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_address;
   reg        [9:0]    fetch_logic_ctrls_2_up_Fetch_ID;
   reg                 fetch_logic_ctrls_2_up_Fetch_PC_FAULT;
   reg        [31:0]   fetch_logic_ctrls_2_up_Fetch_WORD_PC;
   wire                fetch_logic_ctrls_0_down_Fetch_PC_FAULT;
   wire                fetch_logic_ctrls_0_down_isValid;
   reg        [0:0]    fetch_logic_ctrls_1_up_BtbPlugin_logic_readCmd_HAZARDS;
-  reg        [3:0]    fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
+  reg        [4:0]    fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
   reg                 fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
+  reg        [0:0]    fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
   reg                 fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
   reg        [9:0]    fetch_logic_ctrls_1_up_Fetch_ID;
   reg                 fetch_logic_ctrls_1_up_Fetch_PC_FAULT;
@@ -1386,35 +1402,53 @@ module VexiiRiscv (
   wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_HAZARD;
   wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
   wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_error;
-  wire       [21:0]   fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  wire       [20:0]   fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+  wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+  wire       [20:0]   fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_address;
   wire       [31:0]   fetch_logic_ctrls_2_down_Fetch_WORD_PC;
   wire                fetch_logic_ctrls_2_up_isReady;
   wire                fetch_logic_ctrls_2_up_isValid;
+  wire       [0:0]    fetch_logic_ctrls_2_down_FetchL1Plugin_logic_PLRU_BYPASSED_0;
   wire       [31:0]   fetch_logic_ctrls_2_down_MMU_TRANSLATED;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT;
   wire       [31:0]   fetch_logic_ctrls_1_down_MMU_TRANSLATED;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0;
-  wire       [3:0]    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
+  wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_1;
+  wire       [4:0]    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_HAZARD;
   wire       [31:0]   fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_0;
+  wire       [31:0]   fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_1;
   wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0;
+  wire                fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1;
   wire       [31:0]   fetch_logic_ctrls_2_down_Fetch_WORD;
   wire       [31:0]   fetch_logic_ctrls_1_down_Fetch_WORD_PC;
   wire       [31:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_0;
+  wire       [31:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_1;
+  wire       [0:0]    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
-  wire       [3:0]    fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
+  reg        [0:0]    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_BYPASSED_0;
+  wire       [4:0]    fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
   wire                fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
+  wire       [0:0]    fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
   wire                fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
   reg                 fetch_logic_ctrls_1_up_valid;
   wire                fetch_logic_ctrls_1_up_ready;
   wire       [31:0]   fetch_logic_ctrls_0_down_Fetch_WORD_PC;
   reg                 _zz_fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l217;
+  wire       [0:0]    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_READ_0;
+  reg                 _zz_2;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
   wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_error;
-  wire       [21:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  wire       [20:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+  wire                fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+  wire       [20:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_address;
+  reg                 _zz_3;
   wire       [31:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_0;
-  reg                 _zz_2;
+  wire       [31:0]   fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_1;
+  reg                 _zz_4;
   wire                fetch_logic_ctrls_0_down_isFiring;
   wire                execute_ctrl4_down_late0_BarrelShifterPlugin_SEL_lane0;
   wire       [31:0]   execute_ctrl4_down_late0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
@@ -1532,8 +1566,8 @@ module VexiiRiscv (
   wire       [31:0]   execute_ctrl3_down_LsuL1Plugin_logic_BANKS_WORDS_lane0_0;
   wire       [0:0]    execute_ctrl2_down_LsuL1Plugin_logic_BANK_BUSY_lane0;
   wire       [31:0]   execute_ctrl2_down_LsuL1_MIXED_ADDRESS_lane0;
-  reg                 _zz_3;
-  reg                 _zz_4;
+  reg                 _zz_5;
+  reg                 _zz_6;
   wire                execute_ctrl2_down_early0_BarrelShifterPlugin_SEL_lane0;
   wire       [31:0]   execute_ctrl2_down_early0_BarrelShifterPlugin_SHIFT_RESULT_lane0;
   wire                execute_ctrl2_down_BarrelShifterPlugin_SIGNED_lane0;
@@ -1817,7 +1851,7 @@ module VexiiRiscv (
   wire                LsuL1Plugin_logic_lsu_ctrl_doCbm;
   wire                LsuL1Plugin_logic_lsu_ctrl_doRefillPush;
   wire                when_LsuL1Plugin_l915;
-  wire       [2:0]    _zz_13;
+  wire       [2:0]    _zz_15;
   wire                when_LsuL1Plugin_l929;
   wire       [21:0]   _zz_LsuL1Plugin_logic_waysWrite_tag_address;
   wire                when_LsuL1Plugin_l1019;
@@ -1987,31 +2021,45 @@ module VexiiRiscv (
   reg        [3:0]    FetchL1Plugin_logic_trapPort_payload_code;
   reg        [1:0]    FetchL1Plugin_logic_trapPort_payload_arg;
   wire                FetchL1Plugin_logic_banks_0_write_valid;
-  wire       [7:0]    FetchL1Plugin_logic_banks_0_write_payload_address;
+  wire       [8:0]    FetchL1Plugin_logic_banks_0_write_payload_address;
   wire       [31:0]   FetchL1Plugin_logic_banks_0_write_payload_data;
   wire                FetchL1Plugin_logic_banks_0_read_cmd_valid;
-  wire       [7:0]    FetchL1Plugin_logic_banks_0_read_cmd_payload;
+  wire       [8:0]    FetchL1Plugin_logic_banks_0_read_cmd_payload;
   (* keep , syn_keep *) wire       [31:0]   FetchL1Plugin_logic_banks_0_read_rsp /* synthesis syn_keep = 1 */ ;
-  reg        [0:0]    FetchL1Plugin_logic_waysWrite_mask;
-  reg        [3:0]    FetchL1Plugin_logic_waysWrite_address;
+  wire                FetchL1Plugin_logic_banks_1_write_valid;
+  wire       [8:0]    FetchL1Plugin_logic_banks_1_write_payload_address;
+  wire       [31:0]   FetchL1Plugin_logic_banks_1_write_payload_data;
+  wire                FetchL1Plugin_logic_banks_1_read_cmd_valid;
+  wire       [8:0]    FetchL1Plugin_logic_banks_1_read_cmd_payload;
+  (* keep , syn_keep *) wire       [31:0]   FetchL1Plugin_logic_banks_1_read_rsp /* synthesis syn_keep = 1 */ ;
+  reg        [1:0]    FetchL1Plugin_logic_waysWrite_mask;
+  reg        [4:0]    FetchL1Plugin_logic_waysWrite_address;
   reg                 FetchL1Plugin_logic_waysWrite_tag_loaded;
   reg                 FetchL1Plugin_logic_waysWrite_tag_error;
-  reg        [21:0]   FetchL1Plugin_logic_waysWrite_tag_address;
+  reg        [20:0]   FetchL1Plugin_logic_waysWrite_tag_address;
   wire                FetchL1Plugin_logic_ways_0_read_cmd_valid;
-  wire       [3:0]    FetchL1Plugin_logic_ways_0_read_cmd_payload;
+  wire       [4:0]    FetchL1Plugin_logic_ways_0_read_cmd_payload;
   (* keep , syn_keep *) wire                FetchL1Plugin_logic_ways_0_read_rsp_loaded /* synthesis syn_keep = 1 */ ;
   (* keep , syn_keep *) wire                FetchL1Plugin_logic_ways_0_read_rsp_error /* synthesis syn_keep = 1 */ ;
-  (* keep , syn_keep *) wire       [21:0]   FetchL1Plugin_logic_ways_0_read_rsp_address /* synthesis syn_keep = 1 */ ;
-  wire       [23:0]   _zz_FetchL1Plugin_logic_ways_0_read_rsp_loaded;
+  (* keep , syn_keep *) wire       [20:0]   FetchL1Plugin_logic_ways_0_read_rsp_address /* synthesis syn_keep = 1 */ ;
+  wire       [22:0]   _zz_FetchL1Plugin_logic_ways_0_read_rsp_loaded;
+  wire                FetchL1Plugin_logic_ways_1_read_cmd_valid;
+  wire       [4:0]    FetchL1Plugin_logic_ways_1_read_cmd_payload;
+  (* keep , syn_keep *) wire                FetchL1Plugin_logic_ways_1_read_rsp_loaded /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire                FetchL1Plugin_logic_ways_1_read_rsp_error /* synthesis syn_keep = 1 */ ;
+  (* keep , syn_keep *) wire       [20:0]   FetchL1Plugin_logic_ways_1_read_rsp_address /* synthesis syn_keep = 1 */ ;
+  wire       [22:0]   _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded;
   reg                 FetchL1Plugin_logic_plru_write_valid;
-  reg        [3:0]    FetchL1Plugin_logic_plru_write_payload_address;
+  reg        [4:0]    FetchL1Plugin_logic_plru_write_payload_address;
+  reg        [0:0]    FetchL1Plugin_logic_plru_write_payload_data_0;
   wire                FetchL1Plugin_logic_plru_read_cmd_valid;
-  wire       [3:0]    FetchL1Plugin_logic_plru_read_cmd_payload;
+  wire       [4:0]    FetchL1Plugin_logic_plru_read_cmd_payload;
+  (* keep , syn_keep *) wire       [0:0]    FetchL1Plugin_logic_plru_read_rsp_0 /* synthesis syn_keep = 1 */ ;
   wire                FetchL1Plugin_logic_invalidate_cmd_valid;
   wire                FetchL1Plugin_logic_invalidate_cmd_ready;
   reg                 FetchL1Plugin_logic_invalidate_canStart;
-  reg        [4:0]    FetchL1Plugin_logic_invalidate_counter;
-  wire       [4:0]    FetchL1Plugin_logic_invalidate_counterIncr;
+  reg        [5:0]    FetchL1Plugin_logic_invalidate_counter;
+  wire       [5:0]    FetchL1Plugin_logic_invalidate_counterIncr;
   wire                FetchL1Plugin_logic_invalidate_done;
   wire                FetchL1Plugin_logic_invalidate_last;
   reg                 FetchL1Plugin_logic_invalidate_firstEver;
@@ -2021,11 +2069,13 @@ module VexiiRiscv (
   wire                fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l217;
   reg                 FetchL1Plugin_logic_refill_start_valid;
   wire       [31:0]   FetchL1Plugin_logic_refill_start_address;
+  wire       [0:0]    FetchL1Plugin_logic_refill_start_wayToAllocate;
   wire                FetchL1Plugin_logic_refill_start_isIo;
   reg                 FetchL1Plugin_logic_refill_slots_0_valid;
   reg                 FetchL1Plugin_logic_refill_slots_0_cmdSent;
   (* keep , syn_keep *) reg        [31:0]   FetchL1Plugin_logic_refill_slots_0_address /* synthesis syn_keep = 1 */ ;
   reg                 FetchL1Plugin_logic_refill_slots_0_isIo;
+  reg        [0:0]    FetchL1Plugin_logic_refill_slots_0_wayToAllocate;
   reg        [0:0]    FetchL1Plugin_logic_refill_slots_0_priority;
   wire                FetchL1Plugin_logic_refill_slots_0_askCmd;
   reg        [31:0]   FetchL1Plugin_logic_refill_pushCounter;
@@ -2042,6 +2092,7 @@ module VexiiRiscv (
   wire                fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l297;
   reg                 FetchL1Plugin_logic_refill_onRsp_firstCycle;
   wire                FetchL1Plugin_logic_bus_rsp_fire;
+  wire       [0:0]    FetchL1Plugin_logic_refill_onRsp_wayToAllocate;
   wire       [31:0]   FetchL1Plugin_logic_refill_onRsp_address;
   wire                when_FetchL1Plugin_l304;
   wire                when_FetchL1Plugin_l330;
@@ -2049,10 +2100,18 @@ module VexiiRiscv (
   wire       [31:0]   FetchL1Plugin_logic_ctrl_pmaPort_cmd_address;
   wire                FetchL1Plugin_logic_ctrl_pmaPort_rsp_fault;
   wire                FetchL1Plugin_logic_ctrl_pmaPort_rsp_io;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_core_io_context_state_0;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_core_io_evict_id;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_id;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_state_0;
+  wire                FetchL1Plugin_logic_ctrl_plruLogic_core_evict_sel_0;
+  wire                FetchL1Plugin_logic_ctrl_plruLogic_core_evict_logic_0_state;
   wire                FetchL1Plugin_logic_ctrl_plruLogic_buffer_valid;
-  wire       [3:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address;
+  wire       [4:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address;
+  wire       [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_data_0;
   reg                 FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_valid;
-  reg        [3:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_address;
+  reg        [4:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_address;
+  reg        [0:0]    FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_data_0;
   wire                FetchL1Plugin_logic_ctrl_dataAccessFault;
   reg                 FetchL1Plugin_logic_ctrl_trapSent;
   reg                 FetchL1Plugin_logic_ctrl_allowRefill;
@@ -3248,8 +3307,11 @@ module VexiiRiscv (
   reg [0:0] LsuL1Plugin_logic_shared_mem [0:15];
   reg [31:0] LsuL1Plugin_logic_writeback_victimBuffer [0:15];
   (* ram_style = "block" *) reg [49:0] BtbPlugin_logic_mem [0:511];
-  reg [31:0] FetchL1Plugin_logic_banks_0_mem [0:255];
-  reg [23:0] FetchL1Plugin_logic_ways_0_mem [0:15];
+  reg [31:0] FetchL1Plugin_logic_banks_0_mem [0:511];
+  reg [31:0] FetchL1Plugin_logic_banks_1_mem [0:511];
+  reg [22:0] FetchL1Plugin_logic_ways_0_mem [0:31];
+  reg [22:0] FetchL1Plugin_logic_ways_1_mem [0:31];
+  reg [0:0] FetchL1Plugin_logic_plru_mem [0:31];
   reg [31:0] CsrRamPlugin_logic_mem [0:3];
   function [1:0] zz_FetchL1Plugin_logic_trapPort_payload_arg(input dummy);
     begin
@@ -3257,7 +3319,7 @@ module VexiiRiscv (
       zz_FetchL1Plugin_logic_trapPort_payload_arg[1 : 0] = 2'b10;
     end
   endfunction
-  wire [1:0] _zz_26;
+  wire [1:0] _zz_34;
 
   assign _zz_when_1 = (! FetchL1Plugin_logic_refill_slots_0_valid);
   assign _zz_early0_IntAluPlugin_logic_alu_result = (early0_IntAluPlugin_logic_alu_bitwise | _zz_early0_IntAluPlugin_logic_alu_result_1);
@@ -3319,7 +3381,8 @@ module VexiiRiscv (
   assign _zz_late0_BarrelShifterPlugin_logic_shift_shifted = ($signed(_zz_late0_BarrelShifterPlugin_logic_shift_shifted_1) >>> late0_BarrelShifterPlugin_logic_shift_amplitude);
   assign _zz_late0_BarrelShifterPlugin_logic_shift_shifted_1 = {(execute_ctrl4_down_BarrelShifterPlugin_SIGNED_lane0 && execute_ctrl4_down_late0_SrcPlugin_SRC1_lane0[31]),late0_BarrelShifterPlugin_logic_shift_reversed};
   assign _zz_late0_BarrelShifterPlugin_logic_shift_patched = {late0_BarrelShifterPlugin_logic_shift_shifted[0],{late0_BarrelShifterPlugin_logic_shift_shifted[1],{late0_BarrelShifterPlugin_logic_shift_shifted[2],{late0_BarrelShifterPlugin_logic_shift_shifted[3],{late0_BarrelShifterPlugin_logic_shift_shifted[4],{late0_BarrelShifterPlugin_logic_shift_shifted[5],{late0_BarrelShifterPlugin_logic_shift_shifted[6],{late0_BarrelShifterPlugin_logic_shift_shifted[7],{late0_BarrelShifterPlugin_logic_shift_shifted[8],{_zz_late0_BarrelShifterPlugin_logic_shift_patched_1,{_zz_late0_BarrelShifterPlugin_logic_shift_patched_2,_zz_late0_BarrelShifterPlugin_logic_shift_patched_3}}}}}}}}}}};
-  assign _zz_FetchL1Plugin_logic_ctrl_dataAccessFault = (fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_error : 1'b0);
+  assign _zz_FetchL1Plugin_logic_ctrl_dataAccessFault = ((fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_error : 1'b0) | (fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_error : 1'b0));
+  assign _zz_FetchL1Plugin_logic_plru_write_payload_data_0 = 1'b0;
   assign _zz_WhiteboxerPlugin_logic_decodes_0_pc = {32'd0, decode_ctrls_0_down_PC_0};
   assign _zz_FetchL1Plugin_pmaBuilder_onTransfers_0_addressHit = (|_zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io);
   assign _zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io_1 = (|_zz_FetchL1Plugin_logic_ctrl_pmaPort_rsp_io);
@@ -3544,8 +3607,10 @@ module VexiiRiscv (
   assign _zz_BtbPlugin_logic_mem_port = {BtbPlugin_logic_memDp_wp_payload_data_0_taken,{BtbPlugin_logic_memDp_wp_payload_data_0_isPop,{BtbPlugin_logic_memDp_wp_payload_data_0_isPush,{BtbPlugin_logic_memDp_wp_payload_data_0_isBranch,{BtbPlugin_logic_memDp_wp_payload_data_0_pcTarget,BtbPlugin_logic_memDp_wp_payload_data_0_hash}}}}};
   assign _zz_FetchL1Plugin_logic_ways_0_mem_port = {FetchL1Plugin_logic_waysWrite_tag_address,{FetchL1Plugin_logic_waysWrite_tag_error,FetchL1Plugin_logic_waysWrite_tag_loaded}};
   assign _zz_FetchL1Plugin_logic_ways_0_mem_port_1 = FetchL1Plugin_logic_waysWrite_mask[0];
-  assign _zz_23 = _zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
-  assign _zz_25 = {_zz_13[2],{_zz_13[1],_zz_13[0]}};
+  assign _zz_FetchL1Plugin_logic_ways_1_mem_port = {FetchL1Plugin_logic_waysWrite_tag_address,{FetchL1Plugin_logic_waysWrite_tag_error,FetchL1Plugin_logic_waysWrite_tag_loaded}};
+  assign _zz_FetchL1Plugin_logic_ways_1_mem_port_1 = FetchL1Plugin_logic_waysWrite_mask[1];
+  assign _zz_31 = _zz_execute_ctrl4_down_LsuL1Plugin_logic_MUXED_DATA_lane0;
+  assign _zz_33 = {_zz_15[2],{_zz_15[1],_zz_15[0]}};
   assign _zz_LsuPlugin_logic_onCtrl_loadData_shited_1 = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[1 : 0];
   assign _zz_LsuPlugin_logic_onCtrl_loadData_shited_3 = execute_ctrl4_down_LsuL1_MIXED_ADDRESS_lane0[1 : 1];
   assign _zz_WhiteboxerPlugin_logic_perf_candidatesCount_1 = DispatchPlugin_logic_candidates_0_ctx_valid;
@@ -3575,7 +3640,10 @@ module VexiiRiscv (
   assign _zz_late0_BarrelShifterPlugin_logic_shift_patched_5 = late0_BarrelShifterPlugin_logic_shift_shifted[21];
   assign _zz_late0_BarrelShifterPlugin_logic_shift_patched_6 = {late0_BarrelShifterPlugin_logic_shift_shifted[22],{late0_BarrelShifterPlugin_logic_shift_shifted[23],{late0_BarrelShifterPlugin_logic_shift_shifted[24],{late0_BarrelShifterPlugin_logic_shift_shifted[25],{late0_BarrelShifterPlugin_logic_shift_shifted[26],{late0_BarrelShifterPlugin_logic_shift_shifted[27],{late0_BarrelShifterPlugin_logic_shift_shifted[28],{late0_BarrelShifterPlugin_logic_shift_shifted[29],{late0_BarrelShifterPlugin_logic_shift_shifted[30],late0_BarrelShifterPlugin_logic_shift_shifted[31]}}}}}}}}};
   assign _zz_LsuPlugin_logic_onPma_io_rsp_fault = 32'hffff0000;
-  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_1 = 32'hffffc000;
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_1 = (LsuPlugin_pmaBuilder_io_addressBits & 32'hffff8000);
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_2 = 32'h0;
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_3 = (LsuPlugin_pmaBuilder_io_addressBits & 32'hffffe000);
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_4 = 32'hc0000000;
   assign _zz_decode_ctrls_1_down_RD_ENABLE_0_1 = 32'h00000050;
   assign _zz_decode_ctrls_1_down_RD_ENABLE_0_2 = (decode_ctrls_1_down_Decode_INSTRUCTION_0 & 32'h0000000c);
   assign _zz_decode_ctrls_1_down_RD_ENABLE_0_3 = 32'h00000004;
@@ -3671,7 +3739,7 @@ module VexiiRiscv (
   end
 
   always @(posedge clk) begin
-    if(_zz_4) begin
+    if(_zz_6) begin
       LsuL1Plugin_logic_shared_mem[LsuL1Plugin_logic_shared_write_payload_address] <= LsuL1Plugin_logic_shared_write_payload_data_dirty;
     end
   end
@@ -3683,7 +3751,7 @@ module VexiiRiscv (
   end
 
   always @(posedge clk) begin
-    if(_zz_3) begin
+    if(_zz_5) begin
       LsuL1Plugin_logic_writeback_victimBuffer[_zz_LsuL1Plugin_logic_writeback_victimBuffer_port] <= LsuL1Plugin_logic_writeback_read_readedData;
     end
   end
@@ -3707,7 +3775,7 @@ module VexiiRiscv (
   end
 
   always @(posedge clk) begin
-    if(_zz_2) begin
+    if(_zz_4) begin
       FetchL1Plugin_logic_banks_0_mem[FetchL1Plugin_logic_banks_0_write_payload_address] <= FetchL1Plugin_logic_banks_0_write_payload_data;
     end
   end
@@ -3715,6 +3783,18 @@ module VexiiRiscv (
   always @(posedge clk) begin
     if(FetchL1Plugin_logic_banks_0_read_cmd_valid) begin
       FetchL1Plugin_logic_banks_0_mem_spinal_port1 <= FetchL1Plugin_logic_banks_0_mem[FetchL1Plugin_logic_banks_0_read_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_3) begin
+      FetchL1Plugin_logic_banks_1_mem[FetchL1Plugin_logic_banks_1_write_payload_address] <= FetchL1Plugin_logic_banks_1_write_payload_data;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(FetchL1Plugin_logic_banks_1_read_cmd_valid) begin
+      FetchL1Plugin_logic_banks_1_mem_spinal_port1 <= FetchL1Plugin_logic_banks_1_mem[FetchL1Plugin_logic_banks_1_read_cmd_payload];
     end
   end
 
@@ -3727,6 +3807,30 @@ module VexiiRiscv (
   always @(posedge clk) begin
     if(FetchL1Plugin_logic_ways_0_read_cmd_valid) begin
       FetchL1Plugin_logic_ways_0_mem_spinal_port1 <= FetchL1Plugin_logic_ways_0_mem[FetchL1Plugin_logic_ways_0_read_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_FetchL1Plugin_logic_ways_1_mem_port_1) begin
+      FetchL1Plugin_logic_ways_1_mem[FetchL1Plugin_logic_waysWrite_address] <= _zz_FetchL1Plugin_logic_ways_1_mem_port;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(FetchL1Plugin_logic_ways_1_read_cmd_valid) begin
+      FetchL1Plugin_logic_ways_1_mem_spinal_port1 <= FetchL1Plugin_logic_ways_1_mem[FetchL1Plugin_logic_ways_1_read_cmd_payload];
+    end
+  end
+
+  always @(posedge clk) begin
+    if(_zz_2) begin
+      FetchL1Plugin_logic_plru_mem[FetchL1Plugin_logic_plru_write_payload_address] <= FetchL1Plugin_logic_plru_write_payload_data_0;
+    end
+  end
+
+  always @(posedge clk) begin
+    if(FetchL1Plugin_logic_plru_read_cmd_valid) begin
+      FetchL1Plugin_logic_plru_mem_spinal_port1 <= FetchL1Plugin_logic_plru_mem[FetchL1Plugin_logic_plru_read_cmd_payload];
     end
   end
 
@@ -3868,22 +3972,22 @@ module VexiiRiscv (
     .reset               (reset                                                            )  //i
   );
   always @(*) begin
-    case(_zz_23)
-      1'b0 : _zz_22 = 1'b0;
-      default : _zz_22 = 1'b1;
+    case(_zz_31)
+      1'b0 : _zz_30 = 1'b0;
+      default : _zz_30 = 1'b1;
     endcase
   end
 
   always @(*) begin
-    case(_zz_25)
-      3'b000 : _zz_24 = 2'b00;
-      3'b001 : _zz_24 = 2'b01;
-      3'b010 : _zz_24 = 2'b01;
-      3'b011 : _zz_24 = 2'b10;
-      3'b100 : _zz_24 = 2'b01;
-      3'b101 : _zz_24 = 2'b10;
-      3'b110 : _zz_24 = 2'b10;
-      default : _zz_24 = 2'b11;
+    case(_zz_33)
+      3'b000 : _zz_32 = 2'b00;
+      3'b001 : _zz_32 = 2'b01;
+      3'b010 : _zz_32 = 2'b01;
+      3'b011 : _zz_32 = 2'b10;
+      3'b100 : _zz_32 = 2'b01;
+      3'b101 : _zz_32 = 2'b10;
+      3'b110 : _zz_32 = 2'b10;
+      default : _zz_32 = 2'b11;
     endcase
   end
 
@@ -4542,23 +4646,37 @@ module VexiiRiscv (
 
   always @(*) begin
     _zz_2 = 1'b0;
-    if(FetchL1Plugin_logic_banks_0_write_valid) begin
+    if(FetchL1Plugin_logic_plru_write_valid) begin
       _zz_2 = 1'b1;
     end
   end
 
-  assign execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl3_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty;
   always @(*) begin
     _zz_3 = 1'b0;
-    if(LsuL1Plugin_logic_writeback_read_slotReadLast_valid) begin
+    if(FetchL1Plugin_logic_banks_1_write_valid) begin
       _zz_3 = 1'b1;
     end
   end
 
   always @(*) begin
     _zz_4 = 1'b0;
-    if(LsuL1Plugin_logic_shared_write_valid) begin
+    if(FetchL1Plugin_logic_banks_0_write_valid) begin
       _zz_4 = 1'b1;
+    end
+  end
+
+  assign execute_ctrl3_down_LsuL1Plugin_logic_SHARED_lane0_dirty = execute_ctrl3_LsuL1Plugin_logic_SHARED_lane0_bypass_dirty;
+  always @(*) begin
+    _zz_5 = 1'b0;
+    if(LsuL1Plugin_logic_writeback_read_slotReadLast_valid) begin
+      _zz_5 = 1'b1;
+    end
+  end
+
+  always @(*) begin
+    _zz_6 = 1'b0;
+    if(LsuL1Plugin_logic_shared_write_valid) begin
+      _zz_6 = 1'b1;
     end
   end
 
@@ -5111,7 +5229,7 @@ module VexiiRiscv (
   assign execute_ctrl4_down_LsuL1_WAIT_REFILL_lane0 = (LsuL1Plugin_logic_lsu_ctrl_refillHazards | (((! execute_ctrl4_down_LsuL1_HAZARD_lane0) && (LsuL1Plugin_logic_lsu_ctrl_askRefill || LsuL1Plugin_logic_lsu_ctrl_askUpgrade)) ? (LsuL1Plugin_logic_refill_full ? 1'b1 : LsuL1Plugin_logic_refill_free) : 1'b0));
   assign execute_ctrl4_down_LsuL1_WAIT_WRITEBACK_lane0 = 1'b0;
   assign when_LsuL1Plugin_l915 = (execute_ctrl4_down_LsuL1_SEL_lane0 && (! execute_ctrl4_down_LsuL1_ABORD_lane0));
-  assign _zz_13 = {LsuL1Plugin_logic_lsu_ctrl_askRefill,{LsuL1Plugin_logic_lsu_ctrl_doUpgrade,LsuL1Plugin_logic_lsu_ctrl_doFlush}};
+  assign _zz_15 = {LsuL1Plugin_logic_lsu_ctrl_askRefill,{LsuL1Plugin_logic_lsu_ctrl_doUpgrade,LsuL1Plugin_logic_lsu_ctrl_doFlush}};
   always @(*) begin
     LsuL1Plugin_logic_shared_write_valid = 1'b0;
     if(LsuL1Plugin_logic_lsu_ctrl_doFlush) begin
@@ -5428,25 +5546,27 @@ module VexiiRiscv (
 
   assign FetchL1Plugin_logic_banks_0_read_rsp = FetchL1Plugin_logic_banks_0_mem_spinal_port1;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_0 = FetchL1Plugin_logic_banks_0_read_rsp;
+  assign FetchL1Plugin_logic_banks_1_read_rsp = FetchL1Plugin_logic_banks_1_mem_spinal_port1;
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_1 = FetchL1Plugin_logic_banks_1_read_rsp;
   always @(*) begin
-    FetchL1Plugin_logic_waysWrite_mask = 1'b0;
+    FetchL1Plugin_logic_waysWrite_mask = 2'b00;
     if(when_FetchL1Plugin_l204) begin
-      FetchL1Plugin_logic_waysWrite_mask = 1'b1;
+      FetchL1Plugin_logic_waysWrite_mask = 2'b11;
     end
     if(FetchL1Plugin_logic_invalidate_done) begin
       if(when_FetchL1Plugin_l304) begin
-        FetchL1Plugin_logic_waysWrite_mask[0] = 1'b1;
+        FetchL1Plugin_logic_waysWrite_mask[FetchL1Plugin_logic_refill_onRsp_wayToAllocate] = 1'b1;
       end
     end
   end
 
   always @(*) begin
-    FetchL1Plugin_logic_waysWrite_address = 4'bxxxx;
+    FetchL1Plugin_logic_waysWrite_address = 5'bxxxxx;
     if(when_FetchL1Plugin_l204) begin
-      FetchL1Plugin_logic_waysWrite_address = FetchL1Plugin_logic_invalidate_counter[3:0];
+      FetchL1Plugin_logic_waysWrite_address = FetchL1Plugin_logic_invalidate_counter[4:0];
     end
     if(FetchL1Plugin_logic_invalidate_done) begin
-      FetchL1Plugin_logic_waysWrite_address = FetchL1Plugin_logic_refill_onRsp_address[9 : 6];
+      FetchL1Plugin_logic_waysWrite_address = FetchL1Plugin_logic_refill_onRsp_address[10 : 6];
     end
   end
 
@@ -5468,19 +5588,28 @@ module VexiiRiscv (
   end
 
   always @(*) begin
-    FetchL1Plugin_logic_waysWrite_tag_address = 22'bxxxxxxxxxxxxxxxxxxxxxx;
+    FetchL1Plugin_logic_waysWrite_tag_address = 21'bxxxxxxxxxxxxxxxxxxxxx;
     if(FetchL1Plugin_logic_invalidate_done) begin
-      FetchL1Plugin_logic_waysWrite_tag_address = FetchL1Plugin_logic_refill_onRsp_address[31 : 10];
+      FetchL1Plugin_logic_waysWrite_tag_address = FetchL1Plugin_logic_refill_onRsp_address[31 : 11];
     end
   end
 
   assign _zz_FetchL1Plugin_logic_ways_0_read_rsp_loaded = FetchL1Plugin_logic_ways_0_mem_spinal_port1;
   assign FetchL1Plugin_logic_ways_0_read_rsp_loaded = _zz_FetchL1Plugin_logic_ways_0_read_rsp_loaded[0];
   assign FetchL1Plugin_logic_ways_0_read_rsp_error = _zz_FetchL1Plugin_logic_ways_0_read_rsp_loaded[1];
-  assign FetchL1Plugin_logic_ways_0_read_rsp_address = _zz_FetchL1Plugin_logic_ways_0_read_rsp_loaded[23 : 2];
+  assign FetchL1Plugin_logic_ways_0_read_rsp_address = _zz_FetchL1Plugin_logic_ways_0_read_rsp_loaded[22 : 2];
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded = FetchL1Plugin_logic_ways_0_read_rsp_loaded;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_error = FetchL1Plugin_logic_ways_0_read_rsp_error;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address = FetchL1Plugin_logic_ways_0_read_rsp_address;
+  assign _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded = FetchL1Plugin_logic_ways_1_mem_spinal_port1;
+  assign FetchL1Plugin_logic_ways_1_read_rsp_loaded = _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded[0];
+  assign FetchL1Plugin_logic_ways_1_read_rsp_error = _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded[1];
+  assign FetchL1Plugin_logic_ways_1_read_rsp_address = _zz_FetchL1Plugin_logic_ways_1_read_rsp_loaded[22 : 2];
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded = FetchL1Plugin_logic_ways_1_read_rsp_loaded;
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_error = FetchL1Plugin_logic_ways_1_read_rsp_error;
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_address = FetchL1Plugin_logic_ways_1_read_rsp_address;
+  assign FetchL1Plugin_logic_plru_read_rsp_0 = FetchL1Plugin_logic_plru_mem_spinal_port1[0 : 0];
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_READ_0 = FetchL1Plugin_logic_plru_read_rsp_0;
   assign FetchL1Plugin_logic_invalidate_cmd_valid = (|TrapPlugin_logic_fetchL1Invalidate_0_cmd_valid);
   always @(*) begin
     FetchL1Plugin_logic_invalidate_canStart = 1'b1;
@@ -5489,9 +5618,9 @@ module VexiiRiscv (
     end
   end
 
-  assign FetchL1Plugin_logic_invalidate_counterIncr = (FetchL1Plugin_logic_invalidate_counter + 5'h01);
-  assign FetchL1Plugin_logic_invalidate_done = FetchL1Plugin_logic_invalidate_counter[4];
-  assign FetchL1Plugin_logic_invalidate_last = FetchL1Plugin_logic_invalidate_counterIncr[4];
+  assign FetchL1Plugin_logic_invalidate_counterIncr = (FetchL1Plugin_logic_invalidate_counter + 6'h01);
+  assign FetchL1Plugin_logic_invalidate_done = FetchL1Plugin_logic_invalidate_counter[5];
+  assign FetchL1Plugin_logic_invalidate_last = FetchL1Plugin_logic_invalidate_counterIncr[5];
   assign when_FetchL1Plugin_l204 = (! FetchL1Plugin_logic_invalidate_done);
   assign when_FetchL1Plugin_l211 = ((FetchL1Plugin_logic_invalidate_done && FetchL1Plugin_logic_invalidate_cmd_valid) && FetchL1Plugin_logic_invalidate_canStart);
   always @(*) begin
@@ -5506,7 +5635,7 @@ module VexiiRiscv (
   assign when_FetchL1Plugin_l216 = (! FetchL1Plugin_logic_invalidate_done);
   assign fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l217 = _zz_fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l217;
   assign FetchL1Plugin_logic_refill_slots_0_askCmd = (FetchL1Plugin_logic_refill_slots_0_valid && (! FetchL1Plugin_logic_refill_slots_0_cmdSent));
-  assign FetchL1Plugin_logic_refill_hazard = (|(FetchL1Plugin_logic_refill_slots_0_valid && (FetchL1Plugin_logic_refill_slots_0_address[9 : 6] == FetchL1Plugin_logic_refill_start_address[9 : 6])));
+  assign FetchL1Plugin_logic_refill_hazard = (|(FetchL1Plugin_logic_refill_slots_0_valid && (FetchL1Plugin_logic_refill_slots_0_address[10 : 6] == FetchL1Plugin_logic_refill_start_address[10 : 6])));
   assign when_FetchL1Plugin_l255 = ((FetchL1Plugin_logic_refill_start_valid && FetchL1Plugin_logic_invalidate_done) && (! FetchL1Plugin_logic_refill_hazard));
   assign when_FetchL1Plugin_l268 = ((|FetchL1Plugin_logic_refill_slots_0_valid) || FetchL1Plugin_logic_refill_start_valid);
   assign FetchL1Plugin_logic_refill_onCmd_propoedOh = (FetchL1Plugin_logic_refill_slots_0_askCmd && 1'b1);
@@ -5515,32 +5644,56 @@ module VexiiRiscv (
   assign FetchL1Plugin_logic_bus_cmd_valid = (|FetchL1Plugin_logic_refill_onCmd_oh);
   assign FetchL1Plugin_logic_bus_cmd_payload_address = {FetchL1Plugin_logic_refill_slots_0_address[31 : 6],6'h0};
   assign FetchL1Plugin_logic_bus_cmd_payload_io = FetchL1Plugin_logic_refill_slots_0_isIo;
-  assign FetchL1Plugin_logic_refill_onRsp_holdHarts = ((|FetchL1Plugin_logic_waysWrite_mask) || (|((FetchL1Plugin_logic_refill_slots_0_valid && (FetchL1Plugin_logic_refill_slots_0_address[9 : 6] == fetch_logic_ctrls_0_down_Fetch_WORD_PC[9 : 6])) && (! (1'b1 && (fetch_logic_ctrls_0_down_Fetch_WORD_PC[5 : 2] < FetchL1Plugin_logic_refill_onRsp_wordIndex))))));
+  assign FetchL1Plugin_logic_refill_onRsp_holdHarts = ((|FetchL1Plugin_logic_waysWrite_mask) || (|((FetchL1Plugin_logic_refill_slots_0_valid && (FetchL1Plugin_logic_refill_slots_0_address[10 : 6] == fetch_logic_ctrls_0_down_Fetch_WORD_PC[10 : 6])) && (! (1'b1 && (fetch_logic_ctrls_0_down_Fetch_WORD_PC[5 : 2] < FetchL1Plugin_logic_refill_onRsp_wordIndex))))));
   assign fetch_logic_ctrls_0_haltRequest_FetchL1Plugin_l297 = FetchL1Plugin_logic_refill_onRsp_holdHarts;
   assign FetchL1Plugin_logic_bus_rsp_fire = (FetchL1Plugin_logic_bus_rsp_valid && FetchL1Plugin_logic_bus_rsp_ready);
+  assign FetchL1Plugin_logic_refill_onRsp_wayToAllocate = FetchL1Plugin_logic_refill_slots_0_wayToAllocate;
   assign FetchL1Plugin_logic_refill_onRsp_address = FetchL1Plugin_logic_refill_slots_0_address;
   assign when_FetchL1Plugin_l304 = (FetchL1Plugin_logic_bus_rsp_valid && (FetchL1Plugin_logic_refill_onRsp_firstCycle || FetchL1Plugin_logic_bus_rsp_payload_error));
-  assign FetchL1Plugin_logic_banks_0_write_valid = (FetchL1Plugin_logic_bus_rsp_valid && 1'b1);
-  assign FetchL1Plugin_logic_banks_0_write_payload_address = {FetchL1Plugin_logic_refill_onRsp_address[9 : 6],FetchL1Plugin_logic_refill_onRsp_wordIndex};
+  assign FetchL1Plugin_logic_banks_0_write_valid = (FetchL1Plugin_logic_bus_rsp_valid && (FetchL1Plugin_logic_refill_onRsp_wayToAllocate == 1'b0));
+  assign FetchL1Plugin_logic_banks_0_write_payload_address = {FetchL1Plugin_logic_refill_onRsp_address[10 : 6],FetchL1Plugin_logic_refill_onRsp_wordIndex};
   assign FetchL1Plugin_logic_banks_0_write_payload_data = FetchL1Plugin_logic_bus_rsp_payload_data;
+  assign FetchL1Plugin_logic_banks_1_write_valid = (FetchL1Plugin_logic_bus_rsp_valid && (FetchL1Plugin_logic_refill_onRsp_wayToAllocate == 1'b1));
+  assign FetchL1Plugin_logic_banks_1_write_payload_address = {FetchL1Plugin_logic_refill_onRsp_address[10 : 6],FetchL1Plugin_logic_refill_onRsp_wordIndex};
+  assign FetchL1Plugin_logic_banks_1_write_payload_data = FetchL1Plugin_logic_bus_rsp_payload_data;
   assign FetchL1Plugin_logic_bus_rsp_ready = 1'b1;
   assign when_FetchL1Plugin_l330 = (FetchL1Plugin_logic_refill_onRsp_wordIndex == 4'b1111);
   assign FetchL1Plugin_logic_cmd_doIt = (fetch_logic_ctrls_1_up_ready || ((! fetch_logic_ctrls_1_up_valid) && 1'b1));
   assign FetchL1Plugin_logic_banks_0_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
-  assign FetchL1Plugin_logic_banks_0_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[9 : 2];
+  assign FetchL1Plugin_logic_banks_0_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[10 : 2];
+  assign FetchL1Plugin_logic_banks_1_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
+  assign FetchL1Plugin_logic_banks_1_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[10 : 2];
   assign FetchL1Plugin_logic_ways_0_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
-  assign FetchL1Plugin_logic_ways_0_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[9 : 6];
+  assign FetchL1Plugin_logic_ways_0_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[10 : 6];
+  assign FetchL1Plugin_logic_ways_1_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
+  assign FetchL1Plugin_logic_ways_1_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[10 : 6];
   assign FetchL1Plugin_logic_plru_read_cmd_valid = FetchL1Plugin_logic_cmd_doIt;
-  assign FetchL1Plugin_logic_plru_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[9 : 6];
+  assign FetchL1Plugin_logic_plru_read_cmd_payload = fetch_logic_ctrls_0_down_Fetch_WORD_PC[10 : 6];
   assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID = (FetchL1Plugin_logic_plru_write_valid && (FetchL1Plugin_logic_plru_write_payload_address == FetchL1Plugin_logic_plru_read_cmd_payload));
+  assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0 = FetchL1Plugin_logic_plru_write_payload_data_0;
   assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE = (|FetchL1Plugin_logic_waysWrite_mask);
   assign fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS = FetchL1Plugin_logic_waysWrite_address;
+  always @(*) begin
+    fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_BYPASSED_0 = fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_READ_0;
+    if(fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID) begin
+      fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_BYPASSED_0 = fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
+    end
+  end
+
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_0 = fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_0[31 : 0];
-  assign fetch_logic_ctrls_2_down_Fetch_WORD = (fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_0 : 32'h0);
-  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_HAZARD = (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE && (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS == fetch_logic_ctrls_1_down_Fetch_WORD_PC[9 : 6]));
-  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0 = (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded && (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address == fetch_logic_ctrls_1_down_MMU_TRANSLATED[31 : 10]));
-  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT = (|fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0);
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_1 = fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_WORDS_1[31 : 0];
+  assign fetch_logic_ctrls_2_down_Fetch_WORD = ((fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_0 : 32'h0) | (fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1 ? fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_1 : 32'h0));
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_HAZARD = (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE && (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS == fetch_logic_ctrls_1_down_Fetch_WORD_PC[10 : 6]));
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0 = (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded && (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address == fetch_logic_ctrls_1_down_MMU_TRANSLATED[31 : 11]));
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_1 = (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded && (fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_address == fetch_logic_ctrls_1_down_MMU_TRANSLATED[31 : 11]));
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT = (|{fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_1,fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0});
   assign FetchL1Plugin_logic_ctrl_pmaPort_cmd_address = fetch_logic_ctrls_2_down_MMU_TRANSLATED;
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_evict_logic_0_state = FetchL1Plugin_logic_ctrl_plruLogic_core_io_context_state_0[0];
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_evict_sel_0 = (! FetchL1Plugin_logic_ctrl_plruLogic_core_evict_logic_0_state);
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_io_evict_id = FetchL1Plugin_logic_ctrl_plruLogic_core_evict_sel_0;
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_state_0[0] = FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_id[0];
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_io_context_state_0 = fetch_logic_ctrls_2_down_FetchL1Plugin_logic_PLRU_BYPASSED_0;
+  assign FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_id = fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1;
   always @(*) begin
     FetchL1Plugin_logic_plru_write_valid = FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_valid;
     if(when_FetchL1Plugin_l558) begin
@@ -5551,12 +5704,21 @@ module VexiiRiscv (
   always @(*) begin
     FetchL1Plugin_logic_plru_write_payload_address = FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_address;
     if(when_FetchL1Plugin_l558) begin
-      FetchL1Plugin_logic_plru_write_payload_address = FetchL1Plugin_logic_invalidate_counter[3:0];
+      FetchL1Plugin_logic_plru_write_payload_address = FetchL1Plugin_logic_invalidate_counter[4:0];
+    end
+  end
+
+  always @(*) begin
+    FetchL1Plugin_logic_plru_write_payload_data_0 = FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_data_0;
+    if(when_FetchL1Plugin_l558) begin
+      FetchL1Plugin_logic_plru_write_payload_data_0 = _zz_FetchL1Plugin_logic_plru_write_payload_data_0[0 : 0];
     end
   end
 
   assign FetchL1Plugin_logic_ctrl_plruLogic_buffer_valid = (fetch_logic_ctrls_2_up_isValid && fetch_logic_ctrls_2_up_isReady);
-  assign FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address = fetch_logic_ctrls_2_down_Fetch_WORD_PC[9 : 6];
+  assign FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address = fetch_logic_ctrls_2_down_Fetch_WORD_PC[10 : 6];
+  assign FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_data_0 = FetchL1Plugin_logic_ctrl_plruLogic_core_io_update_state_0;
+  assign FetchL1Plugin_logic_refill_start_wayToAllocate = FetchL1Plugin_logic_ctrl_plruLogic_core_io_evict_id;
   assign FetchL1Plugin_logic_ctrl_dataAccessFault = (_zz_FetchL1Plugin_logic_ctrl_dataAccessFault[0] && (! fetch_logic_ctrls_2_down_FetchL1Plugin_logic_HAZARD));
   always @(*) begin
     FetchL1Plugin_logic_trapPort_valid = 1'b0;
@@ -5640,8 +5802,8 @@ module VexiiRiscv (
     end
   end
 
-  assign _zz_26 = zz_FetchL1Plugin_logic_trapPort_payload_arg(1'b0);
-  always @(*) FetchL1Plugin_logic_trapPort_payload_arg = _zz_26;
+  assign _zz_34 = zz_FetchL1Plugin_logic_trapPort_payload_arg(1'b0);
+  always @(*) FetchL1Plugin_logic_trapPort_payload_arg = _zz_34;
   always @(*) begin
     FetchL1Plugin_logic_ctrl_allowRefill = ((! fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HIT) && (! fetch_logic_ctrls_2_down_FetchL1Plugin_logic_HAZARD));
     if(when_FetchL1Plugin_l480) begin
@@ -6582,14 +6744,14 @@ module VexiiRiscv (
   assign LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit = _zz_LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit[0];
   assign LsuPlugin_pmaBuilder_l1_onTransfers_0_argsHit = (|((LsuPlugin_pmaBuilder_l1_argsBits & 1'b0) == 1'b0));
   assign LsuPlugin_pmaBuilder_l1_onTransfers_0_hit = (LsuPlugin_pmaBuilder_l1_onTransfers_0_argsHit && LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit);
-  assign LsuPlugin_logic_onPma_cached_rsp_fault = (! ((|{((LsuPlugin_pmaBuilder_l1_addressBits & 32'hff000000) == 32'h10000000),{((LsuPlugin_pmaBuilder_l1_addressBits & 32'hff000000) == 32'h20000000),((LsuPlugin_pmaBuilder_l1_addressBits & 32'hffffc000) == 32'h0)}}) && (|LsuPlugin_pmaBuilder_l1_onTransfers_0_hit)));
+  assign LsuPlugin_logic_onPma_cached_rsp_fault = (! ((|{((LsuPlugin_pmaBuilder_l1_addressBits & 32'hff000000) == 32'h10000000),{((LsuPlugin_pmaBuilder_l1_addressBits & 32'hff000000) == 32'h20000000),((LsuPlugin_pmaBuilder_l1_addressBits & 32'hffff8000) == 32'h0)}}) && (|LsuPlugin_pmaBuilder_l1_onTransfers_0_hit)));
   assign LsuPlugin_logic_onPma_cached_rsp_io = (! _zz_LsuPlugin_logic_onPma_cached_rsp_io_1[0]);
   assign LsuPlugin_pmaBuilder_io_addressBits = LsuPlugin_logic_onPma_io_cmd_address;
   assign LsuPlugin_pmaBuilder_io_argsBits = {LsuPlugin_logic_onPma_io_cmd_size,LsuPlugin_logic_onPma_io_cmd_op};
   assign LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit = _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit[0];
   assign LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit = (|((LsuPlugin_pmaBuilder_io_argsBits & 3'b000) == 3'b000));
   assign LsuPlugin_pmaBuilder_io_onTransfers_0_hit = (LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit && LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit);
-  assign LsuPlugin_logic_onPma_io_rsp_fault = (! ((|{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h10000000),{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h20000000),{((LsuPlugin_pmaBuilder_io_addressBits & _zz_LsuPlugin_logic_onPma_io_rsp_fault) == 32'hf0000000),((LsuPlugin_pmaBuilder_io_addressBits & _zz_LsuPlugin_logic_onPma_io_rsp_fault_1) == 32'h0)}}}) && (|LsuPlugin_pmaBuilder_io_onTransfers_0_hit)));
+  assign LsuPlugin_logic_onPma_io_rsp_fault = (! ((|{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h10000000),{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h20000000),{((LsuPlugin_pmaBuilder_io_addressBits & _zz_LsuPlugin_logic_onPma_io_rsp_fault) == 32'hf0000000),{(_zz_LsuPlugin_logic_onPma_io_rsp_fault_1 == _zz_LsuPlugin_logic_onPma_io_rsp_fault_2),(_zz_LsuPlugin_logic_onPma_io_rsp_fault_3 == _zz_LsuPlugin_logic_onPma_io_rsp_fault_4)}}}}) && (|LsuPlugin_pmaBuilder_io_onTransfers_0_hit)));
   assign LsuPlugin_logic_onPma_io_rsp_io = (! _zz_LsuPlugin_logic_onPma_io_rsp_io[0]);
   assign execute_ctrl2_COMPLETED_lane0_bypass = (execute_ctrl2_up_COMPLETED_lane0 || execute_ctrl2_down_COMPLETION_AT_2_lane0);
   assign execute_ctrl4_COMPLETED_lane0_bypass = (execute_ctrl4_up_COMPLETED_lane0 || execute_ctrl4_down_COMPLETION_AT_4_lane0);
@@ -8770,6 +8932,7 @@ module VexiiRiscv (
   assign fetch_logic_ctrls_1_down_Fetch_PC_FAULT = fetch_logic_ctrls_1_up_Fetch_PC_FAULT;
   assign fetch_logic_ctrls_1_down_Fetch_ID = fetch_logic_ctrls_1_up_Fetch_ID;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID = fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
+  assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0 = fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE = fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
   assign fetch_logic_ctrls_1_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS = fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
   assign fetch_logic_ctrls_1_down_BtbPlugin_logic_readCmd_HAZARDS = fetch_logic_ctrls_1_up_BtbPlugin_logic_readCmd_HAZARDS;
@@ -8781,9 +8944,15 @@ module VexiiRiscv (
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_error = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_error;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_0_address = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_error = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_TAGS_1_address = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_address;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_PLRU_BYPASSED_0 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_PLRU_BYPASSED_0;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_0 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_0;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_BANKS_MUXES_1 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_1;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_HAZARD = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_HAZARD;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_0 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_0;
+  assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HITS_1 = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_1;
   assign fetch_logic_ctrls_2_down_MMU_TRANSLATED = fetch_logic_ctrls_2_up_MMU_TRANSLATED;
   assign fetch_logic_ctrls_2_down_FetchL1Plugin_logic_WAYS_HIT = fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HIT;
   assign fetch_logic_ctrls_2_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_hash = fetch_logic_ctrls_2_up_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_hash;
@@ -9354,7 +9523,7 @@ module VexiiRiscv (
       PrivilegedPlugin_logic_harts_0_m_ie_msie <= 1'b0;
       LsuL1Plugin_logic_bus_toWishbone_arbiter_counter <= 4'b0000;
       LsuL1Plugin_logic_bus_toWishbone_arbiter_serialized_rValid <= 1'b0;
-      FetchL1Plugin_logic_invalidate_counter <= 5'h0;
+      FetchL1Plugin_logic_invalidate_counter <= 6'h0;
       FetchL1Plugin_logic_invalidate_firstEver <= 1'b1;
       FetchL1Plugin_logic_refill_slots_0_valid <= 1'b0;
       FetchL1Plugin_logic_refill_slots_0_cmdSent <= 1'b1;
@@ -9395,7 +9564,7 @@ module VexiiRiscv (
       PcPlugin_logic_harts_0_self_id <= 10'h0;
       PcPlugin_logic_harts_0_self_increment <= 1'b0;
       PcPlugin_logic_harts_0_self_fault <= 1'b0;
-      PcPlugin_logic_harts_0_self_state <= 32'h20200000;
+      PcPlugin_logic_harts_0_self_state <= 32'h100b0000;
       PcPlugin_logic_harts_0_holdReg <= 1'b1;
       CsrAccessPlugin_logic_fsm_inject_unfreeze <= 1'b0;
       CsrAccessPlugin_logic_fsm_inject_flushReg <= 1'b0;
@@ -9510,9 +9679,9 @@ module VexiiRiscv (
       if(execute_ctrl4_down_LsuL1_SEL_lane0) begin
         `ifndef SYNTHESIS
           `ifdef FORMAL
-            assert((_zz_22 <= 1'b1)); // LsuL1Plugin.scala:L892
+            assert((_zz_30 <= 1'b1)); // LsuL1Plugin.scala:L892
           `else
-            if(!(_zz_22 <= 1'b1)) begin
+            if(!(_zz_30 <= 1'b1)) begin
               $display("FAILURE Multiple way hit ???"); // LsuL1Plugin.scala:L892
               $finish;
             end
@@ -9522,9 +9691,9 @@ module VexiiRiscv (
       if(when_LsuL1Plugin_l915) begin
         `ifndef SYNTHESIS
           `ifdef FORMAL
-            assert((_zz_24 < 2'b10)); // LsuL1Plugin.scala:L916
+            assert((_zz_32 < 2'b10)); // LsuL1Plugin.scala:L916
           `else
-            if(!(_zz_24 < 2'b10)) begin
+            if(!(_zz_32 < 2'b10)) begin
               $display("FAILURE "); // LsuL1Plugin.scala:L916
               $finish;
             end
@@ -9563,7 +9732,7 @@ module VexiiRiscv (
         FetchL1Plugin_logic_invalidate_counter <= FetchL1Plugin_logic_invalidate_counterIncr;
       end
       if(when_FetchL1Plugin_l211) begin
-        FetchL1Plugin_logic_invalidate_counter <= 5'h0;
+        FetchL1Plugin_logic_invalidate_counter <= 6'h0;
       end
       if(when_FetchL1Plugin_l255) begin
         if(_zz_when_1) begin
@@ -9991,6 +10160,7 @@ module VexiiRiscv (
       if(_zz_when_1) begin
         FetchL1Plugin_logic_refill_slots_0_address <= FetchL1Plugin_logic_refill_start_address;
         FetchL1Plugin_logic_refill_slots_0_isIo <= FetchL1Plugin_logic_refill_start_isIo;
+        FetchL1Plugin_logic_refill_slots_0_wayToAllocate <= FetchL1Plugin_logic_refill_start_wayToAllocate;
         FetchL1Plugin_logic_refill_slots_0_priority <= FetchL1Plugin_logic_refill_slots_0_valid;
       end
     end
@@ -9998,6 +10168,7 @@ module VexiiRiscv (
       FetchL1Plugin_logic_refill_onCmd_lockedOh <= FetchL1Plugin_logic_refill_onCmd_propoedOh;
     end
     FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_address <= FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_address;
+    FetchL1Plugin_logic_ctrl_plruLogic_buffer_regNext_payload_data_0 <= FetchL1Plugin_logic_ctrl_plruLogic_buffer_payload_data_0;
     FetchL1WishbonePlugin_logic_bus_DAT_MISO_regNext <= FetchL1WishbonePlugin_logic_bus_DAT_MISO;
     FetchL1WishbonePlugin_logic_bus_ERR_regNext <= FetchL1WishbonePlugin_logic_bus_ERR;
     if(LsuPlugin_logic_onAddress0_flush_port_fire) begin
@@ -10059,6 +10230,7 @@ module VexiiRiscv (
       fetch_logic_ctrls_1_up_Fetch_PC_FAULT <= fetch_logic_ctrls_0_down_Fetch_PC_FAULT;
       fetch_logic_ctrls_1_up_Fetch_ID <= fetch_logic_ctrls_0_down_Fetch_ID;
       fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_VALID;
+      fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0 <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_PLRU_BYPASS_DATA_0;
       fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE;
       fetch_logic_ctrls_1_up_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS <= fetch_logic_ctrls_0_down_FetchL1Plugin_logic_cmd_TAGS_UPDATE_ADDRESS;
       fetch_logic_ctrls_1_up_BtbPlugin_logic_readCmd_HAZARDS <= fetch_logic_ctrls_0_down_BtbPlugin_logic_readCmd_HAZARDS;
@@ -10070,9 +10242,15 @@ module VexiiRiscv (
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_loaded <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_loaded;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_error <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_error;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_0_address <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_0_address;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_loaded <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_loaded;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_error <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_error;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_TAGS_1_address <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_TAGS_1_address;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_PLRU_BYPASSED_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_PLRU_BYPASSED_0;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_0;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_BANKS_MUXES_1 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_BANKS_MUXES_1;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_HAZARD <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_HAZARD;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_0 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_0;
+      fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HITS_1 <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HITS_1;
       fetch_logic_ctrls_2_up_MMU_TRANSLATED <= fetch_logic_ctrls_1_down_MMU_TRANSLATED;
       fetch_logic_ctrls_2_up_FetchL1Plugin_logic_WAYS_HIT <= fetch_logic_ctrls_1_down_FetchL1Plugin_logic_WAYS_HIT;
       fetch_logic_ctrls_2_up_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_hash <= fetch_logic_ctrls_1_down_BtbPlugin_logic_chunksLogic_0_readRsp_ENTRY_hash;

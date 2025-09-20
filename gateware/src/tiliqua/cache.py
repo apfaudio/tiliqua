@@ -46,7 +46,7 @@ class WishboneL2Cache(wiring.Component):
     """
 
     def __init__(self, cachesize_words=64, addr_width=22, data_width=32,
-                 granularity=8, burst_len=4):
+                 granularity=8, burst_len=4, autoflush=False):
 
         # Technically we should issue classic transactions to the backing
         # store if burst_len == 1, but this cache will always issue bursts.
@@ -56,6 +56,7 @@ class WishboneL2Cache(wiring.Component):
         self.data_width      = data_width
         self.burst_len       = burst_len
         self.granularity     = granularity
+        self.autoflush       = autoflush
 
         super().__init__({
             "master": In(wishbone.Signature(addr_width=addr_width,
@@ -82,8 +83,11 @@ class WishboneL2Cache(wiring.Component):
         linebits    = exact_log2(self.cachesize_words // self.burst_len)
         tagbits     = addressbits - linebits - offsetbits
         adr_offset  = master.adr.bit_select(0, offsetbits)
-        adr_line    = master.adr.bit_select(offsetbits, linebits)
+        adr_line    = Signal(linebits)
         adr_tag     = master.adr.bit_select(offsetbits+linebits, tagbits)
+
+        # Sig/comb assignment so we can override this for flushing.
+        m.d.comb += adr_line.eq(master.adr.bit_select(offsetbits, linebits))
 
         # Similar usage as adr_offset, iterates from 0..burst_len when
         # refilling/evicting cache lines.
@@ -150,11 +154,22 @@ class WishboneL2Cache(wiring.Component):
 
         m.d.sync += master.ack.eq(0)
 
+        if self.autoflush:
+            flush_wait = Signal(10, init=1)
+            adr_line_flush = Signal.like(adr_line)
+
         with m.FSM() as fsm:
 
             with m.State("IDLE"):
+
                 with m.If(master.cyc & master.stb):
                     m.next = "TEST_HIT"
+
+                if self.autoflush:
+                    m.d.sync += flush_wait.eq(flush_wait+1)
+                    with m.If(flush_wait == 0):
+                        m.d.comb += adr_line.eq(adr_line_flush)
+                        m.next = "TEST_FLUSH"
 
             with m.State("WAIT"):
                 m.next = "IDLE"
@@ -223,117 +238,34 @@ class WishboneL2Cache(wiring.Component):
                         m.d.comb += slave.cti.eq(wishbone.CycleType.END_OF_BURST)
                         m.next = "TEST_HIT"
 
-        return m
+            if self.autoflush:
+                with m.State("TEST_FLUSH"):
+                    m.d.comb += adr_line.eq(adr_line_flush)
+                    with m.If(tag_do.valid & tag_do.dirty):
+                        m.next = "FLUSH_LINE"
+                    with m.Else():
+                        m.d.sync += adr_line_flush.eq(adr_line_flush+1)
+                        m.next = "IDLE"
 
-
-class CacheFlusher(wiring.Component):
-
-    """
-    Periodically flush stale cache lines.
-    """
-
-    def __init__(self, *, base, addr_width, burst_len, flush_backoff_bits=10):
-        self.base = base
-        self.burst_len = burst_len
-        self.flush_backoff_bits = flush_backoff_bits
-        super().__init__({
-            # Kick this to start the core
-            "enable": In(1),
-            # We are a DMA master (no burst support)
-            "bus":  Out(wishbone.Signature(addr_width=addr_width, data_width=32, granularity=8)),
-        })
-
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        bus = self.bus
-
-        flush_wait = Signal(self.flush_backoff_bits, init=1)
-        flush_adr  = Signal(16)
-
-        m.d.comb += [
-            bus.we.eq(0),
-            bus.sel.eq(0xf),
-            bus.adr.eq(self.base + flush_adr),
-        ]
-
-        with m.FSM() as fsm:
-
-            with m.State('OFF'):
-                with m.If(self.enable):
-                    m.next = 'WAIT'
-
-            with m.State('WAIT'):
-                m.d.sync += flush_wait.eq(flush_wait+1)
-                with m.If(flush_wait == 0):
-                    m.next = 'READ'
-
-            with m.State('READ'):
-                m.d.comb += [
-                    bus.stb.eq(1),
-                    bus.cyc.eq(1),
-                ]
-                with m.If(bus.stb & bus.ack):
-                    m.next = 'WAIT'
-                    m.d.sync += flush_adr.eq(flush_adr + self.burst_len)
-
-        return m
-
-
-class PlotterCache(wiring.Component):
-
-    """
-    Cache optimized for use in stroke-raster conversion.
-
-    Main difference is an extra arbiter to support multiple plotting cores, as well
-    as a periodic cache flusher to avoid cache lines staying dirty (without hitting
-    the persistance emulation) for too long.
-    """
-
-    def __init__(self, *, fb):
-
-        # Instantiate a small cache and connect it to the backing store as a DMA master
-        self.cache = WishboneL2Cache(
-                addr_width=fb.bus.addr_width,
-                cachesize_words=64)
-
-        # Create an arbiter for different plotting cores to share
-        self.arbiter = wishbone.Arbiter(
-            addr_width=self.cache.master.addr_width,
-            data_width=self.cache.master.data_width,
-            granularity=self.cache.master.granularity,
-        )
-
-        # Periodically flush stale cache lines, so we still get a dead beam 'dot'
-        # even if the beam is not being deflected despite the write-back cache.
-        self.flusher = CacheFlusher(
-            base=fb.fb_base,
-            addr_width=self.cache.master.addr_width,
-            burst_len=self.cache.burst_len)
-        self.arbiter.add(self.flusher.bus)
-
-        super().__init__({
-            # Transactions to backing store
-            "bus": Out(wishbone.Signature(addr_width=self.cache.slave.addr_width,
-                                          data_width=self.cache.slave.data_width,
-                                          granularity=self.cache.slave.granularity,
-                                          features={"cti", "bte"})),
-        })
-
-    def add(self, bus):
-        self.arbiter.add(bus)
-
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        wiring.connect(m, self.arbiter.bus, self.cache.master)
-        wiring.connect(m, self.cache.slave, wiring.flipped(self.bus))
-
-        m.submodules += self.cache
-        m.submodules += self.flusher
-        m.submodules += self.arbiter
-
-        with m.If(self.cache.slave.ack):
-            m.d.sync += self.flusher.enable.eq(1)
+                with m.State("FLUSH_LINE"):
+                    m.d.comb += [
+                        adr_line.eq(adr_line_flush),
+                        slave.stb.eq(1),
+                        slave.cyc.eq(1),
+                        slave.we.eq(1),
+                        slave.cti.eq(wishbone.CycleType.INCR_BURST),
+                        rd_port.addr.eq(Cat(burst_offset_lookahead, adr_line)),
+                    ]
+                    with m.If(slave.ack):
+                        m.d.comb += burst_offset_lookahead.eq(burst_offset+1)
+                        m.d.sync += burst_offset.eq(burst_offset + 1)
+                        with m.If(burst_offset == (self.burst_len - 1)):
+                            m.d.comb += [
+                                slave.cti.eq(wishbone.CycleType.END_OF_BURST),
+                                tag_di.valid.eq(0),
+                                tag_wr_port.en.eq(1)
+                            ]
+                            m.d.sync += adr_line_flush.eq(adr_line_flush+1)
+                            m.next = "IDLE"
 
         return m

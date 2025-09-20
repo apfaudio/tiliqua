@@ -5,7 +5,7 @@
 """Utilities for splitting, merging, remapping streams."""
 
 from amaranth import *
-from amaranth.lib import data, stream, wiring
+from amaranth.lib import data, stream, wiring, fifo
 from amaranth.lib.wiring import In, Out
 
 from . import ASQ
@@ -162,6 +162,51 @@ class Arbiter(wiring.Component):
                 m.d.sync += grant.eq(0)
             with m.Else():
                 m.d.sync += grant.eq(grant + 1)
+        return m
+
+class SyncFIFOBuffered(wiring.Component):
+    '''Stream-friendly wrapper around [amaranth.lib.fifo.SyncFIFOBuffered][].
+
+    Unlike the other cores around here, this one is lifted from:
+
+    URL: https://github.com/zyp/katsuo-stream
+    License: MIT
+    Author: Vegard Storheil Eriksen <zyp@jvnv.net>
+
+    Args:
+        shape: Shape of the stream.
+        depth: Depth of the FIFO.
+
+    Attributes:
+        input (stream): Input stream.
+        output (stream): Output stream.
+    '''
+
+    def __init__(self, *, shape, depth: int):
+        super().__init__({
+            'i': wiring.In(stream.Signature(shape)),
+            'o': wiring.Out(stream.Signature(shape)),
+        })
+        self.shape = shape
+        self.depth = depth
+        self.fifo = fifo.SyncFIFOBuffered(width = Shape.cast(self.shape).width, depth = self.depth)
+
+    def elaborate(self, platform):
+        m = Module()
+        m.submodules.fifo = self.fifo
+
+        m.d.comb += [
+            # Input
+            self.i.ready.eq(self.fifo.w_rdy),
+            self.fifo.w_en.eq(self.i.valid),
+            self.fifo.w_data.eq(self.i.payload),
+
+            # Output
+            self.o.valid.eq(self.fifo.r_rdy),
+            self.o.payload.eq(self.fifo.r_data),
+            self.fifo.r_en.eq(self.o.ready),
+        ]
+
         return m
 
 def connect_remap(m, stream_o, stream_i, mapping):

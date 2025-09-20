@@ -5,20 +5,25 @@
 Multi-channel oscilloscope and vectorscope SoC peripherals.
 """
 
+import math
+
 from amaranth import *
 from amaranth.lib import data, stream, wiring
 from amaranth.lib.wiring import In, Out
+from amaranth.utils import exact_log2
 from amaranth_soc import csr
+from amaranth_future import fixed
 
 from .. import dsp
 from ..dsp import ASQ
+from .plot import PlotRequest
 from .stroke import Stroke
 
-class VectorTracePeripheral(wiring.Component):
+
+class VectorPeripheral(wiring.Component):
 
     class Flags(csr.Register, access="w"):
         enable: csr.Field(csr.action.W, unsigned(1))
-        rotate_left: csr.Field(csr.action.W, unsigned(1))
 
     class HueReg(csr.Register, access="w"):
         hue: csr.Field(csr.action.W, unsigned(8))
@@ -32,9 +37,9 @@ class VectorTracePeripheral(wiring.Component):
     class Position(csr.Register, access="w"):
         value: csr.Field(csr.action.W, unsigned(16))
 
-    def __init__(self, fb, **kwargs):
+    def __init__(self, **kwargs):
 
-        self.stroke = Stroke(fb=fb, **kwargs)
+        self.stroke = Stroke(**kwargs)
 
         regs = csr.Builder(addr_width=6, data_width=8)
 
@@ -52,13 +57,11 @@ class VectorTracePeripheral(wiring.Component):
 
         super().__init__({
             "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
-            "en": In(1),
-            "soc_en": In(1),
-            "rotate_left": In(1),
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            # DMA bus (plotting)
-            "bus_dma": Out(self.stroke.bus.signature),
+            # Plot request output to shared backend
+            "o": Out(stream.Signature(PlotRequest)),
+            "soc_en": Out(unsigned(1), init=1),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -68,11 +71,8 @@ class VectorTracePeripheral(wiring.Component):
         m.submodules += self.stroke
 
         wiring.connect(m, wiring.flipped(self.i), self.stroke.i)
-        wiring.connect(m, self.stroke.bus, wiring.flipped(self.bus_dma))
+        wiring.connect(m, self.stroke.o, wiring.flipped(self.o))
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
-
-        m.d.comb += self.stroke.enable.eq(self.en & self.soc_en)
-        m.d.comb += self.stroke.rotate_left.eq(self.rotate_left)
 
         with m.If(self._hue.f.hue.w_stb):
             m.d.sync += self.stroke.hue.eq(self._hue.f.hue.w_data)
@@ -101,16 +101,15 @@ class VectorTracePeripheral(wiring.Component):
         with m.If(self._flags.f.enable.w_stb):
             m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
 
-        with m.If(self._flags.f.rotate_left.w_stb):
-            m.d.sync += self.rotate_left.eq(self._flags.f.rotate_left.w_data)
+        with m.If(~self.soc_en):
+            m.d.comb += self.i.ready.eq(0)
 
         return m
 
-class ScopeTracePeripheral(wiring.Component):
+class ScopePeripheral(wiring.Component):
 
     class Flags(csr.Register, access="w"):
         enable: csr.Field(csr.action.W, unsigned(1))
-        rotate_left: csr.Field(csr.action.W, unsigned(1))
         trigger_always: csr.Field(csr.action.W, unsigned(1))
 
     class Hue(csr.Register, access="w"):
@@ -137,10 +136,10 @@ class ScopeTracePeripheral(wiring.Component):
     class YPosition(csr.Register, access="w"):
         ypos: csr.Field(csr.action.W, unsigned(16))
 
-    def __init__(self, fb, n_channels=4, **kwargs):
+    def __init__(self, n_channels=4, **kwargs):
 
         self.n_channels = n_channels
-        self.strokes = [Stroke(fb=fb, **kwargs)
+        self.strokes = [Stroke(**kwargs)
                         for _ in range(self.n_channels)]
 
         regs = csr.Builder(addr_width=6, data_width=8)
@@ -158,13 +157,11 @@ class ScopeTracePeripheral(wiring.Component):
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
             "i": In(stream.Signature(data.ArrayLayout(ASQ, self.n_channels))),
-            "en": In(1),
-            "soc_en": In(1),
-            "rotate_left": In(1),
             # CSR bus
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-            # DMA buses, one for plotting each channel
-            "bus_dma": Out(self.strokes[0].bus.signature).array(self.n_channels),
+            # Pixel request outputs, one for each channel
+            "o": Out(stream.Signature(PlotRequest)).array(self.n_channels),
+            "soc_en": Out(unsigned(1), init=1),
         })
         self.bus.memory_map = self._bridge.bus.memory_map
 
@@ -184,10 +181,8 @@ class ScopeTracePeripheral(wiring.Component):
 
         m.submodules += self.strokes
 
-        for i, s in enumerate(self.strokes):
-            m.d.comb += s.enable.eq(self.en & self.soc_en)
-            m.d.comb += s.rotate_left.eq(self.rotate_left)
-            wiring.connect(m, s.bus, wiring.flipped(self.bus_dma[i]))
+        for n, s in enumerate(self.strokes):
+            wiring.connect(m, s.o, wiring.flipped(self.o[n]))
 
         # Scope and trigger
         # Ch0 is routed through trigger, the rest are not.
@@ -235,14 +230,8 @@ class ScopeTracePeripheral(wiring.Component):
 
         asq_extra_bits = ASQ.f_bits - 15
 
-        with m.If(self._flags.f.enable.w_stb):
-            m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
-
         with m.If(self._flags.f.trigger_always.w_stb):
             m.d.sync += trigger_always.eq(self._flags.f.trigger_always.w_data)
-
-        with m.If(self._flags.f.rotate_left.w_stb):
-            m.d.sync += self.rotate_left.eq(self._flags.f.rotate_left.w_data)
 
         with m.If(self._hue.f.hue.w_stb):
             for ch, s in enumerate(self.strokes):
@@ -274,5 +263,95 @@ class ScopeTracePeripheral(wiring.Component):
             with m.If(ypos_reg.f.ypos.w_stb):
                 m.d.sync += self.strokes[i].y_offset.eq(ypos_reg.f.ypos.w_data)
 
+        with m.If(self._flags.f.enable.w_stb):
+            m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
+
+        with m.If(~self.soc_en):
+            m.d.comb += self.i.ready.eq(0)
+
         return m
 
+
+class Spectrogram(wiring.Component):
+
+    """
+    Simple spectrogram drawing logic.
+
+    Take input channel 0, run an FFT/STFT on it, take the logarithm and
+    emit the log-magnitude on X (0), frequency index on Y (1), and a
+    pen-lift on 2 (to avoid interpolation artifacts).
+
+    Designed to connect to Stroke - that is, use a vectorscope as
+    a spectrum analyzer visualization.
+    """
+
+    def __init__(self, fs):
+        self.fs = fs
+        super().__init__({
+            # In on channel 0
+            "i": In(stream.Signature(data.ArrayLayout(ASQ, 4))),
+            # Out on channels 0 (y), 1 (x), 2 (intensity)
+            "o": Out(stream.Signature(data.ArrayLayout(ASQ, 4))),
+        })
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.split4 = split4 = dsp.Split(4)
+        m.submodules.merge4 = merge4 = dsp.Merge(4)
+        wiring.connect(m, wiring.flipped(self.i), split4.i)
+        wiring.connect(m, merge4.o, wiring.flipped(self.o))
+
+        fftsz=512
+
+        # Resample input down, so visible area is a fraction of the nyquist (e.g. 192khz/8 = 24kHz visual bandwidth)
+        m.submodules.resample = resample = dsp.Resample(fs_in=self.fs, n_up=1, m_down=8 if self.fs > 48000 else 2)
+        m.submodules.analyzer = analyzer = dsp.fft.STFTAnalyzer(shape=ASQ, sz=fftsz)
+        m.submodules.envelope = envelope = dsp.spectral.SpectralEnvelope(shape=ASQ, sz=fftsz)
+        def log_lut(x):
+            # map 0 - 1 (linear) to 0 - 1 (log representing -X dBr to 0dBr)
+            # where -X (smallest value) represents 1 LSB of the fixed.SQ.
+            max_v = 1 << ASQ.f_bits
+            r = max(0, math.log2(max(1, x*max_v))/math.log2(max_v))
+            return r
+        m.submodules.log = log = dsp.block.WrapCore(dsp.WaveShaper(
+                lut_function=log_lut, lut_size=512, continuous=False))
+
+        wiring.connect(m, split4.o[0], resample.i)
+        wiring.connect(m, resample.o, analyzer.i)
+        wiring.connect(m, analyzer.o, envelope.i)
+        wiring.connect(m, envelope.o, log.i)
+
+        # Increasing X axis counter for frequency bins
+        f_axis = Signal(ASQ)
+        with m.If(log.o.valid & log.o.ready):
+            with m.If(log.o.payload.first):
+                m.d.sync += f_axis.eq(fixed.Const(-0.5))
+            with m.Else():
+                m.d.sync += f_axis.eq(f_axis+(fixed.Const(1)>>exact_log2(fftsz)))
+
+        # Pen lift when we get to the mirrored half of the spectrum.
+        with m.If(f_axis < fixed.Const(0)):
+            m.d.comb += merge4.i[2].payload.eq(ASQ.max())
+        with m.Else():
+            m.d.comb += merge4.i[2].payload.eq(0)
+
+        m.d.comb += [
+            # Connect log magnitude to ch0 output (offset to center)
+            merge4.i[0].payload.eq(log.o.payload.sample - fixed.Const(0.25)),
+            merge4.i[0].valid.eq(log.o.valid),
+            log.o.ready.eq(merge4.i[0].ready),
+
+            # Connect frequency bin / index to ch1 output (offset to center)
+            merge4.i[1].valid.eq(1),
+            merge4.i[1].payload.eq((f_axis<<1) - fixed.Const(0.5)),
+
+            # Pen lift always valid
+            merge4.i[2].valid.eq(1),
+        ]
+
+        # Unused channels
+        split4.wire_ready(m, [1, 2, 3])
+        merge4.wire_valid(m, [3])
+
+        return m

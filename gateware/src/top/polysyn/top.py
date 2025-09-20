@@ -34,11 +34,12 @@ from amaranth.lib.fifo import SyncFIFOBuffered
 from amaranth.lib.wiring import In, Out, connect, flipped
 from amaranth_soc import csr
 
-from tiliqua import cache, dsp, midi
+from tiliqua import dsp, midi
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
-from tiliqua.dsp import ASQ, mac
+from tiliqua.dsp import ASQ
 from tiliqua.raster import scope
+from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc import TiliquaSoc
 from tiliqua.usb_host import SimpleUSBMIDIHost
 
@@ -104,7 +105,7 @@ class PolySynth(wiring.Component):
         ncos = [dsp.SawNCO(shift=0) for _ in range(n_voices)]
 
         # All SVFs share the same multiplier tile through a RingMAC.
-        m.submodules.server = server = mac.RingMACServer()
+        m.submodules.server = server = dsp.mac.RingMACServer()
         svfs = [dsp.SVF(macp=server.new_client()) for _ in range(n_voices)]
 
         m.submodules.merge = merge = dsp.Merge(n_channels=n_voices)
@@ -368,15 +369,15 @@ class PolySoc(TiliquaSoc):
         self.vector_periph_base = 0x00001000
         self.synth_periph_base  = 0x00001100
 
-        self.plotter_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.plotter_cache.bus)
+        # Dedicated framebuffer plotter for scope peripherals (1 port: vector only for polysyn)
+        self.plotter = FramebufferPlotter(
+            bus_signature=self.psram_periph.bus.signature.flip(), n_ports=1)
+        self.psram_periph.add_master(self.plotter.bus)
 
-        self.vector_periph = scope.VectorTracePeripheral(
-            fb=self.fb,
+        self.vector_periph = scope.VectorPeripheral(
             fs=48000,
             n_upsample=32)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
-        self.plotter_cache.add(self.vector_periph.bus_dma)
 
         # synth controls
         self.synth_periph = SynthPeripheral()
@@ -392,9 +393,13 @@ class PolySoc(TiliquaSoc):
 
         m = Module()
 
-        m.submodules += self.plotter_cache
+        m.submodules += self.plotter
 
         m.submodules.vector_periph = self.vector_periph
+
+        wiring.connect(m, self.vector_periph.o, self.plotter.i[0])
+
+        wiring.connect(m, wiring.flipped(self.fb.fbp), self.plotter.fbp)
 
         m.submodules.polysynth = polysynth = PolySynth()
         self.synth_periph.synth = polysynth
@@ -449,10 +454,6 @@ class PolySoc(TiliquaSoc):
                 self.vector_periph.i.payload[0].eq(polysynth.o.payload[2]),
                 self.vector_periph.i.payload[1].eq(polysynth.o.payload[3]),
             ]
-
-        # Memory controller hangs if we start making requests to it straight away.
-        with m.If(self.permit_bus_traffic):
-            m.d.sync += self.vector_periph.en.eq(1)
 
         return m
 

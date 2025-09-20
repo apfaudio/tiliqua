@@ -7,9 +7,9 @@
 famous Eurorack module (credits below), on a softcore, to demonstrate the
 compute capabilities available if you do everything in software.
 
-All 24 engines are available for tweaking and patching via the UI.
+Most engines are available for tweaking and patching via the UI.
 A couple of engines use a bit more compute and may cause the UI to
-slow down, however you should never get audio glitches.
+slow down or audio to glitch, so these ones are disabled.
 A scope and vectorscope is included and hooked up to the oscillator
 outputs so you can visualize exactly what the softcore is spitting out.
 
@@ -17,8 +17,8 @@ The original module was designed to run at 48kHz. Here, we instantiate
 a powerful (rv32imafc) softcore (this one includes an FPU), which
 is enough to run most engines at ~24kHz-48kHz, however with the video
 and menu system running simultaneously, it's necessary to clock
-this down to 12kHz. Surprisingly, most engines still sound reasonable.
-The resampling from 12kHz <-> 48kHz is performed in hardware below.
+this down to 24kHz. Surprisingly, most engines still sound reasonable.
+The resampling from 24kHz <-> 48kHz is performed in hardware below.
 
 Jack mapping:
 
@@ -30,9 +30,8 @@ Jack mapping:
     - Out3: 'aux' output
 
 There is quite some heavy compute here and RAM usage, as a result,
-the firmware and buffers are too big to fit in BRAM. In this demo,
-the firmware is in memory-mapped SPI flash and the DSP buffers are
-allocated from external PSRAM.
+the audio buffers are too big to fit in BRAM. In this demo,
+both the firmware and the DSP buffers are allocated from external PSRAM.
 
 Credits to Emilie Gillet for the original Plaits module and firmware.
 
@@ -51,10 +50,11 @@ from amaranth.utils import exact_log2
 from amaranth_soc import csr, wishbone
 from amaranth_soc.memory import MemoryMap
 
-from tiliqua import cache, dsp
+from tiliqua import dsp
 from tiliqua.build.cli import top_level_cli
 from tiliqua.dsp import ASQ
 from tiliqua.raster import scope
+from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc import TiliquaSoc
 from vendor.vexiiriscv import VexiiRiscv
 
@@ -148,7 +148,6 @@ class MacroOscSoc(TiliquaSoc):
 
     def __init__(self, **kwargs):
 
-        # WARN: TiliquaSoc ends at 0x00000900
         self.vector_periph_base  = 0x00001000
         self.scope_periph_base   = 0x00001100
         self.audio_fifo_csr_base = 0x00001200
@@ -165,21 +164,18 @@ class MacroOscSoc(TiliquaSoc):
         super().__init__(finalize_csr_bridge=False, mainram_size=0x10000,
                          cpu_variant="tiliqua_rv32imafc", extra_cpu_regions=extra_cpu_regions, **kwargs)
 
-        self.plotter_cache = cache.PlotterCache(fb=self.fb)
-        self.psram_periph.add_master(self.plotter_cache.bus)
+        # Dedicated framebuffer plotter for scope peripherals (5 ports: 1 vector + 4 scope channels)
+        self.plotter = FramebufferPlotter(
+            bus_signature=self.psram_periph.bus.signature.flip(), n_ports=5)
+        self.psram_periph.add_master(self.plotter.bus)
 
-        self.vector_periph = scope.VectorTracePeripheral(
-            fb=self.fb,
+        self.vector_periph = scope.VectorPeripheral(
             n_upsample=16,
             fs=48000)
         self.csr_decoder.add(self.vector_periph.bus, addr=self.vector_periph_base, name="vector_periph")
-        self.plotter_cache.add(self.vector_periph.bus_dma)
 
-        self.scope_periph = scope.ScopeTracePeripheral(
-            fb=self.fb)
+        self.scope_periph = scope.ScopePeripheral()
         self.csr_decoder.add(self.scope_periph.bus, addr=self.scope_periph_base, name="scope_periph")
-        for bus in self.scope_periph.bus_dma:
-            self.plotter_cache.add(bus)
 
         self.audio_fifo = AudioFIFOPeripheral()
         self.csr_decoder.add(self.audio_fifo.csr_bus, addr=self.audio_fifo_csr_base, name="audio_fifo")
@@ -198,11 +194,19 @@ class MacroOscSoc(TiliquaSoc):
 
         m = Module()
 
-        m.submodules += self.plotter_cache
+        m.submodules += self.plotter
 
         m.submodules += self.vector_periph
 
         m.submodules += self.scope_periph
+
+        # Connect vector/scope pixel requests to plotter channels
+        wiring.connect(m, self.vector_periph.o, self.plotter.i[0])
+        for n in range(4):
+            wiring.connect(m, self.scope_periph.o[n], self.plotter.i[n+1])
+
+        # Connect framebuffer propreties to plotter backend
+        wiring.connect(m, wiring.flipped(self.fb.fbp), self.plotter.fbp)
 
         m.submodules += self.audio_fifo
 
@@ -232,11 +236,6 @@ class MacroOscSoc(TiliquaSoc):
             wiring.connect(m, plot_fifo.r_stream, self.scope_periph.i)
         with m.Else():
             wiring.connect(m, plot_fifo.r_stream, self.vector_periph.i)
-
-        # Memory controller hangs if we start making requests to it straight away.
-        with m.If(self.permit_bus_traffic):
-            m.d.sync += self.vector_periph.en.eq(1)
-            m.d.sync += self.scope_periph.en.eq(1)
 
         return m
 

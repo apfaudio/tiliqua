@@ -125,10 +125,10 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
         manifest = archiver.write_manifest()
         manifest.write_to_path(manifest_path)
 
-        print(f"Generating bootinfo for simulation: {h_active}x{v_active}@{dvi_clk_hz}Hz")
         dvi_clk_hz = clock_settings.frequencies.dvi
         h_active = fragment.fb.fixed_modeline.h_active
         v_active = fragment.fb.fixed_modeline.v_active
+        print(f"Generating bootinfo for simulation: {h_active}x{v_active}@{dvi_clk_hz}Hz")
         subprocess.check_call([
             "cargo", "run",
             "--manifest-path", "src/rs/bootinfo_gen/Cargo.toml",
