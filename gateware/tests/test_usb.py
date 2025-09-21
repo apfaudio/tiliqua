@@ -10,6 +10,7 @@ from luna.gateware.test.contrib import usb_packet as testp
 from parameterized import parameterized
 
 from tiliqua.usb_host import *
+from tiliqua.test import stream
 
 
 class UsbTests(unittest.TestCase):
@@ -115,4 +116,32 @@ class UsbTests(unittest.TestCase):
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_usb_integration.vcd", "w")):
+            sim.run()
+
+    @parameterized.expand([
+        ["arturia_keylabmkii", 1],
+        ["oxi_one", 1],
+        ["yamaha_cp73", 2],
+        ["yamaha_pssa50", 2],
+    ])
+    def test_endpoint_extractor(self, name, expected_endp):
+
+        dut = DomainRenamer({"usb": "sync"})(
+                USBMIDIConfigurationEndpointExtractor())
+
+        async def testbench(ctx):
+            ctx.set(dut.enable, 1)
+            with open(f'tests/data/usbdesc_config/{name}.bin', 'rb') as f:
+                for byte in f.read():
+                    await stream.put(ctx, dut.i, byte)
+            ctx.tick()
+            endp = ctx.get(dut.o.endp)
+            endp_valid = ctx.get(dut.o.valid)
+            self.assertEqual(endp_valid, 1)
+            self.assertEqual(endp, expected_endp)
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open(f"test_midi_endpoint_extractor_{name}.vcd", "w")):
             sim.run()

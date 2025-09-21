@@ -273,6 +273,79 @@ class USBSOFController(wiring.Component):
 
         return m
 
+class USBMIDIConfigurationEndpointExtractor(wiring.Component):
+
+    """
+    Extremely simple (but effective!) stream-based extractor -
+    takes a stream of bytes from a USB configuration descriptor,
+    walks each descriptor in it and presents the last BULK IN
+    endpoint on its output, after the descriptors are read.
+
+    This is sufficient to identify the correct MIDI BULK IN
+    endpoint on every MIDI device that I have tested.
+    """
+
+    DESC_TYPE_ENDP = 0x05
+
+    enable: In(unsigned(1))
+
+    i: In(stream.Signature(unsigned(8)))
+
+    o: Out(data.StructLayout({
+        "endp": unsigned(4),
+        "valid":  unsigned(1),
+    }))
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        bLength = Signal(unsigned(8))
+        offset = Signal.like(bLength)
+
+        desc_type = Signal(unsigned(8))
+        endp_addr = Signal(unsigned(8))
+        endp_attr = Signal(unsigned(8))
+
+        m.d.comb += self.i.ready.eq(1)
+
+        with m.FSM(domain="usb"):
+            with m.State("INIT"):
+                m.d.comb += self.i.ready.eq(0)
+                with m.If(self.enable):
+                    m.next = "GET-LEN"
+            with m.State("GET-LEN"):
+                with m.If(self.i.valid):
+                    m.d.usb += offset.eq(0)
+                    m.d.usb += bLength.eq(self.i.payload)
+                    m.next = "IN-DESCRIPTOR"
+            with m.State("IN-DESCRIPTOR"):
+                with m.If(self.i.valid):
+                    with m.Switch(offset):
+                        with m.Case(0):
+                            m.d.usb += desc_type.eq(self.i.payload)
+                        with m.Case(1):
+                            with m.If(desc_type == self.DESC_TYPE_ENDP):
+                                m.d.usb += endp_addr.eq(self.i.payload)
+                        with m.Case(2):
+                            with m.If(desc_type == self.DESC_TYPE_ENDP):
+                                m.d.usb += endp_attr.eq(self.i.payload)
+                    m.d.usb += offset.eq(offset+1)
+                    with m.If(offset == (bLength-2)):
+                        # Is this endpoint IN(0x80) and BULK (0x02)?
+                        with m.If(endp_addr[7] & ((endp_attr & 0b11) == 0x02)):
+                            m.d.usb += [
+                                self.o.endp.eq(endp_addr), # bottom 4 bits
+                                self.o.valid.eq(1), # bottom 4 bits
+                            ]
+                            m.next = "DONE"
+                        m.next = "GET-LEN"
+            with m.State("DONE"):
+                # stay here forever
+                pass
+
+        return m
+
 
 class SimpleUSBMIDIHost(Elaboratable):
 
