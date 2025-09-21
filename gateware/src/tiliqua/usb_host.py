@@ -13,7 +13,6 @@ from luna.gateware.interface.ulpi import *
 from luna.gateware.interface.utmi import *
 from luna.gateware.usb.usb2.packet import *
 
-
 class TokenPID(enum.Enum, shape=unsigned(4)):
     OUT   = int(USBPacketID.OUT)
     IN    = int(USBPacketID.IN)
@@ -411,6 +410,9 @@ class SimpleUSBMIDIHost(Elaboratable):
             midi_fifo.w_data.eq(receiver.stream.payload),
         ]
 
+        max_packet_size = Signal(unsigned(8), init=64)
+        last_packet_byte = Signal(unsigned(8), init=0)
+
         with m.FSM(domain="usb"):
 
             #
@@ -504,7 +506,10 @@ class SimpleUSBMIDIHost(Elaboratable):
                 The data itself is simply ignored for now.
                 """
 
+                byte_cnt = Signal(unsigned(8), init=0)
+
                 with m.State(state_id):
+                    m.d.sync += byte_cnt.eq(0)
                     with m.If(sof_controller.txa):
                         m.next = f'{state_id}-TOKEN'
 
@@ -512,15 +517,25 @@ class SimpleUSBMIDIHost(Elaboratable):
 
                 with m.State(f'{state_id}-WAIT-PKT'):
                     # FIXME: tolerate rx timeout
+                    with m.If(receiver.stream.next):
+                        m.d.sync += last_packet_byte.eq(receiver.stream.payload)
+                        m.d.sync += byte_cnt.eq(byte_cnt+1)
                     with m.If(receiver.packet_complete):
                         m.next = f'{state_id}-ACK-PKT'
                     with m.If(handshake_detector.detected.nak):
                         m.next = state_err
 
                 with m.State(f'{state_id}-ACK-PKT'):
+                    with m.If(receiver.stream.next):
+                        m.d.sync += last_packet_byte.eq(receiver.stream.payload)
+                        m.d.sync += byte_cnt.eq(byte_cnt+1)
                     with m.If(receiver.ready_for_response):
                         m.d.comb += handshake_generator.issue_ack.eq(1)
-                        m.next = state_ok
+                        with m.If(byte_cnt == max_packet_size):
+                            # More data, continue fetching.
+                            m.next = state_id
+                        with m.Else():
+                            m.next = state_ok
 
             def fsm_sequence_setup(state_id, state_ok, state_err, setup_payload, addr=0, endp=0):
                 """
@@ -612,16 +627,37 @@ class SimpleUSBMIDIHost(Elaboratable):
                     with m.If(sof_counter == (_SOF_COUNTER_MAX-1)):
                         m.d.usb += sof_counter.eq(0)
                     with m.If(sof_counter == _SETUP_ON_SOF_INDEX):
-                        m.next = 'SETUP0'
+                        m.next = 'SETUPD'
 
             #
-            # SETUP0: GET_DESCRIPTOR
+            # SETUPD: GET_DESCRIPTOR (device)
+            #
+
+            fsm_sequence_setup('SETUPD',
+                               state_ok='SETUPD-IN',
+                               state_err='SOF-IDLE',
+                               setup_payload=SetupPayload.init_get_descriptor(0x0100, 0x0008),
+                               addr=0,
+                               endp=0)
+
+            fsm_sequence_rx_in_stage_ignore('SETUPD-IN', state_ok='SETUPD-ZLP-OUT', state_err='SETUPD-IN')
+
+            fsm_sequence_zlp_out('SETUPD-ZLP-OUT', 'SET-MPS')
+
+            with m.State('SET-MPS'):
+                # Fetch bMaxPacketSize from last byte of device descriptor. This is needed so we
+                # can correctly fetch full-length configuration descriptors in the next step.
+                m.d.sync += max_packet_size.eq(last_packet_byte)
+                m.next = 'SETUP0'
+
+            #
+            # SETUP0: GET_DESCRIPTOR (configuration)
             #
 
             fsm_sequence_setup('SETUP0',
                                state_ok='SETUP0-IN',
                                state_err='SOF-IDLE',
-                               setup_payload=SetupPayload.init_get_descriptor(0x0100, 0x0040),
+                               setup_payload=SetupPayload.init_get_descriptor(0x0200, 0x0200),
                                addr=0,
                                endp=0)
 
