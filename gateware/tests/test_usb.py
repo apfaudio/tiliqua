@@ -123,6 +123,7 @@ class UsbTests(unittest.TestCase):
         ["oxi_one", 1],
         ["yamaha_cp73", 2],
         ["yamaha_pssa50", 2],
+        ["android_uac_midi", 1],
     ])
     def test_endpoint_extractor(self, name, expected_endp):
 
