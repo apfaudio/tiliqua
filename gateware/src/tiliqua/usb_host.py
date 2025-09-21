@@ -411,6 +411,12 @@ class SimpleUSBMIDIHost(Elaboratable):
             USBInterpacketTimer(fs_only  = True)
         m.submodules.tx_multiplexer      = tx_multiplexer = UTMIInterfaceMultiplexer()
 
+        m.submodules.ep_extractor = ep_extractor = USBMIDIConfigurationEndpointExtractor()
+        m.d.comb += [
+            ep_extractor.i.valid.eq(receiver.stream.next),
+            ep_extractor.i.payload.eq(receiver.stream.payload),
+        ]
+
         # Data CRC interfaces
         data_crc.add_interface(transmitter.crc)
         data_crc.add_interface(receiver.data_crc)
@@ -582,7 +588,7 @@ class SimpleUSBMIDIHost(Elaboratable):
                 byte_cnt = Signal(unsigned(8), init=0)
 
                 with m.State(state_id):
-                    m.d.sync += byte_cnt.eq(0)
+                    m.d.usb += byte_cnt.eq(0)
                     with m.If(sof_controller.txa):
                         m.next = f'{state_id}-TOKEN'
 
@@ -591,8 +597,8 @@ class SimpleUSBMIDIHost(Elaboratable):
                 with m.State(f'{state_id}-WAIT-PKT'):
                     # FIXME: tolerate rx timeout
                     with m.If(receiver.stream.next):
-                        m.d.sync += last_packet_byte.eq(receiver.stream.payload)
-                        m.d.sync += byte_cnt.eq(byte_cnt+1)
+                        m.d.usb += last_packet_byte.eq(receiver.stream.payload)
+                        m.d.usb += byte_cnt.eq(byte_cnt+1)
                     with m.If(receiver.packet_complete):
                         m.next = f'{state_id}-ACK-PKT'
                     with m.If(handshake_detector.detected.nak):
@@ -600,8 +606,8 @@ class SimpleUSBMIDIHost(Elaboratable):
 
                 with m.State(f'{state_id}-ACK-PKT'):
                     with m.If(receiver.stream.next):
-                        m.d.sync += last_packet_byte.eq(receiver.stream.payload)
-                        m.d.sync += byte_cnt.eq(byte_cnt+1)
+                        m.d.usb += last_packet_byte.eq(receiver.stream.payload)
+                        m.d.usb += byte_cnt.eq(byte_cnt+1)
                     with m.If(receiver.ready_for_response):
                         m.d.comb += handshake_generator.issue_ack.eq(1)
                         with m.If(byte_cnt == max_packet_size):
@@ -720,7 +726,7 @@ class SimpleUSBMIDIHost(Elaboratable):
             with m.State('SET-MPS'):
                 # Fetch bMaxPacketSize from last byte of device descriptor. This is needed so we
                 # can correctly fetch full-length configuration descriptors in the next step.
-                m.d.sync += max_packet_size.eq(last_packet_byte)
+                m.d.usb += max_packet_size.eq(last_packet_byte)
                 m.next = 'SETUP0'
 
             #
@@ -728,11 +734,15 @@ class SimpleUSBMIDIHost(Elaboratable):
             #
 
             fsm_sequence_setup('SETUP0',
-                               state_ok='SETUP0-IN',
+                               state_ok='SETUP0-EP-EXTRACTOR',
                                state_err='SOF-IDLE',
                                setup_payload=SetupPayload.init_get_descriptor(0x0200, 0x0200),
                                addr=0,
                                endp=0)
+
+            with m.State('SETUP0-EP-EXTRACTOR'):
+                m.d.usb += ep_extractor.enable.eq(1)
+                m.next = 'SETUP0-IN'
 
             fsm_sequence_rx_in_stage_ignore('SETUP0-IN', state_ok='SETUP0-ZLP-OUT', state_err='SETUP0-IN')
 
@@ -778,7 +788,7 @@ class SimpleUSBMIDIHost(Elaboratable):
                     m.next = 'BULK-IN-TOKEN'
 
             fsm_tx_token('BULK-IN-TOKEN', TokenPID.IN, self._DEFAULT_DEVICE_ADDR,
-                         self.midi_endpoint_id, 'MIDI-BULK-IN')
+                         Mux(ep_extractor.o.valid, ep_extractor.o.endp, self.midi_endpoint_id), 'MIDI-BULK-IN')
 
             with m.State('MIDI-BULK-IN'):
                 # send incoming packet to MIDI FIFO
