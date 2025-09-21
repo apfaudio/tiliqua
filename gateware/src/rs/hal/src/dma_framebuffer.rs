@@ -253,17 +253,21 @@ macro_rules! impl_dma_framebuffer {
                 ///
                 /// If the spritesheet is too large for the blitter peripheral, this panics.
                 ///
-                fn upload_spritesheet(&mut self, key: u32, pixels: &[u8], width: u32, height: u32) -> Result<(), Self::Error> {
+                fn upload_spritesheet(&mut self, key: u32, pixels: &[u8], width: u32, height: u32, bpp: u8) -> bool {
 
                     if self.current_spritesheet_key == key {
-                        return Ok(()); // Already loaded, NOP
+                        return true; // Already loaded, NOP
+                    }
+
+                    if bpp != 1 {
+                        return false;
                     }
 
                     let sprite_mem_words = self.registers_blitter.status().read().mem_words().bits() as usize;
                     if (pixels.len() / 4) > sprite_mem_words {
                         // TODO: panic here?
                         log::info!("upload_spritesheet: too large for hardware");
-                        return Ok(());
+                        return false;
                     }
 
                     // Wait for command FIFO to be empty before changing spritesheet
@@ -289,7 +293,7 @@ macro_rules! impl_dma_framebuffer {
                     // Ensure future writes of the same sheet are NOPs
                     self.current_spritesheet_key = key;
 
-                    Ok(())
+                    true
                 }
 
                 /// Blit a single sub-rectangle of the last spritesheet from `upload_spritesheet`.
@@ -303,13 +307,13 @@ macro_rules! impl_dma_framebuffer {
                 /// while the blit itself is still being executed.
                 ///
                 fn blit_sprite(&mut self, key: u32, src_x: u32, src_y: u32, width: u32, height: u32,
-                               dst_x: i32, dst_y: i32, color: Self::Color) -> Result<(), Self::Error> {
+                               dst_x: i32, dst_y: i32, color: Self::Color) -> bool {
 
                     // Verify the correct spritesheet is loaded
                     if self.current_spritesheet_key != key {
                         // TODO: panic here?
                         log::info!("blit_sprite: attempted blit with wrong spritesheet key!");
-                        return Ok(());
+                        return false;
                     }
 
                     // Spin if command FIFO is full (too many blits already enqueued)
@@ -338,7 +342,7 @@ macro_rules! impl_dma_framebuffer {
 
                     // Command is now queued - hardware will execute asynchronously
                     // Next blit_sprite call will stall only if command FIFO is full
-                    Ok(())
+                    true
                 }
 
                 /// Draw a single 2D line between 2 points
@@ -352,7 +356,7 @@ macro_rules! impl_dma_framebuffer {
                 /// while the lines are still being drawn.
                 ///
                 fn draw_line_solid(&mut self, start_x: i32, start_y: i32, end_x: i32, end_y: i32,
-                                   stroke_width: u32, color: Self::Color) -> Option<Result<(), Self::Error>> {
+                                   stroke_width: u32, color: Self::Color) -> bool {
 
                     // TODO: Check bounds? Bresenham hardware might do wierd stuff
                     // or stall forever if the line endpoints are off the screen...
@@ -360,7 +364,7 @@ macro_rules! impl_dma_framebuffer {
                     if stroke_width != 1 {
                         // Only support 1-pixel wide solid lines for now.
                         // Fall back to `embedded-graphics` software implementation.
-                        return None;
+                        return false;
                     }
 
                     // No space for new line commands?
@@ -390,7 +394,7 @@ macro_rules! impl_dma_framebuffer {
 
                     // Line was enqueued and will be drawn asynchronously.
                     // `Some(Ok())` indicates the software line drawing fallback is not needed.
-                    Some(Ok(()))
+                    true
                 }
             }
         )+

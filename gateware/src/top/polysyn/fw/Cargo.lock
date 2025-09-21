@@ -20,9 +20,9 @@ checksum = "7b7e4c2464d97fe331d41de9d5db0def0a96f4d823b8b32a2efd503578988973"
 
 [[package]]
 name = "bitflags"
-version = "2.9.3"
+version = "2.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34efbcccd345379ca2868b2b2c9d3782e9cc58ba87bc7d79d5b53d9c9ae6f25d"
+checksum = "2261d10cca569e4643e526d8dc2e62e433cc8aba21ab764233731f8d369bf394"
 
 [[package]]
 name = "bytemuck"
@@ -127,7 +127,7 @@ dependencies = [
 [[package]]
 name = "embedded-graphics"
 version = "0.8.1"
-source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#62560fd0b714934e23255123314690d68ea15983"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#3af953f07aa6f495aef6f5a344e400e33556c297"
 dependencies = [
  "az",
  "embedded-graphics-core",
@@ -139,7 +139,7 @@ dependencies = [
 [[package]]
 name = "embedded-graphics-core"
 version = "0.4.0"
-source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#62560fd0b714934e23255123314690d68ea15983"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#3af953f07aa6f495aef6f5a344e400e33556c297"
 dependencies = [
  "az",
 ]
@@ -313,9 +313,9 @@ checksum = "5fde4043982dac20deb036c56edf2b1928614509334ee6c392f7d8caffa999a3"
 
 [[package]]
 name = "log"
-version = "0.4.27"
+version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
 
 [[package]]
 name = "micromath"
@@ -482,10 +482,11 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.219"
+version = "1.0.226"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
+checksum = "0dca6411025b24b60bfa7ec1fe1f8e710ac09782dca409ee8237ba74b51295fd"
 dependencies = [
+ "serde_core",
  "serde_derive",
 ]
 
@@ -501,10 +502,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_derive"
-version = "1.0.219"
+name = "serde_core"
+version = "1.0.226"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
+checksum = "ba2ba63999edb9dac981fb34b3e5c0d111a69b0924e253ed29d83f7c99e966a4"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.226"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8db53ae22f34573731bafa1db20f04027b2d25e02d8205921b569171699cdb33"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -682,9 +692,9 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.18"
+version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a5f39404a5da50712a4c1eecf25e90dd62b613502b7e925fd4e4d19b5c96512"
+checksum = "f63a545481291138910575129486daeaf8ac54aee4387fe7906919f7830c7d9d"
 
 [[package]]
 name = "vcell"

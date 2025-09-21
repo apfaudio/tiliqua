@@ -251,7 +251,7 @@ dependencies = [
 [[package]]
 name = "embedded-graphics"
 version = "0.8.1"
-source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#62560fd0b714934e23255123314690d68ea15983"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#3af953f07aa6f495aef6f5a344e400e33556c297"
 dependencies = [
  "az",
  "embedded-graphics-core",
@@ -263,7 +263,7 @@ dependencies = [
 [[package]]
 name = "embedded-graphics-core"
 version = "0.4.0"
-source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#62560fd0b714934e23255123314690d68ea15983"
+source = "git+https://github.com/vk2seb/embedded-graphics.git?branch=seb%2Ffast-draw#3af953f07aa6f495aef6f5a344e400e33556c297"
 dependencies = [
  "az",
 ]
