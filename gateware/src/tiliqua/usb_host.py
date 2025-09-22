@@ -13,7 +13,6 @@ from luna.gateware.interface.ulpi import *
 from luna.gateware.interface.utmi import *
 from luna.gateware.usb.usb2.packet import *
 
-
 class TokenPID(enum.Enum, shape=unsigned(4)):
     OUT   = int(USBPacketID.OUT)
     IN    = int(USBPacketID.IN)
@@ -274,6 +273,89 @@ class USBSOFController(wiring.Component):
 
         return m
 
+class USBMIDIConfigurationEndpointExtractor(wiring.Component):
+
+    """
+    Takes a stream of bytes from a USB configuration descriptor,
+    walks each descriptor in it and presents the last BULK IN
+    endpoint on its output, after the descriptors are read.
+
+    This is sufficient to identify the correct MIDI BULK IN
+    endpoint on every MIDI device that I have tested, and is
+    simulated against bunch of real descriptors in `tests/test_usb.py`
+
+    Usage:
+    - Hook up ``i`` to the USB Rx stream, and assert ``enable`` just
+      before the configuration descriptor arrives.
+    - If ``o.valid`` is asserted after the descriptor is transferred,
+      ``o.endp`` contains the discovered BULK IN endpoint address.
+    """
+
+    DESC_TYPE_ENDP = 0x05
+
+    enable: In(unsigned(1))
+
+    i: In(stream.Signature(unsigned(8)))
+
+    o: Out(data.StructLayout({
+        "endp": unsigned(4),
+        "valid":  unsigned(1),
+    }))
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        bLength = Signal(unsigned(8))
+        offset = Signal.like(bLength)
+
+        desc_type = Signal(unsigned(8))
+        endp_addr = Signal(unsigned(8))
+        endp_attr = Signal(unsigned(8))
+
+        m.d.comb += self.i.ready.eq(1)
+
+        with m.FSM(domain="usb"):
+            with m.State("INIT"):
+                m.d.comb += self.i.ready.eq(0)
+                with m.If(self.enable):
+                    m.next = "GET-LEN"
+            with m.State("GET-LEN"):
+                with m.If(self.i.valid):
+                    m.d.usb += offset.eq(0)
+                    m.d.usb += bLength.eq(self.i.payload)
+                    m.next = "IN-DESCRIPTOR"
+            with m.State("IN-DESCRIPTOR"):
+                with m.If(self.i.valid):
+                    with m.Switch(offset):
+                        # Populate the descriptor type
+                        with m.Case(0):
+                            m.d.usb += desc_type.eq(self.i.payload)
+                        # If it is an endpoint descriptor, save its attributes
+                        with m.Case(1):
+                            with m.If(desc_type == self.DESC_TYPE_ENDP):
+                                m.d.usb += endp_addr.eq(self.i.payload)
+                        with m.Case(2):
+                            with m.If(desc_type == self.DESC_TYPE_ENDP):
+                                m.d.usb += endp_attr.eq(self.i.payload)
+                    m.d.usb += offset.eq(offset+1)
+                    # At the end of each descriptor, check if this
+                    # was an IN(0x80) and BULK (0x02) endpoint?
+                    with m.If(offset == (bLength-2)):
+                        with m.If(endp_addr[7] & ((endp_attr & 0b11) == 0x02)):
+                            m.d.usb += [
+                                self.o.endp.eq(endp_addr), # bottom 4 bits
+                                self.o.valid.eq(1), # bottom 4 bits
+                            ]
+                            m.next = "DONE"
+                        m.next = "GET-LEN"
+            with m.State("DONE"):
+                # Stay here forever. The host logic has a global reset
+                # watchdog, so hotplugging will still work correctly.
+                pass
+
+        return m
+
 
 class SimpleUSBMIDIHost(Elaboratable):
 
@@ -307,8 +389,11 @@ class SimpleUSBMIDIHost(Elaboratable):
     def __init__(self, *, bus=None, handle_clocking=True, sim=False,
                  hardcoded_configuration_id=0x0001,
                  hardcoded_midi_endpoint=1):
-        # FIXME: for now, the configuration and endpoint ID for the MIDI interface is hardcoded.
+        # FIXME: for now, the configuration is hardcoded. Every single device I have
+        # tested just uses configuration 1, is likely perfectly fine for most usecases.
         self.configuration_id = Signal(unsigned(4), init=hardcoded_configuration_id)
+        # This endpoint is a fallback, and is only used if `USBMIDIConfigurationEndpointExtractor`
+        # was unable to determine which endpoint should be used from the descriptor.
         self.midi_endpoint_id = Signal(unsigned(4), init=hardcoded_midi_endpoint)
         self.sim = sim
         if self.sim:
@@ -338,6 +423,12 @@ class SimpleUSBMIDIHost(Elaboratable):
         m.submodules.timer               = timer = \
             USBInterpacketTimer(fs_only  = True)
         m.submodules.tx_multiplexer      = tx_multiplexer = UTMIInterfaceMultiplexer()
+
+        m.submodules.ep_extractor = ep_extractor = USBMIDIConfigurationEndpointExtractor()
+        m.d.comb += [
+            ep_extractor.i.valid.eq(receiver.stream.next),
+            ep_extractor.i.payload.eq(receiver.stream.payload),
+        ]
 
         # Data CRC interfaces
         data_crc.add_interface(transmitter.crc)
@@ -410,6 +501,9 @@ class SimpleUSBMIDIHost(Elaboratable):
             # w_en only strobed in MIDI-BULK-IN phase
             midi_fifo.w_data.eq(receiver.stream.payload),
         ]
+
+        max_packet_size = Signal(unsigned(8), init=64)
+        last_packet_byte = Signal(unsigned(8), init=0)
 
         with m.FSM(domain="usb"):
 
@@ -504,7 +598,10 @@ class SimpleUSBMIDIHost(Elaboratable):
                 The data itself is simply ignored for now.
                 """
 
+                byte_cnt = Signal(unsigned(8), init=0)
+
                 with m.State(state_id):
+                    m.d.usb += byte_cnt.eq(0)
                     with m.If(sof_controller.txa):
                         m.next = f'{state_id}-TOKEN'
 
@@ -512,15 +609,25 @@ class SimpleUSBMIDIHost(Elaboratable):
 
                 with m.State(f'{state_id}-WAIT-PKT'):
                     # FIXME: tolerate rx timeout
+                    with m.If(receiver.stream.next):
+                        m.d.usb += last_packet_byte.eq(receiver.stream.payload)
+                        m.d.usb += byte_cnt.eq(byte_cnt+1)
                     with m.If(receiver.packet_complete):
                         m.next = f'{state_id}-ACK-PKT'
                     with m.If(handshake_detector.detected.nak):
                         m.next = state_err
 
                 with m.State(f'{state_id}-ACK-PKT'):
+                    with m.If(receiver.stream.next):
+                        m.d.usb += last_packet_byte.eq(receiver.stream.payload)
+                        m.d.usb += byte_cnt.eq(byte_cnt+1)
                     with m.If(receiver.ready_for_response):
                         m.d.comb += handshake_generator.issue_ack.eq(1)
-                        m.next = state_ok
+                        with m.If(byte_cnt == max_packet_size):
+                            # More data, continue fetching.
+                            m.next = state_id
+                        with m.Else():
+                            m.next = state_ok
 
             def fsm_sequence_setup(state_id, state_ok, state_err, setup_payload, addr=0, endp=0):
                 """
@@ -612,18 +719,43 @@ class SimpleUSBMIDIHost(Elaboratable):
                     with m.If(sof_counter == (_SOF_COUNTER_MAX-1)):
                         m.d.usb += sof_counter.eq(0)
                     with m.If(sof_counter == _SETUP_ON_SOF_INDEX):
-                        m.next = 'SETUP0'
+                        m.next = 'SETUPD'
 
             #
-            # SETUP0: GET_DESCRIPTOR
+            # SETUPD: GET_DESCRIPTOR (device)
+            #
+
+            fsm_sequence_setup('SETUPD',
+                               state_ok='SETUPD-IN',
+                               state_err='SOF-IDLE',
+                               setup_payload=SetupPayload.init_get_descriptor(0x0100, 0x0008),
+                               addr=0,
+                               endp=0)
+
+            fsm_sequence_rx_in_stage_ignore('SETUPD-IN', state_ok='SETUPD-ZLP-OUT', state_err='SETUPD-IN')
+
+            fsm_sequence_zlp_out('SETUPD-ZLP-OUT', 'SET-MPS')
+
+            with m.State('SET-MPS'):
+                # Fetch bMaxPacketSize from last byte of device descriptor. This is needed so we
+                # can correctly fetch full-length configuration descriptors in the next step.
+                m.d.usb += max_packet_size.eq(last_packet_byte)
+                m.next = 'SETUP0'
+
+            #
+            # SETUP0: GET_DESCRIPTOR (configuration)
             #
 
             fsm_sequence_setup('SETUP0',
-                               state_ok='SETUP0-IN',
+                               state_ok='SETUP0-EP-EXTRACTOR',
                                state_err='SOF-IDLE',
-                               setup_payload=SetupPayload.init_get_descriptor(0x0100, 0x0040),
+                               setup_payload=SetupPayload.init_get_descriptor(0x0200, 0x0200),
                                addr=0,
                                endp=0)
+
+            with m.State('SETUP0-EP-EXTRACTOR'):
+                m.d.usb += ep_extractor.enable.eq(1)
+                m.next = 'SETUP0-IN'
 
             fsm_sequence_rx_in_stage_ignore('SETUP0-IN', state_ok='SETUP0-ZLP-OUT', state_err='SETUP0-IN')
 
@@ -669,7 +801,7 @@ class SimpleUSBMIDIHost(Elaboratable):
                     m.next = 'BULK-IN-TOKEN'
 
             fsm_tx_token('BULK-IN-TOKEN', TokenPID.IN, self._DEFAULT_DEVICE_ADDR,
-                         self.midi_endpoint_id, 'MIDI-BULK-IN')
+                         Mux(ep_extractor.o.valid, ep_extractor.o.endp, self.midi_endpoint_id), 'MIDI-BULK-IN')
 
             with m.State('MIDI-BULK-IN'):
                 # send incoming packet to MIDI FIFO
