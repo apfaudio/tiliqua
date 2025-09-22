@@ -276,13 +276,19 @@ class USBSOFController(wiring.Component):
 class USBMIDIConfigurationEndpointExtractor(wiring.Component):
 
     """
-    Extremely simple (but effective!) stream-based extractor -
-    takes a stream of bytes from a USB configuration descriptor,
+    Takes a stream of bytes from a USB configuration descriptor,
     walks each descriptor in it and presents the last BULK IN
     endpoint on its output, after the descriptors are read.
 
     This is sufficient to identify the correct MIDI BULK IN
-    endpoint on every MIDI device that I have tested.
+    endpoint on every MIDI device that I have tested, and is
+    simulated against bunch of real descriptors in `tests/test_usb.py`
+
+    Usage:
+    - Hook up ``i`` to the USB Rx stream, and assert ``enable`` just
+      before the configuration descriptor arrives.
+    - If ``o.valid`` is asserted after the descriptor is transferred,
+      ``o.endp`` contains the discovered BULK IN endpoint address.
     """
 
     DESC_TYPE_ENDP = 0x05
@@ -322,8 +328,10 @@ class USBMIDIConfigurationEndpointExtractor(wiring.Component):
             with m.State("IN-DESCRIPTOR"):
                 with m.If(self.i.valid):
                     with m.Switch(offset):
+                        # Populate the descriptor type
                         with m.Case(0):
                             m.d.usb += desc_type.eq(self.i.payload)
+                        # If it is an endpoint descriptor, save its attributes
                         with m.Case(1):
                             with m.If(desc_type == self.DESC_TYPE_ENDP):
                                 m.d.usb += endp_addr.eq(self.i.payload)
@@ -331,8 +339,9 @@ class USBMIDIConfigurationEndpointExtractor(wiring.Component):
                             with m.If(desc_type == self.DESC_TYPE_ENDP):
                                 m.d.usb += endp_attr.eq(self.i.payload)
                     m.d.usb += offset.eq(offset+1)
+                    # At the end of each descriptor, check if this
+                    # was an IN(0x80) and BULK (0x02) endpoint?
                     with m.If(offset == (bLength-2)):
-                        # Is this endpoint IN(0x80) and BULK (0x02)?
                         with m.If(endp_addr[7] & ((endp_attr & 0b11) == 0x02)):
                             m.d.usb += [
                                 self.o.endp.eq(endp_addr), # bottom 4 bits
@@ -341,7 +350,8 @@ class USBMIDIConfigurationEndpointExtractor(wiring.Component):
                             m.next = "DONE"
                         m.next = "GET-LEN"
             with m.State("DONE"):
-                # stay here forever
+                # Stay here forever. The host logic has a global reset
+                # watchdog, so hotplugging will still work correctly.
                 pass
 
         return m
@@ -379,8 +389,11 @@ class SimpleUSBMIDIHost(Elaboratable):
     def __init__(self, *, bus=None, handle_clocking=True, sim=False,
                  hardcoded_configuration_id=0x0001,
                  hardcoded_midi_endpoint=1):
-        # FIXME: for now, the configuration and endpoint ID for the MIDI interface is hardcoded.
+        # FIXME: for now, the configuration is hardcoded. Every single device I have
+        # tested just uses configuration 1, is likely perfectly fine for most usecases.
         self.configuration_id = Signal(unsigned(4), init=hardcoded_configuration_id)
+        # This endpoint is a fallback, and is only used if `USBMIDIConfigurationEndpointExtractor`
+        # was unable to determine which endpoint should be used from the descriptor.
         self.midi_endpoint_id = Signal(unsigned(4), init=hardcoded_midi_endpoint)
         self.sim = sim
         if self.sim:
