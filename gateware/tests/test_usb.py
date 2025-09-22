@@ -124,6 +124,7 @@ class UsbTests(unittest.TestCase):
         ["yamaha_cp73", 2],
         ["yamaha_pssa50", 2],
         ["android_uac_midi", 1],
+        ["korg_microkey2", 2],
     ])
     def test_endpoint_extractor(self, name, expected_endp):
 
