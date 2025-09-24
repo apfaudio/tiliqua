@@ -10,6 +10,7 @@ pub trait EurorackPmod {
     fn write_calibration_constant(&mut self, ch: u8, a: i32, b: i32);
     fn mute(&mut self, mute: bool);
     fn hard_reset(&mut self);
+    fn set_aclk_unstable(&mut self);
     fn f_bits(&self) -> u8;
 }
 
@@ -117,6 +118,12 @@ macro_rules! impl_eurorack_pmod {
 
                 fn hard_reset(&mut self) {
                     self.registers.flags().write(|w| w.hard_reset().bit(true) );
+                }
+
+                fn set_aclk_unstable(&mut self) {
+                    self.registers.flags().write(|w| {
+                        w.mute().bit(true);
+                        w.aclk_unstable().bit(true) } );
                 }
 
                 fn f_bits(&self) -> u8 {

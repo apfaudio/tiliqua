@@ -825,6 +825,9 @@ class EurorackPmod(wiring.Component):
     codec_mute: In(1) # Hold at 1 to soft mute CODEC
     hard_reset: In(1) # Strobe a 1 to hard reset the CODEC (pops!)
 
+    # Indicates audio MCLK is changing, we should be held in reset
+    aclk_unstable: In(1, reset=0)
+
     # 1s for automatic audio -> LED control. 0s for manual.
     led_mode: In(8, init=0xff)
     # If an LED is in manual, this is signed i8 from -green to +red.
@@ -966,8 +969,10 @@ class EurorackPmod(wiring.Component):
         else:
             raise ValueError(f"Unsupported pmod_rev: {pmod_rev}")
 
-
-        return m
+        aclk_unstable_audio = Signal()
+        m.submodules.aclk_unstable_ff = FFSynchronizer(
+                i=self.aclk_unstable, o=aclk_unstable_audio, o_domain='audio')
+        return ResetInserter({'sync': self.aclk_unstable, 'audio': aclk_unstable_audio})(m)
 
 
 # Peripheral for accessing eurorack-pmod hardware from an SoC.
@@ -998,6 +1003,7 @@ class Peripheral(wiring.Component):
     class FlagsReg(csr.Register, access="w"):
         mute: csr.Field(csr.action.W, unsigned(1))
         hard_reset: csr.Field(csr.action.W, unsigned(1))
+        aclk_unstable: csr.Field(csr.action.W, unsigned(1))
 
     class CalibrationConstant(csr.Register, access="w"):
         value: csr.Field(csr.action.W, signed(32))
@@ -1066,6 +1072,9 @@ class Peripheral(wiring.Component):
         with m.If(self._flags.f.hard_reset.w_stb & self._flags.f.hard_reset.w_data):
             # Strobe PMOD hard reset.
             m.d.comb += self.pmod.hard_reset.eq(1)
+
+        with m.If(self._flags.f.aclk_unstable.w_stb):
+            m.d.sync += self.pmod.aclk_unstable.eq(self._flags.f.aclk_unstable.w_data)
 
         with m.If(self._led_mode.f.led.w_stb):
             m.d.sync += self.pmod.led_mode.eq(self._led_mode.f.led.w_data)

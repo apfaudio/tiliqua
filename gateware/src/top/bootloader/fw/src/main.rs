@@ -412,6 +412,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         for region in &manifest.regions {
                             validate_and_copy_spiflash_region(region)?;
                         }
+                        // Save this bitstream as the last loaded
+                        let config = EepromConfig { last_boot_slot: Some(n as u8) };
+                        app.eeprom_manager.write_config(&config).ok();
                         if let Some(mut pll_config) = manifest.external_pll_config.clone() {
                             if pll_config.clk1_inherit {
                                 info!("video/pll: inherit pixel clock from bootloader modeline.");
@@ -426,6 +429,8 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                                     Err(BitstreamError::BootloaderStaticModeline)?;
                                 }
                             }
+                            // Disable audio components
+                            app.ui.pmod.set_aclk_unstable();
                             if let Some(ref mut pll) = app.pll {
                                 // Disable DVI PHY before playing with external PLL.
                                 unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
@@ -442,9 +447,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         }
                         // Place BootInfo at the end of PSRAM
                         unsafe { bootinfo.to_addr(BOOTINFO_BASE).expect("Failed to serialize BootInfo") };
-                        // Save this bitstream as the last loaded
-                        let config = EepromConfig { last_boot_slot: Some(n as u8) };
-                        app.eeprom_manager.write_config(&config).ok();
                         riscv::asm::fence();
                         riscv::asm::fence_i();
                         Ok(())
