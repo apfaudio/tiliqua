@@ -206,21 +206,21 @@ class DVIPHY(wiring.Component):
                     i_D0=tmds_ch0_shift[0],
                     i_D1=tmds_ch0_shift[1],
                     i_SCLK=ClockSignal("dvi5x"),
-                    i_RST=Const(0, 1),
+                    i_RST=ResetSignal("dvi5x"),
                     o_Q=dvi_pins.d0.o
                 ),
                 Instance("ODDRX1F",
                     i_D0=tmds_ch1_shift[0],
                     i_D1=tmds_ch1_shift[1],
                     i_SCLK=ClockSignal("dvi5x"),
-                    i_RST=Const(0, 1),
+                    i_RST=ResetSignal("dvi5x"),
                     o_Q=dvi_pins.d1.o
                 ),
                 Instance("ODDRX1F",
                     i_D0=tmds_ch2_shift[0],
                     i_D1=tmds_ch2_shift[1],
                     i_SCLK=ClockSignal("dvi5x"),
-                    i_RST=Const(0, 1),
+                    i_RST=ResetSignal("dvi5x"),
                     o_Q=dvi_pins.d2.o
                 ),
             ]
