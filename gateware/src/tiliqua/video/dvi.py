@@ -226,6 +226,7 @@ class DVIPHY(wiring.Component):
             ]
 
         # Clock output
-        m.d.comb += dvi_pins.ck.o.eq(ClockSignal("dvi"))
+        with m.If(~ResetSignal("dvi")):
+            m.d.comb += dvi_pins.ck.o.eq(ClockSignal("dvi"))
 
         return m
