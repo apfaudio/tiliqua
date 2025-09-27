@@ -698,7 +698,9 @@ fn main() -> ! {
         if HW_REV_MAJOR >= 5 {
             // Rev5+, resetting CODEC is always allowed without popping.
             // So let's just do it to bring the CODEC into a consistent state.
-            timer.delay_ms(200); // Wait for POR on eurorack-pmod
+            if cold_boot {
+                timer.delay_ms(200); // Wait for POR on eurorack-pmod
+            }
             pmod.hard_reset();
         }
         let mut cy8 = Cy8cmbr3108Driver::new(unsafe{I2c1::summon()}, &TOUCH_SENSOR_ORDER);
