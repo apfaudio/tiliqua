@@ -28,7 +28,7 @@ pub enum TouchControl {
 pub enum UsbHost {
     #[default]
     Off,
-    Enable,
+    On,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
@@ -49,8 +49,6 @@ int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
 int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
 int_params!(XScaleParams<u8>      { step: 1, min: 0, max: 15 });
 int_params!(YScaleParams<u8>      { step: 1, min: 0, max: 15 });
-int_params!(CfgIdParams<u8>       { step: 1, min: 1, max: 15 });
-int_params!(EndptIdParams<u8>     { step: 1, min: 1, max: 15 });
 
 button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
 
@@ -97,11 +95,9 @@ pub struct BeamOpts {
 #[derive(OptionPage, Clone)]
 pub struct MiscOpts {
     #[option]
-    pub host: EnumOption<UsbHost>,
-    #[option(1)]
-    pub cfg_id: IntOption<CfgIdParams>,
-    #[option(2)]
-    pub endpt_id: IntOption<EndptIdParams>,
+    pub danger_vbus: EnumOption<UsbHost>,
+    #[option]
+    pub usb_host: EnumOption<UsbHost>,
     #[option]
     pub serial_debug: EnumOption<UsbMidiSerialDebug>,
     #[option(false)]

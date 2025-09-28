@@ -108,9 +108,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             }
         }
 
-        app.synth.usb_midi_host(opts.misc.host.value == UsbHost::Enable,
-                                opts.misc.cfg_id.value,
-                                opts.misc.endpt_id.value);
+        app.synth.usb_midi_host(
+            opts.misc.danger_vbus.value == UsbHost::On &&
+            opts.misc.usb_host.value == UsbHost::On, 1, 1);
     });
 }
 
