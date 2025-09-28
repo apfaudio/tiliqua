@@ -412,9 +412,20 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         for region in &manifest.regions {
                             validate_and_copy_spiflash_region(region)?;
                         }
-                        // Save this bitstream as the last loaded
+
+                        // Save this bitstream as the last_boot_slot for future autoboot.
+                        // NOTE: This should technically happen after any step that could
+                        // cause a BitstreamError, however the PLL reconfiguration below
+                        // can cause the CODEC to go into a state where it NAKs I2C transactions,
+                        // causing I2C writes to fail.
                         let config = EepromConfig { last_boot_slot: Some(n as u8) };
                         app.eeprom_manager.write_config(&config).ok();
+
+
+                        // If required, reconfigure the external PLL to what the bitstream wants.
+                        // There may be dragons here, be VERY careful appropriate components are
+                        // held in reset while the PLL is being reconfigured! (i.e framebuffer,
+                        // audio gateware).
                         if let Some(mut pll_config) = manifest.external_pll_config.clone() {
                             if pll_config.clk1_inherit {
                                 info!("video/pll: inherit pixel clock from bootloader modeline.");
@@ -455,14 +466,25 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     Err(BitstreamError::InvalidManifest)
                 };
                 if let Err(bitstream_error) = error {
-                    // Cancel reboot, draw an error.
+                    // Failure. cancel reboot, draw an error in this slot.
                     app.ui.opts.tracker.modify = false;
                     app.reboot_n = None;
                     app.time_since_reboot_requested = 0;
                     app.error_n[n] = Some(String::from_str(bitstream_error.into()).unwrap());
                     info!("Failed to load bitstream: {:?}", app.error_n[n]);
+                    // Clear the autoboot flag, as it's possible an error occurred after
+                    // the autoboot flag was set (during/after PLL reconfiguration).
+                    let config = EepromConfig { last_boot_slot: None };
+                    app.eeprom_manager.write_config(&config).ok();
                 } else {
-                    // Ask RP2040 to perform reboot.
+                    // Ask RP2040 to replay the JTAG command sequence to reconfigure the ECP5
+                    // to new bitstream. The number is corresponding to SPI flash addresses
+                    // in the ECP5's configuration flash, i.e BITSTREAM3 loads the bitstream from
+                    // 0x100000*(n+1) = 0x400000. In the future I'd like to be able to configure
+                    // from arbitrary addresses, but this requires reverse engineering the
+                    // bitstream structure a bit more than I have time for at the moment.
+                    //
+                    // TODO: use a longer codeword for this with less chance of collision?
                     info!("BITSTREAM{}\n\r", n);
                     loop {}
                 }
@@ -487,6 +509,7 @@ pub enum StartupWarning {
 use embedded_hal::i2c::I2c;
 
 // Mitigation for https://github.com/apfaudio/tiliqua/issues/81
+// Affects hardware R2-R4 only, R5+ is not affected, but there's no harm in doing this.
 pub fn maybe_restart_codec<CodecI2c, Pmod>(i2cdev: &mut CodecI2c, pmod: &mut Pmod) -> Result<(), StartupWarning>
 where
     CodecI2c: I2c,
@@ -511,6 +534,9 @@ where
     }
 }
 
+// Check if touch sense IC NVM register configuration matches what we expect.
+// If it does not, reprogram and reboot it. This allows bootloader updates to change the
+// default touch sense IC register configuration without a special flashing tool.
 pub fn maybe_reprogram_cy8cmbr3xxx<TouchI2c>(dev: &mut Cy8cmbr3108Driver<TouchI2c>) -> Result<(), StartupWarning>
 where
     TouchI2c: I2c,
@@ -548,6 +574,8 @@ where
 
 fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
     const EDID_ADDR: u8 = 0x50;
+    // Some screens fail on the first read and require a delay and re-attempted
+    // read for the valid EDID to actually become available.
     const EDID_READ_ATTEMPTS: usize = 3;
     let mut read_attempts = 0;
     loop {
@@ -776,6 +804,9 @@ fn main() -> ! {
 
     let app = Mutex::new(RefCell::new(
             App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone(), autoboot_to, eeprom_manager)));
+
+    // Until this point, the video gateware is held in reset. Now that we have a target modeline
+    // and the external PLL is appropriately configured, we can bring it up.
 
     let mut display = DMAFramebuffer0::new(
         peripherals.FRAMEBUFFER_PERIPH,
