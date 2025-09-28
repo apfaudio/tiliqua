@@ -738,6 +738,25 @@ fn main() -> ! {
         }
     }
 
+    //
+    // Configure TUSB322 (CC controller) in UFP / Device-only mode.
+    // This is needed if Tiliqua is connected to a host with a true USB-C to USB-C cable.
+    //
+    // TODO: move this into HAL layer!
+    //
+
+    const TUSB322I_ADDR:  u8 = 0x47;
+    use embedded_hal::i2c::{I2c, Operation};
+    let mut i2cdev_tusb = I2c0::new(unsafe { pac::I2C0::steal()});
+    // DISABLE_UFP_ACCESSORY
+    i2cdev_tusb.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x09u8, 0x01u8])]).ok();
+    // DISABLE_TERM
+    i2cdev_tusb.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x01u8])]).ok();
+    // MODE_SELECT=UFP | DISABLE_TERM
+    i2cdev_tusb.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x11u8])]).ok();
+    // MODE_SELECT=UFP | ~DISABLE_TERM
+    i2cdev_tusb.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x10u8])]).ok();
+
     // Fetch initial modeline (may be used for external PLL setup)
 
     timer.delay_ms(10);

@@ -235,12 +235,12 @@ class TiliquaSoc(Component):
             bus_dma=self.psram_periph)
         self.csr_decoder.add(self.persist_periph.bus, addr=self.persist_periph_base, name="persist_periph")
 
-        # Hardware-accelerated pixel plotting (integrated solution)
+        # Pixel plotting, blending, rotation backend (no CSR interface)
         self.framebuffer_plotter = plot.FramebufferPlotter(
             bus_signature=self.psram_periph.bus.signature.flip(), n_ports=3)
         self.psram_periph.add_master(self.framebuffer_plotter.bus)
 
-        # Pixel plotter peripheral
+        # Pixel plotter CSR interface
         self.pixel_plot = plot.Peripheral()
         self.csr_decoder.add(self.pixel_plot.csr_bus, addr=self.pixel_plot_csr_base, name="pixel_plot")
 

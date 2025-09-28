@@ -200,19 +200,16 @@ fn main() -> ! {
     };
 
     //
-    // Configure TUSB322 in DFP/Host mode
+    // Configure TUSB322 (CC controller) in DFP/Host mode
     // This is needed if Tiliqua is connected to a device with a true USB-C to USB-C cable.
     //
     // TODO: make this dynamic or disable when host mode is disabled?
+    // TODO: move this into HAL layer!
     //
 
     use embedded_hal::i2c::{I2c, Operation};
     const TUSB322I_ADDR:  u8 = 0x47;
     let mut i2cdev = I2c0::new(peripherals.I2C0);
-    let mut tusb322i_id: [u8; 8] = [0; 8];
-    let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x00u8]),
-                                                    Operation::Read(&mut tusb322i_id)]);
-    info!("TUSB322 ID: {:?}", tusb322i_id);
     // DISABLE_TERM
     let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x01u8])]);
     // MODE_SELECT=DFP | DISABLE_TERM

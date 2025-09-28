@@ -97,10 +97,16 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
 fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
-    // WARN: assume framebuffer is at the start of PSRAM - don't try memtesting that section.
+    // WARN: be careful about memtesting near:
+    // - framebuffer at the start of PSRAM.
+    // - firmware a couple of megabytes into PSRAM
+    // - bootinfo at end of PSRAM
+    // PSRAM_SZ/2 is not close to any of these
 
     let psram_ptr = PSRAM_BASE as *mut u32;
     let psram_sz_test = 1024*64;
+    let memtest_start = (PSRAM_SZ_WORDS/2) - psram_sz_test;
+    let memtest_end = PSRAM_SZ_WORDS/2;
 
     timer.set_timeout_ticks(0xFFFFFFFF);
     timer.enable();
@@ -108,7 +114,7 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let start = timer.counter();
 
     unsafe {
-        for i in (PSRAM_SZ_WORDS - psram_sz_test)..PSRAM_SZ_WORDS {
+        for i in memtest_start..memtest_end {
             psram_ptr.offset(i as isize).write_volatile(i as u32);
         }
     }
@@ -117,7 +123,7 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
     let mut psram_fl = false;
     unsafe {
-        for i in (PSRAM_SZ_WORDS - psram_sz_test)..PSRAM_SZ_WORDS {
+        for i in memtest_start..memtest_end {
             let value = psram_ptr.offset(i as isize).read_volatile();
             if (i as u32) != value {
                 psram_fl = true;
@@ -270,21 +276,25 @@ fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
 fn print_usb_state(s: &mut ReportString, i2cdev: &mut I2c0)
 {
     // Read TUSB322I connection status register
-    // We don't use this yet. But it's useful for checking for usb circuitry assembly problems.
+    // We don't fully use this yet. But it's useful for checking for usb circuitry assembly problems.
     // (in particular the cable orientation detection registers)
     let mut tusb322_conn_status: [u8; 1] = [0; 1];
-    let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x09u8]),
-                                                    Operation::Read(&mut tusb322_conn_status)]);
-
-    write!(s, "tusb322i_state 0x{:x} (DUA={} DDC={} VF={} IS={} CD={} AS={})\r\n",
-          tusb322_conn_status[0],
-          tusb322_conn_status[0]        & 0x1,
-          (tusb322_conn_status[0] >> 1) & 0x3,
-          (tusb322_conn_status[0] >> 3) & 0x1,
-          (tusb322_conn_status[0] >> 4) & 0x1,
-          (tusb322_conn_status[0] >> 5) & 0x1,
-          (tusb322_conn_status[0] >> 6) & 0x3,
-          ).ok();
+    let r = i2cdev.transaction(TUSB322I_ADDR,
+        &mut [Operation::Write(&[0x09u8]), Operation::Read(&mut tusb322_conn_status)]);
+    if r.is_ok() {
+        write!(s, "tusb322i_state 0x{:x} (DUA={} DDC={} VF={} IS={} CD={} AS={})\r\n",
+              tusb322_conn_status[0],
+              tusb322_conn_status[0]        & 0x1,
+              (tusb322_conn_status[0] >> 1) & 0x3,
+              (tusb322_conn_status[0] >> 3) & 0x1,
+              (tusb322_conn_status[0] >> 4) & 0x1,
+              (tusb322_conn_status[0] >> 5) & 0x1,
+              (tusb322_conn_status[0] >> 6) & 0x3,
+              ).ok();
+        return;
+    } else {
+        write!(s, "tusb322i_state NAK\r\n",).ok();
+    }
 }
 
 fn print_pmod_state(s: &mut ReportString, pmod: &impl EurorackPmod)
@@ -506,8 +516,11 @@ fn main() -> ! {
                 let (page_name, report_str) = match opts.report.page.value {
                     ReportPage::Startup => ("[startup report]", &startup_report),
                     ReportPage::Status  => {
-                        print_pmod_state(&mut status_report, &pmod);
-                        print_usb_state(&mut status_report, &mut i2cdev);
+                        critical_section::with(|_| {
+                            // Devices shared with timer callback, be careful!
+                            print_pmod_state(&mut status_report, &pmod);
+                            print_usb_state(&mut status_report, &mut i2cdev);
+                        });
                         print_die_temperature(&mut status_report, &dtr);
                         print_psram_stats(&mut status_report, &psram);
                         write!(&mut status_report, "dvi_hpd [active={}]\r\n", dvi_hpd).ok();
