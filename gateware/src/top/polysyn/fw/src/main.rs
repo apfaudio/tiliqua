@@ -27,6 +27,7 @@ use tiliqua_hal::embedded_graphics::prelude::*;
 
 use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
+use hal::tusb322::{TUSB322Driver, TUSB322Mode};
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
@@ -203,19 +204,13 @@ fn main() -> ! {
     // Configure TUSB322 (CC controller) in DFP/Host mode
     // This is needed if Tiliqua is connected to a device with a true USB-C to USB-C cable.
     //
-    // TODO: make this dynamic or disable when host mode is disabled?
-    // TODO: move this into HAL layer!
+    // TODO: disable terminations when host mode is disabled?
+    // TODO: gate VBUS on Attached.Src state?
     //
 
-    use embedded_hal::i2c::{I2c, Operation};
-    const TUSB322I_ADDR:  u8 = 0x47;
-    let mut i2cdev = I2c0::new(peripherals.I2C0);
-    // DISABLE_TERM
-    let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x01u8])]);
-    // MODE_SELECT=DFP | DISABLE_TERM
-    let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x21u8])]);
-    // MODE_SELECT=DFP | ~DISABLE_TERM
-    let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x20u8])]);
+    let i2cdev = I2c0::new(peripherals.I2C0);
+    let mut tusb322 = TUSB322Driver::new(i2cdev);
+    let _ = tusb322.set_mode(TUSB322Mode::Dfp);
 
     //
     // Create App instance

@@ -28,8 +28,7 @@ use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pca9635::Pca9635Driver;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 use tiliqua_hal::eeprom::EepromDriver;
-
-const TUSB322I_ADDR:  u8 = 0x47;
+use tiliqua_hal::tusb322::TUSB322Driver;
 
 pub type ReportString = String<512>;
 
@@ -191,18 +190,23 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (spiflash_sz_test/1024) as u64) / (read_ticks as u64)).ok();
 }
 
-fn tusb322i_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
-    // Read TUSB322I device ID
-    let mut tusb322i_id: [u8; 8] = [0; 8];
-    let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x00u8]),
-                                                    Operation::Read(&mut tusb322i_id)]);
-    if tusb322i_id != [0x32, 0x32, 0x33, 0x42, 0x53, 0x55, 0x54, 0x0] {
-        write!(s, "FAIL: tusb322i_id ").ok();
-    } else {
-        write!(s, "PASS: tusb322i_id ").ok();
-    }
-    for byte in tusb322i_id {
-        write!(s, "{:x} ", byte).ok();
+fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
+    // Read TUSB322 device ID
+    let mut tusb322 = TUSB322Driver::new(i2cdev);
+    match tusb322.read_device_id() {
+        Ok(tusb322_id) => {
+            if tusb322_id != [0x32, 0x32, 0x33, 0x42, 0x53, 0x55, 0x54, 0x0] {
+                write!(s, "FAIL: tusb322_id ").ok();
+            } else {
+                write!(s, "PASS: tusb322_id ").ok();
+            }
+            for byte in tusb322_id {
+                write!(s, "{:x} ", byte).ok();
+            }
+        },
+        Err(_) => {
+            write!(s, "FAIL: tusb322_id (nak?) ").ok();
+        }
     }
     write!(s, "\r\n").ok();
 }
@@ -275,25 +279,17 @@ fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
 
 fn print_usb_state(s: &mut ReportString, i2cdev: &mut I2c0)
 {
-    // Read TUSB322I connection status register
+    // Read TUSB322 connection status register
     // We don't fully use this yet. But it's useful for checking for usb circuitry assembly problems.
     // (in particular the cable orientation detection registers)
-    let mut tusb322_conn_status: [u8; 1] = [0; 1];
-    let r = i2cdev.transaction(TUSB322I_ADDR,
-        &mut [Operation::Write(&[0x09u8]), Operation::Read(&mut tusb322_conn_status)]);
-    if r.is_ok() {
-        write!(s, "tusb322i_state 0x{:x} (DUA={} DDC={} VF={} IS={} CD={} AS={})\r\n",
-              tusb322_conn_status[0],
-              tusb322_conn_status[0]        & 0x1,
-              (tusb322_conn_status[0] >> 1) & 0x3,
-              (tusb322_conn_status[0] >> 3) & 0x1,
-              (tusb322_conn_status[0] >> 4) & 0x1,
-              (tusb322_conn_status[0] >> 5) & 0x1,
-              (tusb322_conn_status[0] >> 6) & 0x3,
-              ).ok();
-        return;
-    } else {
-        write!(s, "tusb322i_state NAK\r\n",).ok();
+    let mut tusb322 = TUSB322Driver::new(i2cdev);
+    match tusb322.read_connection_status_control() {
+        Ok(status) => {
+            write!(s, "tusb322 {:?}\r\n", status).ok();
+        },
+        Err(_) => {
+            write!(s, "tusb322 NAK\r\n").ok();
+        }
     }
 }
 
@@ -421,7 +417,7 @@ fn main() -> ! {
 
     psram_memtest(&mut startup_report, &mut timer);
     spiflash_memtest(&mut startup_report, &mut timer);
-    tusb322i_id_test(&mut startup_report, &mut i2cdev);
+    tusb322_id_test(&mut startup_report, &mut i2cdev);
     print_touch_err(&mut startup_report, &pmod);
     eeprom_id_test(&mut startup_report, &mut i2cdev1);
     edid_test(&mut startup_report, &mut i2cdev);
