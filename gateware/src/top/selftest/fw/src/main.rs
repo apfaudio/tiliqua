@@ -285,7 +285,9 @@ fn print_usb_state(s: &mut ReportString, i2cdev: &mut I2c0)
     let mut tusb322 = TUSB322Driver::new(i2cdev);
     match tusb322.read_connection_status_control() {
         Ok(status) => {
-            write!(s, "tusb322 {:?}\r\n", status).ok();
+            write!(s, "tusb322 [AS={:?} CD={:?}]\r\n",
+                   status.attached_state,
+                   status.cable_dir).ok();
         },
         Err(_) => {
             write!(s, "tusb322 NAK\r\n").ok();
