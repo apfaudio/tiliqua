@@ -18,6 +18,7 @@ use tiliqua_hal::embedded_graphics::prelude::*;
 use options::*;
 use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
+use tiliqua_hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState};
 use tiliqua_hal::persist::Persist;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
@@ -89,6 +90,15 @@ fn main() -> ! {
     CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     //
+    // Start up TUSB322 in UFP/Device mode
+    //
+
+    let i2cdev_tusb = I2c0::new(unsafe { pac::I2C0::steal() } );
+    let mut tusb322 = TUSB322Driver::new(i2cdev_tusb);
+    tusb322.soft_reset().ok();
+    tusb322.set_mode(TUSB322Mode::Ufp).ok();
+
+    //
     // Create options and maybe load from persistent storage
     //
 
@@ -126,6 +136,7 @@ fn main() -> ! {
         let xbeam_mux = peripherals.XBEAM_PERIPH;
         let mut first = true;
 
+        let mut usb_cc_attached = false;
 
         loop {
 
@@ -203,9 +214,23 @@ fn main() -> ! {
             scope.ypos2().write(|w| unsafe { w.ypos().bits(opts.scope2.ypos2.value as u16) } );
             scope.ypos3().write(|w| unsafe { w.ypos().bits(opts.scope2.ypos3.value as u16) } );
 
+            // Only connect USB PHY if the TUSB322 Type-C controller says we are attached.
+            // This fixes enumeration issues on some machines when using typec <-> typec cables.
+            critical_section::with(|_| {
+                if let Ok(status) = tusb322.read_connection_status_control() {
+                    // Only update on valid reads to reduce risk of unintended toggling mid-stream
+                    let new_state = status.attached_state == AttachedState::AttachedSnk;
+                    if new_state != usb_cc_attached {
+                        info!("USB CC hotplug: {:?}", status);
+                        usb_cc_attached = new_state;
+                    }
+                }
+            });
+
             xbeam_mux.flags().write(
                 |w| { w.usb_en().bit(opts.misc.usb_mode.value == USBMode::Enable);
-                      w.show_outputs().bit(opts.misc.plot_src.value == PlotSrc::Outputs)
+                      w.show_outputs().bit(opts.misc.plot_src.value == PlotSrc::Outputs);
+                      w.usb_connect().bit(usb_cc_attached)
                 } );
 
             xbeam_mux.delay0().write(|w| unsafe { w.value().bits(

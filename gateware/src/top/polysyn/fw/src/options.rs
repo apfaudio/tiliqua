@@ -95,8 +95,6 @@ pub struct BeamOpts {
 #[derive(OptionPage, Clone)]
 pub struct MiscOpts {
     #[option]
-    pub danger_vbus: EnumOption<UsbHost>,
-    #[option]
     pub usb_host: EnumOption<UsbHost>,
     #[option]
     pub serial_debug: EnumOption<UsbMidiSerialDebug>,

@@ -32,6 +32,7 @@ class XbeamPeripheral(wiring.Component):
 
     class Flags(csr.Register, access="w"):
         usb_en:   csr.Field(csr.action.W, unsigned(1))
+        usb_connect:   csr.Field(csr.action.W, unsigned(1))
         show_outputs: csr.Field(csr.action.W, unsigned(1))
 
     class Delay(csr.Register, access="w"):
@@ -47,6 +48,7 @@ class XbeamPeripheral(wiring.Component):
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
             "usb_en": Out(1),
+            "usb_connect": Out(1),
             "show_outputs": Out(1),
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
 
@@ -64,6 +66,9 @@ class XbeamPeripheral(wiring.Component):
 
         with m.If(self._flags.f.usb_en.w_stb):
             m.d.sync += self.usb_en.eq(self._flags.f.usb_en.w_data)
+
+        with m.If(self._flags.f.usb_connect.w_stb):
+            m.d.sync += self.usb_connect.eq(self._flags.f.usb_connect.w_data)
 
         with m.If(self._flags.f.show_outputs.w_stb):
             m.d.sync += self.show_outputs.eq(self._flags.f.show_outputs.w_data)
@@ -152,6 +157,8 @@ class XbeamSoc(TiliquaSoc):
         if sim.is_hw(platform):
             m.submodules.usbif = usbif = usb_audio.USB2AudioInterface(
                     audio_clock=self.clock_settings.audio_clock, nr_channels=4)
+            # SoC-controlled USB PHY connection (based on typeC CC status)
+            m.d.comb += usbif.usb_connect.eq(self.xbeam_periph.usb_connect)
 
         with m.If(self.xbeam_periph.usb_en):
             if sim.is_hw(platform):

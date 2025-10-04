@@ -63,6 +63,7 @@ class USB2AudioInterface(wiring.Component):
         super().__init__({
             "i":  In(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, self.nr_channels))),
             "o": Out(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, self.nr_channels))),
+            "usb_connect": In(1, init=1),
 
             "dbg": Out(self.DebugInterface())
         })
@@ -328,10 +329,10 @@ class USB2AudioInterface(wiring.Component):
                 m.d.usb += audio_in_frame_bytes_counting.eq(0)
 
         # Connect our device as a high speed device
+        m.submodules.usb_connect_ffsync = FFSynchronizer(self.usb_connect, usb.connect, o_domain="usb", init=0)
         m.d.comb += [
             ep1_in.bytes_in_frame.eq(4),
             ep2_in.bytes_in_frame.eq(audio_in_frame_bytes),
-            usb.connect          .eq(1),
             usb.full_speed_only  .eq(0),
         ]
 

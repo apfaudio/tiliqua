@@ -27,6 +27,7 @@ use tiliqua_hal::embedded_graphics::prelude::*;
 
 use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
+use hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState};
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
@@ -107,10 +108,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                 }
             }
         }
-
-        app.synth.usb_midi_host(
-            opts.misc.danger_vbus.value == UsbHost::On &&
-            opts.misc.usb_host.value == UsbHost::On, 1, 1);
     });
 }
 
@@ -202,20 +199,17 @@ fn main() -> ! {
     //
     // Configure TUSB322 (CC controller) in DFP/Host mode
     // This is needed if Tiliqua is connected to a device with a true USB-C to USB-C cable.
+    // It is also used for detecting (and preventing) applying VBUS if we have a host/host
+    // connection.
     //
-    // TODO: make this dynamic or disable when host mode is disabled?
-    // TODO: move this into HAL layer!
+    // TODO: disable terminations when host mode is disabled?
+    // TODO: draw error text if this fails?
     //
 
-    use embedded_hal::i2c::{I2c, Operation};
-    const TUSB322I_ADDR:  u8 = 0x47;
-    let mut i2cdev = I2c0::new(peripherals.I2C0);
-    // DISABLE_TERM
-    let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x01u8])]);
-    // MODE_SELECT=DFP | DISABLE_TERM
-    let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x21u8])]);
-    // MODE_SELECT=DFP | ~DISABLE_TERM
-    let _ = i2cdev.transaction(TUSB322I_ADDR, &mut [Operation::Write(&[0x0Au8, 0x20u8])]);
+    let i2cdev = I2c0::new(peripherals.I2C0);
+    let mut tusb322 = TUSB322Driver::new(i2cdev);
+    tusb322.soft_reset().ok();
+    tusb322.set_mode(TUSB322Mode::Dfp).ok();
 
     //
     // Create App instance
@@ -241,8 +235,9 @@ fn main() -> ! {
 
         let mut last_jack = pmod.jack();
 
-        loop {
+        let mut usb_cc_attached_as_src = false;
 
+        loop {
 
             let (opts, notes, cutoffs, draw_options, save_opts, wipe_opts) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
@@ -253,6 +248,28 @@ fn main() -> ! {
                 last_jack = pmod.jack();
                 let save_opts = app.ui.opts.misc.save_opts.poll();
                 let wipe_opts = app.ui.opts.misc.wipe_opts.poll();
+
+                // Type-C hotplugging detection
+                //
+                // Only enable VBUS if the TUSB322 Type-C controller says we are attached as a source.
+                // This is an extra safeguard against applying VBUS if we're accidentally connecting host<->host.
+                //
+
+                if let Ok(status) = tusb322.read_connection_status_control() {
+                    // Only update on valid reads to reduce risk of unintended toggling mid-stream
+                    let new_state = status.attached_state == AttachedState::AttachedSrc;
+                    if new_state != usb_cc_attached_as_src {
+                        info!("USB CC hotplug: {:?}", status);
+                        usb_cc_attached_as_src = new_state;
+                    }
+                }
+                let usb_vbus_enabled = usb_cc_attached_as_src && (app.ui.opts.misc.usb_host.value == UsbHost::On);
+                app.synth.usb_midi_host(usb_vbus_enabled, 1, 1);
+
+                //
+                // Copy out all the bits of state we need for drawing
+                //
+
                 (app.ui.opts.clone(),
                  app.synth.voice_notes().clone(),
                  app.synth.voice_cutoffs().clone(),

@@ -16,6 +16,7 @@ pub mod polysynth;
 pub mod serial;
 pub mod si5351;
 pub mod timer;
+pub mod tusb322;
 pub mod persist;
 pub mod cy8cmbr3xxx;
 pub mod spiflash;
