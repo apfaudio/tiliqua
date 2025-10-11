@@ -7,9 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tiliqua.build.archive import ArchiveBuilder, ArchiveLoader
-from tiliqua.build.flash import (FlashCommandGenerator,
-                                 compute_concrete_regions_to_flash)
+from tiliqua.build.archive import ArchiveBuilder
+from tiliqua.flash import (ArchiveLoader,
+                           compute_concrete_regions_to_flash,
+                           FlashCommandGenerator)
 from tiliqua.build.types import FirmwareLocation
 from tiliqua.platform import TiliquaRevision
 
@@ -60,7 +61,7 @@ class TestFlashCommandGenerator(unittest.TestCase):
         archiver.create()
 
         with ArchiveLoader(archiver.archive_path) as loader:
-            manifest = loader.get_manifest()
+            manifest = loader.manifest
             (_concrete_manifest, flashable_regions) = compute_concrete_regions_to_flash(
                     manifest, slot=None)  # Bootloader
             generator = FlashCommandGenerator(flashable_regions)
@@ -96,7 +97,7 @@ class TestFlashCommandGenerator(unittest.TestCase):
         archiver.create()
 
         with ArchiveLoader(archiver.archive_path) as loader:
-            manifest = loader.get_manifest()
+            manifest = loader.manifest
             (_concrete_manifest, flashable_regions) = compute_concrete_regions_to_flash(
                     manifest, slot=1)  # User slot 1
             generator = FlashCommandGenerator(flashable_regions)
@@ -129,7 +130,7 @@ class TestFlashCommandGenerator(unittest.TestCase):
         archiver.create()
 
         with ArchiveLoader(archiver.archive_path) as loader:
-            manifest = loader.get_manifest()
+            manifest = loader.manifest
             (_concrete_manifest, flashable_regions) = compute_concrete_regions_to_flash(
                     manifest, slot=2)  # User slot 2
             generator = FlashCommandGenerator(flashable_regions)
@@ -170,7 +171,7 @@ class TestFlashCommandGenerator(unittest.TestCase):
         # Create the archive and then load it to get the finalized manifest
         archiver.create()
         with ArchiveLoader(archiver.archive_path) as loader:
-            manifest_json_path = loader.get_tmpdir() / "manifest.json"
+            manifest_json_path = loader.tmpdir / "manifest.json"
             with open(manifest_json_path, 'r') as f:
                 manifest_json = f.read()
 

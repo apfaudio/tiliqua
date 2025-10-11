@@ -1,6 +1,6 @@
 import copy
 
-from .types import *
+from ..build.types import *
 
 class SlotLayout:
 

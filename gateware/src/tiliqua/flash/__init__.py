@@ -15,7 +15,7 @@ bitstreams, as for user bitstreams the bootloader is responsible for
 copying the firmware from SPIFlash to a desired region of PSRAM before
 the user bitstream is started.
 
-This should have zero code dependencies from this repository besides some
+This should have minimal code dependencies from this repository besides some
 constants, as it will be re-used for the WebUSB flasher.
 """
 
@@ -29,9 +29,10 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-from .types import *
-from .archive import ArchiveLoader
-from .flash_layout import *
+from ..build.types import RegionType
+from .archive_loader import ArchiveLoader
+from .spiflash_layout import compute_concrete_regions_to_flash
+from .spiflash_status import flash_status
 
 def scan_for_tiliqua():
     """
@@ -76,13 +77,13 @@ def scan_for_tiliqua():
 class FlashCommandGenerator:
     """Generates and executes flash commands."""
 
-    def __init__(self, flashable_regions: List[FlashableRegion]):
-        self.flashable_regions = sorted(flashable_regions)
+    def __init__(self, regions_to_flash):
+        self.regions_to_flash = sorted(regions_to_flash)
 
     def generate_commands(self, erase_option_storage: bool = False) -> List[List[str]]:
         """Generate flash commands for all regions."""
         commands = []
-        for region in self.flashable_regions:
+        for region in self.regions_to_flash:
             if region.memory_region.region_type == RegionType.OptionStorage:
                 # Handle OptionStorage regions based on erase_option_storage flag
                 if erase_option_storage:
@@ -150,7 +151,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
     # Load and extract archive
     with ArchiveLoader(archive_path) as loader:
 
-        manifest = loader.get_manifest()
+        manifest = loader.manifest
 
         # Validate hardware compatibility
 
@@ -179,7 +180,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
         # Write the concrete manifest back to our extracted archive path.
         # So that it is the one actually flashed to the device.
 
-        with open(loader.get_tmpdir() / "manifest.json", "w") as f:
+        with open(loader.tmpdir / "manifest.json", "w") as f:
             manifest_dict = concrete_manifest.to_dict()
             print(f"\nFinal manifest contents:\n{json.dumps(manifest_dict, indent=2)}")
             json.dump(manifest_dict, f)
@@ -197,125 +198,15 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
         for cmd in commands:
             print(f"\t$ {' '.join(cmd)}")
 
+        def confirm_operation():
+            response = input("\nProceed with flashing? [y/N] ")
+            return response.lower() == 'y'
+
         if not noconfirm and not confirm_operation():
             print("Aborting.")
             sys.exit(0)
 
         command_generator.execute_commands(commands, cwd=loader.get_tmpdir())
-
-def read_flash_segment(offset: int, size: int, reset: bool = False) -> bytes:
-    """
-    Read a segment of flash memory to a temporary file and return its contents.
-
-    Args:
-        offset: Flash memory offset
-        size: Number of bytes to read
-        reset: Whether to reset the device after reading
-
-    Returns:
-        Binary data read from flash
-    """
-    with tempfile.NamedTemporaryFile(suffix='.bin', delete=True) as tmp_file:
-        temp_file_name = tmp_file.name
-
-    cmd = [
-        "openFPGALoader", "-c", "dirtyJtag",
-        "--dump-flash", "-o", f"{hex(offset)}",
-        "--file-size", str(size),
-    ]
-
-    if not reset:
-        cmd.append("--skip-reset")
-
-    cmd.append(temp_file_name)
-    print(" ".join(cmd))
-    subprocess.check_call(cmd)
-
-    with open(temp_file_name, 'rb') as f:
-        data = f.read()
-
-    return data
-
-
-def is_empty_flash(data: bytes) -> bool:
-    """Check if a flash segment is empty (all 0xFF)."""
-    return all(b == 0xFF for b in data)
-
-
-def parse_json_from_flash(data: bytes) -> Optional[Dict]:
-    """
-    Try to parse JSON data from a flash segment.
-
-    Args:
-        data: Binary data to parse
-
-    Returns:
-        Parsed JSON object or None if parsing failed
-    """
-    try:
-        # Find the end of the JSON data (null terminator or 0xFF)
-        for delimiter in [b'\x00', b'\xff']:
-            end_idx = data.find(delimiter)
-            if end_idx != -1:
-                break
-        else:
-            end_idx = len(data)
-
-        json_bytes = data[:end_idx]
-        return json.loads(json_bytes)
-    except json.JSONDecodeError:
-        return None
-
-
-def flash_status() -> None:
-    """Display the status of flashed bitstreams in each manifest slot."""
-    print("Reading manifests from flash...")
-    manifest_data = []
-
-    # Read all manifests
-    for slot in range(N_MANIFESTS):
-        slot_layout = SlotLayout(slot)
-        offset = slot_layout.manifest_addr
-        is_last = (slot == N_MANIFESTS - 1)
-
-        print(f"\nReading Slot {slot} manifest at {hex(offset)}:")
-        try:
-            data = read_flash_segment(offset, MANIFEST_SIZE, reset=is_last)
-            manifest_data.append((slot, offset, data))
-        except subprocess.CalledProcessError as e:
-            print(f"  Error reading flash: {e}")
-
-    # Print manifest statuses
-    print("\nMANIFESTS:")
-    print("-" * 40)
-
-    for slot, offset, data in manifest_data:
-        print(f"\nSlot {slot} manifest at {hex(offset)}:")
-
-        try:
-            if is_empty_flash(data):
-                print("  status: empty (all 0xFF)")
-                continue
-
-            json_data = parse_json_from_flash(data)
-            if json_data:
-                print("  status: valid manifest")
-                print("  contents:")
-                print(json.dumps(json_data, indent=2))
-            else:
-                print("  status: data is there, but does not look like a manifest")
-                print(f"  first 32 bytes: {data[:32].hex()}")
-        except Exception as e:
-            print(f"  Error processing data: {e}")
-
-    print("\nNote: empty segments are shown as 'empty (all 0xFF)'")
-
-
-def confirm_operation() -> bool:
-    """Prompt for user confirmation."""
-    response = input("\nProceed with flashing? [y/N] ")
-    return response.lower() == 'y'
-
 
 def main():
     parser = argparse.ArgumentParser(description="Flash Tiliqua bitstream archives")
