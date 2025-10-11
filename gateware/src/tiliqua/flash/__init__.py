@@ -1,5 +1,6 @@
-#!/usr/bin/env python3
-
+# Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
 """
 Flash tool for Tiliqua bitstream archives.
 See docs/gettingstarted.rst for usage.

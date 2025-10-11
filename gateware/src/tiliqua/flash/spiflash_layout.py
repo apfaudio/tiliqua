@@ -1,3 +1,11 @@
+# Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
+#
+# SPDX-License-Identifier: CERN-OHL-S-2.0
+"""
+Utilities for computing the layout of different artifacts in
+SPI flash based on the ``--slot`` the user wants to flash to.
+"""
+
 import copy
 
 from ..build.types import *
