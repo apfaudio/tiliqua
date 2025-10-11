@@ -1,7 +1,9 @@
+import re
 import os
 import tempfile
 import subprocess
 from typing import Optional
+from colorama import Fore, Style
 
 from ..build.types import RegionType
 
@@ -102,7 +104,7 @@ def scan_for_tiliqua_hardware_version() -> Optional[int]:
     except subprocess.CalledProcessError as e:
         print(f"Error running {TILIQUA_OPENFPGALOADER}: {e}")
         sys.exit(1)
-    print(output)
+    print(f"{Fore.BLUE}{Style.BRIGHT}{output}{Style.RESET_ALL}")
     lines = output.strip().split('\n')
     for line in lines:
         if "apfbug" in line.lower() or "apf.audio" in line.lower():
@@ -115,7 +117,7 @@ def scan_for_tiliqua_hardware_version() -> Optional[int]:
                 hw_version_match = re.search(r'R(\d+)', product)
                 if hw_version_match:
                     hw_version = int(hw_version_match.group(1))
-                    print(f"Found attached Tiliqua! (hw_rev={hw_version}, serial={serial})")
+                    print(f"Found Tiliqua! (hw_rev={Style.BRIGHT}{hw_version}{Style.RESET_ALL}, serial={Style.BRIGHT}{serial}{Style.RESET_ALL})")
                     return hw_version
                 else:
                     print("Found tiliqua-like device, product code is malformed (update RP2040?).")

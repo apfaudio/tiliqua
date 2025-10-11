@@ -7,6 +7,7 @@ SPI flash based on the ``--slot`` the user wants to flash to.
 """
 
 import copy
+from colorama import Fore, Style
 
 from ..build.types import *
 
@@ -100,9 +101,13 @@ class FlashableRegion:
         return self.addr < other.addr
 
     def __str__(self) -> str:
-        result = (f"{self.memory_region.filename} ({self.memory_region.region_type}):\n"
-                  f"    start: 0x{self.addr:x}\n"
-                  f"    end:   0x{self.addr + self.aligned_size - 1:x}")
+        result = (f"{Style.BRIGHT}{self.memory_region.filename}{Style.RESET_ALL} ({self.memory_region.region_type}):\n"
+                  f"    start:     0x{self.addr:x}\n"
+                  f"    start+sz:  0x{self.addr+self.size:x}\n"
+                  f"    end:       0x{self.addr + self.aligned_size - 1:x}")
+        if self.memory_region.region_type == RegionType.RamLoad:
+            result = result + f"\n    psram_dst: 0x{self.memory_region.psram_dst:x}"
+            result = result + f" (copied by bootloader before bitstream starts)"
         return result
 
 
@@ -144,7 +149,6 @@ def compute_concrete_regions_to_flash(
             case RegionType.RamLoad:
                 assert region.spiflash_src is None, "RamLoad region already has spiflash_src set"
                 region.spiflash_src = ramload_base
-                print(f"manifest: region {region.filename}: spiflash_src set to 0x{ramload_base:x}")
                 # Align firmware base to next flash sector boundary
                 ramload_base += region.size
                 ramload_base = (ramload_base + FLASH_SECTOR_SZ - 1) & ~(FLASH_SECTOR_SZ - 1)

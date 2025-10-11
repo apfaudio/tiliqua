@@ -21,14 +21,12 @@ besides some constants, as it will be re-used for the WebUSB flasher.
 """
 
 import argparse
+import colorama
 import json
 import os
-import subprocess
 import sys
-import re
-import tempfile
-from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from colorama import Fore, Style
+from typing import Optional
 
 from ..build.types import N_MANIFESTS
 from .archive_loader import ArchiveLoader
@@ -36,32 +34,29 @@ from .spiflash_layout import compute_concrete_regions_to_flash
 from .spiflash_status import flash_status
 from .openfpgaloader import *
 
-def flash_archive(
-    archive_path: str,
-    hw_rev_major: int,
-    slot: Optional[int] = None,
-    noconfirm: bool = False,
-    erase_option_storage: bool = False):
+def flash_archive(args, detected_hw_rev: int):
 
-    with ArchiveLoader(archive_path) as loader:
+    slot = args.slot
+
+    with ArchiveLoader(args.archive_path) as loader:
 
         manifest = loader.manifest
 
         # Validate hardware compatibility
 
-        if manifest.hw_rev != hw_rev_major:
-            print(f"Aborting: attached Tiliqua (hw=r{hw_rev_major}) does not match archive (hw=r{manifest.hw_rev}).")
+        if manifest.hw_rev != detected_hw_rev:
+            print(f"Aborting: attached Tiliqua (hw=r{detected_hw_rev}) does not match archive (hw=r{manifest.hw_rev}).")
             sys.exit(1)
 
         # Error out if we flash to the wrong kind of slot
 
         is_bootloader = loader.is_bootloader_archive()
         if is_bootloader and slot is not None:
-            print("Error: bootloader bitstream must be flashed to bootloader slot")
-            print(f"Remove --slot argument to flash to bootloader slot.")
+            print("Error: bootloader bitstream must be flashed to bootloader region")
+            print(f"Remove `--slot` argument to flash to bootloader region.")
             sys.exit(1)
         elif not is_bootloader and slot is None:
-            print("Error: Must specify slot for user bitstreams")
+            print("Error: Please specify target `--slot` for user bitstreams")
             sys.exit(1)
 
         # Assign real SPI flash addresses to memory regions that must exist
@@ -76,33 +71,40 @@ def flash_archive(
 
         with open(loader.tmpdir / "manifest.json", "w") as f:
             manifest_dict = concrete_manifest.to_dict()
-            print(f"\nFinal manifest contents:\n{json.dumps(manifest_dict, indent=2)}")
+            if args.dump_manifest:
+                print(f"\nManifest (for slot={slot}), with concrete flash layout:")
+                print(f"{Style.DIM}{json.dumps(manifest_dict, indent=2)}{Style.RESET_ALL}")
             json.dump(manifest_dict, f)
 
-        print("\nRegions to flash:")
+        print(f"\nFlash layout (for slot = {slot}):")
         for region in sorted(regions_to_flash):
             print(f"  {region}")
 
         # Generate and execute flashing commands (with optional confirmation)
 
         sequence = OpenFPGALoaderCommandSequence.from_flashable_regions(
-            regions_to_flash, erase_option_storage)
+            regions_to_flash, args.erase_option_storage)
 
         print("\nThe following commands will be executed:")
+        print(f"{Fore.BLUE}{Style.BRIGHT}")
         for cmd in sequence.commands:
             print(f"\t$ {' '.join(cmd)}")
+        print(Style.RESET_ALL)
 
         def confirm_operation():
-            response = input("\nProceed with flashing? [y/N] ")
+            response = input("Proceed with flashing? [y/N] ")
             return response.lower() == 'y'
 
-        if not noconfirm and not confirm_operation():
+        if not args.noconfirm and not confirm_operation():
             print("Aborting.")
             sys.exit(0)
 
         sequence.execute(cwd=loader.tmpdir)
 
 def main():
+
+    colorama.init()
+
     parser = argparse.ArgumentParser(description="Flash Tiliqua bitstream archives")
     subparsers = parser.add_subparsers(dest='command', required=True)
 
@@ -112,6 +114,7 @@ def main():
     archive_parser.add_argument("--slot", type=int, help="Slot number (0-7) for bootloader-managed bitstreams")
     archive_parser.add_argument("--noconfirm", action="store_true", help="Do not ask for confirmation before flashing")
     archive_parser.add_argument("--erase-option-storage", action="store_true", help="Erase option storage regions in the manifest")
+    archive_parser.add_argument("--dump-manifest", action="store_true", help="Dump the final JSON manifest before flashing it.")
 
     # Status command
     subparsers.add_parser('status', help='Display current bitstream status')
@@ -132,7 +135,7 @@ def main():
             if args.slot is not None and not 0 <= args.slot < N_MANIFESTS:
                 print(f"Error: Slot must be between 0 and {N_MANIFESTS-1}")
                 sys.exit(1)
-            flash_archive(args.archive_path, hw_rev_major, args.slot, args.noconfirm, args.erase_option_storage)
+            flash_archive(args, detected_hw_rev=hw_rev_major)
         case 'status':
             flash_status()
 
