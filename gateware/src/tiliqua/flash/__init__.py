@@ -16,8 +16,8 @@ bitstreams, as for user bitstreams the bootloader is responsible for
 copying the firmware from SPIFlash to a desired region of PSRAM before
 the user bitstream is started.
 
-This should have minimal code dependencies from this repository besides some
-constants, as it will be re-used for the WebUSB flasher.
+This directory should have minimal code dependencies from this repository
+besides some constants, as it will be re-used for the WebUSB flasher.
 """
 
 import argparse
@@ -30,127 +30,11 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-from ..build.types import N_MANIFESTS, RegionType
+from ..build.types import N_MANIFESTS
 from .archive_loader import ArchiveLoader
 from .spiflash_layout import compute_concrete_regions_to_flash
 from .spiflash_status import flash_status
-
-class OpenFPGALoaderCommandSequence:
-
-    """
-    Generates the ``openFPGALoader`` commands needed in order
-    to flash each region to the hardware.
-    """
-
-    def __init__(self, binary="openFPGALoader"):
-        self._command_base = [binary, "-c", "dirtyJtag"]
-        self._commands = []
-
-    @staticmethod
-    def from_flashable_regions(regions, erase_option_storage=False):
-        sequence = OpenFPGALoaderCommandSequence()
-        for region in regions:
-            if region.memory_region.region_type == RegionType.OptionStorage:
-                if erase_option_storage:
-                    sequence = sequence.with_erase_cmd(region.addr, region.memory_region.size)
-                continue
-            sequence = sequence.with_flash_cmd(str(region.memory_region.filename), region.addr, "raw")
-        return sequence
-
-    @staticmethod
-    def _create_erased_file(size: int) -> str:
-        """
-        Create a temporary file filled with 0xff bytes (erased flash state).
-        This is used to erase sectors because openFPGALoader does not have such a command.
-        """
-        import tempfile
-        fd, path = tempfile.mkstemp(suffix=".erase.bin")
-        try:
-            with os.fdopen(fd, 'wb') as f:
-                f.write(b'\xff' * size)
-        except:
-            os.close(fd)
-            raise
-        return path
-
-
-    def with_flash_cmd(self, path: str, offset: int, file_type: str = "auto"):
-        # Command to flash a file to a specific flash offset.
-        # Add commands using a builder pattern:  o.with_flash_cmd(...).execute()
-        cmd = self._command_base + [
-            "-f", "-o", f"{hex(offset)}",
-        ]
-        if file_type != "auto":
-            cmd.extend(["--file-type", file_type])
-        cmd.append(path)
-        self._commands.append(cmd)
-        return self
-
-    def with_erase_cmd(self, offset: int, size: int):
-        # Command to flash 0xff*size bytes to offset (same as erasing)
-        temp_file = self._create_erased_file(size)
-        return self.with_flash_cmd(temp_file, offset, "raw")
-
-    @property
-    def commands(self):
-        commands = self._commands.copy()
-        # Add skip-reset flag to all but the last command
-        if len(commands) > 1:
-            for cmd in commands[:-1]:
-                if "--skip-reset" not in cmd:
-                    cmd.insert(-1, "--skip-reset")
-        return commands
-
-    def execute(self, cwd=None):
-        """
-        Execute flashing commands on the hardware.
-
-        ``cwd`` should normally be the path to which the bitstream
-        archive was extracted, so ``openFPGALoader`` can find the files
-        that it needs to flash.
-        """
-        print("\nExecuting commands...")
-        for cmd in self.commands:
-            subprocess.check_call(cmd, cwd=cwd)
-
-def scan_for_tiliqua():
-    """
-    Scan for a debugger with "apfbug" in the product name using openFPGALoader.
-    Return the attached Tiliqua hardware version.
-    """
-    print("Scan for Tiliqua...")
-    try:
-        result = subprocess.run(
-            ["openFPGALoader", "--scan-usb"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        output = result.stdout
-    except subprocess.CalledProcessError as e:
-        print(f"Error running openFPGALoader: {e}")
-        sys.exit(1)
-    print(output)
-    lines = output.strip().split('\n')
-    for line in lines:
-        if "apfbug" in line.lower() or "apf.audio" in line.lower():
-            # Extract serial (16-char hex string) and product (contains "Tiliqua R#")
-            serial_match = re.search(r'\b([A-F0-9]{16})\b', line)
-            product_match = re.search(r'(Tiliqua\s+R\d+[^$]*)', line, re.IGNORECASE)
-            if serial_match and product_match:
-                serial = serial_match.group(1)
-                product = product_match.group(1).strip()
-                hw_version_match = re.search(r'R(\d+)', product)
-                if hw_version_match:
-                    hw_version = int(hw_version_match.group(1))
-                    print(f"Found attached Tiliqua! (hw_rev={hw_version}, serial={serial})")
-                    return hw_version
-                else:
-                    print("Found tiliqua-like device, product code is malformed (update RP2040?).")
-
-    print("Could not find Tiliqua debugger.")
-    print("Check it is turned on, plugged in ('dbg' port), permissions correct, and RP2040 firmware is up to date.")
-    sys.exit(1)
+from .openfpgaloader import *
 
 def flash_archive(
     archive_path: str,
@@ -234,7 +118,11 @@ def main():
 
     args = parser.parse_args()
 
-    hw_rev_major = scan_for_tiliqua()
+    hw_rev_major = scan_for_tiliqua_hardware_version()
+    if not isinstance(hw_rev_major, int):
+        print("Could not find Tiliqua debugger.")
+        print("Check it is turned on, plugged in ('dbg' port), permissions correct, and RP2040 firmware is up to date.")
+        sys.exit(1)
 
     match args.command:
         case 'archive':
