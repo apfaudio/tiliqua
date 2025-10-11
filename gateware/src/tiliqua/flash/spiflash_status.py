@@ -6,6 +6,7 @@ Utilities for dumping manifests from the SPI flash on a device to
 determine what is flashed where (i.e. ``pdm flash status``).
 """
 
+import json
 import tempfile
 import subprocess
 from typing import Dict, List, Tuple, Optional

@@ -30,7 +30,7 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-from ..build.types import RegionType
+from ..build.types import N_MANIFESTS, RegionType
 from .archive_loader import ArchiveLoader
 from .spiflash_layout import compute_concrete_regions_to_flash
 from .spiflash_status import flash_status
