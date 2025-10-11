@@ -108,6 +108,9 @@ def compute_concrete_regions_to_flash(
     After assignment, check the addresses for any overlap our out-of-slot conditions.
 
     Returns an updated manifest and list of FlashableRegion.
+
+    The updated manifest (with concrete spi flash addresses) should be the one
+    written to the flash, so the SoC knows where to find things.
     """
 
     manifest = copy.deepcopy(manifest)

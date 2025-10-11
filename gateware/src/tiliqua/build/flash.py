@@ -98,11 +98,11 @@ class FlashCommandGenerator:
                     cmd.insert(-1, "--skip-reset")
         return commands
 
-    def execute_commands(self, commands: List[List[str]]):
+    def execute_commands(self, commands: List[List[str]], cwd=None):
         """Execute all flash commands."""
         print("\nExecuting flash commands...")
         for cmd in commands:
-            subprocess.check_call(cmd)
+            subprocess.check_call(cmd, cwd=cwd)
         print("\nFlashing completed successfully")
 
 
@@ -152,11 +152,13 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
 
         manifest = loader.get_manifest()
 
-        # Validate hardware compatibility and other CLI arguments
+        # Validate hardware compatibility
 
         if manifest.hw_rev != hw_rev_major:
             print(f"Aborting: attached Tiliqua (hw=r{hw_rev_major}) does not match archive (hw=r{manifest.hw_rev}).")
             sys.exit(1)
+
+        # Error out if we flash to the wrong kind of slot
 
         is_bootloader = loader.is_bootloader_archive()
         if is_bootloader and slot is not None:
@@ -167,8 +169,20 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             print("Error: Must specify slot for user bitstreams")
             sys.exit(1)
 
+        # Assign real SPI flash addresses to memory regions that must exist
+        # in the SPI flash (but could not have their addresses calculated until now,
+        # as we didn't know which slot the bitstream would land in).
+
         (concrete_manifest, regions_to_flash) = compute_concrete_regions_to_flash(
             manifest, slot)
+
+        # Write the concrete manifest back to our extracted archive path.
+        # So that it is the one actually flashed to the device.
+
+        with open(loader.get_tmpdir() / "manifest.json", "w") as f:
+            manifest_dict = concrete_manifest.to_dict()
+            print(f"\nFinal manifest contents:\n{json.dumps(manifest_dict, indent=2)}")
+            json.dump(manifest_dict, f)
 
         print("\nRegions to flash:")
         for region in sorted(regions_to_flash):
@@ -187,7 +201,7 @@ def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = No
             print("Aborting.")
             sys.exit(0)
 
-        command_generator.execute_commands(commands)
+        command_generator.execute_commands(commands, cwd=loader.get_tmpdir())
 
 def read_flash_segment(offset: int, size: int, reset: bool = False) -> bytes:
     """
