@@ -35,9 +35,89 @@ from .archive_loader import ArchiveLoader
 from .spiflash_layout import compute_concrete_regions_to_flash
 from .spiflash_status import flash_status
 
+class FlashCommandGenerator:
+
+    """
+    Given a list of ``FlashableRegion`` objects, this class
+    generates the ``openFPGALoader`` commands needed in order
+    to flash each region to the hardware.
+
+    ``generate_commands`` and ``execute_commands`` are separated,
+    so the user is shown exactly what *will* be executed before
+    they confirm/deny, and so that ``generate_commands`` is potentially
+    useful for other (e.g. WebUSB) flashing backends.
+    """
+
+    def __init__(self, regions_to_flash):
+        self.regions_to_flash = sorted(regions_to_flash)
+
+    @staticmethod
+    def _flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str]:
+        """
+        ``openFPGALoader`` command to flash a file to the specified offset.
+        """
+        cmd = [
+            "openFPGALoader", "-c", "dirtyJtag",
+            "-f", "-o", f"{hex(offset)}",
+        ]
+        if file_type != "auto":
+            cmd.extend(["--file-type", file_type])
+        cmd.append(file_path)
+        return cmd
+
+    @staticmethod
+    def _create_erased_file(size: int) -> str:
+        """
+        Create a temporary file filled with 0xff bytes (erased flash state).
+        This is used to erase sectors because openFPGALoader does not have such a command.
+        """
+        import tempfile
+        fd, path = tempfile.mkstemp(suffix=".erase.bin")
+        try:
+            with os.fdopen(fd, 'wb') as f:
+                f.write(b'\xff' * size)
+        except:
+            os.close(fd)
+            raise
+        return path
+
+    def generate_commands(self, erase_option_storage: bool = False) -> List[List[str]]:
+        """Generate flash commands for all regions."""
+        commands = []
+        for region in self.regions_to_flash:
+            if region.memory_region.region_type == RegionType.OptionStorage:
+                # Handle OptionStorage regions based on erase_option_storage flag
+                if erase_option_storage:
+                    temp_file = self._create_erased_file(region.memory_region.size)
+                    commands.append(self._flash_file(temp_file, region.addr, "raw"))
+                continue
+            # Use the pre-calculated file path
+            commands.append(
+                    self._flash_file(str(region.memory_region.filename), region.addr, "raw"))
+        # Add skip-reset flag to all but the last command
+        if len(commands) > 1:
+            for cmd in commands[:-1]:
+                if "--skip-reset" not in cmd:
+                    cmd.insert(-1, "--skip-reset")
+        return commands
+
+    def execute_commands(self, commands: List[List[str]], cwd=None):
+        """
+        Execute flashing commands on the hardware.
+
+        ``cwd`` should normally be the path to which the bitstream
+        archive was extracted, so ``openFPGALoader`` can find the files
+        that it needs to flash.
+        """
+        print("\nExecuting flash commands...")
+        for cmd in commands:
+            subprocess.check_call(cmd, cwd=cwd)
+        print("\nFlashing completed successfully")
+
 def scan_for_tiliqua():
     """
     Scan for a debugger with "apfbug" in the product name using openFPGALoader.
+    Return the attached Tiliqua hardware version.
     """
     print("Scan for Tiliqua...")
     try:
@@ -58,11 +138,9 @@ def scan_for_tiliqua():
             # Extract serial (16-char hex string) and product (contains "Tiliqua R#")
             serial_match = re.search(r'\b([A-F0-9]{16})\b', line)
             product_match = re.search(r'(Tiliqua\s+R\d+[^$]*)', line, re.IGNORECASE)
-
             if serial_match and product_match:
                 serial = serial_match.group(1)
                 product = product_match.group(1).strip()
-
                 hw_version_match = re.search(r'R(\d+)', product)
                 if hw_version_match:
                     hw_version = int(hw_version_match.group(1))
@@ -75,81 +153,13 @@ def scan_for_tiliqua():
     print("Check it is turned on, plugged in ('dbg' port), permissions correct, and RP2040 firmware is up to date.")
     sys.exit(1)
 
-class FlashCommandGenerator:
-    """Generates and executes flash commands."""
+def flash_archive(
+    archive_path: str,
+    hw_rev_major: int,
+    slot: Optional[int] = None,
+    noconfirm: bool = False,
+    erase_option_storage: bool = False):
 
-    def __init__(self, regions_to_flash):
-        self.regions_to_flash = sorted(regions_to_flash)
-
-    def generate_commands(self, erase_option_storage: bool = False) -> List[List[str]]:
-        """Generate flash commands for all regions."""
-        commands = []
-        for region in self.regions_to_flash:
-            if region.memory_region.region_type == RegionType.OptionStorage:
-                # Handle OptionStorage regions based on erase_option_storage flag
-                if erase_option_storage:
-                    temp_file = create_erased_file(region.memory_region.size)
-                    commands.append(flash_file(temp_file, region.addr, "raw"))
-                continue
-            # Use the pre-calculated file path
-            commands.append(flash_file(str(region.memory_region.filename), region.addr, "raw"))
-        # Add skip-reset flag to all but the last command
-        if len(commands) > 1:
-            for cmd in commands[:-1]:
-                if "--skip-reset" not in cmd:
-                    cmd.insert(-1, "--skip-reset")
-        return commands
-
-    def execute_commands(self, commands: List[List[str]], cwd=None):
-        """Execute all flash commands."""
-        print("\nExecuting flash commands...")
-        for cmd in commands:
-            subprocess.check_call(cmd, cwd=cwd)
-        print("\nFlashing completed successfully")
-
-
-def flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str]:
-    """
-    Generate an openFPGALoader command to flash a file to the specified offset.
-    """
-    cmd = [
-        "openFPGALoader", "-c", "dirtyJtag",
-        "-f", "-o", f"{hex(offset)}",
-    ]
-    if file_type != "auto":
-        cmd.extend(["--file-type", file_type])
-    cmd.append(file_path)
-    return cmd
-
-
-def create_erased_file(size: int) -> str:
-    """
-    Create a temporary file filled with 0xff bytes (erased flash state).
-    This is used to erase sectors because openFPGALoader does not have such a command.
-    """
-    import tempfile
-    fd, path = tempfile.mkstemp(suffix=".erase.bin")
-    try:
-        with os.fdopen(fd, 'wb') as f:
-            f.write(b'\xff' * size)
-    except:
-        os.close(fd)
-        raise
-    return path
-
-
-def flash_archive(archive_path: str, hw_rev_major: int, slot: Optional[int] = None, noconfirm: bool = False, erase_option_storage: bool = False) -> None:
-    """
-    Flash a bitstream archive to the specified slot.
-
-    Args:
-        archive_path: Path to the bitstream archive
-        hw_rev_major: Hardware revision of attached Tiliqua
-        slot: Slot number for bootloader-managed bitstreams
-        noconfirm: Skip confirmation prompt if True
-        erase_option_storage: Erase option storage regions if True
-    """
-    # Load and extract archive
     with ArchiveLoader(archive_path) as loader:
 
         manifest = loader.manifest
