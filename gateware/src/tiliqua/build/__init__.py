@@ -4,4 +4,4 @@
 
 # Note: cli is not imported here to avoid circular imports
 # Import it directly as needed: from tiliqua.build import cli
-from . import archive, flash, sim
+from . import archive, sim

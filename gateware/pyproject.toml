@@ -23,6 +23,7 @@ dependencies = [
     "portalocker>=3.1.1",
     "apollo-fpga>=1.1.1",
     "pytest-xdist>=3.8.0",
+    "colorama>=0.4.6",
 ]
 
 [tool.pdm.dev-dependencies]
@@ -59,4 +60,4 @@ colors_vectorscope = { call = "top.vectorscope_no_soc.top:colors()" }
 # Documentation
 document.cmd = "sphinx-build docs/ docs/_build/ -W --keep-going"
 document-live.cmd = "sphinx-autobuild docs/ docs/_build/ --watch ."
-flash = {call = "tiliqua.build.flash:main"}
+flash = {call = "tiliqua.flash:main"}
