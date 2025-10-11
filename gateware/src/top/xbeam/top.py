@@ -3,13 +3,78 @@
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
 """
-Vectorscope and 4-channel oscilloscope with menu system.
+Vectorscope/oscilloscope with menu system, USB audio and tunable delay lines.
 
-In vectorscope mode, rasterize X/Y (audio channel 0, 1) and
-color (audio channel 3) to a simulated CRT.
+    - In **vectorscope mode**, rasterize X/Y (audio channel 0, 1), intensity (channel 2)
+      and color (channel 3) to a simulated CRT, with adjustable beam settings, scale
+      and offset for each channel.
 
-In oscilloscope mode, all 4 input channels are plotted simultaneosly
-in classic oscilloscope fashion.
+    - In **oscilloscope mode**, all 4 input channels are plotted simultaneosly
+      with adjustable timebase, trigger settings and so on.
+
+A USB audio interface, tunable delay lines, and series of switches is included in
+the signal path to open up more applications. The overall signal flow looks like this:
+
+    .. code-block:: text
+
+        in0/x ───────►┌───────┐
+        in1/y ───────►│Audio  │
+        in2/i ───────►│IN (4x)│
+        in3/c ───────►└───┬───┘
+                          ▼
+                 ┌───◄─[SPLIT]─►────┐
+                 │        │         ▼
+                 │        ▼  ┌──────────────┐     ┌────────┐
+                 │        │  │4in/4out USB  ├────►│Computer│
+                 │        │  │Audio I/F     │◄────│(USB2)  │
+                 │        │  └──────┬───────┘     └────────┘
+                 │        └───┐ ┌───┘
+                 │ usb=bypass ▼ ▼ usb=enabled
+                 │           [MUX]
+                 │      ┌──────────────┐
+                 │      │4x Delay Lines│ (tunable)
+                 │      └──────┬───────┘
+                 │             ▼
+                 └────┐ ┌─◄─[SPLIT]─►────┐
+                      │ │                │
+           src=inputs ▼ ▼ src=outputs    │
+                     [MUX]               │
+                       │                 ▼
+                 ┌─────▼──────┐     ┌────────┬──────► out0
+     (select with│Vectorscope/│     │Audio   ├──────► out1
+      plot_mode) │Oscilloscope│     │OUT (4x)├──────► out2
+                 └────────────┘     └────────┴──────► out3
+
+The ``[MUX]`` elements pictured above can be switched by the menu system, for viewing
+different parts of the signal path (i.e inputs or outputs to delay lines, USB streams).
+Some usage ideas:
+
+    - With ``plot_src=inputs`` and ``usb_mode=bypass``, we can visualize our analog
+      audio inputs.
+    - With ``plot_src=outputs`` and ``usb_mode=bypass``, we can visualize our analog
+      audio inputs after being affected by the delay lines (this is fun to get patterns
+      out of duplicated mono signals)
+    - With ``plot_src=outputs`` and ``usb_mode=enable``, we can visualize a USB audio
+      stream as it is sent to the analog outputs. This is perfect for visualizing
+      oscilloscope music being streamed from a computer.
+    - With ``plot_src=inputs`` and ``usb_mode=enable``, we can visualize what we are
+      sending back to the computer on our analog inputs.
+
+    .. note::
+
+        The USB audio interface will always enumerate if it is connected to a computer, however
+        it is only part of the signal flow if ``usb_mode=enabled`` in the menu system.
+
+    .. note::
+
+        By default, this core builds for ``48kHz/16bit`` sampling.
+        However, Tiliqua is shipped with ``--fs-192khz`` enabled,
+        which provides much higher fidelity plots. If you're feeling
+        adventurous, you can also synthesize with the environment variable
+        ``TILIQUA_ASQ_WIDTH=24`` to use a completely 24-bit audio path.
+        This mostly works, but might break the scope triggering and
+        use a bit more FPGA resources.
+
 """
 
 import os
