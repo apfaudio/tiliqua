@@ -217,7 +217,7 @@ def flash_archive(
             print("Aborting.")
             sys.exit(0)
 
-        command_generator.execute_commands(commands, cwd=loader.get_tmpdir())
+        command_generator.execute_commands(commands, cwd=loader.tmpdir)
 
 def main():
     parser = argparse.ArgumentParser(description="Flash Tiliqua bitstream archives")
