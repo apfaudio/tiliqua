@@ -10,7 +10,7 @@ from pathlib import Path
 from tiliqua.build.archive import ArchiveBuilder
 from tiliqua.flash import (ArchiveLoader,
                            compute_concrete_regions_to_flash,
-                           FlashCommandGenerator)
+                           OpenFPGALoaderCommandSequence)
 from tiliqua.build.types import FirmwareLocation
 from tiliqua.platform import TiliquaRevision
 
@@ -64,8 +64,8 @@ class TestFlashCommandGenerator(unittest.TestCase):
             manifest = loader.manifest
             (_concrete_manifest, flashable_regions) = compute_concrete_regions_to_flash(
                     manifest, slot=None)  # Bootloader
-            generator = FlashCommandGenerator(flashable_regions)
-            commands = generator.generate_commands()
+            commands = OpenFPGALoaderCommandSequence.from_flashable_regions(
+                flashable_regions).commands
 
             self._print_regions_and_commands(flashable_regions, commands)
 
@@ -100,8 +100,8 @@ class TestFlashCommandGenerator(unittest.TestCase):
             manifest = loader.manifest
             (_concrete_manifest, flashable_regions) = compute_concrete_regions_to_flash(
                     manifest, slot=1)  # User slot 1
-            generator = FlashCommandGenerator(flashable_regions)
-            commands = generator.generate_commands()
+            commands = OpenFPGALoaderCommandSequence.from_flashable_regions(
+                flashable_regions).commands
 
             self._print_regions_and_commands(flashable_regions, commands)
 
@@ -133,8 +133,8 @@ class TestFlashCommandGenerator(unittest.TestCase):
             manifest = loader.manifest
             (_concrete_manifest, flashable_regions) = compute_concrete_regions_to_flash(
                     manifest, slot=2)  # User slot 2
-            generator = FlashCommandGenerator(flashable_regions)
-            commands = generator.generate_commands()
+            commands = OpenFPGALoaderCommandSequence.from_flashable_regions(
+                flashable_regions).commands
 
             self._print_regions_and_commands(flashable_regions, commands)
 

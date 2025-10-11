@@ -35,35 +35,27 @@ from .archive_loader import ArchiveLoader
 from .spiflash_layout import compute_concrete_regions_to_flash
 from .spiflash_status import flash_status
 
-class FlashCommandGenerator:
+class OpenFPGALoaderCommandSequence:
 
     """
-    Given a list of ``FlashableRegion`` objects, this class
-    generates the ``openFPGALoader`` commands needed in order
+    Generates the ``openFPGALoader`` commands needed in order
     to flash each region to the hardware.
-
-    ``generate_commands`` and ``execute_commands`` are separated,
-    so the user is shown exactly what *will* be executed before
-    they confirm/deny, and so that ``generate_commands`` is potentially
-    useful for other (e.g. WebUSB) flashing backends.
     """
 
-    def __init__(self, regions_to_flash):
-        self.regions_to_flash = sorted(regions_to_flash)
+    def __init__(self, binary="openFPGALoader"):
+        self._command_base = [binary, "-c", "dirtyJtag"]
+        self._commands = []
 
     @staticmethod
-    def _flash_file(file_path: str, offset: int, file_type: str = "auto") -> List[str]:
-        """
-        ``openFPGALoader`` command to flash a file to the specified offset.
-        """
-        cmd = [
-            "openFPGALoader", "-c", "dirtyJtag",
-            "-f", "-o", f"{hex(offset)}",
-        ]
-        if file_type != "auto":
-            cmd.extend(["--file-type", file_type])
-        cmd.append(file_path)
-        return cmd
+    def from_flashable_regions(regions, erase_option_storage=False):
+        sequence = OpenFPGALoaderCommandSequence()
+        for region in regions:
+            if region.memory_region.region_type == RegionType.OptionStorage:
+                if erase_option_storage:
+                    sequence = sequence.with_erase_cmd(region.addr, region.memory_region.size)
+                continue
+            sequence = sequence.with_flash_cmd(str(region.memory_region.filename), region.addr, "raw")
+        return sequence
 
     @staticmethod
     def _create_erased_file(size: int) -> str:
@@ -81,19 +73,27 @@ class FlashCommandGenerator:
             raise
         return path
 
-    def generate_commands(self, erase_option_storage: bool = False) -> List[List[str]]:
-        """Generate flash commands for all regions."""
-        commands = []
-        for region in self.regions_to_flash:
-            if region.memory_region.region_type == RegionType.OptionStorage:
-                # Handle OptionStorage regions based on erase_option_storage flag
-                if erase_option_storage:
-                    temp_file = self._create_erased_file(region.memory_region.size)
-                    commands.append(self._flash_file(temp_file, region.addr, "raw"))
-                continue
-            # Use the pre-calculated file path
-            commands.append(
-                    self._flash_file(str(region.memory_region.filename), region.addr, "raw"))
+
+    def with_flash_cmd(self, path: str, offset: int, file_type: str = "auto"):
+        # Command to flash a file to a specific flash offset.
+        # Add commands using a builder pattern:  o.with_flash_cmd(...).execute()
+        cmd = self._command_base + [
+            "-f", "-o", f"{hex(offset)}",
+        ]
+        if file_type != "auto":
+            cmd.extend(["--file-type", file_type])
+        cmd.append(path)
+        self._commands.append(cmd)
+        return self
+
+    def with_erase_cmd(self, offset: int, size: int):
+        # Command to flash 0xff*size bytes to offset (same as erasing)
+        temp_file = self._create_erased_file(size)
+        return self.with_flash_cmd(temp_file, offset, "raw")
+
+    @property
+    def commands(self):
+        commands = self._commands.copy()
         # Add skip-reset flag to all but the last command
         if len(commands) > 1:
             for cmd in commands[:-1]:
@@ -101,7 +101,7 @@ class FlashCommandGenerator:
                     cmd.insert(-1, "--skip-reset")
         return commands
 
-    def execute_commands(self, commands: List[List[str]], cwd=None):
+    def execute(self, cwd=None):
         """
         Execute flashing commands on the hardware.
 
@@ -109,10 +109,9 @@ class FlashCommandGenerator:
         archive was extracted, so ``openFPGALoader`` can find the files
         that it needs to flash.
         """
-        print("\nExecuting flash commands...")
-        for cmd in commands:
+        print("\nExecuting commands...")
+        for cmd in self.commands:
             subprocess.check_call(cmd, cwd=cwd)
-        print("\nFlashing completed successfully")
 
 def scan_for_tiliqua():
     """
@@ -200,13 +199,13 @@ def flash_archive(
         for region in sorted(regions_to_flash):
             print(f"  {region}")
 
-        # Generate and execute flash commands
-        command_generator = FlashCommandGenerator(regions_to_flash)
-        commands = command_generator.generate_commands(erase_option_storage)
+        # Generate and execute flashing commands (with optional confirmation)
 
-        # Show all commands and get confirmation
+        sequence = OpenFPGALoaderCommandSequence.from_flashable_regions(
+            regions_to_flash, erase_option_storage)
+
         print("\nThe following commands will be executed:")
-        for cmd in commands:
+        for cmd in sequence.commands:
             print(f"\t$ {' '.join(cmd)}")
 
         def confirm_operation():
@@ -217,7 +216,7 @@ def flash_archive(
             print("Aborting.")
             sys.exit(0)
 
-        command_generator.execute_commands(commands, cwd=loader.tmpdir)
+        sequence.execute(cwd=loader.tmpdir)
 
 def main():
     parser = argparse.ArgumentParser(description="Flash Tiliqua bitstream archives")
