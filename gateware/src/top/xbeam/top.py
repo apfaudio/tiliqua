@@ -5,12 +5,23 @@
 """
 Vectorscope/oscilloscope with menu system, USB audio and tunable delay lines.
 
-    - In **vectorscope mode**, rasterize X/Y (audio channel 0, 1), intensity (channel 2)
-      and color (channel 3) to a simulated CRT, with adjustable beam settings, scale
-      and offset for each channel.
+    - In **vectorscope mode**, rasterize X/Y, intensity and color to a simulated CRT,
+      with adjustable beam settings, scale and offset for each channel.
 
     - In **oscilloscope mode**, all 4 input channels are plotted simultaneosly
       with adjustable timebase, trigger settings and so on.
+
+The channels are assigned as follows:
+
+.. code-block:: text
+
+                 Vectorscope │ Oscilloscope
+        ┌────┐               │
+        │in0 │◄─ x           │ channel 0 + trig
+        │in1 │◄─ y           │ channel 1
+        │in2 │◄─ intensity   │ channel 2
+        │in3 │◄─ color       │ channel 3
+        └────┘
 
 A USB audio interface, tunable delay lines, and series of switches is included in
 the signal path to open up more applications. The overall signal flow looks like this:

@@ -4,21 +4,41 @@
 """
 8-voice polyphonic synthesizer with video display and menu system.
 
+.. code-block:: text
+
+        Pitch
+                     ┌────┐
+        C2    touch0 │in0 │◄─ phase modulation
+        G2    touch1 │in1 │◄─ -
+        C3    touch2 │in2 │◄─ -
+        Eb3   touch3 │in3 │◄─ -
+                     └────┘
+                     ┌────┐
+        G3    touch4 │out0│─► -
+        C4    touch5 │out1│─► -
+        -     touch6 │out2│─► audio out (L)
+        -     touch7 │out3│─► audio out (R)
+                     └────┘
+
 The synthesizer can be controlled through touching jacks 0-5 or using a
-MIDI keyboard through TRS midi. The control source must be selected in
-the menu system.
+MIDI keyboard (TRS MIDI or USB host is supported). The control source
+must be selected in the menu system.
 
-In touch mode, the touch magnitude controls the filter envelopes of
-each voice. In MIDI mode, the velocity of each note as well as the
-value of the modulation wheel affects the filter envelopes.
+    - Output audio is sent to output channels 2 and 3 (last 2 jacks).
 
-Output audio is sent to output channels 2 and 3 (last 2 jacks).
+    - In touch mode, the touch magnitude controls the filter envelopes of
+      each voice. In MIDI mode, the velocity of each note as well as the
+      value of the modulation wheel affects the filter envelopes.
 
-Input jack 0 also controls phase modulation of all oscillators,
-so you can patch input jack 0 to an LFO for retro-sounding slow
-vibrato, or to an oscillator for some wierd FM effects.
+    - Input jack 0 also controls phase modulation of all oscillators,
+      so you can patch input jack 0 to an LFO for retro-sounding slow
+      vibrato, or to an oscillator for some wierd FM effects.
 
-A block diagram of the core components of this polysynth:
+Each voice is hard panned left or right in the stereo field,
+with 2 end-of-chain effects: distortion and diffusion (delay),
+both of which can be mixed in with the UI.
+
+A block diagram of the core components of each voice:
 
 .. image:: /_static/polysynth.png
   :width: 800

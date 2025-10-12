@@ -4,7 +4,7 @@
 """
 Collect some information about Tiliqua health, display it on the video
 output and log it over serial. This is mostly used to check for
-hardware issues and for bringup.
+hardware issues and for calibration.
 """
 
 import os

@@ -5,7 +5,23 @@
 """
 'Macro-Oscillator' runs a downsampled version of the DSP code from a
 famous Eurorack module (credits below), on a softcore, to demonstrate the
-compute capabilities available if you do everything in software.
+compute capabilities available if you do everything in software, using
+a really large CPU that has big caches and an FPU.
+
+.. code-block:: text
+
+        ┌────┐
+        │in0 │◄─ frequency modulation
+        │in1 │◄─ trigger
+        │in2 │◄─ timbre modulation
+        │in3 │◄─ morph modulation
+        └────┘
+        ┌────┐
+        │out0│─► -
+        │out1│─► -
+        │out2│─► 'out' output (mono)
+        │out3│─► 'aux' output (mono)
+        └────┘
 
 Most engines are available for tweaking and patching via the UI.
 A couple of engines use a bit more compute and may cause the UI to
@@ -13,21 +29,29 @@ slow down or audio to glitch, so these ones are disabled.
 A scope and vectorscope is included and hooked up to the oscillator
 outputs so you can visualize exactly what the softcore is spitting out.
 
+.. code-block:: text
+
+                          (write samples to)
+                         ┌─────────────────┐
+                         │                 ▼
+         poll       ┌────┴─────┐┌───────────────────┐
+        audio/ ────►│VexiiRiscv││AudioFifoPeripheral│
+          CV        └──────────┘└──────────┬────────┘
+                     (plaits               ▼
+                       engines)      ┌──[SPLIT]────────►
+                                     │             (audio out)
+                                     ▼
+                            ┌────────────┐
+                            │Vectorscope/│
+                            │Oscilloscope│
+                            └────────────┘
+
 The original module was designed to run at 48kHz. Here, we instantiate
 a powerful (rv32imafc) softcore (this one includes an FPU), which
 is enough to run most engines at ~24kHz-48kHz, however with the video
 and menu system running simultaneously, it's necessary to clock
 this down to 24kHz. Surprisingly, most engines still sound reasonable.
 The resampling from 24kHz <-> 48kHz is performed in hardware below.
-
-Jack mapping:
-
-    - In0: frequency modulation
-    - In1: trigger
-    - In2: timbre modulation
-    - In3: morph modulation
-    - Out2: 'out' output
-    - Out3: 'aux' output
 
 There is quite some heavy compute here and RAM usage, as a result,
 the audio buffers are too big to fit in BRAM. In this demo,

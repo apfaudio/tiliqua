@@ -1,6 +1,49 @@
 # Copyright (c) 2024 Seb Holzapfel
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
+"""
+This example instantiates a SID chip, which can be modulated via CV.
+
+.. code-block:: text
+
+        ┌────┐
+        │in0 │◄─ modulation source 0
+        │in1 │◄─ modulation source 1
+        │in2 │◄─ modulation source 2
+        │in3 │◄─ modulation source 3
+        └────┘
+        ┌────┐
+        │out0│─► voice 0 (solo)
+        │out1│─► voice 1 (solo)
+        │out2│─► voice 2 (solo)
+        │out3│─► voices 0-2 (sum)
+        └────┘
+
+Using the menu system, each input channel can be assigned to a
+modulation target (i.e pitch / gate of specific voices or
+multiple voices).
+
+The soft CPU then uses this mapping to redirect CV to perform
+specific register writes on the SID chip. To add new modulation
+types or for more complex modulation, only the rust firmware
+needs to be changed.
+
+The audio routing out the SID chip to the audio outputs however
+is pure gateware. The softcore is only used for register writes.
+
+.. code-block:: text
+
+                        ┌──────────┐  ┌───┐
+        (poll CV) ─────►│VexiiRiscv│  │SID│ ─────► (audio out)
+                        └────┬─────┘  └───┘
+                             │          ▲
+                             └──────────┘
+                           (register writes)
+
+There is a lot of design space left to explore here. For example,
+adding MIDI input, more modulation sources, adding end of
+chain effects and so on...
+"""
 
 import os
 
