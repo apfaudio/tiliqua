@@ -579,6 +579,10 @@ fn main() -> ! {
                             ops_per_loop = 10000;
                             draw::draw_benchmark_pixels(&mut display, ops_per_loop, &mut benchmark_rng).ok();
                         },
+                        BenchmarkType::Unicode => {
+                            ops_per_loop = 1;
+                            draw::draw_benchmark_unicode(&mut display, ops_per_loop, &mut benchmark_rng).ok();
+                        },
                     }
                 }
                 draw::draw_benchmark_stats(&mut display, h_active/2-50, v_active-50, hue,

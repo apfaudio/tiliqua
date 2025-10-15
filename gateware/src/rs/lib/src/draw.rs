@@ -732,7 +732,7 @@ where
     Ok(())
 }
 
-pub fn draw_benchmark_stats<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, 
+pub fn draw_benchmark_stats<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8,
                               refresh_rate: u32, frame_count: u32) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
@@ -754,6 +754,58 @@ where
         Point::new(pos_x as i32, (pos_y + 40) as i32),
         font_white,
     ).draw(d)?;
+
+    Ok(())
+}
+
+pub fn draw_benchmark_unicode<D>(
+    d: &mut D, count: u32, rng: &mut Rng) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    use crate::mono_6x12_optimized::MONO_6X12_OPTIMIZED;
+
+    let font_unicode = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::BLUE);
+
+    let unicode_text = "\
+in0/x ───────►┌───────┐
+in1/y ───────►│Audio  │
+in2/i ───────►│IN (4x)│
+in3/c ───────►└───┬───┘
+                  ▼
+         ┌───◄─[SPLIT]─►────┐
+         │        │         ▼
+         │        ▼  ┌──────────────┐     ┌────────┐
+         │        │  │4in/4out USB  ├────►│Computer│
+         │        │  │Audio I/F     │◄────│(USB2)  │
+         │        │  └──────┬───────┘     └────────┘
+         │        └───┐ ┌───┘
+         │ usb=bypass ▼ ▼ usb=enabled
+         │           [MUX]
+         │      ┌──────────────┐
+         │      │4x Delay Lines│ (tunable)
+         │      └──────┬───────┘
+         │             ▼
+         └────┐ ┌─◄─[SPLIT]─►────┐
+              │ │                │
+   src=inputs ▼ ▼ src=outputs    │
+             [MUX]               │
+               │                 ▼
+         ┌─────▼──────┐     ┌────────┬──────► out0
+(select w│Vectorscope/│     │Audio   ├──────► out1
+plot_mode│Oscilloscope│     │OUT (4x)├──────► out2
+         └────────────┘     └────────┴──────► out3";
+
+    let size = d.bounding_box().size;
+    for _ in 0..count {
+        let x = rng.u32(0..size.width);
+        let y = rng.u32(0..size.height);
+        Text::new(
+            unicode_text,
+            Point::new(x as i32, y as i32),
+            font_unicode,
+        ).draw(d)?;
+    }
 
     Ok(())
 }
@@ -925,5 +977,14 @@ mod tests {
                  ).ok();
 
         disp.img.save("draw_cal.png").unwrap();
+    }
+
+    #[test]
+    fn test_draw_unicode() {
+        let mut disp = setup_display();
+
+        draw_benchmark_unicode(&mut disp).ok();
+
+        disp.img.save("draw_unicode.png").unwrap();
     }
 }
