@@ -235,6 +235,34 @@ where
     Ok(())
 }
 
+pub fn draw_help<D>(d: &mut D, x: u32, y: u32, scroll: u8, help_text: &str, hue: u8) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    use crate::mono_6x12_optimized::MONO_6X12_OPTIMIZED;
+
+    let font_help = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 10));
+
+    let skip_lines = scroll as usize;
+
+    let line_spacing = 12;
+    let max_visible_lines = 30;
+
+    for (i, line) in help_text.lines()
+        .skip(skip_lines)
+        .take(max_visible_lines)
+        .enumerate()
+    {
+        Text::new(
+            line,
+            Point::new(x as i32, (y + (i as u32 * line_spacing)) as i32),
+            font_help,
+        ).draw(d)?;
+    }
+
+    Ok(())
+}
+
 pub fn draw_cal<D>(d: &mut D, x: u32, y: u32, hue: u8, dac: &[i16; 4], adc: &[i16; 4]) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,

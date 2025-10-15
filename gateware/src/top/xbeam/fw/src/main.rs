@@ -177,8 +177,16 @@ fn main() -> ! {
                 });
             }
 
-            persist.set_persist(opts.beam.persist.value);
-            persist.set_decay(opts.beam.decay.value);
+            if opts.tracker.page.value == Page::Help {
+                draw::draw_help(&mut display, 80, h_active/2-180, opts.help.scroll.value,
+                               HELP_TEXT, opts.beam.ui_hue.value).ok();
+
+                persist.set_persist(256);
+                persist.set_decay(1);
+            } else {
+                persist.set_persist(opts.beam.persist.value);
+                persist.set_decay(opts.beam.decay.value);
+            }
 
             vscope.xoffset().write(|w| unsafe { w.value().bits(opts.vector.x_offset.value as u16) } );
             vscope.yoffset().write(|w| unsafe { w.value().bits(opts.vector.y_offset.value as u16) } );

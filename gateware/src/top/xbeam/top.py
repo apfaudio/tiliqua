@@ -185,6 +185,12 @@ class XbeamSoc(TiliquaSoc):
         # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
         super().__init__(finalize_csr_bridge=False, **kwargs)
 
+        # Extract module docstring for help page
+        import sys
+        help_text = sys.modules[__name__].__doc__ or ""
+        # Inject as Rust constant (raw string literal handles special chars)
+        self.add_rust_constant(f'pub const HELP_TEXT: &str = r###"{help_text}"###;\n')
+
         self.vector_periph_base = 0x00001000
         self.scope_periph_base  = 0x00001100
         self.xbeam_periph_base  = 0x00001200
