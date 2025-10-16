@@ -187,6 +187,28 @@ class QuadNCO(wiring.Component):
 
         return m
 
+class DWO(wiring.Component):
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        m.submodules.split4 = split4 = dsp.Split(
+                n_channels=4, source=wiring.flipped(self.i))
+        m.submodules.merge4 = merge4 = dsp.Merge(
+                n_channels=4, sink=wiring.flipped(self.o))
+
+        split4.wire_ready(m, [1, 2, 3])
+        merge4.wire_valid(m, [1, 2, 3])
+
+        m.submodules.dwo = dwo = dsp.oscillators.DWO()
+        wiring.connect(m, dwo.o, merge4.i[0])
+
+        return m
+
 
 class Resampler(wiring.Component):
 
@@ -1090,6 +1112,7 @@ CORES = {
     #                 (touch, class name)
     "mirror":         (False, Mirror),
     "nco":            (False, QuadNCO),
+    "dwo":            (False, DWO),
     "svf":            (False, ResonantFilter),
     "vca":            (False, DualVCA),
     "pitch":          (False, Pitch),
