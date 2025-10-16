@@ -104,8 +104,9 @@ class DWO(wiring.Component):
 
     o: Out(stream.Signature(ASQ))
 
-    def __init__(self, sq=None, macp=None):
+    def __init__(self, sq=None, macp=None, c=0.99):
         super().__init__()
+        self.c = c
         self.sq = sq or self.o.payload.shape()
         self.macp = macp or mac.MAC.default()
 
@@ -117,7 +118,7 @@ class DWO(wiring.Component):
         m.submodules.macp = mp = self.macp
 
         # Frequency tuning coefficient: `C = cos(2*pi*f/fs)`.
-        C = fixed.Const(0.99, shape=sq)
+        C = fixed.Const(self.c, shape=sq)
 
         # Initial conditions (determines output amplitude)
         x1 = Signal(sq, init=fixed.Const(0.0, shape=sq))

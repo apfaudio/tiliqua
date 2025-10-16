@@ -204,8 +204,21 @@ class DWO(wiring.Component):
         split4.wire_ready(m, [1, 2, 3])
         merge4.wire_valid(m, [1, 2, 3])
 
-        m.submodules.dwo = dwo = dsp.oscillators.DWO()
-        wiring.connect(m, dwo.o, merge4.i[0])
+        N = 16
+
+        m.submodules.matrix_mix = matrix_mix = dsp.MatrixMix(
+            i_channels=N, o_channels=1,
+            coefficients=[[1/N]]*N)
+        m.submodules.imix = imix = dsp.Merge(
+                n_channels=N, sink=matrix_mix.i)
+
+        m.submodules.server = server = dsp.mac.RingMACServer()
+        for n in range(N):
+            dwo = dsp.oscillators.DWO(c=0.98+0.001*n, macp=server.new_client())
+            m.submodules += dwo
+            wiring.connect(m, dwo.o, imix.i[n])
+
+        wiring.connect(m, matrix_mix.o, merge4.i[0])
 
         return m
 
