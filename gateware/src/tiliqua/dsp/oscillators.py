@@ -8,7 +8,7 @@ from amaranth.lib.wiring import In, Out
 
 from amaranth_future import fixed
 
-from . import ASQ
+from . import ASQ, mac
 
 
 class SawNCO(wiring.Component):
@@ -104,14 +104,17 @@ class DWO(wiring.Component):
 
     o: Out(stream.Signature(ASQ))
 
-    def __init__(self, sq=None):
+    def __init__(self, sq=None, macp=None):
         super().__init__()
         self.sq = sq or self.o.payload.shape()
+        self.macp = macp or mac.MAC.default()
 
     def elaborate(self, platform):
         m = Module()
 
         sq = self.sq
+
+        m.submodules.macp = mp = self.macp
 
         # Frequency tuning coefficient: `C = cos(2*pi*f/fs)`.
         C = fixed.Const(0.99, shape=sq)
@@ -120,27 +123,21 @@ class DWO(wiring.Component):
         x1 = Signal(sq, init=fixed.Const(0.0, shape=sq))
         x2 = Signal(sq, init=fixed.Const(0.5, shape=sq))
 
-        # Registers for single-sample delay (2x)
-        x1n = Signal(sq)
-        x2n = Signal(sq)
-        with m.If(self.o.ready):
-            m.d.sync += [
-                x1.eq(x1n),
-                x2.eq(x2n),
-            ]
-
-        # DWO update equations.
-        c_o = Signal(sq)
-        m.d.comb += [
-            c_o.eq((x1+x2)*C),
-            x1n.eq(c_o-x2),
-            x2n.eq(c_o+x1),
-        ]
-
         # x2 -> Output
-        m.d.comb += [
-            self.o.payload.eq(x2),
-            self.o.valid.eq(1),
-        ]
+        m.d.comb += self.o.payload.eq(x2),
+
+        with m.FSM() as fsm:
+            with m.State('MAC'):
+                with mp.Multiply(m, a=(x1+x2), b=C):
+                    m.d.sync += [
+                        x1.eq(mp.z - x2),
+                        x2.eq(mp.z + x1),
+                    ]
+                    m.next = 'WAIT-READY'
+
+            with m.State('WAIT-READY'):
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
+                    m.next = 'MAC'
 
         return m
