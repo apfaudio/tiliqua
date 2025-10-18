@@ -244,19 +244,45 @@ where
     let font_help = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 10));
 
     let skip_lines = scroll as usize;
-
     let line_spacing = 12;
     let max_visible_lines = 30;
 
-    for (i, line) in help_text.lines()
-        .skip(skip_lines)
-        .take(max_visible_lines)
-        .enumerate()
-    {
-        Text::new(
-            line,
-            Point::new(x as i32, (y + (i as u32 * line_spacing)) as i32),
+    let mut lines_iter = help_text.lines().skip(skip_lines);
+
+    for i in 0..max_visible_lines {
+        if let Some(line) = lines_iter.next() {
+            Text::new(
+                line,
+                Point::new(x as i32, (y + (i as u32 * line_spacing)) as i32),
+                font_help,
+            ).draw(d)?;
+        } else {
+            break;
+        }
+    }
+
+    let has_lines_above = skip_lines > 0;
+    let has_lines_below = lines_iter.next().is_some();
+
+    // Draw up arrow if there are lines above (2 lines up)
+    if has_lines_above {
+        let arrow_y = y.saturating_sub(2 * line_spacing);
+        Text::with_alignment(
+            "▴",
+            Point::new((x + 200) as i32, arrow_y as i32),
             font_help,
+            Alignment::Center,
+        ).draw(d)?;
+    }
+
+    // Draw down arrow if there are more lines below (1 line down)
+    if has_lines_below {
+        let arrow_y = y + ((max_visible_lines + 1) as u32 * line_spacing);
+        Text::with_alignment(
+            "▾",
+            Point::new((x + 200) as i32, arrow_y as i32),
+            font_help,
+            Alignment::Center,
         ).draw(d)?;
     }
 
