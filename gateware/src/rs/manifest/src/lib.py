@@ -70,6 +70,12 @@ class MemoryRegion:
 
 @dataclass_json
 @dataclass
+class IOMapping:
+    left: List[str]  # 8 strings for left jacks
+    right: List[str] # 6 strings for right connectors
+
+@dataclass_json
+@dataclass
 class ExternalPLLConfig:
     clk0_hz: int
     clk1_inherit: bool
@@ -85,6 +91,7 @@ class BitstreamManifest:
     brief: str
     video: str
     regions: List[MemoryRegion]
+    io_mapping: Optional[IOMapping] = None
     external_pll_config: Optional[ExternalPLLConfig] = None
     magic: int = MANIFEST_MAGIC
 

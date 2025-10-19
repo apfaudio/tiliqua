@@ -939,30 +939,48 @@ fn main() -> ! {
             draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
             draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA, &modeline).ok();
 
-            // Draw Tiliqua hardware diagram
-            draw::draw_tiliqua(&mut display,
-                h_active/2 - 80,
-                v_active/2 + 100,
-                0,
-                [
-                    "in0",
-                    "in1",
-                    "in2",
-                    "in3",
-                    "out0",
-                    "out1",
-                    "out2",
-                    "out3",
-                ],
-                [
-                    "encoder",
-                    "usb2",
-                    "dvi",
-                    "ex1",
-                    "ex2",
-                    "TRS midi",
-                ],
-            ).ok();
+            // Draw Tiliqua hardware diagram with IO mapping from selected bitstream
+            if let Some(n) = opts.tracker.selected {
+                let (io_left, io_right) = if let Some(ref manifest) = manifests[n] {
+                    if let Some(ref io_mapping) = manifest.io_mapping {
+                        (io_mapping.left.clone(), io_mapping.right.clone())
+                    } else {
+                        // Default labels if no io_mapping in manifest
+                        ([const { heapless::String::new() }; 8], [const { heapless::String::new() }; 6])
+                    }
+                } else {
+                    // Default labels if no manifest
+                    ([const { heapless::String::new() }; 8], [const { heapless::String::new() }; 6])
+                };
+
+                let io_left_str: [&str; 8] = [
+                    io_left[0].as_str(),
+                    io_left[1].as_str(),
+                    io_left[2].as_str(),
+                    io_left[3].as_str(),
+                    io_left[4].as_str(),
+                    io_left[5].as_str(),
+                    io_left[6].as_str(),
+                    io_left[7].as_str(),
+                ];
+
+                let io_right_str: [&str; 6] = [
+                    io_right[0].as_str(),
+                    io_right[1].as_str(),
+                    io_right[2].as_str(),
+                    io_right[3].as_str(),
+                    io_right[4].as_str(),
+                    io_right[5].as_str(),
+                ];
+
+                draw::draw_tiliqua(&mut display,
+                    h_active/2 - 80,
+                    v_active/2 + 100,
+                    0,
+                    io_left_str,
+                    io_right_str,
+                ).ok();
+            }
 
             if let Some(n) = opts.tracker.selected {
                 draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
