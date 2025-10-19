@@ -507,7 +507,7 @@ fn main() -> ! {
             draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                hue).ok();
             draw::draw_name(&mut display, h_active/2, 30, hue,
-                            &bootinfo.manifest.name, &bootinfo.manifest.sha, &modeline).ok();
+                            &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
 
             if opts.tracker.page.value == Page::Report {
                 let mut status_report = ReportString::new();

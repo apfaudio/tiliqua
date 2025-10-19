@@ -157,8 +157,8 @@ fn main() -> ! {
 
             if draw_options {
                 draw::draw_options(&mut display, &opts, h_active-200, v_active/2, opts.beam.ui_hue.value).ok();
-                draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.ui_hue.value, UI_NAME, UI_SHA,
-                                &modeline).ok();
+                draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.ui_hue.value,
+                                &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
             }
 
             if save_opts {

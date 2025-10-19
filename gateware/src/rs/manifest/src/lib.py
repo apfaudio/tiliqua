@@ -89,7 +89,7 @@ class ExternalPLLConfig:
 class BitstreamManifest:
     hw_rev: int
     name: str
-    sha: str
+    tag: str
     regions: List[MemoryRegion]
     help: Optional[BitstreamHelp] = None
     external_pll_config: Optional[ExternalPLLConfig] = None

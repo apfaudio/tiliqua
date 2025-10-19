@@ -198,7 +198,7 @@ where
 }
 
 use tiliqua_hal::dma_framebuffer::DVIModeline;
-pub fn draw_name<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, name: &str, sha: &str, modeline: &DVIModeline) -> Result<(), D::Error>
+pub fn draw_name<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, name: &str, tag: &str, modeline: &DVIModeline) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
 {
@@ -216,11 +216,11 @@ where
     if modeline.fixed() {
         // Fixed modeline doesn't have all the info needed to calculate refresh rate.
         write!(modeline_text, "{}/{}x{}(fxd)\r\n",
-               sha, modeline.h_active, modeline.v_active
+               tag, modeline.h_active, modeline.v_active
                ).ok();
     } else {
         write!(modeline_text, "{}/{}x{}@{:.1}Hz\r\n",
-               sha,
+               tag,
                modeline.h_active, modeline.v_active, modeline.refresh_rate()
                ).ok();
     }

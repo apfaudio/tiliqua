@@ -304,8 +304,8 @@ fn main() -> ! {
             if draw_options || help_screen {
                 draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                    opts.beam.hue.value).ok();
-                draw::draw_name(&mut display, h_active/2, 30, opts.beam.hue.value, UI_NAME, UI_SHA,
-                                &modeline).ok();
+                draw::draw_name(&mut display, h_active/2, 30, opts.beam.hue.value,
+                                &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
             }
 
             if help_screen {

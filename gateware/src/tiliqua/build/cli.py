@@ -43,7 +43,12 @@ def top_level_cli(
 
     # Get some repository properties
     repo = git.Repo(search_parent_directories=True)
-    repo_sha = repo.head.object.hexsha[:6]
+
+    # Try to get a git tag, otherwise use short hash
+    try:
+        repo_tag = repo.git.describe('--tags', '--exact-match', '--dirty')[:8]
+    except git.exc.GitCommandError:
+        repo_tag = repo.git.describe('--always', '--dirty')[:8]
 
     # Configure logging.
     logging.getLogger().setLevel(logging.DEBUG)
@@ -185,7 +190,7 @@ def top_level_cli(
         else:
             kwargs["fw_offset"] = int(args.fw_offset, 16)
         kwargs["ui_name"] = args.name
-        kwargs["ui_sha"]  = repo_sha
+        kwargs["ui_tag"]  = repo_tag
         kwargs["platform_class"] = platform_class
 
     assert callable(fragment)
@@ -223,7 +228,7 @@ def top_level_cli(
     archiver = ArchiveBuilder.for_project(
         build_path=build_path,
         name=args.name,
-        sha=repo_sha,
+        tag=repo_tag,
         hw_rev=args.hw
     )
     archiver.help = help_metadata

@@ -69,7 +69,7 @@ pub struct BitstreamHelp {
 pub struct BitstreamManifest {
     pub hw_rev: u32,
     pub name: String<32>,
-    pub sha: String<8>,
+    pub tag: String<8>,
     pub regions: Vec<MemoryRegion, 5>,
     pub help: Option<BitstreamHelp>,
     pub external_pll_config: Option<ExternalPLLConfig>,
@@ -83,7 +83,7 @@ impl BitstreamManifest {
         info!("\tmagic:    {:#x}", self.magic);
         info!("\thw_rev:   {}",    self.hw_rev);
         info!("\tname:    '{}'",   self.name);
-        info!("\tsha:     '{}'",   self.sha);
+        info!("\ttag:     '{}'",   self.tag);
         if let Some(help) = &self.help {
             info!("\thelp = {{");
             info!("\t\tbrief:   '{}'", help.brief);

@@ -203,14 +203,14 @@ where
             .draw(d).ok();
         }
         Text::with_alignment(
-            "sha:".into(),
+            "tag:".into(),
             Point::new((h_active/2 - 10) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
-            &bitstream.sha,
+            &bitstream.tag,
             Point::new((h_active/2) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Left,
@@ -939,7 +939,7 @@ fn main() -> ! {
             modeline = final_modeline;
 
             draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
-            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA, &modeline).ok();
+            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_TAG, &modeline).ok();
 
             // Draw Tiliqua hardware diagram with IO help from selected bitstream
             if let Some(n) = opts.tracker.selected {

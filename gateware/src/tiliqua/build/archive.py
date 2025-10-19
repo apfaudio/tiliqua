@@ -29,7 +29,7 @@ class ArchiveBuilder:
 
     build_path: str
     name: str
-    sha: str
+    tag: str
     hw_rev: TiliquaRevision
     external_pll_config: Optional[ExternalPLLConfig] = None
     help: Optional[BitstreamHelp] = None
@@ -39,9 +39,9 @@ class ArchiveBuilder:
     _firmware_bin_path: Optional[str] = None
 
     @classmethod
-    def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision) -> 'ArchiveBuilder':
+    def for_project(cls, build_path: str, name: str, tag: str, hw_rev: TiliquaRevision) -> 'ArchiveBuilder':
         """Create an ArchiveBuilder for a project."""
-        archiver = cls(build_path, name, sha, hw_rev)
+        archiver = cls(build_path, name, tag, hw_rev)
         return archiver
 
     def __post_init__(self):
@@ -51,7 +51,7 @@ class ArchiveBuilder:
 
     @property
     def archive_name(self) -> str:
-        return f"{self.name.lower()}-{self.sha}-{self.hw_rev.value}.tar.gz"
+        return f"{self.name.lower()}-{self.tag}-{self.hw_rev.value}.tar.gz"
 
     @property
     def archive_path(self) -> str:
@@ -170,7 +170,7 @@ class ArchiveBuilder:
         self._manifest = BitstreamManifest(
             name=self.name,
             hw_rev=self.hw_rev.platform_class().version_major,
-            sha=self.sha,
+            tag=self.tag,
             regions=self._regions,
             help=self.help,
             external_pll_config=self.external_pll_config

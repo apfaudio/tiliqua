@@ -271,8 +271,8 @@ fn main() -> ! {
 
             // Draw UI elements
             draw::draw_options(&mut display, &opts, 100, v_active/2, hue).ok();
-            draw::draw_name(&mut display, h_active/2, v_active-50, hue, UI_NAME, UI_SHA,
-                            &modeline).ok();
+            draw::draw_name(&mut display, h_active/2, v_active-50, hue,
+                            &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
 
             // Draw SID visualization
             let hl_wfm: Option<u8> = match opts.tracker.page.value {
