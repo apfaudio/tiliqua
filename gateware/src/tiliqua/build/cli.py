@@ -203,24 +203,35 @@ def top_level_cli(
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
 
+    # Extract help metadata from fragment
+    brief = args.brief
+    help_metadata = None
+
+    if hasattr(fragment, "help"):
+        # BitstreamHelp class format
+        if brief is None:
+            brief = fragment.help.brief
+        help_metadata = fragment.help
+
+        # Validate string lengths (must fit in Rust String<16>)
+        for i, label in enumerate(fragment.help.io_left):
+            if len(label) > 16:
+                print(f"ERROR: help.io_left[{i}] = '{label}' is {len(label)} chars (max 16)")
+                sys.exit(1)
+        for i, label in enumerate(fragment.help.io_right):
+            if len(label) > 16:
+                print(f"ERROR: help.io_right[{i}] = '{label}' is {len(label)} chars (max 16)")
+                sys.exit(1)
+
     archiver = ArchiveBuilder.for_project(
         build_path=build_path,
         name=args.name,
         sha=repo_sha,
         hw_rev=args.hw,
-        brief=args.brief if args.brief is not None else getattr(fragment, "brief", "")
+        brief=brief
     )
     archiver.video = "<none>"
-
-    # Add IO help if the fragment defines it
-    if hasattr(fragment, "io_help"):
-        # Validate string lengths (must fit in Rust String<16>)
-        for side, labels in fragment.io_help.items():
-            for i, label in enumerate(labels):
-                if len(label) > 16:
-                    print(f"ERROR: io_help['{side}'][{i}] = '{label}' is {len(label)} chars (max 16)")
-                    sys.exit(1)
-        archiver.io_help = fragment.io_help
+    archiver.help = help_metadata
 
     if video_core:
         archiver.video ="<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline

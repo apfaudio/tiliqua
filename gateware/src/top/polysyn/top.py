@@ -57,6 +57,7 @@ from amaranth_soc import csr
 from tiliqua import dsp, midi
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.dsp import ASQ
 from tiliqua.raster import scope
 from tiliqua.raster.plot import FramebufferPlotter
@@ -378,11 +379,11 @@ class SynthPeripheral(wiring.Component):
 
 class PolySoc(TiliquaSoc):
 
-    brief = "Touch+MIDI Polysynth (8-voice)"
-    io_help = {
-        'left': ['phase cv / touch', 'touch1', 'touch2', 'touch3', 'touch4', 'touch5', 'out L', 'out R'],
-        'right': ['navigate menu', 'MIDI host', 'video out', '', '', 'TRS MIDI in']
-    }
+    help = BitstreamHelp(
+        brief="Touch+MIDI Polysynth (8-voice)",
+        io_left=['phase cv / touch', 'touch1', 'touch2', 'touch3', 'touch4', 'touch5', 'out L', 'out R'],
+        io_right=['navigate menu', 'MIDI host', 'video out', '', '', 'TRS MIDI in']
+    )
 
     def __init__(self, **kwargs):
 

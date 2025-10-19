@@ -34,7 +34,7 @@ class ArchiveBuilder:
     brief: str = ""
     video: Optional[str] = None
     external_pll_config: Optional[ExternalPLLConfig] = None
-    io_help: Optional[IOHelp] = None
+    help: Optional[BitstreamHelp] = None
 
     _regions: List[MemoryRegion] = field(default_factory=list)
     _manifest: Optional[BitstreamManifest] = None
@@ -169,6 +169,11 @@ class ArchiveBuilder:
         if not has_manifest:
             self.with_manifest()
 
+        # Convert BitstreamHelp to IOHelp if present
+        io_help = None
+        if self.help is not None:
+            io_help = IOHelp(left=self.help.io_left, right=self.help.io_right)
+
         self._manifest = BitstreamManifest(
             name=self.name,
             hw_rev=self.hw_rev.platform_class().version_major,
@@ -176,7 +181,7 @@ class ArchiveBuilder:
             brief=self.brief,
             video=self.video if self.video else "<none>",
             regions=self._regions,
-            io_help=getattr(self, 'io_help', None),
+            io_help=io_help,
             external_pll_config=self.external_pll_config
         )
         self._manifest.write_to_path(self.manifest_path)

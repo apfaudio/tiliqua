@@ -98,6 +98,7 @@ from amaranth_soc import csr
 from tiliqua import dsp, usb_audio
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.periph import eurorack_pmod
 from tiliqua.raster import scope
 from tiliqua.raster.plot import FramebufferPlotter
@@ -173,11 +174,11 @@ class XbeamPeripheral(wiring.Component):
 
 class XbeamSoc(TiliquaSoc):
 
-    brief = "Graphical vectorscope and oscilloscope."
-    io_help = {
-        'left': ['x / in0', 'y / in1', 'intensity / in2', 'color / in3', 'out0', 'out1', 'out2', 'out3'],
-        'right': ['navigate menu', '4x4 audio device', 'video out', '', '', '']
-    }
+    help = BitstreamHelp(
+        brief="Graphical vectorscope and oscilloscope.",
+        io_left=['x / in0', 'y / in1', 'intensity / in2', 'color / in3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['navigate menu', '4x4 audio device', 'video out', '', '', '']
+    )
 
     def __init__(self, **kwargs):
 

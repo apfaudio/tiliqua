@@ -28,6 +28,7 @@ from amaranth_soc import wishbone
 from tiliqua import dsp, midi
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.dsp import ASQ
 from tiliqua.periph import eurorack_pmod, psram
 from tiliqua.platform import RebootProvider
@@ -65,10 +66,11 @@ class QuadNCO(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    io_help = {
-        'left': ['V/oct', 'phase mod', '-', '-', 'sine', 'saw', 'tri', 'square'],
-        'right': ['', '', '', '', '', '']
-    }
+    help = BitstreamHelp(
+        brief="Quad oscillator (NCO)",
+        io_left=['V/oct', 'phase mod', '-', '-', 'sine', 'saw', 'tri', 'square'],
+        io_right=['', '', '', '', '', '']
+    )
 
     def elaborate(self, platform):
         m = Module()
@@ -248,10 +250,11 @@ class ResonantFilter(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    io_help = {
-        'left': ['audio in', 'cutoff', 'resonance', '-', 'LPF out', 'HPF out', 'BPF out', '-'],
-        'right': ['', '', '', '', '', '']
-    }
+    help = BitstreamHelp(
+        brief="Resonant filter (SVF)",
+        io_left=['audio in', 'cutoff', 'resonance', '-', 'LPF out', 'HPF out', 'BPF out', '-'],
+        io_right=['', '', '', '', '', '']
+    )
 
     def elaborate(self, platform):
 
@@ -938,9 +941,9 @@ class CoreTop(Elaboratable):
         if hasattr(self.core, "bus"):
             self.psram_periph = psram.Peripheral(size=16*1024*1024)
 
-        # Forward io_help from the core if it exists
-        if hasattr(self.core, "io_help"):
-            self.io_help = self.core.io_help
+        # Forward help from the core if it exists
+        if hasattr(self.core, "help"):
+            self.help = self.core.help
 
         super().__init__()
 
