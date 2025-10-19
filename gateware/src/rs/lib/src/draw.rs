@@ -264,7 +264,6 @@ where
     let has_lines_above = skip_lines > 0;
     let has_lines_below = lines_iter.next().is_some();
 
-    // Draw up arrow if there are lines above (2 lines up)
     if has_lines_above {
         let arrow_y = y.saturating_sub(2 * line_spacing);
         Text::with_alignment(
@@ -275,7 +274,6 @@ where
         ).draw(d)?;
     }
 
-    // Draw down arrow if there are more lines below (1 line down)
     if has_lines_below {
         let arrow_y = y + ((max_visible_lines + 1) as u32 * line_spacing);
         Text::with_alignment(
