@@ -939,6 +939,31 @@ fn main() -> ! {
             draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
             draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA, &modeline).ok();
 
+            // Draw Tiliqua hardware diagram
+            draw::draw_tiliqua(&mut display,
+                h_active/2 - 80,
+                v_active/2 + 100,
+                0,
+                [
+                    "in0",
+                    "in1",
+                    "in2",
+                    "in3",
+                    "out0",
+                    "out1",
+                    "out2",
+                    "out3",
+                ],
+                [
+                    "encoder",
+                    "usb2",
+                    "dvi",
+                    "ex1",
+                    "ex2",
+                    "TRS midi",
+                ],
+            ).ok();
+
             if let Some(n) = opts.tracker.selected {
                 draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
                 if manifests[n].is_some() {

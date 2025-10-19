@@ -357,7 +357,7 @@ where
 }
 
 pub fn draw_tiliqua<D>(d: &mut D, x: u32, y: u32, hue: u8,
-                       str_l: [&str; 8], str_r: [&str; 6], text_title: &str, text_desc: &str) -> Result<(), D::Error>
+                       str_l: [&str; 8], str_r: [&str; 6]) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
 {
@@ -462,20 +462,6 @@ where
     text_l[7][1] = 129;
     for n in 0..text_l.len() { text_l[n][0] = 45 };
 
-    Text::with_alignment(
-        text_title,
-        Point::new((x + 80) as i32, (y-10) as i32),
-        font_small_white,
-        Alignment::Center
-    ).draw(d)?;
-
-    Text::with_alignment(
-        "touch  jack".into(),
-        Point::new((x+45-15) as i32, (y+15+5) as i32),
-        font_small_white,
-        Alignment::Right
-    ).draw(d)?;
-
     for n in 0..text_l.len() {
         Text::with_alignment(
             str_l[n],
@@ -502,14 +488,6 @@ where
             Alignment::Left
         ).draw(d)?;
     }
-
-    Text::with_alignment(
-        text_desc,
-        Point::new((x - 120) as i32, (y + 180) as i32),
-        font_small_grey,
-        Alignment::Left
-    ).draw(d)?;
-
 
     Ok(())
 }
