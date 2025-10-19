@@ -170,7 +170,7 @@ where
 {
     let h_active = d.size().width as i32;
     let v_active = d.size().height as i32;
-    let norm = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 11));
+    let norm = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
     if let Some(bitstream) = bitstream_manifest {
         if let Some(ref help) = bitstream.help {
             Text::with_alignment(
@@ -242,7 +242,7 @@ where
     .draw(d).ok();
     Text::with_alignment(
         "Select a bitstream. To return here, hold encoder down for 3sec.",
-        Point::new((h_active/2) as i32, (v_active/2-70) as i32 + ot),
+        Point::new((h_active/2) as i32, (v_active/2-30) as i32 + ot),
         norm,
         Alignment::Center,
     )
@@ -844,7 +844,7 @@ fn main() -> ! {
         persist.set_persist(256);
 
         let stroke = PrimitiveStyleBuilder::new()
-            .stroke_color(HI8::new(0, 11))
+            .stroke_color(HI8::new(0, 10))
             .stroke_width(1)
             .build();
 
@@ -938,67 +938,53 @@ fn main() -> ! {
 
             modeline = final_modeline;
 
-            draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
+            draw::draw_options(&mut display, &opts, 80, v_active/2-50, 0).ok();
             draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_TAG, &modeline).ok();
 
-            // Draw Tiliqua hardware diagram with IO help from selected bitstream
+
             if let Some(n) = opts.tracker.selected {
-                let (io_left, io_right) = if let Some(ref manifest) = manifests[n] {
+                draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -110, 0);
+                if let Some(ref manifest) = manifests[n] {
                     if let Some(ref help) = manifest.help {
-                        (help.io_left.clone(), help.io_right.clone())
-                    } else {
-                        // Default labels if no help in manifest
-                        ([const { heapless::String::new() }; 8], [const { heapless::String::new() }; 6])
+                        let (io_left, io_right) = (help.io_left.clone(), help.io_right.clone());
+                        let io_left_str: [&str; 8] = [
+                            io_left[0].as_str(),
+                            io_left[1].as_str(),
+                            io_left[2].as_str(),
+                            io_left[3].as_str(),
+                            io_left[4].as_str(),
+                            io_left[5].as_str(),
+                            io_left[6].as_str(),
+                            io_left[7].as_str(),
+                        ];
+                        let io_right_str: [&str; 6] = [
+                            io_right[0].as_str(),
+                            io_right[1].as_str(),
+                            io_right[2].as_str(),
+                            io_right[3].as_str(),
+                            io_right[4].as_str(),
+                            io_right[5].as_str(),
+                        ];
+                        draw::draw_tiliqua(&mut display,
+                            h_active/2+30,
+                            v_active/2-40,
+                            0,
+                            io_left_str,
+                            io_right_str,
+                        ).ok();
                     }
-                } else {
-                    // Default labels if no manifest
-                    ([const { heapless::String::new() }; 8], [const { heapless::String::new() }; 6])
-                };
-
-                let io_left_str: [&str; 8] = [
-                    io_left[0].as_str(),
-                    io_left[1].as_str(),
-                    io_left[2].as_str(),
-                    io_left[3].as_str(),
-                    io_left[4].as_str(),
-                    io_left[5].as_str(),
-                    io_left[6].as_str(),
-                    io_left[7].as_str(),
-                ];
-
-                let io_right_str: [&str; 6] = [
-                    io_right[0].as_str(),
-                    io_right[1].as_str(),
-                    io_right[2].as_str(),
-                    io_right[3].as_str(),
-                    io_right[4].as_str(),
-                    io_right[5].as_str(),
-                ];
-
-                draw::draw_tiliqua(&mut display,
-                    h_active/2 - 80,
-                    v_active/2 + 100,
-                    0,
-                    io_left_str,
-                    io_right_str,
-                ).ok();
-            }
-
-            if let Some(n) = opts.tracker.selected {
-                draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
-                if manifests[n].is_some() {
-                    Line::new(Point::new(255, (v_active/2 - 55 + (n as u32)*18) as i32),
-                              Point::new((h_active/2-90) as i32, (v_active/2+8) as i32))
-                              .into_styled(stroke)
-                              .draw(&mut display).ok();
                 }
+                Line::new(Point::new((h_active/2-100) as i32, (v_active/2-100+4) as i32),
+                          Point::new((h_active/2-100) as i32, (v_active/2+100+4) as i32))
+                          .into_styled(stroke)
+                          .draw(&mut display).ok();
             }
 
-            const LINES_PER_LOOP: usize = 2;
+            const LINES_PER_LOOP: usize = 3;
             for _ in 0..LINES_PER_LOOP {
                 let _ = draw::draw_boot_logo(&mut display,
                                              (h_active/2) as i32,
-                                             150 as i32,
+                                             130 as i32,
                                              logo_coord_ix);
                 logo_coord_ix += 1;
             }
