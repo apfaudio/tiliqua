@@ -240,22 +240,48 @@ where
     D: DrawTarget<Color = HI8>,
 {
     use crate::mono_6x12_optimized::MONO_6X12_OPTIMIZED;
+    use tiliqua_hal::embedded_graphics::mono_font::ascii::FONT_8X13;
 
-    let font_help = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 10));
+    let font_normal = MonoTextStyle::new(&FONT_8X13, HI8::new(hue, 10));
+    let font_small = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 10));
 
     let skip_lines = scroll as usize;
-    let line_spacing = 12;
+    let line_spacing_normal = 13;  // Spacing for FONT_8X13
+    let line_spacing_small = 12;   // Spacing for MONO_6X12_OPTIMIZED
     let max_visible_lines = 30;
 
-    let mut lines_iter = help_text.lines().skip(skip_lines);
+    let mut lines_iter = help_text.lines();
+
+    // Skip to the starting line
+    let mut lines_iter = lines_iter.skip(skip_lines);
+
+    let mut current_y = y;
 
     for i in 0..max_visible_lines {
         if let Some(line) = lines_iter.next() {
+            // Count leading spaces
+            let leading_spaces = line.len() - line.trim_start().len();
+            let trimmed = line.trim_start();
+
+            // Use small font for:
+            // - Lines indented 8+ spaces
+            // - Lines that start with indent + ".." (Sphinx directives)
+            let use_small_font = leading_spaces >= 8 ||
+                                 (leading_spaces > 0 && trimmed.starts_with(".."));
+
+            let (font, line_spacing) = if use_small_font {
+                (font_small, line_spacing_small)
+            } else {
+                (font_normal, line_spacing_normal)
+            };
+
             Text::new(
                 line,
-                Point::new(x as i32, (y + (i as u32 * line_spacing)) as i32),
-                font_help,
+                Point::new(x as i32, current_y as i32),
+                font,
             ).draw(d)?;
+
+            current_y += line_spacing;
         } else {
             break;
         }
@@ -265,21 +291,21 @@ where
     let has_lines_below = lines_iter.next().is_some();
 
     if has_lines_above {
-        let arrow_y = y.saturating_sub(2 * line_spacing);
+        let arrow_y = y.saturating_sub(2 * line_spacing_small);
         Text::with_alignment(
             "▴",
             Point::new((x + 200) as i32, arrow_y as i32),
-            font_help,
+            font_small,
             Alignment::Center,
         ).draw(d)?;
     }
 
     if has_lines_below {
-        let arrow_y = y + ((max_visible_lines + 1) as u32 * line_spacing);
+        let arrow_y = current_y + line_spacing_small;
         Text::with_alignment(
             "▾",
             Point::new((x + 200) as i32, arrow_y as i32),
-            font_help,
+            font_small,
             Alignment::Center,
         ).draw(d)?;
     }

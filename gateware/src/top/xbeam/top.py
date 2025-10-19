@@ -13,7 +13,7 @@ Vectorscope/oscilloscope with menu system, USB audio and tunable delay lines.
 
 The channels are assigned as follows:
 
-.. code-block:: text
+    .. code-block:: text
 
                  Vectorscope │ Oscilloscope
         ┌────┐               │
@@ -52,8 +52,8 @@ the signal path to open up more applications. The overall signal flow looks like
                      [MUX]               │
                        │                 ▼
                  ┌─────▼──────┐     ┌────────┬──────► out0
-     (select with│Vectorscope/│     │Audio   ├──────► out1
-      plot_mode) │Oscilloscope│     │OUT (4x)├──────► out2
+                 │Vectorscope/│     │Audio   ├──────► out1
+                 │Oscilloscope│     │OUT (4x)├──────► out2
                  └────────────┘     └────────┴──────► out3
 
 The ``[MUX]`` elements pictured above can be switched by the menu system, for viewing

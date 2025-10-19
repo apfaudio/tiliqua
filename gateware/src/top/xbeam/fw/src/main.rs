@@ -178,7 +178,7 @@ fn main() -> ! {
             }
 
             if opts.tracker.page.value == Page::Help {
-                draw::draw_help(&mut display, 80, v_active/2-180, opts.help.scroll.value,
+                draw::draw_help(&mut display, 20, v_active/2-180, opts.help.scroll.value,
                                HELP_TEXT, opts.beam.ui_hue.value).ok();
 
                 persist.set_persist(64);
