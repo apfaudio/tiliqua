@@ -76,6 +76,7 @@ from amaranth_soc.memory import MemoryMap
 
 from tiliqua import dsp
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.dsp import ASQ
 from tiliqua.raster import scope
 from tiliqua.raster.plot import FramebufferPlotter
@@ -166,13 +167,14 @@ class AudioFIFOPeripheral(wiring.Component):
 
         return m
 
+
 class MacroOscSoc(TiliquaSoc):
 
-    brief = "Emulation of a famous Eurorack module."
-    io_help = {
-        'left': ['pitch', 'trigger', 'timbre', 'morph', '', '', 'out MAIN', 'out AUX'],
-        'right': ['navigate menu', '', 'video out', '', '', '']
-    }
+    help = BitstreamHelp(
+        brief="Emulation of a famous Eurorack module.",
+        io_left=['pitch', 'trigger', 'timbre', 'morph', '', '', 'out MAIN', 'out AUX'],
+        io_right=['navigate menu', '', 'video out', '', '', '']
+    )
 
     def __init__(self, **kwargs):
 

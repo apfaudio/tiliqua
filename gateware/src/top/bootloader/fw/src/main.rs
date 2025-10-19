@@ -172,34 +172,36 @@ where
     let v_active = d.size().height as i32;
     let norm = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 11));
     if let Some(bitstream) = bitstream_manifest {
-        Text::with_alignment(
-            "brief:".into(),
-            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+20) as i32 + ot),
-            norm,
-            Alignment::Right,
-        )
-        .draw(d).ok();
-        Text::with_alignment(
-            &bitstream.brief,
-            Point::new((h_active/2) as i32 + or, (v_active/2+20) as i32 + ot),
-            norm,
-            Alignment::Left,
-        )
-        .draw(d).ok();
-        Text::with_alignment(
-            "video:".into(),
-            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+40) as i32 + ot),
-            norm,
-            Alignment::Right,
-        )
-        .draw(d).ok();
-        Text::with_alignment(
-            &bitstream.video,
-            Point::new((h_active/2) as i32 + or, (v_active/2+40) as i32 + ot),
-            norm,
-            Alignment::Left,
-        )
-        .draw(d).ok();
+        if let Some(ref help) = bitstream.help {
+            Text::with_alignment(
+                "brief:".into(),
+                Point::new((h_active/2 - 10) as i32 + or, (v_active/2+20) as i32 + ot),
+                norm,
+                Alignment::Right,
+            )
+            .draw(d).ok();
+            Text::with_alignment(
+                &help.brief,
+                Point::new((h_active/2) as i32 + or, (v_active/2+20) as i32 + ot),
+                norm,
+                Alignment::Left,
+            )
+            .draw(d).ok();
+            Text::with_alignment(
+                "video:".into(),
+                Point::new((h_active/2 - 10) as i32 + or, (v_active/2+40) as i32 + ot),
+                norm,
+                Alignment::Right,
+            )
+            .draw(d).ok();
+            Text::with_alignment(
+                &help.video,
+                Point::new((h_active/2) as i32 + or, (v_active/2+40) as i32 + ot),
+                norm,
+                Alignment::Left,
+            )
+            .draw(d).ok();
+        }
         Text::with_alignment(
             "sha:".into(),
             Point::new((h_active/2 - 10) as i32 + or, (v_active/2+60) as i32 + ot),
@@ -942,10 +944,10 @@ fn main() -> ! {
             // Draw Tiliqua hardware diagram with IO help from selected bitstream
             if let Some(n) = opts.tracker.selected {
                 let (io_left, io_right) = if let Some(ref manifest) = manifests[n] {
-                    if let Some(ref io_help) = manifest.io_help {
-                        (io_help.left.clone(), io_help.right.clone())
+                    if let Some(ref help) = manifest.help {
+                        (help.io_left.clone(), help.io_right.clone())
                     } else {
-                        // Default labels if no io_help in manifest
+                        // Default labels if no help in manifest
                         ([const { heapless::String::new() }; 8], [const { heapless::String::new() }; 6])
                     }
                 } else {

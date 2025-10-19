@@ -70,9 +70,11 @@ class MemoryRegion:
 
 @dataclass_json
 @dataclass
-class IOHelp:
-    left: List[str]  # 8 strings for left jacks
-    right: List[str] # 6 strings for right connectors
+class BitstreamHelp:
+    brief: str
+    io_left: List[str]  # 8 strings for left jacks
+    io_right: List[str] # 6 strings for right connectors
+    video: str = "<none>"
 
 @dataclass_json
 @dataclass
@@ -88,10 +90,8 @@ class BitstreamManifest:
     hw_rev: int
     name: str
     sha: str
-    brief: str
-    video: str
     regions: List[MemoryRegion]
-    io_help: Optional[IOHelp] = None
+    help: Optional[BitstreamHelp] = None
     external_pll_config: Optional[ExternalPLLConfig] = None
     magic: int = MANIFEST_MAGIC
 

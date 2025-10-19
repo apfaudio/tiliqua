@@ -18,15 +18,16 @@ from luna.gateware.applets.speed_test import (PRODUCT_ID, VENDOR_ID,
 
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.tiliqua_soc import TiliquaSoc
 
 
 class SelftestSoc(TiliquaSoc):
-    brief = "Test & calibration utilities"
-    io_help = {
-        'left': ['adc0', 'adc1', 'adc2', 'adc3', 'dac0', 'dac1', 'dac2', 'dac3'],
-        'right': ['navigate menu', 'speedtest device', 'video out', 'gpio in (0)', 'gpio in (1)', '']
-    }
+    help = BitstreamHelp(
+        brief="Test & calibration utilities",
+        io_left=['adc0', 'adc1', 'adc2', 'adc3', 'dac0', 'dac1', 'dac2', 'dac3'],
+        io_right=['navigate menu', 'speedtest device', 'video out', 'gpio in (0)', 'gpio in (1)', '']
+    )
 
     def __init__(self, **kwargs):
 

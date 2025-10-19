@@ -44,6 +44,12 @@ class Mirror(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="Audio passthrough",
+        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def elaborate(self, platform):
         m = Module()
         wiring.connect(m, wiring.flipped(self.i), wiring.flipped(self.o))
@@ -188,6 +194,12 @@ class Resampler(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="Resampler test",
+        io_left=['in0 (6kHz)', 'in1 (192kHz)', 'in2 (44.1kHz)', 'in3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def elaborate(self, platform):
         m = Module()
 
@@ -291,6 +303,12 @@ class DualVCA(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="Dual VCA",
+        io_left=['VCA0 audio', 'VCA0 CV', 'VCA1 audio', 'VCA1 CV', 'VCA0 out', 'VCA1 out', '-', '-'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def elaborate(self, platform):
         m = Module()
 
@@ -339,6 +357,12 @@ class Pitch(wiring.Component):
                                 data_width=32,
                                 granularity=8,
                                 features={'bte', 'cti'}))
+
+    help = BitstreamHelp(
+        brief="Pitch shifter",
+        io_left=['audio in', 'pitch CV', '-', '-', 'shifted out', '-', '-', '-'],
+        io_right=['', '', '', '', '', '']
+    )
 
     def elaborate(self, platform):
         m = Module()
@@ -392,6 +416,12 @@ class Matrix(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="4x4 matrix mixer",
+        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def elaborate(self, platform):
         m = Module()
 
@@ -413,6 +443,12 @@ class DualWaveshaper(wiring.Component):
 
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    help = BitstreamHelp(
+        brief="Dual waveshaper",
+        io_left=['audio in 0', 'audio in 1', 'drive', '-', 'distorted 0', 'distorted 1', '-', '-'],
+        io_right=['', '', '', '', '', '']
+    )
 
     def elaborate(self, platform):
         m = Module()
@@ -457,6 +493,12 @@ class TouchMixTop(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="Touch matrix mix",
+        io_left=['touch0', 'touch1', 'touch2', 'touch3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def elaborate(self, platform):
         m = Module()
 
@@ -495,6 +537,12 @@ class PSRAMPingPongDelay(wiring.Component):
                                 data_width=32,
                                 granularity=8,
                                 features={'bte', 'cti'}))
+
+    help = BitstreamHelp(
+        brief="Ping-pong delay",
+        io_left=['in L', 'in R', '-', '-', 'out L', 'out R', '-', '-'],
+        io_right=['', '', '', '', '', '']
+    )
 
     def __init__(self):
         super().__init__()
@@ -556,6 +604,12 @@ class SRAMPingPongDelay(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="Ping-pong (SRAM)",
+        io_left=['in L', 'in R', '-', '-', 'out L', 'out R', '-', '-'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def __init__(self):
         super().__init__()
 
@@ -603,6 +657,12 @@ class PSRAMDiffuser(wiring.Component):
                                 data_width=32,
                                 granularity=8,
                                 features={'bte', 'cti'}))
+
+    help = BitstreamHelp(
+        brief="4ch diffuser",
+        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['', '', '', '', '', '']
+    )
 
     def __init__(self):
         super().__init__()
@@ -671,6 +731,12 @@ class SRAMDiffuser(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="4ch diffuser (SRAM)",
+        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def __init__(self):
         super().__init__()
 
@@ -726,6 +792,12 @@ class PSRAMMultiDiffuser(wiring.Component):
                                 data_width=32,
                                 granularity=8,
                                 features={'bte', 'cti'}))
+
+    help = BitstreamHelp(
+        brief="Multi-diffuser",
+        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['', '', '', '', '', '']
+    )
 
     def __init__(self):
         super().__init__()
@@ -806,6 +878,12 @@ class TripleMirror(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="3x audio boards",
+        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def elaborate(self, platform):
         m = Module()
 
@@ -847,6 +925,12 @@ class STFTMirror(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="STFT test",
+        io_left=['audio in', '-', '-', '-', 'audio out', '-', '-', '-'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def elaborate(self, platform):
         m = Module()
 
@@ -885,6 +969,12 @@ class Vocoder(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    help = BitstreamHelp(
+        brief="Vocoder",
+        io_left=['carrier', 'modulator', '-', '-', 'vocoded out', '-', '-', '-'],
+        io_right=['', '', '', '', '', '']
+    )
+
     def elaborate(self, platform):
         m = Module()
 
@@ -919,6 +1009,12 @@ class Noise(wiring.Component):
 
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    help = BitstreamHelp(
+        brief="White noise gen",
+        io_left=['-', '-', '-', '-', 'noise out', '-', '-', '-'],
+        io_right=['', '', '', '', '', '']
+    )
 
     def elaborate(self, platform):
         m = Module()

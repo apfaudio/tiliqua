@@ -21,6 +21,7 @@ from amaranth.lib.cdc import FFSynchronizer
 
 from tiliqua import midi
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.periph import eurorack_pmod
 from tiliqua.platform import RebootProvider
 from tiliqua.usb_host import *
@@ -45,9 +46,14 @@ MIDI_DEVICES = {
     "arturia-keylab49-mkii":  (1, 1),
 }
 
+
 class USB2HostTest(Elaboratable):
 
-    brief = "USB host MIDI to CV conversion (EXPERIMENT)."
+    help = BitstreamHelp(
+        brief="USB host MIDI to CV conversion (EXPERIMENT).",
+        io_left=['V/oct', 'gate', 'velocity', 'mod wheel', '', '', '', ''],
+        io_right=['', 'USB MIDI host', '', '', '', '']
+    )
 
     def __init__(self, clock_settings, usb_device_config_id, usb_midi_bulk_endp_id):
         self.usb_device_config_id = usb_device_config_id

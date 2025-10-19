@@ -204,13 +204,10 @@ def top_level_cli(
     args_flash_firmware = None
 
     # Extract help metadata from fragment
-    brief = args.brief
     help_metadata = None
 
     if hasattr(fragment, "help"):
         # BitstreamHelp class format
-        if brief is None:
-            brief = fragment.help.brief
         help_metadata = fragment.help
 
         # Validate string lengths (must fit in Rust String<16>)
@@ -227,14 +224,12 @@ def top_level_cli(
         build_path=build_path,
         name=args.name,
         sha=repo_sha,
-        hw_rev=args.hw,
-        brief=brief
+        hw_rev=args.hw
     )
-    archiver.video = "<none>"
     archiver.help = help_metadata
 
-    if video_core:
-        archiver.video ="<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
+    if help_metadata is not None and video_core:
+        help_metadata.video = "<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
 
     if hw_platform.clock_domain_generator == pll.TiliquaDomainGeneratorPLLExternal:
         archiver.external_pll_config = ExternalPLLConfig(

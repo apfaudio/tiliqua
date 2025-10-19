@@ -58,9 +58,11 @@ pub struct ExternalPLLConfig {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub struct IOHelp {
-    pub left: [String<16>; 8],
-    pub right: [String<16>; 6],
+pub struct BitstreamHelp {
+    pub brief: String<128>,
+    pub video: String<64>,
+    pub io_left: [String<16>; 8],
+    pub io_right: [String<16>; 6],
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -68,10 +70,8 @@ pub struct BitstreamManifest {
     pub hw_rev: u32,
     pub name: String<32>,
     pub sha: String<8>,
-    pub brief: String<128>,
-    pub video: String<64>,
     pub regions: Vec<MemoryRegion, 5>,
-    pub io_help: Option<IOHelp>,
+    pub help: Option<BitstreamHelp>,
     pub external_pll_config: Option<ExternalPLLConfig>,
     pub magic: u32,
 }
@@ -84,8 +84,12 @@ impl BitstreamManifest {
         info!("\thw_rev:   {}",    self.hw_rev);
         info!("\tname:    '{}'",   self.name);
         info!("\tsha:     '{}'",   self.sha);
-        info!("\tbrief:   '{}'",   self.brief);
-        info!("\tvideo:   '{}'",   self.video);
+        if let Some(help) = &self.help {
+            info!("\thelp = {{");
+            info!("\t\tbrief:   '{}'", help.brief);
+            info!("\t\tvideo:   '{}'", help.video);
+            info!("\t}}");
+        }
         if let Some(clocks) = &self.external_pll_config {
             info!("\texternal_pll_config = {{");
             info!("\t\tclk0_hz: {}", clocks.clk0_hz);

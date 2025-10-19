@@ -31,8 +31,6 @@ class ArchiveBuilder:
     name: str
     sha: str
     hw_rev: TiliquaRevision
-    brief: str = ""
-    video: Optional[str] = None
     external_pll_config: Optional[ExternalPLLConfig] = None
     help: Optional[BitstreamHelp] = None
 
@@ -41,9 +39,9 @@ class ArchiveBuilder:
     _firmware_bin_path: Optional[str] = None
 
     @classmethod
-    def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision, brief: str = "") -> 'ArchiveBuilder':
+    def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision) -> 'ArchiveBuilder':
         """Create an ArchiveBuilder for a project."""
-        archiver = cls(build_path, name, sha, hw_rev, brief)
+        archiver = cls(build_path, name, sha, hw_rev)
         return archiver
 
     def __post_init__(self):
@@ -169,19 +167,12 @@ class ArchiveBuilder:
         if not has_manifest:
             self.with_manifest()
 
-        # Convert BitstreamHelp to IOHelp if present
-        io_help = None
-        if self.help is not None:
-            io_help = IOHelp(left=self.help.io_left, right=self.help.io_right)
-
         self._manifest = BitstreamManifest(
             name=self.name,
             hw_rev=self.hw_rev.platform_class().version_major,
             sha=self.sha,
-            brief=self.brief,
-            video=self.video if self.video else "<none>",
             regions=self._regions,
-            io_help=io_help,
+            help=self.help,
             external_pll_config=self.external_pll_config
         )
         self._manifest.write_to_path(self.manifest_path)
