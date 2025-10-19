@@ -939,13 +939,13 @@ fn main() -> ! {
             draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
             draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA, &modeline).ok();
 
-            // Draw Tiliqua hardware diagram with IO mapping from selected bitstream
+            // Draw Tiliqua hardware diagram with IO help from selected bitstream
             if let Some(n) = opts.tracker.selected {
                 let (io_left, io_right) = if let Some(ref manifest) = manifests[n] {
-                    if let Some(ref io_mapping) = manifest.io_mapping {
-                        (io_mapping.left.clone(), io_mapping.right.clone())
+                    if let Some(ref io_help) = manifest.io_help {
+                        (io_help.left.clone(), io_help.right.clone())
                     } else {
-                        // Default labels if no io_mapping in manifest
+                        // Default labels if no io_help in manifest
                         ([const { heapless::String::new() }; 8], [const { heapless::String::new() }; 6])
                     }
                 } else {

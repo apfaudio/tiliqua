@@ -528,6 +528,7 @@ fn main() -> ! {
                         ("[status report]", &status_report)
                     }
                 };
+                /*
                 draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-200, hue,
                     [
                     //  "touch  jack "
@@ -551,6 +552,7 @@ fn main() -> ! {
                     &page_name,
                     report_str
                 ).ok();
+                */
             }
 
             if opts.tracker.page.value == Page::Autocal {

@@ -379,6 +379,10 @@ class SynthPeripheral(wiring.Component):
 class PolySoc(TiliquaSoc):
 
     brief = "Touch+MIDI Polysynth (8-voice)"
+    io_help = {
+        'left': ['phase cv / touch', 'touch1', 'touch2', 'touch3', 'touch4', 'touch5', 'out L', 'out R'],
+        'right': ['navigate menu', 'MIDI host', 'video out', '', '', 'TRS MIDI in']
+    }
 
     def __init__(self, **kwargs):
 

@@ -169,6 +169,10 @@ class AudioFIFOPeripheral(wiring.Component):
 class MacroOscSoc(TiliquaSoc):
 
     brief = "Emulation of a famous Eurorack module."
+    io_help = {
+        'left': ['pitch', 'trigger', 'timbre', 'morph', '', '', 'out MAIN', 'out AUX'],
+        'right': ['navigate menu', '', 'video out', '', '', '']
+    }
 
     def __init__(self, **kwargs):
 

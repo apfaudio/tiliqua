@@ -245,6 +245,10 @@ class SIDPeripheral(wiring.Component):
 class SIDSoc(TiliquaSoc):
 
     brief = "MOS 6581 (SID) emulation."
+    io_help = {
+        'left': ['modulate0', 'modulate1', 'modulate2', 'modulate3', 'voice0', 'voice1', 'voice2', 'voice mix'],
+        'right': ['navigate menu', '', 'video out', '', '', '']
+    }
 
     def __init__(self, **kwargs):
         # Don't finalize CSR bridge yet

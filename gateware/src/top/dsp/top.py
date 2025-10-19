@@ -65,6 +65,11 @@ class QuadNCO(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
+    io_help = {
+        'left': ['V/oct', 'phase mod', '-', '-', 'sine', 'saw', 'tri', 'square'],
+        'right': ['', '', '', '', '', '']
+    }
+
     def elaborate(self, platform):
         m = Module()
 
@@ -242,6 +247,11 @@ class ResonantFilter(wiring.Component):
 
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    io_help = {
+        'left': ['audio in', 'cutoff', 'resonance', '-', 'LPF out', 'HPF out', 'BPF out', '-'],
+        'right': ['', '', '', '', '', '']
+    }
 
     def elaborate(self, platform):
 
@@ -927,6 +937,10 @@ class CoreTop(Elaboratable):
         # Only if this core uses PSRAM
         if hasattr(self.core, "bus"):
             self.psram_periph = psram.Peripheral(size=16*1024*1024)
+
+        # Forward io_help from the core if it exists
+        if hasattr(self.core, "io_help"):
+            self.io_help = self.core.io_help
 
         super().__init__()
 

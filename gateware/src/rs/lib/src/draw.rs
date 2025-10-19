@@ -367,7 +367,6 @@ where
             .build();
 
     let font_small_grey = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
-    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 15));
 
     let line = |disp: &mut D, x1: u32, y1: u32, x2: u32, y2: u32| {
         Line::new(Point::new((x+x1) as i32, (y+y1) as i32),

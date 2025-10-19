@@ -23,6 +23,10 @@ from tiliqua.tiliqua_soc import TiliquaSoc
 
 class SelftestSoc(TiliquaSoc):
     brief = "Test & calibration utilities"
+    io_help = {
+        'left': ['adc0', 'adc1', 'adc2', 'adc3', 'dac0', 'dac1', 'dac2', 'dac3'],
+        'right': ['navigate menu', 'speedtest device', 'video out', 'gpio in (0)', 'gpio in (1)', '']
+    }
 
     def __init__(self, **kwargs):
 

@@ -212,6 +212,16 @@ def top_level_cli(
     )
     archiver.video = "<none>"
 
+    # Add IO help if the fragment defines it
+    if hasattr(fragment, "io_help"):
+        # Validate string lengths (must fit in Rust String<16>)
+        for side, labels in fragment.io_help.items():
+            for i, label in enumerate(labels):
+                if len(label) > 16:
+                    print(f"ERROR: io_help['{side}'][{i}] = '{label}' is {len(label)} chars (max 16)")
+                    sys.exit(1)
+        archiver.io_help = fragment.io_help
+
     if video_core:
         archiver.video ="<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
 

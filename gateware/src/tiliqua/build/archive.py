@@ -34,6 +34,7 @@ class ArchiveBuilder:
     brief: str = ""
     video: Optional[str] = None
     external_pll_config: Optional[ExternalPLLConfig] = None
+    io_help: Optional[IOHelp] = None
 
     _regions: List[MemoryRegion] = field(default_factory=list)
     _manifest: Optional[BitstreamManifest] = None
@@ -174,8 +175,9 @@ class ArchiveBuilder:
             sha=self.sha,
             brief=self.brief,
             video=self.video if self.video else "<none>",
-            external_pll_config=self.external_pll_config,
-            regions=self._regions
+            regions=self._regions,
+            io_help=getattr(self, 'io_help', None),
+            external_pll_config=self.external_pll_config
         )
         self._manifest.write_to_path(self.manifest_path)
         return self._manifest

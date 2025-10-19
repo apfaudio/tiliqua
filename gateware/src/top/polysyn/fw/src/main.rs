@@ -309,6 +309,7 @@ fn main() -> ! {
             }
 
             if help_screen {
+                /*
                 draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-200, opts.beam.hue.value,
                     [
                         "C2     phase",
@@ -351,6 +352,7 @@ fn main() -> ! {
                     * Hold encoder for 3sec to enter bootloader.\n\
                     ",
                     ).ok();
+                */
                 // Enough persistance to reduce flicker on loads of text.
                 persist.set_persist(512);
                 persist.set_decay(1);

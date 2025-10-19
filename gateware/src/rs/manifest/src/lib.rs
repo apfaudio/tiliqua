@@ -58,7 +58,7 @@ pub struct ExternalPLLConfig {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
-pub struct IOMapping {
+pub struct IOHelp {
     pub left: [String<16>; 8],
     pub right: [String<16>; 6],
 }
@@ -71,7 +71,7 @@ pub struct BitstreamManifest {
     pub brief: String<128>,
     pub video: String<64>,
     pub regions: Vec<MemoryRegion, 5>,
-    pub io_mapping: Option<IOMapping>,
+    pub io_help: Option<IOHelp>,
     pub external_pll_config: Option<ExternalPLLConfig>,
     pub magic: u32,
 }
