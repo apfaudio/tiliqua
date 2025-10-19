@@ -84,7 +84,7 @@ int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
 int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
 int_params!(TriggerLvlParams<i16> { step: 512, min: -16384, max: 16384 });
 int_params!(PosParams<i16>       { step: 25, min: -500, max: 500 });
-int_params!(ScrollParams<u8>      { step: 5, min: 0, max: 60 });
+int_params!(ScrollParams<u8>      { step: 1, min: 0, max: 60 });
 
 button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
 

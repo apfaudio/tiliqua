@@ -181,7 +181,7 @@ fn main() -> ! {
                 draw::draw_help(&mut display, 80, h_active/2-180, opts.help.scroll.value,
                                HELP_TEXT, opts.beam.ui_hue.value).ok();
 
-                persist.set_persist(256);
+                persist.set_persist(64);
                 persist.set_decay(1);
             } else {
                 persist.set_persist(opts.beam.persist.value);
@@ -252,18 +252,26 @@ fn main() -> ! {
 
             display.rotate(&opts.misc.rotation.value);
 
-            if opts.misc.plot_type.value == PlotType::Vector {
+
+            if opts.tracker.page.value == Page::Help {
                 scope.flags().write(
                     |w| w.enable().bit(false) );
                 vscope.flags().write(
-                    |w| w.enable().bit(true) );
+                    |w| w.enable().bit(false) );
             } else {
-                scope.flags().write(
-                    |w| { w.enable().bit(true);
-                          w.trigger_always().bit(opts.scope1.trig_mode.value == TriggerMode::Always)
-                    } );
-                vscope.flags().write(
-                    |w| w.enable().bit(false) );
+                if opts.misc.plot_type.value == PlotType::Vector {
+                    scope.flags().write(
+                        |w| w.enable().bit(false) );
+                    vscope.flags().write(
+                        |w| w.enable().bit(true) );
+                } else {
+                    scope.flags().write(
+                        |w| { w.enable().bit(true);
+                              w.trigger_always().bit(opts.scope1.trig_mode.value == TriggerMode::Always)
+                        } );
+                    vscope.flags().write(
+                        |w| w.enable().bit(false) );
+                }
             }
 
             first = false;
