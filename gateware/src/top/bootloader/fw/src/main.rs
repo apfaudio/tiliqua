@@ -153,7 +153,7 @@ where
     write!(countdown_text, "Autoboot {} (slot {}) in {}sec", target, slot, countdown_sec).ok();
     Text::with_alignment(
         &countdown_text,
-        Point::new(h_active/2, v_active/2 - 125),
+        Point::new(h_active/2, v_active/2 - 115),
         style,
         Alignment::Center,
     )
