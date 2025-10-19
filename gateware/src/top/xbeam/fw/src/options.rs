@@ -90,7 +90,7 @@ button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
 
 #[derive(OptionPage, Clone)]
 pub struct HelpOpts {
-    #[option(default=0, help="Scroll position in help text")]
+    #[option(0)]
     pub scroll: IntOption<ScrollParams>,
 }
 
