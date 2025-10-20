@@ -845,24 +845,6 @@ mod tests {
             "midi notes (+mod, +pitch)",
         ];
 
-        let title = "[8-voice polyphonic synthesizer]";
-        let help_text = "The synthesizer can be controlled by touching\n\
-            jacks 0-5 or using a MIDI keyboard through TRS\n\
-            midi. Control source is selected in the menu.\n\
-            \n\
-            In touch mode, the touch magnitude controls the\n\
-            filter envelopes of each voice. In MIDI mode\n\
-            the velocity of each note as well as the value\n\
-            of the modulation wheel affects the filter\n\
-            envelopes.\n\
-            \n\
-            Output audio is sent to output channels 2 and\n\
-            3 (last 2 jacks). Input jack 0 also controls\n\
-            phase modulation of all oscillators, so you\n\
-            can patch input jack 0 to an LFO for retro-sounding\n\
-            slow vibrato, or to an oscillator for some wierd\n\
-            FM effects.\n";
-
         draw_tiliqua(
             &mut disp,
             H_ACTIVE/2-80,
@@ -870,8 +852,6 @@ mod tests {
             0,
             connection_labels,
             menu_items,
-            title,
-            help_text,
         ).ok();
         disp.img.save("draw_help.png").unwrap();
     }
