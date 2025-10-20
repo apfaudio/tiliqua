@@ -242,13 +242,14 @@ where
     use crate::mono_6x12_optimized::MONO_6X12_OPTIMIZED;
     use tiliqua_hal::embedded_graphics::mono_font::ascii::FONT_7X13;
 
-    let font_normal = MonoTextStyle::new(&FONT_7X13, HI8::new(hue, 10));
+    let font_normal = MonoTextStyle::new(&FONT_7X13, HI8::new(hue, 12));
     let font_small = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 10));
+    let font_small_white = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 15));
 
     let skip_lines = scroll as usize;
     let line_spacing_normal = 13;  // Spacing for FONT_8X13
     let line_spacing_small = 12;   // Spacing for MONO_6X12_OPTIMIZED
-    let max_visible_lines = 30;
+    let max_visible_lines = 28;
 
     let mut lines_iter = help_text.lines();
 
@@ -290,24 +291,51 @@ where
     let has_lines_above = skip_lines > 0;
     let has_lines_below = lines_iter.next().is_some();
 
+    // Center arrows horizontally - approximate text width is 80 chars * 7 pixels
+    let text_width = 80 * 7;
+    let arrow_x = x + (text_width / 2);
+
+    let stroke = PrimitiveStyleBuilder::new()
+        .stroke_color(HI8::new(hue, 10))
+        .stroke_width(1)
+        .build();
+
     if has_lines_above {
-        let arrow_y = y.saturating_sub(2 * line_spacing_small);
+        let arrow_y = y.saturating_sub(1 * line_spacing_small);
         Text::with_alignment(
             "▴",
-            Point::new((x + 200) as i32, arrow_y as i32),
-            font_small,
+            Point::new(arrow_x as i32, arrow_y as i32),
+            font_small_white,
             Alignment::Center,
         ).draw(d)?;
+        // Draw horizontal lines either side of arrow
+        Line::new(
+            Point::new((arrow_x - 60) as i32, arrow_y as i32 - 3),
+            Point::new((arrow_x - 10) as i32, arrow_y as i32 - 3)
+        ).into_styled(stroke).draw(d)?;
+        Line::new(
+            Point::new((arrow_x + 10) as i32, arrow_y as i32 - 3),
+            Point::new((arrow_x + 60) as i32, arrow_y as i32 - 3)
+        ).into_styled(stroke).draw(d)?;
     }
 
     if has_lines_below {
-        let arrow_y = current_y + line_spacing_small;
+        let arrow_y = current_y;
         Text::with_alignment(
             "▾",
-            Point::new((x + 200) as i32, arrow_y as i32),
-            font_small,
+            Point::new(arrow_x as i32, arrow_y as i32),
+            font_small_white,
             Alignment::Center,
         ).draw(d)?;
+        // Draw horizontal lines either side of arrow
+        Line::new(
+            Point::new((arrow_x - 60) as i32, arrow_y as i32 - 2),
+            Point::new((arrow_x - 10) as i32, arrow_y as i32 - 2)
+        ).into_styled(stroke).draw(d)?;
+        Line::new(
+            Point::new((arrow_x + 10) as i32, arrow_y as i32 - 2),
+            Point::new((arrow_x + 60) as i32, arrow_y as i32 - 2)
+        ).into_styled(stroke).draw(d)?;
     }
 
     Ok(())
@@ -977,8 +1005,8 @@ mod tests {
 
         draw_tiliqua(
             &mut disp,
-            H_ACTIVE/2-80,
-            V_ACTIVE/2-200,
+            (H_ACTIVE/2-80) as i32,
+            (V_ACTIVE/2-200) as i32,
             0,
             connection_labels,
             menu_items,
@@ -1006,9 +1034,139 @@ mod tests {
     #[test]
     fn test_draw_unicode() {
         let mut disp = setup_display();
+        let mut rng = Rng::with_seed(0);
 
-        draw_benchmark_unicode(&mut disp).ok();
+        draw_benchmark_unicode(&mut disp, 1, &mut rng).ok();
 
         disp.img.save("draw_unicode.png").unwrap();
+    }
+
+    #[test]
+    fn test_draw_xbeam_help() {
+        let mut disp = setup_display();
+
+        const XBEAM_HELP_TEXT: &str = r###"
+Vectorscope/oscilloscope with menu system, USB audio and tunable delay lines.
+
+    - In **vectorscope mode**, rasterize X/Y, intensity and color to a simulated
+      CRT, with adjustable beam settings, scale and offset for each channel.
+
+    - In **oscilloscope mode**, all 4 input channels are plotted simultaneosly
+      with adjustable timebase, trigger settings and so on.
+
+The channels are assigned as follows:
+
+    .. code-block:: text
+
+                 Vectorscope │ Oscilloscope
+        ┌────┐               │
+        │in0 │◄─ x           │ channel 0 + trig
+        │in1 │◄─ y           │ channel 1
+        │in2 │◄─ intensity   │ channel 2
+        │in3 │◄─ color       │ channel 3
+        └────┘
+
+A USB audio interface, tunable delay lines, and series of switches is included
+in the signal path to open up more applications. The overall signal flow looks
+like this:
+
+    .. code-block:: text
+
+        in0/x ───────►┌───────┐
+        in1/y ───────►│Audio  │
+        in2/i ───────►│IN (4x)│
+        in3/c ───────►└───┬───┘
+                          ▼
+                 ┌───◄─[SPLIT]─►────┐
+                 │        │         ▼
+                 │        ▼  ┌──────────────┐     ┌────────┐
+                 │        │  │4in/4out USB  ├────►│Computer│
+                 │        │  │Audio I/F     │◄────│(USB2)  │
+                 │        │  └──────┬───────┘     └────────┘
+                 │        └───┐ ┌───┘
+                 │ usb=bypass ▼ ▼ usb=enabled
+                 │           [MUX]
+                 │      ┌──────────────┐
+                 │      │4x Delay Lines│ (tunable)
+                 │      └──────┬───────┘
+                 │             ▼
+                 └────┐ ┌─◄─[SPLIT]─►────┐
+                      │ │                │
+           src=inputs ▼ ▼ src=outputs    │
+                     [MUX]               │
+                       │                 ▼
+                 ┌─────▼──────┐     ┌────────┬──────► out0
+                 │Vectorscope/│     │Audio   ├──────► out1
+                 │Oscilloscope│     │OUT (4x)├──────► out2
+                 └────────────┘     └────────┴──────► out3
+
+The ``[MUX]`` elements pictured above can be switched by the menu system, for
+viewing different parts of the signal path (i.e inputs or outputs to delay
+lines, USB streams).  Some usage ideas:
+
+    - With ``plot_src=inputs`` and ``usb_mode=bypass``, we can visualize our
+      analog audio inputs.
+    - With ``plot_src=outputs`` and ``usb_mode=bypass``, we can visualize our
+      analog audio inputs after being affected by the delay lines (this is fun
+      to get patterns out of duplicated mono signals)
+    - With ``plot_src=outputs`` and ``usb_mode=enable``, we can visualize a USB
+      audio stream as it is sent to the analog outputs. This is perfect for
+      visualizing oscilloscope music being streamed from a computer.
+    - With ``plot_src=inputs`` and ``usb_mode=enable``, we can visualize what we
+      are sending back to the computer on our analog inputs.
+
+    .. note::
+
+        The USB audio interface will always enumerate if it is connected to a
+        computer, however it is only part of the signal flow if
+        ``usb_mode=enabled`` in the menu system.
+
+    .. note::
+
+        By default, this core builds for ``48kHz/16bit`` sampling.  However,
+        Tiliqua is shipped with ``--fs-192khz`` enabled, which provides much
+        higher fidelity plots. If you're feeling adventurous, you can also
+        synthesize with the environment variable ``TILIQUA_ASQ_WIDTH=24`` to use
+        a completely 24-bit audio path.  This mostly works, but might break the
+        scope triggering and use a bit more FPGA resources.
+"###;
+
+        // Use same position as in xbeam/fw/src/main.rs (h_active/2-280, v_active/2-180)
+        draw_help(&mut disp, H_ACTIVE/2-280, V_ACTIVE/2-150, 3, XBEAM_HELP_TEXT, 0).ok();
+
+        // Draw the tiliqua diagram at scroll position 0
+        let io_left = [
+            "x / in0",
+            "y / in1",
+            "intensity / in2",
+            "color / in3",
+            "out0",
+            "out1",
+            "out2",
+            "out3",
+        ];
+        let io_right = [
+            "navigate menu",
+            "4x4 audio device",
+            "video out",
+            "",
+            "",
+            "",
+        ];
+        draw_tiliqua(
+            &mut disp,
+            (H_ACTIVE/2-80) as i32,
+            (V_ACTIVE/2) as i32 - 330,
+            0,
+            io_left,
+            io_right,
+        ).ok();
+
+        draw_name(&mut disp, H_ACTIVE/2, V_ACTIVE-50, 0, "XBEAM", "b2d3aa", &DVIModeline::default()).ok();
+
+        let mut opts = test_data::Opts::default();
+        draw_options(&mut disp, &opts, H_ACTIVE/2-30, V_ACTIVE-135, 0).ok();
+
+        disp.img.save("draw_xbeam_help.png").unwrap();
     }
 }

@@ -178,18 +178,16 @@ fn main() -> ! {
             }
 
             if opts.tracker.page.value == Page::Help {
-                draw::draw_help(&mut display, h_active/2-280, v_active/2-180, opts.help.scroll.value,
+                draw::draw_help(&mut display, h_active/2-280, v_active/2-150, opts.help.scroll.value,
                                HELP_TEXT, opts.beam.ui_hue.value).ok();
-                if opts.help.scroll.value < 15 {
-                    if let Some(ref help) = bootinfo.manifest.help {
-                        draw::draw_tiliqua(&mut display,
-                            (h_active/2-80) as i32,
-                            (v_active/2) as i32 - (opts.help.scroll.value as i32 * 13) - 340,
-                            opts.beam.ui_hue.value,
-                            help.io_left.each_ref().map(|s| s.as_str()),
-                            help.io_right.each_ref().map(|s| s.as_str())
-                        ).ok();
-                    }
+                if let Some(ref help) = bootinfo.manifest.help {
+                    draw::draw_tiliqua(&mut display,
+                        (h_active/2-80) as i32,
+                        (v_active/2) as i32 - 330,
+                        opts.beam.ui_hue.value,
+                        help.io_left.each_ref().map(|s| s.as_str()),
+                        help.io_right.each_ref().map(|s| s.as_str())
+                    ).ok();
                 }
                 persist.set_persist(64);
                 persist.set_decay(1);
