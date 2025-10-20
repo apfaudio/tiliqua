@@ -178,43 +178,19 @@ fn main() -> ! {
             }
 
             if opts.tracker.page.value == Page::Help {
-                // Always draw help text, but use 0 when scroll is negative
-                let scroll_for_help = if opts.help.scroll.value < 0 { 0 } else { opts.help.scroll.value as u8 };
-                draw::draw_help(&mut display, 20, v_active/2-180, scroll_for_help,
+                draw::draw_help(&mut display, h_active/2-280, v_active/2-180, opts.help.scroll.value,
                                HELP_TEXT, opts.beam.ui_hue.value).ok();
-
-                // Draw tiliqua diagram only when scroll is at default (-15)
-                if opts.help.scroll.value == -15 {
+                if opts.help.scroll.value < 15 {
                     if let Some(ref help) = bootinfo.manifest.help {
-                        let (io_left, io_right) = (help.io_left.clone(), help.io_right.clone());
-                        let io_left_str: [&str; 8] = [
-                            io_left[0].as_str(),
-                            io_left[1].as_str(),
-                            io_left[2].as_str(),
-                            io_left[3].as_str(),
-                            io_left[4].as_str(),
-                            io_left[5].as_str(),
-                            io_left[6].as_str(),
-                            io_left[7].as_str(),
-                        ];
-                        let io_right_str: [&str; 6] = [
-                            io_right[0].as_str(),
-                            io_right[1].as_str(),
-                            io_right[2].as_str(),
-                            io_right[3].as_str(),
-                            io_right[4].as_str(),
-                            io_right[5].as_str(),
-                        ];
                         draw::draw_tiliqua(&mut display,
-                            h_active/2+80,
-                            v_active/2-80,
+                            (h_active/2-80) as i32,
+                            (v_active/2) as i32 - (opts.help.scroll.value as i32 * 13) - 340,
                             opts.beam.ui_hue.value,
-                            io_left_str,
-                            io_right_str,
+                            help.io_left.each_ref().map(|s| s.as_str()),
+                            help.io_right.each_ref().map(|s| s.as_str())
                         ).ok();
                     }
                 }
-
                 persist.set_persist(64);
                 persist.set_decay(1);
             } else {

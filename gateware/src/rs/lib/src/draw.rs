@@ -240,9 +240,9 @@ where
     D: DrawTarget<Color = HI8>,
 {
     use crate::mono_6x12_optimized::MONO_6X12_OPTIMIZED;
-    use tiliqua_hal::embedded_graphics::mono_font::ascii::FONT_8X13;
+    use tiliqua_hal::embedded_graphics::mono_font::ascii::FONT_7X13;
 
-    let font_normal = MonoTextStyle::new(&FONT_8X13, HI8::new(hue, 10));
+    let font_normal = MonoTextStyle::new(&FONT_7X13, HI8::new(hue, 10));
     let font_small = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 10));
 
     let skip_lines = scroll as usize;
@@ -434,7 +434,7 @@ where
     Ok(())
 }
 
-pub fn draw_tiliqua<D>(d: &mut D, x: u32, y: u32, hue: u8,
+pub fn draw_tiliqua<D>(d: &mut D, x: i32, y: i32, hue: u8,
                        str_l: [&str; 8], str_r: [&str; 6]) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
@@ -446,15 +446,15 @@ where
 
     let font_small_grey = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
 
-    let line = |disp: &mut D, x1: u32, y1: u32, x2: u32, y2: u32| {
+    let line = |disp: &mut D, x1: i32, y1: i32, x2: i32, y2: i32| {
         Line::new(Point::new((x+x1) as i32, (y+y1) as i32),
                   Point::new((x+x2) as i32, (y+y2) as i32))
                   .into_styled(stroke_grey)
                   .draw(disp).ok()
     };
 
-    let ellipse = |disp: &mut D, x1: u32, y1: u32, sx: u32, sy: u32| {
-        Ellipse::new(Point::new((x+x1-sx) as i32, (y+y1-sy) as i32),
+    let ellipse = |disp: &mut D, x1: i32, y1: i32, sx: u32, sy: u32| {
+        Ellipse::new(Point::new((x+x1-sx as i32) as i32, (y+y1-sy as i32) as i32),
                   Size::new(sx<<1, sy<<1))
                   .into_styled(stroke_grey)
                   .draw(disp).ok()
@@ -542,7 +542,7 @@ where
     for n in 0..text_l.len() {
         Text::with_alignment(
             str_l[n],
-            Point::new((x+text_l[n][0]-6) as i32, (y+text_l[n][1]+5) as i32),
+            Point::new(x + text_l[n][0] as i32 - 6, y + text_l[n][1] as i32 + 5),
             font_small_grey,
             Alignment::Right
         ).draw(d)?;
@@ -560,7 +560,7 @@ where
     for n in 0..text_r.len() {
         Text::with_alignment(
             str_r[n],
-            Point::new((x+text_r[n][0]+7) as i32, (y+text_r[n][1]+3) as i32),
+            Point::new(x + text_r[n][0] as i32 + 7, y + text_r[n][1] as i32 + 3),
             font_small_grey,
             Alignment::Left
         ).draw(d)?;

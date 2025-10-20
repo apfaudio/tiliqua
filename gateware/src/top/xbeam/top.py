@@ -5,8 +5,8 @@
 """
 Vectorscope/oscilloscope with menu system, USB audio and tunable delay lines.
 
-    - In **vectorscope mode**, rasterize X/Y, intensity and color to a simulated CRT,
-      with adjustable beam settings, scale and offset for each channel.
+    - In **vectorscope mode**, rasterize X/Y, intensity and color to a simulated
+      CRT, with adjustable beam settings, scale and offset for each channel.
 
     - In **oscilloscope mode**, all 4 input channels are plotted simultaneosly
       with adjustable timebase, trigger settings and so on.
@@ -23,8 +23,9 @@ The channels are assigned as follows:
         │in3 │◄─ color       │ channel 3
         └────┘
 
-A USB audio interface, tunable delay lines, and series of switches is included in
-the signal path to open up more applications. The overall signal flow looks like this:
+A USB audio interface, tunable delay lines, and series of switches is included
+in the signal path to open up more applications. The overall signal flow looks
+like this:
 
     .. code-block:: text
 
@@ -56,35 +57,35 @@ the signal path to open up more applications. The overall signal flow looks like
                  │Oscilloscope│     │OUT (4x)├──────► out2
                  └────────────┘     └────────┴──────► out3
 
-The ``[MUX]`` elements pictured above can be switched by the menu system, for viewing
-different parts of the signal path (i.e inputs or outputs to delay lines, USB streams).
-Some usage ideas:
+The ``[MUX]`` elements pictured above can be switched by the menu system, for
+viewing different parts of the signal path (i.e inputs or outputs to delay
+lines, USB streams).  Some usage ideas:
 
-    - With ``plot_src=inputs`` and ``usb_mode=bypass``, we can visualize our analog
-      audio inputs.
-    - With ``plot_src=outputs`` and ``usb_mode=bypass``, we can visualize our analog
-      audio inputs after being affected by the delay lines (this is fun to get patterns
-      out of duplicated mono signals)
-    - With ``plot_src=outputs`` and ``usb_mode=enable``, we can visualize a USB audio
-      stream as it is sent to the analog outputs. This is perfect for visualizing
-      oscilloscope music being streamed from a computer.
-    - With ``plot_src=inputs`` and ``usb_mode=enable``, we can visualize what we are
-      sending back to the computer on our analog inputs.
-
-    .. note::
-
-        The USB audio interface will always enumerate if it is connected to a computer, however
-        it is only part of the signal flow if ``usb_mode=enabled`` in the menu system.
+    - With ``plot_src=inputs`` and ``usb_mode=bypass``, we can visualize our
+      analog audio inputs.
+    - With ``plot_src=outputs`` and ``usb_mode=bypass``, we can visualize our
+      analog audio inputs after being affected by the delay lines (this is fun
+      to get patterns out of duplicated mono signals)
+    - With ``plot_src=outputs`` and ``usb_mode=enable``, we can visualize a USB
+      audio stream as it is sent to the analog outputs. This is perfect for
+      visualizing oscilloscope music being streamed from a computer.
+    - With ``plot_src=inputs`` and ``usb_mode=enable``, we can visualize what we
+      are sending back to the computer on our analog inputs.
 
     .. note::
 
-        By default, this core builds for ``48kHz/16bit`` sampling.
-        However, Tiliqua is shipped with ``--fs-192khz`` enabled,
-        which provides much higher fidelity plots. If you're feeling
-        adventurous, you can also synthesize with the environment variable
-        ``TILIQUA_ASQ_WIDTH=24`` to use a completely 24-bit audio path.
-        This mostly works, but might break the scope triggering and
-        use a bit more FPGA resources.
+        The USB audio interface will always enumerate if it is connected to a
+        computer, however it is only part of the signal flow if
+        ``usb_mode=enabled`` in the menu system.
+
+    .. note::
+
+        By default, this core builds for ``48kHz/16bit`` sampling.  However,
+        Tiliqua is shipped with ``--fs-192khz`` enabled, which provides much
+        higher fidelity plots. If you're feeling adventurous, you can also
+        synthesize with the environment variable ``TILIQUA_ASQ_WIDTH=24`` to use
+        a completely 24-bit audio path.  This mostly works, but might break the
+        scope triggering and use a bit more FPGA resources.
 
 """
 
