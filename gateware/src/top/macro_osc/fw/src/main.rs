@@ -323,7 +323,7 @@ fn main() -> ! {
             if draw_options {
                 draw::draw_options(&mut display, &opts, h_active-175, v_active/2-50, opts.beam.hue.value).ok();
                 draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.hue.value,
-                                &bootinfo.manifest.name, &bootinfo.manifest.sha, &modeline).ok();
+                                &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
             }
 
             if save_opts {

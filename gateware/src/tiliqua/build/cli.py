@@ -43,7 +43,13 @@ def top_level_cli(
 
     # Get some repository properties
     repo = git.Repo(search_parent_directories=True)
-    repo_sha = repo.head.object.hexsha[:6]
+
+    try:
+        repo_tag = repo.git.describe('--tags', '--exact-match', '--dirty')
+    except git.exc.GitCommandError:
+        repo_tag = repo.git.describe('--always', '--dirty')
+    # Only keep what the bootloader / bitstreams can display
+    repo_tag = repo_tag[:BitstreamManifest.BITSTREAM_TAG_LEN]
 
     # Configure logging.
     logging.getLogger().setLevel(logging.DEBUG)
@@ -185,7 +191,7 @@ def top_level_cli(
         else:
             kwargs["fw_offset"] = int(args.fw_offset, 16)
         kwargs["ui_name"] = args.name
-        kwargs["ui_sha"]  = repo_sha
+        kwargs["ui_tag"]  = repo_tag
         kwargs["platform_class"] = platform_class
 
     assert callable(fragment)
@@ -203,17 +209,20 @@ def top_level_cli(
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
 
-    archiver = ArchiveBuilder.for_project(
+    # Create default help strings, override them if the fragment supplies its own.
+    bitstream_help = BitstreamHelp()
+    if hasattr(fragment, "bitstream_help"):
+        bitstream_help = fragment.bitstream_help
+    if video_core:
+        bitstream_help.video = "<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
+
+    archiver = ArchiveBuilder(
         build_path=build_path,
         name=args.name,
-        sha=repo_sha,
+        tag=repo_tag,
         hw_rev=args.hw,
-        brief=args.brief if args.brief is not None else getattr(fragment, "brief", "")
+        bitstream_help=bitstream_help
     )
-    archiver.video = "<none>"
-
-    if video_core:
-        archiver.video ="<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
 
     if hw_platform.clock_domain_generator == pll.TiliquaDomainGeneratorPLLExternal:
         archiver.external_pll_config = ExternalPLLConfig(

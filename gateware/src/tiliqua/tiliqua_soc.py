@@ -60,7 +60,7 @@ from .video import framebuffer, palette
 
 
 class TiliquaSoc(Component):
-    def __init__(self, *, firmware_bin_path, ui_name, ui_sha, platform_class, clock_settings,
+    def __init__(self, *, firmware_bin_path, ui_name, ui_tag, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, poke_outputs=False, mainram_size=0x4000,
                  fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
                  extra_cpu_regions=[]):
@@ -68,7 +68,7 @@ class TiliquaSoc(Component):
         super().__init__({})
 
         self.ui_name = ui_name
-        self.ui_sha  = ui_sha
+        self.ui_tag  = ui_tag
 
         self.sim_fs_strobe = Signal()
 
@@ -447,7 +447,7 @@ class TiliquaSoc(Component):
         print("Generating (rust) constants ...", dst)
         with open(dst, "w") as f:
             f.write(f"pub const UI_NAME: &str            = \"{self.ui_name}\";\n")
-            f.write(f"pub const UI_SHA: &str             = \"{self.ui_sha}\";\n")
+            f.write(f"pub const UI_TAG: &str             = \"{self.ui_tag}\";\n")
             f.write(f"pub const HW_REV_MAJOR: u32        = {self.platform_class.version_major};\n")
             use_external_pll = self.platform_class.clock_domain_generator == pll.TiliquaDomainGeneratorPLLExternal
             f.write(f"pub const USE_EXTERNAL_PLL: bool   = {str(use_external_pll).lower()};\n")

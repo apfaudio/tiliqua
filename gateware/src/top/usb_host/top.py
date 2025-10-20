@@ -2,15 +2,13 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 """
-Extremely bare-bones USB MIDI host demo. EXPERIMENTAL.
+Extremely bare-bones gateware-only USB MIDI host. EXPERIMENTAL.
 
-***WARN*** This demo hardwires the VBUS output to ON !!! ***WARN***
-
-At the moment this is only used for Tiliqua hardware validation.
-NOTE: the MIDI USB configuration and endpoint IDs are hard-coded below.
+***WARN*** because there is no SoC to do USB CC negotiation, this demo
+hardwires the VBUS output to ON !!!
 
 At the moment, all the MIDI traffic is routed to CV outputs according
-to the existing example (see docstring) in `top/dsp:MidiCVTop`.
+to the existing example (see docstring) in ``tiliqua.midi:MonoMidiCV``.
 """
 
 import sys
@@ -21,37 +19,22 @@ from amaranth.lib.cdc import FFSynchronizer
 
 from tiliqua import midi
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.periph import eurorack_pmod
 from tiliqua.platform import RebootProvider
 from tiliqua.usb_host import *
 from vendor.ila import AsyncSerialILA
 
-#
-# FIXME: hardcoded device properties
-#
-# You can get this by looking at the device descriptors
-# on a PC --> Find an 'Interface descriptor' with subclass
-# 0x03 (MIDI Streaming). The parent configuration ID is the
-# correct configuration ID. The IN (bulk) endpoint ID is the
-# MIDI BULK endpoint ID.
-#
-# These will not be hardcoded when this demo is finished.
-#
-
-# These can be selected at top-level CLI.
-MIDI_DEVICES = {
-    # (name):                 (usb configuration_id, usb_midi_endpoint_id)
-    "yamaha-cp73":            (1, 2),
-    "arturia-keylab49-mkii":  (1, 1),
-}
 
 class USB2HostTest(Elaboratable):
 
-    brief = "USB host MIDI to CV conversion (EXPERIMENT)."
+    bitstream_help = BitstreamHelp(
+        brief="USB host MIDI to CV conversion (EXPERIMENT).",
+        io_left=midi.MonoMidiCV.bitstream_help.io_left,
+        io_right=['', 'USB MIDI host', '', '', '', '']
+    )
 
-    def __init__(self, clock_settings, usb_device_config_id, usb_midi_bulk_endp_id):
-        self.usb_device_config_id = usb_device_config_id
-        self.usb_midi_bulk_endp_id = usb_midi_bulk_endp_id
+    def __init__(self, clock_settings):
         self.clock_settings = clock_settings
         super().__init__()
 
@@ -66,10 +49,7 @@ class USB2HostTest(Elaboratable):
         ulpi = platform.request(platform.default_usb_connection)
         m.submodules.usb = usb = SimpleUSBMIDIHost(
                 bus=ulpi,
-                hardcoded_configuration_id=self.usb_device_config_id,
-                hardcoded_midi_endpoint=self.usb_midi_bulk_endp_id,
         )
-
 
         m.submodules.midi_decode = midi_decode = midi.MidiDecode(usb=True)
         wiring.connect(m, usb.o_midi_bytes, midi_decode.i)
@@ -79,7 +59,6 @@ class USB2HostTest(Elaboratable):
                 car.settings.audio_clock)
         wiring.connect(m, pmod0.pins, pmod0_provider.pins)
         m.d.comb += pmod0.codec_mute.eq(reboot.mute)
-
 
         m.submodules.midi_cv = self.midi_cv = midi.MonoMidiCV()
         wiring.connect(m, pmod0.o_cal, self.midi_cv.i)
@@ -127,27 +106,9 @@ class USB2HostTest(Elaboratable):
 
         return m
 
-def argparse_callback(parser):
-    parser.add_argument('--midi-device', type=str, default=None,
-                        help=f"One of {list(MIDI_DEVICES)}")
-
-def argparse_fragment(args):
-    # Additional arguments to be provided to CoreTop
-    if args.midi_device not in MIDI_DEVICES:
-        print(f"provided '--midi-device {args.midi_device}' is not one of {list(MIDI_DEVICES)}")
-        sys.exit(-1)
-
-    config_id, endp_id = MIDI_DEVICES[args.midi_device]
-    return {
-        "usb_device_config_id": config_id,
-        "usb_midi_bulk_endp_id": endp_id,
-    }
-
 if __name__ == "__main__":
     top_level_cli(
         USB2HostTest,
         video_core=False,
         ila_supported=True,
-        argparse_callback=argparse_callback,
-        argparse_fragment=argparse_fragment,
     )

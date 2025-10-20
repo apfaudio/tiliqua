@@ -153,7 +153,7 @@ where
     write!(countdown_text, "Autoboot {} (slot {}) in {}sec", target, slot, countdown_sec).ok();
     Text::with_alignment(
         &countdown_text,
-        Point::new(h_active/2, v_active/2 - 125),
+        Point::new(h_active/2, v_active/2 - 115),
         style,
         Alignment::Center,
     )
@@ -170,45 +170,47 @@ where
 {
     let h_active = d.size().width as i32;
     let v_active = d.size().height as i32;
-    let norm = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 11));
+    let norm = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
     if let Some(bitstream) = bitstream_manifest {
+        if let Some(ref help) = bitstream.help {
+            Text::with_alignment(
+                "brief:".into(),
+                Point::new((h_active/2 - 10) as i32 + or, (v_active/2+20) as i32 + ot),
+                norm,
+                Alignment::Right,
+            )
+            .draw(d).ok();
+            Text::with_alignment(
+                &help.brief,
+                Point::new((h_active/2) as i32 + or, (v_active/2+20) as i32 + ot),
+                norm,
+                Alignment::Left,
+            )
+            .draw(d).ok();
+            Text::with_alignment(
+                "video:".into(),
+                Point::new((h_active/2 - 10) as i32 + or, (v_active/2+40) as i32 + ot),
+                norm,
+                Alignment::Right,
+            )
+            .draw(d).ok();
+            Text::with_alignment(
+                &help.video,
+                Point::new((h_active/2) as i32 + or, (v_active/2+40) as i32 + ot),
+                norm,
+                Alignment::Left,
+            )
+            .draw(d).ok();
+        }
         Text::with_alignment(
-            "brief:".into(),
-            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+20) as i32 + ot),
-            norm,
-            Alignment::Right,
-        )
-        .draw(d).ok();
-        Text::with_alignment(
-            &bitstream.brief,
-            Point::new((h_active/2) as i32 + or, (v_active/2+20) as i32 + ot),
-            norm,
-            Alignment::Left,
-        )
-        .draw(d).ok();
-        Text::with_alignment(
-            "video:".into(),
-            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+40) as i32 + ot),
-            norm,
-            Alignment::Right,
-        )
-        .draw(d).ok();
-        Text::with_alignment(
-            &bitstream.video,
-            Point::new((h_active/2) as i32 + or, (v_active/2+40) as i32 + ot),
-            norm,
-            Alignment::Left,
-        )
-        .draw(d).ok();
-        Text::with_alignment(
-            "sha:".into(),
+            "tag:".into(),
             Point::new((h_active/2 - 10) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
-            &bitstream.sha,
+            &bitstream.tag,
             Point::new((h_active/2) as i32 + or, (v_active/2+60) as i32 + ot),
             norm,
             Alignment::Left,
@@ -240,7 +242,7 @@ where
     .draw(d).ok();
     Text::with_alignment(
         "Select a bitstream. To return here, hold encoder down for 3sec.",
-        Point::new((h_active/2) as i32, (v_active/2-70) as i32 + ot),
+        Point::new((h_active/2) as i32, (v_active/2-30) as i32 + ot),
         norm,
         Alignment::Center,
     )
@@ -842,7 +844,7 @@ fn main() -> ! {
         persist.set_persist(256);
 
         let stroke = PrimitiveStyleBuilder::new()
-            .stroke_color(HI8::new(0, 11))
+            .stroke_color(HI8::new(0, 10))
             .stroke_width(1)
             .build();
 
@@ -936,24 +938,34 @@ fn main() -> ! {
 
             modeline = final_modeline;
 
-            draw::draw_options(&mut display, &opts, 100, v_active/2-50, 0).ok();
-            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_SHA, &modeline).ok();
+            draw::draw_options(&mut display, &opts, 80, v_active/2-50, 0).ok();
+            draw::draw_name(&mut display, h_active/2, v_active-50, 0, UI_NAME, UI_TAG, &modeline).ok();
+
 
             if let Some(n) = opts.tracker.selected {
-                draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -18, 0);
-                if manifests[n].is_some() {
-                    Line::new(Point::new(255, (v_active/2 - 55 + (n as u32)*18) as i32),
-                              Point::new((h_active/2-90) as i32, (v_active/2+8) as i32))
-                              .into_styled(stroke)
-                              .draw(&mut display).ok();
+                draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -110, 0);
+                if let Some(ref manifest) = manifests[n] {
+                    if let Some(ref help) = manifest.help {
+                        draw::draw_tiliqua(&mut display,
+                            h_active/2+30,
+                            v_active/2-40,
+                            0,
+                            help.io_left.each_ref().map(|s| s.as_str()),
+                            help.io_right.each_ref().map(|s| s.as_str())
+                        ).ok();
+                    }
                 }
+                Line::new(Point::new((h_active/2-100) as i32, (v_active/2-100+4) as i32),
+                          Point::new((h_active/2-100) as i32, (v_active/2+100+4) as i32))
+                          .into_styled(stroke)
+                          .draw(&mut display).ok();
             }
 
-            const LINES_PER_LOOP: usize = 2;
+            const LINES_PER_LOOP: usize = 3;
             for _ in 0..LINES_PER_LOOP {
                 let _ = draw::draw_boot_logo(&mut display,
                                              (h_active/2) as i32,
-                                             150 as i32,
+                                             130 as i32,
                                              logo_coord_ix);
                 logo_coord_ix += 1;
             }

@@ -32,6 +32,7 @@ from amaranth.lib.wiring import In, Out
 
 from tiliqua import dsp
 from tiliqua.build import sim
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.build.cli import top_level_cli
 from tiliqua.build.sim import FakeTiliquaDomainGenerator
 from tiliqua.dsp import ASQ
@@ -48,6 +49,12 @@ class VectorScopeTop(Elaboratable):
     """
     Top-level Vectorscope design.
     """
+
+    bitstream_help = BitstreamHelp(
+        brief="Vectorscope (no CPU or menu!).",
+        io_left=['x', 'y', '', '', '', '', '', ''],
+        io_right=['', '', 'video', '', '', '']
+    )
 
     def __init__(self, *, clock_settings, spectrogram):
 

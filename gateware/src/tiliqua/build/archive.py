@@ -29,21 +29,14 @@ class ArchiveBuilder:
 
     build_path: str
     name: str
-    sha: str
+    tag: str
     hw_rev: TiliquaRevision
-    brief: str = ""
-    video: Optional[str] = None
     external_pll_config: Optional[ExternalPLLConfig] = None
+    bitstream_help: Optional[BitstreamHelp] = None
 
     _regions: List[MemoryRegion] = field(default_factory=list)
     _manifest: Optional[BitstreamManifest] = None
     _firmware_bin_path: Optional[str] = None
-
-    @classmethod
-    def for_project(cls, build_path: str, name: str, sha: str, hw_rev: TiliquaRevision, brief: str = "") -> 'ArchiveBuilder':
-        """Create an ArchiveBuilder for a project."""
-        archiver = cls(build_path, name, sha, hw_rev, brief)
-        return archiver
 
     def __post_init__(self):
         # Ensure build directory exists
@@ -52,7 +45,7 @@ class ArchiveBuilder:
 
     @property
     def archive_name(self) -> str:
-        return f"{self.name.lower()}-{self.sha}-{self.hw_rev.value}.tar.gz"
+        return f"{self.name.lower()}-{self.tag}-{self.hw_rev.value}.tar.gz"
 
     @property
     def archive_path(self) -> str:
@@ -171,11 +164,10 @@ class ArchiveBuilder:
         self._manifest = BitstreamManifest(
             name=self.name,
             hw_rev=self.hw_rev.platform_class().version_major,
-            sha=self.sha,
-            brief=self.brief,
-            video=self.video if self.video else "<none>",
-            external_pll_config=self.external_pll_config,
-            regions=self._regions
+            tag=self.tag,
+            regions=self._regions,
+            help=self.bitstream_help,
+            external_pll_config=self.external_pll_config
         )
         self._manifest.write_to_path(self.manifest_path)
         return self._manifest

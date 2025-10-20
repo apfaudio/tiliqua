@@ -54,6 +54,7 @@ from amaranth.lib.wiring import In, Out, connect, flipped
 from amaranth_soc import csr
 
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.raster import scope
 from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc import TiliquaSoc
@@ -244,7 +245,11 @@ class SIDPeripheral(wiring.Component):
 
 class SIDSoc(TiliquaSoc):
 
-    brief = "MOS 6581 (SID) emulation."
+    bitstream_help = BitstreamHelp(
+        brief="MOS 6581 (SID) emulation.",
+        io_left=['modulate0', 'modulate1', 'modulate2', 'modulate3', 'voice0', 'voice1', 'voice2', 'voice mix'],
+        io_right=['navigate menu', '', 'video out', '', '', '']
+    )
 
     def __init__(self, **kwargs):
         # Don't finalize CSR bridge yet

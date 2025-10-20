@@ -50,10 +50,10 @@ class TestFlashCommandGenerator(unittest.TestCase):
 
     def test_bootloader_archive_commands(self):
 
-        archiver = ArchiveBuilder.for_project(
+        archiver = ArchiveBuilder(
             build_path=str(self.build_path),
             name="BOOTLOADER",
-            sha="abc123",
+            tag="abc123",
             hw_rev=TiliquaRevision.R5
         ).with_bitstream()                                                           \
          .with_firmware(str(self.firmware_path), FirmwareLocation.SPIFlash, 0xb0000) \
@@ -87,10 +87,10 @@ class TestFlashCommandGenerator(unittest.TestCase):
 
     def test_user_bitstream_without_firmware(self):
 
-        archiver = ArchiveBuilder.for_project(
+        archiver = ArchiveBuilder(
             build_path=str(self.build_path),
             name="USER_NO_FW",
-            sha="def456",
+            tag="def456",
             hw_rev=TiliquaRevision.R5
         ).with_bitstream()
 
@@ -118,10 +118,10 @@ class TestFlashCommandGenerator(unittest.TestCase):
 
     def test_user_bitstream_with_firmware(self):
 
-        archiver = ArchiveBuilder.for_project(
+        archiver = ArchiveBuilder(
             build_path=str(self.build_path),
             name="USER_WITH_FW",
-            sha="ghi789",
+            tag="ghi789",
             hw_rev=TiliquaRevision.R5
         ).with_bitstream()                                                         \
          .with_firmware(str(self.firmware_path), FirmwareLocation.PSRAM, 0x200000) \
@@ -158,12 +158,11 @@ class TestFlashCommandGenerator(unittest.TestCase):
     def test_manifest_rust_compatibility(self):
         """Test that a Python-generated manifest can be read by Rust lib.rs."""
 
-        archiver = ArchiveBuilder.for_project(
+        archiver = ArchiveBuilder(
             build_path=str(self.build_path),
             name="RUST_TEST",
-            sha="abc123",
+            tag="abc123",
             hw_rev=TiliquaRevision.R5,
-            brief="Test manifest for Rust compatibility"
         ).with_bitstream()                                                         \
          .with_firmware(str(self.firmware_path), FirmwareLocation.PSRAM, 0x200000) \
          .with_option_storage()

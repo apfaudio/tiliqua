@@ -24,6 +24,14 @@ pub const SLOT_BITSTREAM_BASE: usize = 0x100000; // First user slot starts here
 pub const SLOT_SIZE: usize           = 0x100000; // Spacing between user slots
 pub const MANIFEST_OFFSET: usize     = 0xF0000;
 pub const MANIFEST_SIZE: usize       = 0x1000;
+pub const BITSTREAM_NAME_LEN: usize  = 32;
+pub const BITSTREAM_TAG_LEN: usize   = 8;
+pub const REGION_MAX_N: usize        = 5;
+pub const REGION_FILE_LEN: usize     = 16;
+pub const HELP_BRIEF_MAX_SIZE: usize = 64;
+pub const HELP_IO_MAX_SIZE: usize    = 20;
+pub const HELP_IO_LEFT_N: usize      = 8;
+pub const HELP_IO_RIGHT_N: usize     = 6;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum RegionType {
@@ -41,7 +49,7 @@ pub enum RegionType {
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct MemoryRegion {
-    pub filename: String<16>,
+    pub filename: String<REGION_FILE_LEN>,
     pub region_type: RegionType,
     pub spiflash_src: Option<u32>,
     pub psram_dst: Option<u32>,
@@ -58,14 +66,21 @@ pub struct ExternalPLLConfig {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
+pub struct BitstreamHelp {
+    pub brief: String<HELP_BRIEF_MAX_SIZE>,
+    pub video: String<64>,
+    pub io_left: [String<HELP_IO_MAX_SIZE>; HELP_IO_LEFT_N],
+    pub io_right: [String<HELP_IO_MAX_SIZE>; HELP_IO_RIGHT_N],
+}
+
+#[derive(Deserialize, Serialize, Clone)]
 pub struct BitstreamManifest {
     pub hw_rev: u32,
-    pub name: String<32>,
-    pub sha: String<8>,
-    pub brief: String<128>,
-    pub video: String<64>,
+    pub name: String<BITSTREAM_NAME_LEN>,
+    pub tag: String<BITSTREAM_TAG_LEN>,
+    pub regions: Vec<MemoryRegion, REGION_MAX_N>,
+    pub help: Option<BitstreamHelp>,
     pub external_pll_config: Option<ExternalPLLConfig>,
-    pub regions: Vec<MemoryRegion, 5>,
     pub magic: u32,
 }
 
@@ -76,9 +91,13 @@ impl BitstreamManifest {
         info!("\tmagic:    {:#x}", self.magic);
         info!("\thw_rev:   {}",    self.hw_rev);
         info!("\tname:    '{}'",   self.name);
-        info!("\tsha:     '{}'",   self.sha);
-        info!("\tbrief:   '{}'",   self.brief);
-        info!("\tvideo:   '{}'",   self.video);
+        info!("\ttag:     '{}'",   self.tag);
+        if let Some(help) = &self.help {
+            info!("\thelp = {{");
+            info!("\t\tbrief:   '{}'", help.brief);
+            info!("\t\tvideo:   '{}'", help.video);
+            info!("\t}}");
+        }
         if let Some(clocks) = &self.external_pll_config {
             info!("\texternal_pll_config = {{");
             info!("\t\tclk0_hz: {}", clocks.clk0_hz);

@@ -198,7 +198,7 @@ where
 }
 
 use tiliqua_hal::dma_framebuffer::DVIModeline;
-pub fn draw_name<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, name: &str, sha: &str, modeline: &DVIModeline) -> Result<(), D::Error>
+pub fn draw_name<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, name: &str, tag: &str, modeline: &DVIModeline) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
 {
@@ -216,11 +216,11 @@ where
     if modeline.fixed() {
         // Fixed modeline doesn't have all the info needed to calculate refresh rate.
         write!(modeline_text, "{}/{}x{}(fxd)\r\n",
-               sha, modeline.h_active, modeline.v_active
+               tag, modeline.h_active, modeline.v_active
                ).ok();
     } else {
         write!(modeline_text, "{}/{}x{}@{:.1}Hz\r\n",
-               sha,
+               tag,
                modeline.h_active, modeline.v_active, modeline.refresh_rate()
                ).ok();
     }
@@ -357,7 +357,7 @@ where
 }
 
 pub fn draw_tiliqua<D>(d: &mut D, x: u32, y: u32, hue: u8,
-                       str_l: [&str; 8], str_r: [&str; 6], text_title: &str, text_desc: &str) -> Result<(), D::Error>
+                       str_l: [&str; 8], str_r: [&str; 6]) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
 {
@@ -367,7 +367,6 @@ where
             .build();
 
     let font_small_grey = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
-    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 15));
 
     let line = |disp: &mut D, x1: u32, y1: u32, x2: u32, y2: u32| {
         Line::new(Point::new((x+x1) as i32, (y+y1) as i32),
@@ -462,20 +461,6 @@ where
     text_l[7][1] = 129;
     for n in 0..text_l.len() { text_l[n][0] = 45 };
 
-    Text::with_alignment(
-        text_title,
-        Point::new((x + 80) as i32, (y-10) as i32),
-        font_small_white,
-        Alignment::Center
-    ).draw(d)?;
-
-    Text::with_alignment(
-        "touch  jack".into(),
-        Point::new((x+45-15) as i32, (y+15+5) as i32),
-        font_small_white,
-        Alignment::Right
-    ).draw(d)?;
-
     for n in 0..text_l.len() {
         Text::with_alignment(
             str_l[n],
@@ -502,14 +487,6 @@ where
             Alignment::Left
         ).draw(d)?;
     }
-
-    Text::with_alignment(
-        text_desc,
-        Point::new((x - 120) as i32, (y + 180) as i32),
-        font_small_grey,
-        Alignment::Left
-    ).draw(d)?;
-
 
     Ok(())
 }
@@ -868,24 +845,6 @@ mod tests {
             "midi notes (+mod, +pitch)",
         ];
 
-        let title = "[8-voice polyphonic synthesizer]";
-        let help_text = "The synthesizer can be controlled by touching\n\
-            jacks 0-5 or using a MIDI keyboard through TRS\n\
-            midi. Control source is selected in the menu.\n\
-            \n\
-            In touch mode, the touch magnitude controls the\n\
-            filter envelopes of each voice. In MIDI mode\n\
-            the velocity of each note as well as the value\n\
-            of the modulation wheel affects the filter\n\
-            envelopes.\n\
-            \n\
-            Output audio is sent to output channels 2 and\n\
-            3 (last 2 jacks). Input jack 0 also controls\n\
-            phase modulation of all oscillators, so you\n\
-            can patch input jack 0 to an LFO for retro-sounding\n\
-            slow vibrato, or to an oscillator for some wierd\n\
-            FM effects.\n";
-
         draw_tiliqua(
             &mut disp,
             H_ACTIVE/2-80,
@@ -893,8 +852,6 @@ mod tests {
             0,
             connection_labels,
             menu_items,
-            title,
-            help_text,
         ).ok();
         disp.img.save("draw_help.png").unwrap();
     }

@@ -27,4 +27,4 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm vectorscope_no_soc build --fs-192khz --spectrogram --name=spectrogram" \
   "pdm bootstub build" \
   "pdm usb_audio build" \
-  "pdm usb_host build --midi-device=yamaha-cp73"
+  "pdm usb_host build"

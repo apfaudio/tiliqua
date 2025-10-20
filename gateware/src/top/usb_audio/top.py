@@ -10,13 +10,18 @@ from amaranth.lib import cdc, wiring
 from tiliqua import usb_audio
 from tiliqua.build.cli import top_level_cli
 from tiliqua.periph import eurorack_pmod
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.platform import RebootProvider
 from vendor.ila import AsyncSerialILA
 
 
 class USBAudioTop(Elaboratable):
 
-    brief = "USB soundcard, 4in + 4out."
+    bitstream_help = BitstreamHelp(
+        brief="USB soundcard, 4in + 4out.",
+        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
+        io_right=['', 'USB audio device', '', '', '', '']
+    )
 
     def __init__(self, clock_settings):
         super().__init__()
