@@ -946,31 +946,12 @@ fn main() -> ! {
                 draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -110, 0);
                 if let Some(ref manifest) = manifests[n] {
                     if let Some(ref help) = manifest.help {
-                        let (io_left, io_right) = (help.io_left.clone(), help.io_right.clone());
-                        let io_left_str: [&str; 8] = [
-                            io_left[0].as_str(),
-                            io_left[1].as_str(),
-                            io_left[2].as_str(),
-                            io_left[3].as_str(),
-                            io_left[4].as_str(),
-                            io_left[5].as_str(),
-                            io_left[6].as_str(),
-                            io_left[7].as_str(),
-                        ];
-                        let io_right_str: [&str; 6] = [
-                            io_right[0].as_str(),
-                            io_right[1].as_str(),
-                            io_right[2].as_str(),
-                            io_right[3].as_str(),
-                            io_right[4].as_str(),
-                            io_right[5].as_str(),
-                        ];
                         draw::draw_tiliqua(&mut display,
                             h_active/2+30,
                             v_active/2-40,
                             0,
-                            io_left_str,
-                            io_right_str,
+                            help.io_left.each_ref().map(|s| s.as_str()),
+                            help.io_right.each_ref().map(|s| s.as_str())
                         ).ok();
                     }
                 }

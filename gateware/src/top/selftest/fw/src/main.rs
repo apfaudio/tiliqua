@@ -11,7 +11,11 @@ use core::fmt::Write;
 
 use embedded_hal::i2c::{I2c, Operation};
 use embedded_hal::delay::DelayNs;
-use tiliqua_hal::embedded_graphics::prelude::*;
+use tiliqua_hal::embedded_graphics::{
+    mono_font::{ascii::FONT_9X15, MonoTextStyle},
+    text::{Alignment, Text},
+    prelude::*,
+};
 
 use heapless::String;
 use fastrand::Rng;
@@ -22,6 +26,7 @@ use tiliqua_lib::*;
 use pac::constants::*;
 use tiliqua_lib::draw;
 use tiliqua_lib::calibration::*;
+use tiliqua_lib::color::HI8;
 use tiliqua_fw::options::*;
 use tiliqua_hal::pmod::EurorackPmod;
 use tiliqua_hal::persist::Persist;
@@ -511,8 +516,8 @@ fn main() -> ! {
 
             if opts.tracker.page.value == Page::Report {
                 let mut status_report = ReportString::new();
-                let (page_name, report_str) = match opts.report.page.value {
-                    ReportPage::Startup => ("[startup report]", &startup_report),
+                let report_str = match opts.report.page.value {
+                    ReportPage::Startup => &startup_report,
                     ReportPage::Status  => {
                         critical_section::with(|_| {
                             // Devices shared with timer callback, be careful!
@@ -525,34 +530,21 @@ fn main() -> ! {
                         write!(&mut status_report, "ex0={:08b} ex1={:08b}\r\n",
                                gpio0.input().read().bits(),
                                gpio1.input().read().bits()).ok();
-                        ("[status report]", &status_report)
+                        &status_report
                     }
                 };
-                /*
-                draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-200, hue,
-                    [
-                    //  "touch  jack "
-                        "-      adc0 ",
-                        "-      adc1 ",
-                        "-      adc2 ",
-                        "-      adc3 ",
-                        "-      dac0 ",
-                        "-      dac1 ",
-                        "-      dac2 ",
-                        "-      dac3 ",
-                    ],
-                    [
-                        "menu",
-                        "-",
-                        "video",
-                        "-",
-                        "-",
-                        "-",
-                    ],
-                    &page_name,
-                    report_str
-                ).ok();
-                */
+                if let Some(ref help) = bootinfo.manifest.help {
+                    draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-250, hue,
+                        help.io_left.each_ref().map(|s| s.as_str()),
+                        help.io_right.each_ref().map(|s| s.as_str())
+                    ).ok();
+                }
+                Text::with_alignment(
+                    report_str,
+                    Point::new((h_active/2-200) as i32, (v_active/2-20) as i32),
+                    MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10)),
+                    Alignment::Left
+                ).draw(&mut display).ok();
             }
 
             if opts.tracker.page.value == Page::Autocal {

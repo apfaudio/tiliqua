@@ -294,90 +294,34 @@ fn main() -> ! {
                 });
             }
 
-            let help_screen: bool = opts.tracker.page.value == Page::Help;
-
             if opts.beam.palette.value != last_palette || first {
                 opts.beam.palette.value.write_to_hardware(&mut display);
                 last_palette = opts.beam.palette.value;
             }
 
-            if draw_options || help_screen {
+            if draw_options {
                 draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                    opts.beam.hue.value).ok();
                 draw::draw_name(&mut display, h_active/2, 30, opts.beam.hue.value,
                                 &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
             }
 
-            if help_screen {
-                /*
-                draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-200, opts.beam.hue.value,
-                    [
-                        "C2     phase",
-                        "G2     -    ",
-                        "C3     -    ",
-                        "Eb3    -    ",
-                        "G3     -    ",
-                        "C4     -    ",
-                        "-      out L",
-                        "-      out R",
-                    ],
-                    [
-                        "menu",
-                        "-",
-                        "video",
-                        "-",
-                        "-",
-                        "midi notes (+mod, +pitch)",
-                    ],
-                    "[8-voice polyphonic synthesizer]",
-                    "The synthesizer can be controlled by touching\n\
-                    jacks 0-5 or using a MIDI keyboard through TRS\n\
-                    midi. Control source is selected in the menu.\n\
-                    \n\
-                    In touch mode, the touch magnitude controls the\n\
-                    filter envelopes of each voice. In MIDI mode\n\
-                    the velocity of each note as well as the value\n\
-                    of the modulation wheel affects the filter\n\
-                    envelopes.\n\
-                    \n\
-                    Output audio is sent to output channels 2 and\n\
-                    3 (last 2 jacks). Input jack 0 also controls\n\
-                    phase modulation of all oscillators, so you\n\
-                    can patch input jack 0 to an LFO for retro-sounding\n\
-                    slow vibrato, or to an oscillator for some wierd\n\
-                    FM effects.\n\
-                    \n\
-                    * Use encoder and encoder button to navigate menu.\n\
-                    * Switch away from the HELP screen to start visuals.\n\
-                    * Hold encoder for 3sec to enter bootloader.\n\
-                    ",
-                    ).ok();
-                */
-                // Enough persistance to reduce flicker on loads of text.
-                persist.set_persist(512);
-                persist.set_decay(1);
-                vscope.flags().write(
-                    |w| { w.enable().bit(false) } );
-            } else {
-                persist.set_persist(opts.beam.persist.value);
-                persist.set_decay(opts.beam.decay.value);
-                vscope.flags().write(
-                    |w| w.enable().bit(true) );
-            }
+            persist.set_persist(opts.beam.persist.value);
+            persist.set_decay(opts.beam.decay.value);
+            vscope.flags().write(
+                |w| w.enable().bit(true) );
 
             vscope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
             vscope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
             vscope.xscale().write(|w| unsafe { w.scale().bits(opts.vector.xscale.value) } );
             vscope.yscale().write(|w| unsafe { w.scale().bits(opts.vector.yscale.value) } );
 
-            if !help_screen {
-                for ix in 0usize..N_VOICES {
-                    let j = (N_VOICES-1)-ix;
-                    draw::draw_voice(&mut display,
-                                     ((h_active as f32)/2.0f32 + 330.0f32*f32::cos(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as i32,
-                                     ((v_active as f32)/2.0f32 + 330.0f32*f32::sin(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as u32 - 15,
-                                     notes[ix], cutoffs[ix], opts.beam.hue.value).ok();
-                }
+            for ix in 0usize..N_VOICES {
+                let j = (N_VOICES-1)-ix;
+                draw::draw_voice(&mut display,
+                                 ((h_active as f32)/2.0f32 + 330.0f32*f32::cos(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as i32,
+                                 ((v_active as f32)/2.0f32 + 330.0f32*f32::sin(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as u32 - 15,
+                                 notes[ix], cutoffs[ix], opts.beam.hue.value).ok();
             }
 
             first = false;
