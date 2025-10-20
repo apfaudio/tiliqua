@@ -44,11 +44,12 @@ def top_level_cli(
     # Get some repository properties
     repo = git.Repo(search_parent_directories=True)
 
-    # Try to get a git tag, otherwise use short hash
     try:
-        repo_tag = repo.git.describe('--tags', '--exact-match', '--dirty')[:8]
+        repo_tag = repo.git.describe('--tags', '--exact-match', '--dirty')
     except git.exc.GitCommandError:
-        repo_tag = repo.git.describe('--always', '--dirty')[:8]
+        repo_tag = repo.git.describe('--always', '--dirty')
+    # Only keep what the bootloader / bitstreams can display
+    repo_tag = repo_tag[:BitstreamManifest.BITSTREAM_TAG_LEN]
 
     # Configure logging.
     logging.getLogger().setLevel(logging.DEBUG)
@@ -208,33 +209,20 @@ def top_level_cli(
     # (only used if firmware comes from SPI flash)
     args_flash_firmware = None
 
-    # Extract help metadata from fragment
-    help_metadata = None
+    # Create default help strings, override them if the fragment supplies its own.
+    bitstream_help = BitstreamHelp()
+    if hasattr(fragment, "bitstream_help"):
+        bitstream_help = fragment.bitstream_help
+    if video_core:
+        bitstream_help.video = "<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
 
-    if hasattr(fragment, "help"):
-        # BitstreamHelp class format
-        help_metadata = fragment.help
-
-        # Validate string lengths (must fit in Rust String<16>)
-        for i, label in enumerate(fragment.help.io_left):
-            if len(label) > 16:
-                print(f"ERROR: help.io_left[{i}] = '{label}' is {len(label)} chars (max 16)")
-                sys.exit(1)
-        for i, label in enumerate(fragment.help.io_right):
-            if len(label) > 16:
-                print(f"ERROR: help.io_right[{i}] = '{label}' is {len(label)} chars (max 16)")
-                sys.exit(1)
-
-    archiver = ArchiveBuilder.for_project(
+    archiver = ArchiveBuilder(
         build_path=build_path,
         name=args.name,
         tag=repo_tag,
-        hw_rev=args.hw
+        hw_rev=args.hw,
+        bitstream_help=bitstream_help
     )
-    archiver.help = help_metadata
-
-    if help_metadata is not None and video_core:
-        help_metadata.video = "<match-bootloader>" if kwargs["clock_settings"].dynamic_modeline else args.modeline
 
     if hw_platform.clock_domain_generator == pll.TiliquaDomainGeneratorPLLExternal:
         archiver.external_pll_config = ExternalPLLConfig(

@@ -379,7 +379,7 @@ class SynthPeripheral(wiring.Component):
 
 class PolySoc(TiliquaSoc):
 
-    help = BitstreamHelp(
+    bitstream_help = BitstreamHelp(
         brief="Touch+MIDI Polysynth (8-voice)",
         io_left=['phase cv / touch', 'touch1', 'touch2', 'touch3', 'touch4', 'touch5', 'out L', 'out R'],
         io_right=['navigate menu', 'MIDI host', 'video out', '', '', 'TRS MIDI in']

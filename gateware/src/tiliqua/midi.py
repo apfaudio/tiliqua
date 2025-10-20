@@ -400,6 +400,15 @@ class MonoMidiCV(wiring.Component):
     out3: Mod Wheel (CC1)
     """
 
+    # Only needed for this core
+    from tiliqua.build.types import BitstreamHelp
+
+    bitstream_help = BitstreamHelp(
+        brief="TRS MIDI to CV conversion.",
+        io_left=['','','','','gate', 'V/oct', 'velocity', 'mod wheel'],
+        io_right=['', '', '', '', '', 'TRS MIDI in']
+    )
+
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 

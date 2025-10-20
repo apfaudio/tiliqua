@@ -44,9 +44,9 @@ class Mirror(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
+    bitstream_help = BitstreamHelp(
         brief="Audio passthrough",
-        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
+        io_left=['in0', 'in1', 'in2', 'in3', 'in0 (copy)', 'in1 (copy)', 'in2 (copy)', 'in3 (copy)'],
         io_right=['', '', '', '', '', '']
     )
 
@@ -72,7 +72,7 @@ class QuadNCO(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
+    bitstream_help = BitstreamHelp(
         brief="Quad oscillator (NCO)",
         io_left=['V/oct', 'phase mod', '-', '-', 'sine', 'saw', 'tri', 'square'],
         io_right=['', '', '', '', '', '']
@@ -194,9 +194,9 @@ class Resampler(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="Resampler test",
-        io_left=['in0 (6kHz)', 'in1 (192kHz)', 'in2 (44.1kHz)', 'in3', 'out0', 'out1', 'out2', 'out3'],
+    bitstream_help = BitstreamHelp(
+        brief="Up/downsampling round-trip test",
+        io_left=['in0', 'in1', 'in2', 'in3', 'out0 (6kHz)', 'out1 (192kHz)', 'out2 (44.1kHz)', 'out3 (unchanged)'],
         io_right=['', '', '', '', '', '']
     )
 
@@ -262,9 +262,9 @@ class ResonantFilter(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
+    bitstream_help = BitstreamHelp(
         brief="Resonant filter (SVF)",
-        io_left=['audio in', 'cutoff', 'resonance', '-', 'LPF out', 'HPF out', 'BPF out', '-'],
+        io_left=['audio in', 'cutoff', 'resonance', '', 'LPF out', 'HPF out', 'BPF out', ''],
         io_right=['', '', '', '', '', '']
     )
 
@@ -303,9 +303,9 @@ class DualVCA(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="Dual VCA",
-        io_left=['VCA0 audio', 'VCA0 CV', 'VCA1 audio', 'VCA1 CV', 'VCA0 out', 'VCA1 out', '-', '-'],
+    bitstream_help = BitstreamHelp(
+        brief="Dual audio-rate VCA",
+        io_left=['VCA0 audio', 'VCA0 CV', 'VCA1 audio', 'VCA1 CV', 'VCA0 out', 'VCA1 out', '', ''],
         io_right=['', '', '', '', '', '']
     )
 
@@ -358,9 +358,9 @@ class Pitch(wiring.Component):
                                 granularity=8,
                                 features={'bte', 'cti'}))
 
-    help = BitstreamHelp(
-        brief="Pitch shifter",
-        io_left=['audio in', 'pitch CV', '-', '-', 'shifted out', '-', '-', '-'],
+    bitstream_help = BitstreamHelp(
+        brief="Crossfade pitch shifter",
+        io_left=['audio in', 'pitch CV', '', '', 'shifted out', '', '', ''],
         io_right=['', '', '', '', '', '']
     )
 
@@ -416,9 +416,9 @@ class Matrix(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="4x4 matrix mixer",
-        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
+    bitstream_help = BitstreamHelp(
+        brief="Mix inputs with fixed coefficients.",
+        io_left=['in0', 'in1', 'in2', 'in3', 'mixed0', 'mixed1', 'mixed2', 'mixed3'],
         io_right=['', '', '', '', '', '']
     )
 
@@ -444,9 +444,9 @@ class DualWaveshaper(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="Dual waveshaper",
-        io_left=['audio in 0', 'audio in 1', 'drive', '-', 'distorted 0', 'distorted 1', '-', '-'],
+    bitstream_help = BitstreamHelp(
+        brief="Dual waveshaper / distortion",
+        io_left=['audio in 0', 'audio in 1', 'drive', '-', 'distorted 0', 'distorted 1', '', ''],
         io_right=['', '', '', '', '', '']
     )
 
@@ -493,8 +493,8 @@ class TouchMixTop(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="Touch matrix mix",
+    bitstream_help = BitstreamHelp(
+        brief="Mix touch inputs to outputs 0-3",
         io_left=['touch0', 'touch1', 'touch2', 'touch3', 'out0', 'out1', 'out2', 'out3'],
         io_right=['', '', '', '', '', '']
     )
@@ -538,9 +538,9 @@ class PSRAMPingPongDelay(wiring.Component):
                                 granularity=8,
                                 features={'bte', 'cti'}))
 
-    help = BitstreamHelp(
-        brief="Ping-pong delay",
-        io_left=['in L', 'in R', '-', '-', 'out L', 'out R', '-', '-'],
+    bitstream_help = BitstreamHelp(
+        brief="Ping-pong delay (PSRAM)",
+        io_left=['in L', 'in R', '', '', 'out L', 'out R', '', ''],
         io_right=['', '', '', '', '', '']
     )
 
@@ -604,9 +604,9 @@ class SRAMPingPongDelay(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="Ping-pong (SRAM)",
-        io_left=['in L', 'in R', '-', '-', 'out L', 'out R', '-', '-'],
+    bitstream_help = BitstreamHelp(
+        brief="Ping-pong delay (SRAM)",
+        io_left=['in L', 'in R', '', '', 'out L', 'out R', '', ''],
         io_right=['', '', '', '', '', '']
     )
 
@@ -658,8 +658,8 @@ class PSRAMDiffuser(wiring.Component):
                                 granularity=8,
                                 features={'bte', 'cti'}))
 
-    help = BitstreamHelp(
-        brief="4ch diffuser",
+    bitstream_help = BitstreamHelp(
+        brief="4ch diffusion delay (short, PSRAM-backed)",
         io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
         io_right=['', '', '', '', '', '']
     )
@@ -731,8 +731,8 @@ class SRAMDiffuser(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="4ch diffuser (SRAM)",
+    bitstream_help = BitstreamHelp(
+        brief="4ch diffusion delay (short, SRAM-backed)",
         io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
         io_right=['', '', '', '', '', '']
     )
@@ -793,8 +793,8 @@ class PSRAMMultiDiffuser(wiring.Component):
                                 granularity=8,
                                 features={'bte', 'cti'}))
 
-    help = BitstreamHelp(
-        brief="Multi-diffuser",
+    bitstream_help = BitstreamHelp(
+        brief="4ch diffusion delay (long, PSRAM-backed)",
         io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
         io_right=['', '', '', '', '', '']
     )
@@ -878,10 +878,10 @@ class TripleMirror(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="3x audio boards",
-        io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
-        io_right=['', '', '', '', '', '']
+    bitstream_help = BitstreamHelp(
+        brief="Audio passthrough on ex0 & ex1",
+        io_left=['in0', 'in1', 'in2', 'in3', 'in0 (copy)', 'in1 (copy)', 'in2 (copy)', 'in3 (copy)'],
+        io_right=['', '', '', 'send ins -> outs', 'send ins -> outs', '']
     )
 
     def elaborate(self, platform):
@@ -925,9 +925,9 @@ class STFTMirror(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="STFT test",
-        io_left=['audio in', '-', '-', '-', 'audio out', '-', '-', '-'],
+    bitstream_help = BitstreamHelp(
+        brief="STFT round-trip test",
+        io_left=['audio in', '', '', '', 'audio out', '', '', ''],
         io_right=['', '', '', '', '', '']
     )
 
@@ -969,8 +969,8 @@ class Vocoder(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="Vocoder",
+    bitstream_help = BitstreamHelp(
+        brief="Frequency-domain cross-synthesis",
         io_left=['carrier', 'modulator', '-', '-', 'vocoded out', '-', '-', '-'],
         io_right=['', '', '', '', '', '']
     )
@@ -1010,9 +1010,9 @@ class Noise(wiring.Component):
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
-    help = BitstreamHelp(
-        brief="White noise gen",
-        io_left=['-', '-', '-', '-', 'noise out', '-', '-', '-'],
+    bitstream_help = BitstreamHelp(
+        brief="White noise",
+        io_left=['', '', '', '', 'noise out', '', '', ''],
         io_right=['', '', '', '', '', '']
     )
 
@@ -1033,13 +1033,14 @@ class CoreTop(Elaboratable):
         self.touch = enable_touch
         self.clock_settings = clock_settings
         self.pmod0 = eurorack_pmod.EurorackPmod(clock_settings.audio_clock)
+
         # Only if this core uses PSRAM
         if hasattr(self.core, "bus"):
             self.psram_periph = psram.Peripheral(size=16*1024*1024)
 
-        # Forward help from the core if it exists
-        if hasattr(self.core, "help"):
-            self.help = self.core.help
+        # Forward bitstream_help from the core if it exists
+        if hasattr(self.core, "bitstream_help"):
+            self.bitstream_help = self.core.bitstream_help
 
         super().__init__()
 

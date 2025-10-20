@@ -245,7 +245,7 @@ class SIDPeripheral(wiring.Component):
 
 class SIDSoc(TiliquaSoc):
 
-    help = BitstreamHelp(
+    bitstream_help = BitstreamHelp(
         brief="MOS 6581 (SID) emulation.",
         io_left=['modulate0', 'modulate1', 'modulate2', 'modulate3', 'voice0', 'voice1', 'voice2', 'voice mix'],
         io_right=['navigate menu', '', 'video out', '', '', '']

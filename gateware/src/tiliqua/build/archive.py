@@ -32,17 +32,11 @@ class ArchiveBuilder:
     tag: str
     hw_rev: TiliquaRevision
     external_pll_config: Optional[ExternalPLLConfig] = None
-    help: Optional[BitstreamHelp] = None
+    bitstream_help: Optional[BitstreamHelp] = None
 
     _regions: List[MemoryRegion] = field(default_factory=list)
     _manifest: Optional[BitstreamManifest] = None
     _firmware_bin_path: Optional[str] = None
-
-    @classmethod
-    def for_project(cls, build_path: str, name: str, tag: str, hw_rev: TiliquaRevision) -> 'ArchiveBuilder':
-        """Create an ArchiveBuilder for a project."""
-        archiver = cls(build_path, name, tag, hw_rev)
-        return archiver
 
     def __post_init__(self):
         # Ensure build directory exists
@@ -172,7 +166,7 @@ class ArchiveBuilder:
             hw_rev=self.hw_rev.platform_class().version_major,
             tag=self.tag,
             regions=self._regions,
-            help=self.help,
+            help=self.bitstream_help,
             external_pll_config=self.external_pll_config
         )
         self._manifest.write_to_path(self.manifest_path)

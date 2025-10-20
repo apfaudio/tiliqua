@@ -170,7 +170,7 @@ class AudioFIFOPeripheral(wiring.Component):
 
 class MacroOscSoc(TiliquaSoc):
 
-    help = BitstreamHelp(
+    bitstream_help = BitstreamHelp(
         brief="Emulation of a famous Eurorack module.",
         io_left=['pitch', 'trigger', 'timbre', 'morph', '', '', 'out MAIN', 'out AUX'],
         io_right=['navigate menu', '', 'video out', '', '', '']

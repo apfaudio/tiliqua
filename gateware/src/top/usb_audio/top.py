@@ -17,7 +17,7 @@ from vendor.ila import AsyncSerialILA
 
 class USBAudioTop(Elaboratable):
 
-    help = BitstreamHelp(
+    bitstream_help = BitstreamHelp(
         brief="USB soundcard, 4in + 4out.",
         io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
         io_right=['', 'USB audio device', '', '', '', '']
