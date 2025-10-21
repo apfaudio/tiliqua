@@ -4,9 +4,9 @@
 """
 8-voice polyphonic synthesizer with video display and menu system.
 
-.. code-block:: text
+    .. code-block:: text
 
-        Pitch
+        Pitch / Touch         Audio / CV
                      ┌────┐
         C2    touch0 │in0 │◄─ phase modulation
         G2    touch1 │in1 │◄─ -
@@ -38,10 +38,31 @@ Each voice is hard panned left or right in the stereo field, with 2 end-of-chain
 effects: distortion and diffusion (delay), both of which can be mixed in with
 the UI.
 
-A block diagram of the core components of each voice:
+    .. code-block:: text
 
-.. image:: /_static/polysynth.png
-  :width: 800
+              USB MIDI   TRS MIDI
+                 ─────┐ ┌─────  (`usb-host` setting)
+                ┌─────▼─▼─────┐
+        touch──►│Voice Tracker├──►┌─────────┐
+                └─────────────┘   │ Voices  │
+                    ┌─────────┐   │  (x8)   │ (resonance =
+             cv in0─►Phase Mod├──►│NCO + SVF│ (`reso` setting)
+                    └─────────┘   └─────────┘
+                                  ┌────▼────┐
+                                  │Mix L/R  │
+                                  │(stereo) │
+                                  └────┬────┘
+                                  ┌────▼────┐ (wet/dry mix =
+                                  │Diffuser │  `diffuse` setting)
+                                  └────┬────┘
+                                  ┌────▼────┐
+                                  │  Drive  │ (`drive` setting)
+                                  └────┬────┘
+                                  ┌────┴───┐
+                                  │Audio   │
+                                  │OUT (4x)├──────► out2 (L)
+                                  └────────┴──────► out3 (R)
+
 
 """
 
