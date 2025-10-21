@@ -169,17 +169,13 @@ fn main() -> ! {
             }
 
             if on_help_page {
-                draw::draw_help(&mut display, h_active/2-280, v_active/2-150, opts.help.scroll.value,
-                               HELP_TEXT, opts.beam.ui_hue.value).ok();
-                if let Some(ref help) = bootinfo.manifest.help {
-                    draw::draw_tiliqua(&mut display,
-                        (h_active/2-80) as i32,
-                        (v_active/2) as i32 - 330,
-                        opts.beam.ui_hue.value,
-                        help.io_left.each_ref().map(|s| s.as_str()),
-                        help.io_right.each_ref().map(|s| s.as_str())
-                    ).ok();
-                }
+                draw::draw_help_page(&mut display,
+                    HELP_TEXT,
+                    bootinfo.manifest.help.as_ref(),
+                    h_active,
+                    v_active,
+                    opts.help.scroll.value,
+                    opts.beam.ui_hue.value).ok();
                 persist.set_persist(64);
                 persist.set_decay(1);
             } else {

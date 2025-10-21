@@ -341,6 +341,34 @@ where
     Ok(())
 }
 
+pub fn draw_help_page<D>(
+    d: &mut D,
+    help_text: &str,
+    manifest_help: Option<&tiliqua_manifest::BitstreamHelp>,
+    h_active: u32,
+    v_active: u32,
+    scroll: u8,
+    hue: u8,
+) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    draw_help(d, h_active/2-280, v_active/2-150, scroll, help_text, hue)?;
+
+    if let Some(help) = manifest_help {
+        draw_tiliqua(
+            d,
+            (h_active/2-80) as i32,
+            (v_active/2) as i32 - 330,
+            hue,
+            help.io_left.each_ref().map(|s| s.as_str()),
+            help.io_right.each_ref().map(|s| s.as_str())
+        )?;
+    }
+
+    Ok(())
+}
+
 pub fn draw_cal<D>(d: &mut D, x: u32, y: u32, hue: u8, dac: &[i16; 4], adc: &[i16; 4]) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
@@ -1131,36 +1159,8 @@ lines, USB streams).  Some usage ideas:
         scope triggering and use a bit more FPGA resources.
 "###;
 
-        // Use same position as in xbeam/fw/src/main.rs (h_active/2-280, v_active/2-180)
-        draw_help(&mut disp, H_ACTIVE/2-280, V_ACTIVE/2-150, 3, XBEAM_HELP_TEXT, 0).ok();
-
-        // Draw the tiliqua diagram at scroll position 0
-        let io_left = [
-            "x / in0",
-            "y / in1",
-            "intensity / in2",
-            "color / in3",
-            "out0",
-            "out1",
-            "out2",
-            "out3",
-        ];
-        let io_right = [
-            "navigate menu",
-            "4x4 audio device",
-            "video out",
-            "",
-            "",
-            "",
-        ];
-        draw_tiliqua(
-            &mut disp,
-            (H_ACTIVE/2-80) as i32,
-            (V_ACTIVE/2) as i32 - 330,
-            0,
-            io_left,
-            io_right,
-        ).ok();
+        // Test without manifest help (Tiliqua diagram won't be drawn)
+        draw_help_page(&mut disp, XBEAM_HELP_TEXT, None, H_ACTIVE, V_ACTIVE, 3, 0).ok();
 
         draw_name(&mut disp, H_ACTIVE/2, V_ACTIVE-50, 0, "XBEAM", "b2d3aa", &DVIModeline::default()).ok();
 
