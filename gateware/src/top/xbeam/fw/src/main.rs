@@ -150,14 +150,16 @@ fn main() -> ! {
                 (app.ui.opts.clone(), app.ui.draw(), save_opts, wipe_opts)
             });
 
+            let on_help_page = opts.tracker.page.value == Page::Help;
+
             if opts.beam.palette.value != last_palette || first {
                 opts.beam.palette.value.write_to_hardware(&mut display);
                 last_palette = opts.beam.palette.value;
             }
 
-            if draw_options {
-                let (x, y) = if opts.tracker.page.value == Page::Help {
-                    (h_active/2-30, v_active-135)
+            if draw_options || on_help_page {
+                let (x, y) = if on_help_page {
+                    (h_active/2-30, v_active-100)
                 } else {
                     (h_active-200, v_active/2)
                 };
@@ -166,7 +168,7 @@ fn main() -> ! {
                                 &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
             }
 
-            if opts.tracker.page.value == Page::Help {
+            if on_help_page {
                 draw::draw_help(&mut display, h_active/2-280, v_active/2-150, opts.help.scroll.value,
                                HELP_TEXT, opts.beam.ui_hue.value).ok();
                 if let Some(ref help) = bootinfo.manifest.help {
@@ -196,6 +198,7 @@ fn main() -> ! {
                 critical_section::with(|cs| {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = Opts::default();
+                    app.ui.opts.misc.rotation.value = modeline.rotate.clone();
                     if let Some(ref mut flash_persist) = flash_persist_opt {
                         flash_persist.erase_all().unwrap();
                     }
