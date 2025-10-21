@@ -590,7 +590,7 @@ class TiliquaRevision(str, enum.Enum):
     R5    = "r5"
 
     def default():
-        return TiliquaRevision.R4
+        return TiliquaRevision.R5
 
     def all():
         return [

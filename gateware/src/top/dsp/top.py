@@ -61,6 +61,10 @@ class QuadNCO(wiring.Component):
     Audio-rate oscillator (NCO) with internal oversampling.
     4 different waveform outputs.
 
+    TODO: We should really inject the cal for this one as
+    otherwise the V/oct is not calibrated. Yet to figure
+    out the easiest way to do so without an SoC.
+
     in0: V/oct pitch
     in1: phase modulation
     out0: sine
@@ -73,8 +77,8 @@ class QuadNCO(wiring.Component):
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
     bitstream_help = BitstreamHelp(
-        brief="Quad oscillator (NCO)",
-        io_left=['V/oct', 'phase mod', '-', '-', 'sine', 'saw', 'tri', 'square'],
+        brief="Quad oscillator (audio only!)",
+        io_left=['V/oct', 'phase mod', '', '', 'sine', 'saw', 'tri', 'square'],
         io_right=['', '', '', '', '', '']
     )
 
@@ -794,7 +798,7 @@ class PSRAMMultiDiffuser(wiring.Component):
                                 features={'bte', 'cti'}))
 
     bitstream_help = BitstreamHelp(
-        brief="4ch diffusion delay (long, PSRAM-backed)",
+        brief="4x4 diffusion delay (audio-only!)",
         io_left=['in0', 'in1', 'in2', 'in3', 'out0', 'out1', 'out2', 'out3'],
         io_right=['', '', '', '', '', '']
     )
@@ -970,8 +974,8 @@ class Vocoder(wiring.Component):
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
     bitstream_help = BitstreamHelp(
-        brief="Frequency-domain cross-synthesis",
-        io_left=['carrier', 'modulator', '-', '-', 'vocoded out', '-', '-', '-'],
+        brief="Spectral cross-synthesis (audio-only!)",
+        io_left=['carrier', 'modulator', '', '', 'vocoded out', '', '', ''],
         io_right=['', '', '', '', '', '']
     )
 
@@ -1097,11 +1101,11 @@ CORES = {
     "sram_pingpong":  (False, SRAMPingPongDelay),
     "psram_diffuser": (False, PSRAMDiffuser),
     "sram_diffuser":  (False, SRAMDiffuser),
-    "multi_diffuser": (False, PSRAMMultiDiffuser),
+    "mdiff":          (False, PSRAMMultiDiffuser),
     "resampler":      (False, Resampler),
     "triple_mirror":  (False, TripleMirror),
     "stft_mirror":    (False, STFTMirror),
-    "vocoder":        (False, Vocoder),
+    "vocode":         (False, Vocoder),
     "noise":          (False, Noise),
 }
 

@@ -181,7 +181,7 @@ class XbeamSoc(TiliquaSoc):
 
     # Stored in manifest and used by bootloader for brief summary of each bitstream.
     bitstream_help = BitstreamHelp(
-        brief="Graphical vectorscope and oscilloscope.",
+        brief="Scope / Vectorscope / USB audio.",
         io_left=['x / in0', 'y / in1', 'intensity / in2', 'color / in3', 'out0', 'out1', 'out2', 'out3'],
         io_right=['navigate menu', '4x4 audio device', 'video out', '', '', '']
     )
