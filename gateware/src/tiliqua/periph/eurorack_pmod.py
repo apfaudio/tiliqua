@@ -5,6 +5,8 @@
 
 """Low-level drivers and domain crossing logic for `eurorack-pmod` hardware."""
 
+import os
+
 from amaranth import *
 from amaranth.build import *
 from amaranth.lib import data, io, stream, wiring
@@ -22,6 +24,7 @@ from ..dsp import ASQ
 from ..platform import EurorackPmodRevision, TiliquaRevision
 from . import i2c
 
+R35_OUTPUT_ALWAYS_MUTE = os.getenv('R35_OUTPUT_ALWAYS_MUTE', '0')
 
 class I2SSignature(wiring.Signature):
     """
@@ -966,6 +969,12 @@ class EurorackPmod(wiring.Component):
                 m.d.comb += self.pins.pdn_d.eq(0)
             with m.Else():
                 m.d.comb += self.pins.pdn_d.eq(1)
+
+            # HACK: override to keep bootloader silent despite init sequence
+            # TODO: delete this, it shouldn't be necessary!
+            if R35_OUTPUT_ALWAYS_MUTE == '1':
+                m.d.comb += self.pins.pdn_d.eq(0)
+
         else:
             raise ValueError(f"Unsupported pmod_rev: {pmod_rev}")
 
