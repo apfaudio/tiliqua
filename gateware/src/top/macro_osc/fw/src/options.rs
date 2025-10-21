@@ -6,8 +6,9 @@ use tiliqua_lib::palette::ColorPalette;
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
-    Scope,
     #[default]
+    Help,
+    Scope,
     Osc,
     Misc,
     Beam,
@@ -92,8 +93,15 @@ int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
 int_params!(TimebaseParams<u16>   { step: 128, min: 32, max: 3872 });
 int_params!(TriggerLvlParams<i16> { step: 512, min: -16384, max: 16384 });
 int_params!(YPosParams<i16>       { step: 25, min: -500, max: 500 });
+int_params!(ScrollParams<u8>      { step: 1, min: 0, max: 60 });
 
 button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
+
+#[derive(OptionPage, Clone)]
+pub struct HelpOpts {
+    #[option(0)]
+    pub scroll: IntOption<ScrollParams>,
+}
 
 #[derive(OptionPage, Clone)]
 pub struct MiscOpts {
@@ -166,6 +174,8 @@ pub struct ScopeOpts {
 #[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
+    #[page(Page::Help)]
+    pub help: HelpOpts,
     #[page(Page::Misc)]
     pub misc: MiscOpts,
     #[page(Page::Scope)]

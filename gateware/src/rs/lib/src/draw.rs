@@ -235,6 +235,151 @@ where
     Ok(())
 }
 
+pub fn draw_help<D>(d: &mut D, x: u32, y: u32, scroll: u8, help_text: &str, hue: u8) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    // Draw a sliding window of a long multiline docstring.
+    //
+    // 2 fonts are used here. A larger one for text, and a smaller one with
+    // some unicode box drawing characters for flowcharts / diagrams.
+    //
+    // The goal is for flowcharts to be small enough to fit on the screen,
+    // and for the rest of the text to still be readable.
+    //
+    // Be careful that the unicode font fits inside the blitter peripheral's
+    // sprite memory, otherwise the HAL falls back to per-pixel drawing, which
+    // is massively slower.
+
+    use crate::mono_6x12_optimized::MONO_6X12_OPTIMIZED;
+    use tiliqua_hal::embedded_graphics::mono_font::ascii::FONT_7X13;
+
+    let font_normal = MonoTextStyle::new(&FONT_7X13, HI8::new(hue, 10));
+    let font_small = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 10));
+    let font_small_white = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 15));
+
+    let skip_lines = scroll as usize;
+    let line_spacing_normal = 13;  // Spacing for FONT_8X13
+    let line_spacing_small = 12;   // Spacing for MONO_6X12_OPTIMIZED
+    let max_visible_lines = 28;
+
+    let lines_iter = help_text.lines();
+
+    // Skip to the starting line
+    let mut lines_iter = lines_iter.skip(skip_lines);
+
+    let mut current_y = y;
+
+    for _i in 0..max_visible_lines {
+        if let Some(line) = lines_iter.next() {
+            // Dumb heuristic for sphinx `.. note::` or `.. text::` blocks --
+            // - Lines indented 8+ spaces
+            // - Lines that start with indent + ".."
+            // Small font is selected for these blocks.
+            let leading_spaces = line.len() - line.trim_start().len();
+            let trimmed = line.trim_start();
+            let use_small_font = leading_spaces >= 8 ||
+                                 (leading_spaces > 0 && trimmed.starts_with(".."));
+
+            let (font, line_spacing) = if use_small_font {
+                (font_small, line_spacing_small)
+            } else {
+                (font_normal, line_spacing_normal)
+            };
+
+            Text::new(
+                line,
+                Point::new(x as i32, current_y as i32),
+                font,
+            ).draw(d)?;
+
+            current_y += line_spacing;
+        } else {
+            break;
+        }
+    }
+
+    let has_lines_above = skip_lines > 0;
+    let has_lines_below = lines_iter.next().is_some();
+
+    let text_width = 80 * 7;
+    let arrow_x = x + (text_width / 2);
+
+    let stroke = PrimitiveStyleBuilder::new()
+        .stroke_color(HI8::new(hue, 10))
+        .stroke_width(1)
+        .build();
+
+    // If there is unseen text, show an up or down arrow like -- ^ --
+    // at top and bottom of the sliding window.
+
+    if has_lines_above {
+        let arrow_y = y.saturating_sub(1 * line_spacing_small);
+        Text::with_alignment(
+            "▴",
+            Point::new(arrow_x as i32, arrow_y as i32),
+            font_small_white,
+            Alignment::Center,
+        ).draw(d)?;
+        Line::new(
+            Point::new((arrow_x - 60) as i32, arrow_y as i32 - 3),
+            Point::new((arrow_x - 10) as i32, arrow_y as i32 - 3)
+        ).into_styled(stroke).draw(d)?;
+        Line::new(
+            Point::new((arrow_x + 10) as i32, arrow_y as i32 - 3),
+            Point::new((arrow_x + 60) as i32, arrow_y as i32 - 3)
+        ).into_styled(stroke).draw(d)?;
+    }
+
+    if has_lines_below {
+        let arrow_y = y + 13*max_visible_lines-8;
+        Text::with_alignment(
+            "▾",
+            Point::new(arrow_x as i32, arrow_y as i32),
+            font_small_white,
+            Alignment::Center,
+        ).draw(d)?;
+        Line::new(
+            Point::new((arrow_x - 60) as i32, arrow_y as i32 - 2),
+            Point::new((arrow_x - 10) as i32, arrow_y as i32 - 2)
+        ).into_styled(stroke).draw(d)?;
+        Line::new(
+            Point::new((arrow_x + 10) as i32, arrow_y as i32 - 2),
+            Point::new((arrow_x + 60) as i32, arrow_y as i32 - 2)
+        ).into_styled(stroke).draw(d)?;
+    }
+
+    Ok(())
+}
+
+pub fn draw_help_page<D>(
+    d: &mut D,
+    help_text: &str,
+    manifest_help: Option<&tiliqua_manifest::BitstreamHelp>,
+    h_active: u32,
+    v_active: u32,
+    scroll: u8,
+    hue: u8,
+) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    // Draw the sliding help window with the 'mini tiliqua' above it that
+    // shows the IO mapping.
+    draw_help(d, h_active/2-280, v_active/2-150, scroll, help_text, hue)?;
+    if let Some(help) = manifest_help {
+        draw_tiliqua(
+            d,
+            (h_active/2-80) as i32,
+            (v_active/2) as i32 - 330,
+            hue,
+            help.io_left.each_ref().map(|s| s.as_str()),
+            help.io_right.each_ref().map(|s| s.as_str())
+        )?;
+    }
+    Ok(())
+}
+
 pub fn draw_cal<D>(d: &mut D, x: u32, y: u32, hue: u8, dac: &[i16; 4], adc: &[i16; 4]) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
@@ -356,7 +501,7 @@ where
     Ok(())
 }
 
-pub fn draw_tiliqua<D>(d: &mut D, x: u32, y: u32, hue: u8,
+pub fn draw_tiliqua<D>(d: &mut D, x: i32, y: i32, hue: u8,
                        str_l: [&str; 8], str_r: [&str; 6]) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
@@ -368,15 +513,15 @@ where
 
     let font_small_grey = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
 
-    let line = |disp: &mut D, x1: u32, y1: u32, x2: u32, y2: u32| {
+    let line = |disp: &mut D, x1: i32, y1: i32, x2: i32, y2: i32| {
         Line::new(Point::new((x+x1) as i32, (y+y1) as i32),
                   Point::new((x+x2) as i32, (y+y2) as i32))
                   .into_styled(stroke_grey)
                   .draw(disp).ok()
     };
 
-    let ellipse = |disp: &mut D, x1: u32, y1: u32, sx: u32, sy: u32| {
-        Ellipse::new(Point::new((x+x1-sx) as i32, (y+y1-sy) as i32),
+    let ellipse = |disp: &mut D, x1: i32, y1: i32, sx: u32, sy: u32| {
+        Ellipse::new(Point::new((x+x1-sx as i32) as i32, (y+y1-sy as i32) as i32),
                   Size::new(sx<<1, sy<<1))
                   .into_styled(stroke_grey)
                   .draw(disp).ok()
@@ -464,7 +609,7 @@ where
     for n in 0..text_l.len() {
         Text::with_alignment(
             str_l[n],
-            Point::new((x+text_l[n][0]-6) as i32, (y+text_l[n][1]+5) as i32),
+            Point::new(x + text_l[n][0] as i32 - 6, y + text_l[n][1] as i32 + 5),
             font_small_grey,
             Alignment::Right
         ).draw(d)?;
@@ -482,7 +627,7 @@ where
     for n in 0..text_r.len() {
         Text::with_alignment(
             str_r[n],
-            Point::new((x+text_r[n][0]+7) as i32, (y+text_r[n][1]+3) as i32),
+            Point::new(x + text_r[n][0] as i32 + 7, y + text_r[n][1] as i32 + 3),
             font_small_grey,
             Alignment::Left
         ).draw(d)?;
@@ -678,7 +823,7 @@ where
     Ok(())
 }
 
-pub fn draw_benchmark_stats<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8, 
+pub fn draw_benchmark_stats<D>(d: &mut D, pos_x: u32, pos_y: u32, hue: u8,
                               refresh_rate: u32, frame_count: u32) -> Result<(), D::Error>
 where
     D: DrawTarget<Color = HI8>,
@@ -700,6 +845,58 @@ where
         Point::new(pos_x as i32, (pos_y + 40) as i32),
         font_white,
     ).draw(d)?;
+
+    Ok(())
+}
+
+pub fn draw_benchmark_unicode<D>(
+    d: &mut D, count: u32, rng: &mut Rng) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    use crate::mono_6x12_optimized::MONO_6X12_OPTIMIZED;
+
+    let font_unicode = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::BLUE);
+
+    let unicode_text = "\
+in0/x ───────►┌───────┐
+in1/y ───────►│Audio  │
+in2/i ───────►│IN (4x)│
+in3/c ───────►└───┬───┘
+                  ▼
+         ┌───◄─[SPLIT]─►────┐
+         │        │         ▼
+         │        ▼  ┌──────────────┐     ┌────────┐
+         │        │  │4in/4out USB  ├────►│Computer│
+         │        │  │Audio I/F     │◄────│(USB2)  │
+         │        │  └──────┬───────┘     └────────┘
+         │        └───┐ ┌───┘
+         │ usb=bypass ▼ ▼ usb=enabled
+         │           [MUX]
+         │      ┌──────────────┐
+         │      │4x Delay Lines│ (tunable)
+         │      └──────┬───────┘
+         │             ▼
+         └────┐ ┌─◄─[SPLIT]─►────┐
+              │ │                │
+   src=inputs ▼ ▼ src=outputs    │
+             [MUX]               │
+               │                 ▼
+         ┌─────▼──────┐     ┌────────┬──────► out0
+(select w│Vectorscope/│     │Audio   ├──────► out1
+plot_mode│Oscilloscope│     │OUT (4x)├──────► out2
+         └────────────┘     └────────┴──────► out3";
+
+    let size = d.bounding_box().size;
+    for _ in 0..count {
+        let x = rng.u32(0..size.width);
+        let y = rng.u32(0..size.height);
+        Text::new(
+            unicode_text,
+            Point::new(x as i32, y as i32),
+            font_unicode,
+        ).draw(d)?;
+    }
 
     Ok(())
 }
@@ -847,8 +1044,8 @@ mod tests {
 
         draw_tiliqua(
             &mut disp,
-            H_ACTIVE/2-80,
-            V_ACTIVE/2-200,
+            (H_ACTIVE/2-80) as i32,
+            (V_ACTIVE/2-200) as i32,
             0,
             connection_labels,
             menu_items,
@@ -871,5 +1068,116 @@ mod tests {
                  ).ok();
 
         disp.img.save("draw_cal.png").unwrap();
+    }
+
+    #[test]
+    fn test_draw_unicode() {
+        let mut disp = setup_display();
+        let mut rng = Rng::with_seed(0);
+
+        draw_benchmark_unicode(&mut disp, 1, &mut rng).ok();
+
+        disp.img.save("draw_unicode.png").unwrap();
+    }
+
+    #[test]
+    fn test_draw_xbeam_help() {
+        let mut disp = setup_display();
+
+        const XBEAM_HELP_TEXT: &str = r###"
+Vectorscope/oscilloscope with menu system, USB audio and tunable delay lines.
+
+    - In **vectorscope mode**, rasterize X/Y, intensity and color to a simulated
+      CRT, with adjustable beam settings, scale and offset for each channel.
+
+    - In **oscilloscope mode**, all 4 input channels are plotted simultaneosly
+      with adjustable timebase, trigger settings and so on.
+
+The channels are assigned as follows:
+
+    .. code-block:: text
+
+                 Vectorscope │ Oscilloscope
+        ┌────┐               │
+        │in0 │◄─ x           │ channel 0 + trig
+        │in1 │◄─ y           │ channel 1
+        │in2 │◄─ intensity   │ channel 2
+        │in3 │◄─ color       │ channel 3
+        └────┘
+
+A USB audio interface, tunable delay lines, and series of switches is included
+in the signal path to open up more applications. The overall signal flow looks
+like this:
+
+    .. code-block:: text
+
+        in0/x ───────►┌───────┐
+        in1/y ───────►│Audio  │
+        in2/i ───────►│IN (4x)│
+        in3/c ───────►└───┬───┘
+                          ▼
+                 ┌───◄─[SPLIT]─►────┐
+                 │        │         ▼
+                 │        ▼  ┌──────────────┐     ┌────────┐
+                 │        │  │4in/4out USB  ├────►│Computer│
+                 │        │  │Audio I/F     │◄────│(USB2)  │
+                 │        │  └──────┬───────┘     └────────┘
+                 │        └───┐ ┌───┘
+                 │ usb=bypass ▼ ▼ usb=enabled
+                 │           [MUX]
+                 │      ┌──────────────┐
+                 │      │4x Delay Lines│ (tunable)
+                 │      └──────┬───────┘
+                 │             ▼
+                 └────┐ ┌─◄─[SPLIT]─►────┐
+                      │ │                │
+           src=inputs ▼ ▼ src=outputs    │
+                     [MUX]               │
+                       │                 ▼
+                 ┌─────▼──────┐     ┌────────┬──────► out0
+                 │Vectorscope/│     │Audio   ├──────► out1
+                 │Oscilloscope│     │OUT (4x)├──────► out2
+                 └────────────┘     └────────┴──────► out3
+
+The ``[MUX]`` elements pictured above can be switched by the menu system, for
+viewing different parts of the signal path (i.e inputs or outputs to delay
+lines, USB streams).  Some usage ideas:
+
+    - With ``plot_src=inputs`` and ``usb_mode=bypass``, we can visualize our
+      analog audio inputs.
+    - With ``plot_src=outputs`` and ``usb_mode=bypass``, we can visualize our
+      analog audio inputs after being affected by the delay lines (this is fun
+      to get patterns out of duplicated mono signals)
+    - With ``plot_src=outputs`` and ``usb_mode=enable``, we can visualize a USB
+      audio stream as it is sent to the analog outputs. This is perfect for
+      visualizing oscilloscope music being streamed from a computer.
+    - With ``plot_src=inputs`` and ``usb_mode=enable``, we can visualize what we
+      are sending back to the computer on our analog inputs.
+
+    .. note::
+
+        The USB audio interface will always enumerate if it is connected to a
+        computer, however it is only part of the signal flow if
+        ``usb_mode=enabled`` in the menu system.
+
+    .. note::
+
+        By default, this core builds for ``48kHz/16bit`` sampling.  However,
+        Tiliqua is shipped with ``--fs-192khz`` enabled, which provides much
+        higher fidelity plots. If you're feeling adventurous, you can also
+        synthesize with the environment variable ``TILIQUA_ASQ_WIDTH=24`` to use
+        a completely 24-bit audio path.  This mostly works, but might break the
+        scope triggering and use a bit more FPGA resources.
+"###;
+
+        // Test without manifest help (Tiliqua diagram won't be drawn)
+        draw_help_page(&mut disp, XBEAM_HELP_TEXT, None, H_ACTIVE, V_ACTIVE, 3, 0).ok();
+
+        draw_name(&mut disp, H_ACTIVE/2, V_ACTIVE-50, 0, "XBEAM", "b2d3aa", &DVIModeline::default()).ok();
+
+        let mut opts = test_data::Opts::default();
+        draw_options(&mut disp, &opts, H_ACTIVE/2-30, V_ACTIVE-135, 0).ok();
+
+        disp.img.save("draw_xbeam_help.png").unwrap();
     }
 }

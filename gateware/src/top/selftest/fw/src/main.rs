@@ -534,7 +534,7 @@ fn main() -> ! {
                     }
                 };
                 if let Some(ref help) = bootinfo.manifest.help {
-                    draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-250, hue,
+                    draw::draw_tiliqua(&mut display, (h_active/2-80) as i32, (v_active/2-250) as i32, hue,
                         help.io_left.each_ref().map(|s| s.as_str()),
                         help.io_right.each_ref().map(|s| s.as_str())
                     ).ok();
@@ -578,6 +578,10 @@ fn main() -> ! {
                         BenchmarkType::Pixels => {
                             ops_per_loop = 10000;
                             draw::draw_benchmark_pixels(&mut display, ops_per_loop, &mut benchmark_rng).ok();
+                        },
+                        BenchmarkType::Unicode => {
+                            ops_per_loop = 1;
+                            draw::draw_benchmark_unicode(&mut display, ops_per_loop, &mut benchmark_rng).ok();
                         },
                     }
                 }

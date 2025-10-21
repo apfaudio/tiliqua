@@ -294,34 +294,57 @@ fn main() -> ! {
                 });
             }
 
+            let on_help_page = opts.tracker.page.value == Page::Help;
+
             if opts.beam.palette.value != last_palette || first {
                 opts.beam.palette.value.write_to_hardware(&mut display);
                 last_palette = opts.beam.palette.value;
             }
 
-            if draw_options {
-                draw::draw_options(&mut display, &opts, h_active/2-30, 70,
+            if draw_options || on_help_page {
+                let (x, y) = if on_help_page {
+                    (h_active/2-30, v_active-100)
+                } else {
+                    (h_active/2-30, 70)
+                };
+                draw::draw_options(&mut display, &opts, x, y,
                                    opts.beam.hue.value).ok();
-                draw::draw_name(&mut display, h_active/2, 30, opts.beam.hue.value,
+                draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.hue.value,
                                 &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
             }
 
-            persist.set_persist(opts.beam.persist.value);
-            persist.set_decay(opts.beam.decay.value);
-            vscope.flags().write(
-                |w| w.enable().bit(true) );
+            if on_help_page {
+                draw::draw_help_page(&mut display,
+                    MODULE_DOCSTRING,
+                    bootinfo.manifest.help.as_ref(),
+                    h_active,
+                    v_active,
+                    opts.help.scroll.value,
+                    opts.beam.hue.value).ok();
+                persist.set_persist(64);
+                persist.set_decay(1);
+                vscope.flags().write(
+                    |w| w.enable().bit(false) );
+            } else {
+                persist.set_persist(opts.beam.persist.value);
+                persist.set_decay(opts.beam.decay.value);
+                vscope.flags().write(
+                    |w| w.enable().bit(true) );
+            }
 
             vscope.hue().write(|w| unsafe { w.hue().bits(opts.beam.hue.value) } );
             vscope.intensity().write(|w| unsafe { w.intensity().bits(opts.beam.intensity.value) } );
             vscope.xscale().write(|w| unsafe { w.scale().bits(opts.vector.xscale.value) } );
             vscope.yscale().write(|w| unsafe { w.scale().bits(opts.vector.yscale.value) } );
 
-            for ix in 0usize..N_VOICES {
-                let j = (N_VOICES-1)-ix;
-                draw::draw_voice(&mut display,
-                                 ((h_active as f32)/2.0f32 + 330.0f32*f32::cos(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as i32,
-                                 ((v_active as f32)/2.0f32 + 330.0f32*f32::sin(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as u32 - 15,
-                                 notes[ix], cutoffs[ix], opts.beam.hue.value).ok();
+            if !on_help_page {
+                for ix in 0usize..N_VOICES {
+                    let j = (N_VOICES-1)-ix;
+                    draw::draw_voice(&mut display,
+                                     ((h_active as f32)/2.0f32 + 330.0f32*f32::cos(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as i32,
+                                     ((v_active as f32)/2.0f32 + 330.0f32*f32::sin(2.3f32 + 2.0f32 * j as f32 / (N_VOICES as f32))) as u32 - 15,
+                                     notes[ix], cutoffs[ix], opts.beam.hue.value).ok();
+                }
             }
 
             first = false;

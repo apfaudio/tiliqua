@@ -51,6 +51,7 @@ pub enum BenchmarkType {
     Lines,
     Text,
     Pixels,
+    Unicode,
 }
 
 #[derive(OptionPage, Clone)]

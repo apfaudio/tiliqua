@@ -229,6 +229,10 @@ macro_rules! impl_dma_framebuffer {
                     I: IntoIterator<Item = Pixel<Self::Color>>,
                 {
                     for Pixel(coord, color) in pixels.into_iter() {
+                        while self.registers_pixel_plot.status().read().busy().bit() {
+                            // Plotting FIFO is full. Spin.
+                            riscv::asm::nop();
+                        }
                         self.registers_pixel_plot.plot().write(|w| unsafe {
                             w.x().bits(coord.x as u16);
                             w.y().bits(coord.y as u16);
@@ -273,7 +277,7 @@ macro_rules! impl_dma_framebuffer {
                     // Wait for command FIFO to be empty before changing spritesheet
                     // This ensures all pending blit operations using the current spritesheet complete
                     while !self.registers_blitter.status().read().empty().bit() {
-                        // .. spin
+                        riscv::asm::nop();
                     }
 
                     // Set new sprite sheet width (in 1bpp pixels)
@@ -318,7 +322,7 @@ macro_rules! impl_dma_framebuffer {
 
                     // Spin if command FIFO is full (too many blits already enqueued)
                     while self.registers_blitter.status().read().full().bit() {
-                        // .. spin
+                        riscv::asm::nop();
                     }
 
                     // Enqueue new source sub-rectangle
@@ -330,7 +334,7 @@ macro_rules! impl_dma_framebuffer {
                     });
 
                     while self.registers_blitter.status().read().full().bit() {
-                        // .. spin
+                        riscv::asm::nop();
                     }
 
                     // Enqueue new blit operation from the last source sub-rectangle.
@@ -369,7 +373,7 @@ macro_rules! impl_dma_framebuffer {
 
                     // No space for new line commands?
                     while self.registers_line.status().read().full().bit() {
-                        // .. spin until there is
+                        riscv::asm::nop();
                     }
 
                     let pixel_data = color.to_raw();
@@ -382,7 +386,7 @@ macro_rules! impl_dma_framebuffer {
                     });
 
                     while self.registers_line.status().read().full().bit() {
-                        // .. spin
+                        riscv::asm::nop();
                     }
 
                     self.registers_line.point().write(|w| unsafe {

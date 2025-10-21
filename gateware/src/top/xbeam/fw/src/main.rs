@@ -150,16 +150,39 @@ fn main() -> ! {
                 (app.ui.opts.clone(), app.ui.draw(), save_opts, wipe_opts)
             });
 
+            let on_help_page = opts.tracker.page.value == Page::Help;
+
             if opts.beam.palette.value != last_palette || first {
                 opts.beam.palette.value.write_to_hardware(&mut display);
                 last_palette = opts.beam.palette.value;
             }
 
-            if draw_options {
-                draw::draw_options(&mut display, &opts, h_active-200, v_active/2, opts.beam.ui_hue.value).ok();
+            if draw_options || on_help_page {
+                let (x, y) = if on_help_page {
+                    (h_active/2-30, v_active-100)
+                } else {
+                    (h_active-200, v_active/2)
+                };
+                draw::draw_options(&mut display, &opts, x, y, opts.beam.ui_hue.value).ok();
                 draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.ui_hue.value,
                                 &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
             }
+
+            if on_help_page {
+                draw::draw_help_page(&mut display,
+                    MODULE_DOCSTRING,
+                    bootinfo.manifest.help.as_ref(),
+                    h_active,
+                    v_active,
+                    opts.help.scroll.value,
+                    opts.beam.ui_hue.value).ok();
+                persist.set_persist(64);
+                persist.set_decay(1);
+            } else {
+                persist.set_persist(opts.beam.persist.value);
+                persist.set_decay(opts.beam.decay.value);
+            }
+
 
             if save_opts {
                 if let Some(ref mut flash_persist) = flash_persist_opt {
@@ -171,14 +194,12 @@ fn main() -> ! {
                 critical_section::with(|cs| {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = Opts::default();
+                    app.ui.opts.misc.rotation.value = modeline.rotate.clone();
                     if let Some(ref mut flash_persist) = flash_persist_opt {
                         flash_persist.erase_all().unwrap();
                     }
                 });
             }
-
-            persist.set_persist(opts.beam.persist.value);
-            persist.set_decay(opts.beam.decay.value);
 
             vscope.xoffset().write(|w| unsafe { w.value().bits(opts.vector.x_offset.value as u16) } );
             vscope.yoffset().write(|w| unsafe { w.value().bits(opts.vector.y_offset.value as u16) } );
@@ -244,18 +265,26 @@ fn main() -> ! {
 
             display.rotate(&opts.misc.rotation.value);
 
-            if opts.misc.plot_type.value == PlotType::Vector {
+
+            if opts.tracker.page.value == Page::Help {
                 scope.flags().write(
                     |w| w.enable().bit(false) );
                 vscope.flags().write(
-                    |w| w.enable().bit(true) );
+                    |w| w.enable().bit(false) );
             } else {
-                scope.flags().write(
-                    |w| { w.enable().bit(true);
-                          w.trigger_always().bit(opts.scope1.trig_mode.value == TriggerMode::Always)
-                    } );
-                vscope.flags().write(
-                    |w| w.enable().bit(false) );
+                if opts.misc.plot_type.value == PlotType::Vector {
+                    scope.flags().write(
+                        |w| w.enable().bit(false) );
+                    vscope.flags().write(
+                        |w| w.enable().bit(true) );
+                } else {
+                    scope.flags().write(
+                        |w| { w.enable().bit(true);
+                              w.trigger_always().bit(opts.scope1.trig_mode.value == TriggerMode::Always)
+                        } );
+                    vscope.flags().write(
+                        |w| w.enable().bit(false) );
+                }
             }
 
             first = false;

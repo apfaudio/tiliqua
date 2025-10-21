@@ -71,7 +71,6 @@ class VectorPeripheral(wiring.Component):
         m.submodules += self.stroke
 
         wiring.connect(m, wiring.flipped(self.i), self.stroke.i)
-        wiring.connect(m, self.stroke.o, wiring.flipped(self.o))
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         with m.If(self._hue.f.hue.w_stb):
@@ -101,8 +100,8 @@ class VectorPeripheral(wiring.Component):
         with m.If(self._flags.f.enable.w_stb):
             m.d.sync += self.soc_en.eq(self._flags.f.enable.w_data)
 
-        with m.If(~self.soc_en):
-            m.d.comb += self.i.ready.eq(0)
+        with m.If(self.soc_en):
+            wiring.connect(m, self.stroke.o, wiring.flipped(self.o))
 
         return m
 

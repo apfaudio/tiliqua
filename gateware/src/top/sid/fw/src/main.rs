@@ -269,78 +269,93 @@ fn main() -> ! {
                 });
             }
 
+            let on_help_page = opts.tracker.page.value == options::Page::Help;
+
             // Draw UI elements
-            draw::draw_options(&mut display, &opts, 100, v_active/2, hue).ok();
-            draw::draw_name(&mut display, h_active/2, v_active-50, hue,
-                            &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
+            if on_help_page {
+                draw::draw_options(&mut display, &opts, h_active/2-30, v_active-100, hue).ok();
+                draw::draw_name(&mut display, h_active/2, v_active-50, hue,
+                                &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
+                draw::draw_help_page(&mut display,
+                    MODULE_DOCSTRING,
+                    bootinfo.manifest.help.as_ref(),
+                    h_active,
+                    v_active,
+                    opts.help.scroll.value,
+                    hue).ok();
+            } else {
+                draw::draw_options(&mut display, &opts, 100, v_active/2, hue).ok();
+                draw::draw_name(&mut display, h_active/2, v_active-50, hue,
+                                &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
 
-            // Draw SID visualization
-            let hl_wfm: Option<u8> = match opts.tracker.page.value {
-                options::Page::Voice1 => Some(0),
-                options::Page::Voice2 => Some(1),
-                options::Page::Voice3 => Some(2),
-                _ => None,
-            };
+                // Draw SID visualization
+                let hl_wfm: Option<u8> = match opts.tracker.page.value {
+                    options::Page::Voice1 => Some(0),
+                    options::Page::Voice2 => Some(1),
+                    options::Page::Voice3 => Some(2),
+                    _ => None,
+                };
 
-            let gates: [bool; 3] = [
-                opts.voice1.gate.value == 1,
-                opts.voice2.gate.value == 1,
-                opts.voice3.gate.value == 1,
-            ];
+                let gates: [bool; 3] = [
+                    opts.voice1.gate.value == 1,
+                    opts.voice2.gate.value == 1,
+                    opts.voice3.gate.value == 1,
+                ];
 
-            let switches: [bool; 3] = [
-                opts.filter.filt1.value == 1,
-                opts.filter.filt2.value == 1,
-                opts.filter.filt3.value == 1,
-            ];
+                let switches: [bool; 3] = [
+                    opts.filter.filt1.value == 1,
+                    opts.filter.filt2.value == 1,
+                    opts.filter.filt3.value == 1,
+                ];
 
-            let filter_types: [bool; 3] = [
-                opts.filter.lp.value == 1,
-                opts.filter.bp.value == 1,
-                opts.filter.hp.value == 1,
-            ];
+                let filter_types: [bool; 3] = [
+                    opts.filter.lp.value == 1,
+                    opts.filter.bp.value == 1,
+                    opts.filter.hp.value == 1,
+                ];
 
-            let hl_filter: bool = opts.tracker.page.value == options::Page::Filter;
+                let hl_filter: bool = opts.tracker.page.value == options::Page::Filter;
 
-            draw::draw_sid(&mut display, 100, v_active/4+25, hue, hl_wfm, gates, hl_filter, switches, filter_types).ok();
+                draw::draw_sid(&mut display, 100, v_active/4+25, hue, hl_wfm, gates, hl_filter, switches, filter_types).ok();
 
-            // Draw channel labels
-            {
-                let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 0xB));
-                let hc = (h_active/2) as i16;
-                let vc = (v_active/2) as i16;
+                // Draw channel labels
+                {
+                    let font_small_white = MonoTextStyle::new(&FONT_9X15_BOLD, HI8::new(hue, 0xB));
+                    let hc = (h_active/2) as i16;
+                    let vc = (v_active/2) as i16;
 
-                Text::new(
-                    "out3: combined, post-filter",
-                    Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                               (opts.scope.ypos0.value + vc + 50) as i32),
-                    font_small_white,
-                )
-                .draw(&mut display).ok();
+                    Text::new(
+                        "out3: combined, post-filter",
+                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
+                                   (opts.scope.ypos0.value + vc + 50) as i32),
+                        font_small_white,
+                    )
+                    .draw(&mut display).ok();
 
-                Text::new(
-                    "out0: voice 1, post-VCA",
-                    Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                               (opts.scope.ypos1.value + vc + 50) as i32),
-                    font_small_white,
-                )
-                .draw(&mut display).ok();
+                    Text::new(
+                        "out0: voice 1, post-VCA",
+                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
+                                   (opts.scope.ypos1.value + vc + 50) as i32),
+                        font_small_white,
+                    )
+                    .draw(&mut display).ok();
 
-                Text::new(
-                    "out1: voice 2, post-VCA",
-                    Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                               (opts.scope.ypos2.value + vc + 50) as i32),
-                    font_small_white,
-                )
-                .draw(&mut display).ok();
+                    Text::new(
+                        "out1: voice 2, post-VCA",
+                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
+                                   (opts.scope.ypos2.value + vc + 50) as i32),
+                        font_small_white,
+                    )
+                    .draw(&mut display).ok();
 
-                Text::new(
-                    "out2: voice 3, post-VCA",
-                    Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                               (opts.scope.ypos3.value + vc + 50) as i32),
-                    font_small_white,
-                )
-                .draw(&mut display).ok();
+                    Text::new(
+                        "out2: voice 3, post-VCA",
+                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
+                                   (opts.scope.ypos3.value + vc + 50) as i32),
+                        font_small_white,
+                    )
+                    .draw(&mut display).ok();
+                }
             }
 
             // Update scope settings
@@ -357,10 +372,15 @@ fn main() -> ! {
 
             scope.xpos().write(|w| unsafe { w.xpos().bits(opts.scope.xpos.value as u16) } );
 
-            scope.flags().write(
-                |w| { w.enable().bit(true);
-                      w.trigger_always().bit(opts.scope.trig_mode.value == options::TriggerMode::Always)
-                } );
+            if on_help_page {
+                scope.flags().write(
+                    |w| w.enable().bit(false) );
+            } else {
+                scope.flags().write(
+                    |w| { w.enable().bit(true);
+                          w.trigger_always().bit(opts.scope.trig_mode.value == options::TriggerMode::Always)
+                    } );
+            }
         }
     })
 }

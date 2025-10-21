@@ -106,7 +106,7 @@ class Peripheral(wiring.Component):
             }),
         })
 
-    def __init__(self, memory_words=512, fifo_depth=8):
+    def __init__(self, memory_words=1024, fifo_depth=8):
 
         self.memory_words = memory_words
         self.memory_addr_width = exact_log2(memory_words)
@@ -157,8 +157,8 @@ class Peripheral(wiring.Component):
         m.d.comb += [
             # full = FIFO can't accept new commands
             self._status.f.full.r_data.eq(~cmd_fifo.i.ready),
-            # empty = FIFO is empty (safe to change spritesheet)
-            self._status.f.empty.r_data.eq(~cmd_fifo.o.valid),
+            # empty = FIFO is empty and no command executing (safe to change spritesheet)
+            self._status.f.empty.r_data.eq(~cmd_fifo.o.valid & cmd_fifo.o.ready),
             self._status.f.mem_words.r_data.eq(self.memory_words),
         ]
 

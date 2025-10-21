@@ -4,9 +4,9 @@
 """
 8-voice polyphonic synthesizer with video display and menu system.
 
-.. code-block:: text
+    .. code-block:: text
 
-        Pitch
+        Pitch / Touch         Audio / CV
                      ┌────┐
         C2    touch0 │in0 │◄─ phase modulation
         G2    touch1 │in1 │◄─ -
@@ -20,33 +20,55 @@
         -     touch7 │out3│─► audio out (R)
                      └────┘
 
-The synthesizer can be controlled through touching jacks 0-5 or using a
-MIDI keyboard (TRS MIDI or USB host is supported). The control source
-must be selected in the menu system.
+The synthesizer can be controlled through touching jacks 0-5 or using a MIDI
+keyboard (TRS MIDI or USB host is supported). The control source must be
+selected in the menu system.
 
     - Output audio is sent to output channels 2 and 3 (last 2 jacks).
 
-    - In touch mode, the touch magnitude controls the filter envelopes of
-      each voice. In MIDI mode, the velocity of each note as well as the
-      value of the modulation wheel affects the filter envelopes.
+    - In touch mode, the touch magnitude controls the filter envelopes of each
+      voice. In MIDI mode, the velocity of each note as well as the value of the
+      modulation wheel affects the filter envelopes.
 
-    - Input jack 0 also controls phase modulation of all oscillators,
-      so you can patch input jack 0 to an LFO for retro-sounding slow
-      vibrato, or to an oscillator for some wierd FM effects.
+    - Input jack 0 also controls phase modulation of all oscillators, so you can
+      patch input jack 0 to an LFO for retro-sounding slow vibrato, or to an
+      oscillator for some wierd FM effects.
 
-Each voice is hard panned left or right in the stereo field,
-with 2 end-of-chain effects: distortion and diffusion (delay),
-both of which can be mixed in with the UI.
+Each voice is hard panned left or right in the stereo field, with 2 end-of-chain
+effects: distortion and diffusion (delay), both of which can be mixed in with
+the UI.
 
-A block diagram of the core components of each voice:
+    .. code-block:: text
 
-.. image:: /_static/polysynth.png
-  :width: 800
+              USB MIDI   TRS MIDI
+                 ─────┐ ┌─────  (`usb-host` setting)
+                ┌─────▼─▼─────┐
+        touch──►│Voice Tracker├──►┌─────────┐
+                └─────────────┘   │ Voices  │
+                    ┌─────────┐   │  (x8)   │ (resonance =
+             cv in0─►Phase Mod├──►│NCO + SVF│ (`reso` setting)
+                    └─────────┘   └─────────┘
+                                  ┌────▼────┐
+                                  │Mix L/R  │
+                                  │(stereo) │
+                                  └────┬────┘
+                                  ┌────▼────┐ (wet/dry mix =
+                                  │Diffuser │  `diffuse` setting)
+                                  └────┬────┘
+                                  ┌────▼────┐
+                                  │  Drive  │ (`drive` setting)
+                                  └────┬────┘
+                                  ┌────┴───┐
+                                  │Audio   │
+                                  │OUT (4x)├──────► out2 (L)
+                                  └────────┴──────► out3 (R)
+
 
 """
 
 import math
 import os
+import sys
 
 from amaranth import *
 from amaranth.lib import data, stream, wiring
@@ -379,6 +401,10 @@ class SynthPeripheral(wiring.Component):
 
 class PolySoc(TiliquaSoc):
 
+    # Used by `tiliqua_soc.py` to create a MODULE_DOCSTRING rust constant used by the 'help' page.
+    __doc__ = sys.modules[__name__].__doc__
+
+    # Stored in manifest and used by bootloader for brief summary of each bitstream.
     bitstream_help = BitstreamHelp(
         brief="Touch+MIDI Polysynth (8-voice)",
         io_left=['phase cv / touch', 'touch1', 'touch2', 'touch3', 'touch4', 'touch5', 'out L', 'out R'],

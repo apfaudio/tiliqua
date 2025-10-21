@@ -5,8 +5,9 @@ use serde_derive::{Serialize, Deserialize};
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
-    Modulate,
     #[default]
+    Help,
+    Modulate,
     Voice1,
     Voice2,
     Voice3,
@@ -85,8 +86,15 @@ int_params!(TimebaseParams<u16>     { step: 128, min: 32,     max: 3872 });
 int_params!(TriggerLevelParams<i16> { step: 512, min: -16384, max: 16384 });
 int_params!(PositionParams<i16>     { step: 25,  min: -500,   max: 500 });
 int_params!(ScaleParams<u8>         { step: 1,   min: 0,      max: 15 });
+int_params!(ScrollParams<u8>        { step: 1,   min: 0,      max: 60 });
 
 button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
+
+#[derive(OptionPage, Clone)]
+pub struct HelpOpts {
+    #[option(0)]
+    pub scroll: IntOption<ScrollParams>,
+}
 
 #[derive(OptionPage, Clone)]
 pub struct MiscOpts {
@@ -185,6 +193,8 @@ pub struct ModulateOpts {
 #[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
+    #[page(Page::Help)]
+    pub help: HelpOpts,
     #[page(Page::Modulate)]
     pub modulate: ModulateOpts,
     #[page(Page::Voice1)]

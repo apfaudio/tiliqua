@@ -8,6 +8,7 @@ use tiliqua_lib::palette::ColorPalette;
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     #[default]
+    Help,
     Poly,
     Beam,
     Vector,
@@ -48,8 +49,15 @@ int_params!(IntensityParams<u8>   { step: 1, min: 0, max: 15 });
 int_params!(HueParams<u8>         { step: 1, min: 0, max: 15 });
 int_params!(XScaleParams<u8>      { step: 1, min: 0, max: 15 });
 int_params!(YScaleParams<u8>      { step: 1, min: 0, max: 15 });
+int_params!(ScrollParams<u8>      { step: 1, min: 0, max: 60 });
 
 button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
+
+#[derive(OptionPage, Clone)]
+pub struct HelpOpts {
+    #[option(0)]
+    pub scroll: IntOption<ScrollParams>,
+}
 
 #[derive(OptionPage, Clone)]
 pub struct PolyOpts {
@@ -100,6 +108,8 @@ pub struct MiscOpts {
 #[derive(Options, Clone)]
 pub struct Opts {
     pub tracker: ScreenTracker<Page>,
+    #[page(Page::Help)]
+    pub help: HelpOpts,
     #[page(Page::Poly)]
     pub poly: PolyOpts,
     #[page(Page::Beam)]

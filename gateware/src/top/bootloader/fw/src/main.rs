@@ -153,7 +153,7 @@ where
     write!(countdown_text, "Autoboot {} (slot {}) in {}sec", target, slot, countdown_sec).ok();
     Text::with_alignment(
         &countdown_text,
-        Point::new(h_active/2, v_active/2 - 115),
+        Point::new(h_active/2, v_active/2 - 135),
         style,
         Alignment::Center,
     )
@@ -242,7 +242,7 @@ where
     .draw(d).ok();
     Text::with_alignment(
         "Select a bitstream. To return here, hold encoder down for 3sec.",
-        Point::new((h_active/2) as i32, (v_active/2-30) as i32 + ot),
+        Point::new((h_active/2) as i32, (v_active-180) as i32),
         norm,
         Alignment::Center,
     )
@@ -947,8 +947,8 @@ fn main() -> ! {
                 if let Some(ref manifest) = manifests[n] {
                     if let Some(ref help) = manifest.help {
                         draw::draw_tiliqua(&mut display,
-                            h_active/2+30,
-                            v_active/2-40,
+                            (h_active/2+30) as i32,
+                            (v_active/2-40) as i32,
                             0,
                             help.io_left.each_ref().map(|s| s.as_str()),
                             help.io_right.each_ref().map(|s| s.as_str())
