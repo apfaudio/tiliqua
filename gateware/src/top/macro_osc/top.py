@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
 """
-'Macro-Oscillator' runs a downsampled version of the DSP code from a
-famous Eurorack module (credits below), on a softcore, to demonstrate the
-compute capabilities available if you do everything in software, using
-a really large CPU that has big caches and an FPU.
+'Macro-Oscillator' runs a downsampled version of the DSP code from a famous
+Eurorack module (credits below), on a softcore, to demonstrate the compute
+capabilities available if you do everything in software, using a really large
+CPU that has big caches and an FPU.
 
 .. code-block:: text
 
@@ -23,11 +23,11 @@ a really large CPU that has big caches and an FPU.
         │out3│─► 'aux' output (mono)
         └────┘
 
-Most engines are available for tweaking and patching via the UI.
-A couple of engines use a bit more compute and may cause the UI to
-slow down or audio to glitch, so these ones are disabled.
-A scope and vectorscope is included and hooked up to the oscillator
-outputs so you can visualize exactly what the softcore is spitting out.
+Most engines are available for tweaking and patching via the UI.  A couple of
+engines use a bit more compute and may cause the UI to slow down or audio to
+glitch, so these ones are disabled.  A scope and vectorscope is included and
+hooked up to the oscillator outputs so you can visualize exactly what the
+softcore is spitting out.
 
 .. code-block:: text
 
@@ -46,16 +46,16 @@ outputs so you can visualize exactly what the softcore is spitting out.
                             │Oscilloscope│
                             └────────────┘
 
-The original module was designed to run at 48kHz. Here, we instantiate
-a powerful (rv32imafc) softcore (this one includes an FPU), which
-is enough to run most engines at ~24kHz-48kHz, however with the video
-and menu system running simultaneously, it's necessary to clock
-this down to 24kHz. Surprisingly, most engines still sound reasonable.
-The resampling from 24kHz <-> 48kHz is performed in hardware below.
+The original module was designed to run at 48kHz. Here, we instantiate a
+powerful (rv32imafc) softcore (this one includes an FPU), which is enough to run
+most engines at ~24kHz-48kHz, however with the video and menu system running
+simultaneously, it's necessary to clock this down to 24kHz. Surprisingly, most
+engines still sound reasonable.  The resampling from 24kHz <-> 48kHz is
+performed in hardware below.
 
-There is quite some heavy compute here and RAM usage, as a result,
-the audio buffers are too big to fit in BRAM. In this demo,
-both the firmware and the DSP buffers are allocated from external PSRAM.
+There is quite some heavy compute here and RAM usage, as a result, the audio
+buffers are too big to fit in BRAM. In this demo, both the firmware and the DSP
+buffers are allocated from external PSRAM.
 
 Credits to Emilie Gillet for the original Plaits module and firmware.
 
@@ -66,6 +66,7 @@ The Rust port is what is running on this softcore.
 """
 
 import os
+import sys
 
 from amaranth import *
 from amaranth.lib import data, fifo, stream, wiring
@@ -170,6 +171,10 @@ class AudioFIFOPeripheral(wiring.Component):
 
 class MacroOscSoc(TiliquaSoc):
 
+    # Used by `tiliqua_soc.py` to create a MODULE_DOCSTRING rust constant used by the 'help' page.
+    __doc__ = sys.modules[__name__].__doc__
+
+    # Stored in manifest and used by bootloader for brief summary of each bitstream.
     bitstream_help = BitstreamHelp(
         brief="Emulation of a famous Eurorack module.",
         io_left=['pitch', 'trigger', 'timbre', 'morph', '', '', 'out MAIN', 'out AUX'],

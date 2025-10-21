@@ -19,17 +19,15 @@ This example instantiates a SID chip, which can be modulated via CV.
         │out3│─► voices 0-2 (sum)
         └────┘
 
-Using the menu system, each input channel can be assigned to a
-modulation target (i.e pitch / gate of specific voices or
-multiple voices).
+Using the menu system, each input channel can be assigned to a modulation target
+(i.e pitch / gate of specific voices or multiple voices).
 
-The soft CPU then uses this mapping to redirect CV to perform
-specific register writes on the SID chip. To add new modulation
-types or for more complex modulation, only the rust firmware
-needs to be changed.
+The soft CPU then uses this mapping to redirect CV to perform specific register
+writes on the SID chip. To add new modulation types or for more complex
+modulation, only the rust firmware needs to be changed.
 
-The audio routing out the SID chip to the audio outputs however
-is pure gateware. The softcore is only used for register writes.
+The audio routing out the SID chip to the audio outputs however is pure
+gateware. The softcore is only used for register writes.
 
 .. code-block:: text
 
@@ -40,12 +38,12 @@ is pure gateware. The softcore is only used for register writes.
                              └──────────┘
                            (register writes)
 
-There is a lot of design space left to explore here. For example,
-adding MIDI input, more modulation sources, adding end of
-chain effects and so on...
+There is a lot of design space left to explore here. For example, adding MIDI
+input, more modulation sources, adding end of chain effects and so on...
 """
 
 import os
+import sys
 
 from amaranth import *
 from amaranth.lib import data, wiring
@@ -245,6 +243,10 @@ class SIDPeripheral(wiring.Component):
 
 class SIDSoc(TiliquaSoc):
 
+    # Used by `tiliqua_soc.py` to create a MODULE_DOCSTRING rust constant used by the 'help' page.
+    __doc__ = sys.modules[__name__].__doc__
+
+    # Stored in manifest and used by bootloader for brief summary of each bitstream.
     bitstream_help = BitstreamHelp(
         brief="MOS 6581 (SID) emulation.",
         io_left=['modulate0', 'modulate1', 'modulate2', 'modulate3', 'voice0', 'voice1', 'voice2', 'voice mix'],

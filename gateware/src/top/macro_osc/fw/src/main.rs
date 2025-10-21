@@ -315,15 +315,32 @@ fn main() -> ! {
                 (app.ui.opts.clone(), app.ui.draw(), save_opts, wipe_opts)
             });
 
+            let on_help_page = opts.tracker.page.value == Page::Help;
+
             if opts.beam.palette.value != last_palette || first {
                 opts.beam.palette.value.write_to_hardware(&mut display);
                 last_palette = opts.beam.palette.value;
             }
 
-            if draw_options {
-                draw::draw_options(&mut display, &opts, h_active-175, v_active/2-50, opts.beam.hue.value).ok();
+            if draw_options || on_help_page {
+                let (x, y) = if on_help_page {
+                    (h_active/2-30, v_active-100)
+                } else {
+                    (h_active-175, v_active/2-50)
+                };
+                draw::draw_options(&mut display, &opts, x, y, opts.beam.hue.value).ok();
                 draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.hue.value,
                                 &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
+            }
+
+            if on_help_page {
+                draw::draw_help_page(&mut display,
+                    MODULE_DOCSTRING,
+                    bootinfo.manifest.help.as_ref(),
+                    h_active,
+                    v_active,
+                    opts.help.scroll.value,
+                    opts.beam.hue.value).ok();
             }
 
             if save_opts {
@@ -342,8 +359,13 @@ fn main() -> ! {
                 });
             }
 
-            persist.set_persist(opts.beam.persist.value);
-            persist.set_decay(opts.beam.decay.value);
+            if on_help_page {
+                persist.set_persist(128);
+                persist.set_decay(1);
+            } else {
+                persist.set_persist(opts.beam.persist.value);
+                persist.set_decay(opts.beam.decay.value);
+            }
 
             let timebase_value = match opts.scope.timebase.value {
                 Timebase::Timebase1s    => 12,
@@ -377,18 +399,25 @@ fn main() -> ! {
             }
 
 
-            if opts.misc.plot_type.value == PlotType::Vector {
+            if opts.tracker.page.value == Page::Help {
                 scope.flags().write(
                     |w| w.enable().bit(false) );
                 vscope.flags().write(
-                    |w| w.enable().bit(true) );
+                    |w| w.enable().bit(false) );
             } else {
-                scope.flags().write(
-                    |w| { w.enable().bit(true);
-                          w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always)
-                    } );
-                vscope.flags().write(
-                    |w| w.enable().bit(false) );
+                if opts.misc.plot_type.value == PlotType::Vector {
+                    scope.flags().write(
+                        |w| w.enable().bit(false) );
+                    vscope.flags().write(
+                        |w| w.enable().bit(true) );
+                } else {
+                    scope.flags().write(
+                        |w| { w.enable().bit(true);
+                              w.trigger_always().bit(opts.scope.trig_mode.value == TriggerMode::Always)
+                        } );
+                    vscope.flags().write(
+                        |w| w.enable().bit(false) );
+                }
             }
 
             first = false;
