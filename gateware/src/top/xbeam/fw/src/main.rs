@@ -176,7 +176,7 @@ fn main() -> ! {
                     v_active,
                     opts.help.scroll.value,
                     opts.beam.ui_hue.value).ok();
-                persist.set_persist(64);
+                persist.set_persist(128);
                 persist.set_decay(1);
             } else {
                 persist.set_persist(opts.beam.persist.value);

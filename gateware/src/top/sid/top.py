@@ -4,7 +4,7 @@
 """
 This example instantiates a SID chip, which can be modulated via CV.
 
-.. code-block:: text
+    .. code-block:: text
 
         ┌────┐
         │in0 │◄─ modulation source 0
@@ -29,7 +29,7 @@ modulation, only the rust firmware needs to be changed.
 The audio routing out the SID chip to the audio outputs however is pure
 gateware. The softcore is only used for register writes.
 
-.. code-block:: text
+    .. code-block:: text
 
                         ┌──────────┐  ┌───┐
         (poll CV) ─────►│VexiiRiscv│  │SID│ ─────► (audio out)

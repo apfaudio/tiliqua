@@ -8,7 +8,7 @@ Eurorack module (credits below), on a softcore, to demonstrate the compute
 capabilities available if you do everything in software, using a really large
 CPU that has big caches and an FPU.
 
-.. code-block:: text
+    .. code-block:: text
 
         ┌────┐
         │in0 │◄─ frequency modulation
@@ -29,7 +29,7 @@ glitch, so these ones are disabled.  A scope and vectorscope is included and
 hooked up to the oscillator outputs so you can visualize exactly what the
 softcore is spitting out.
 
-.. code-block:: text
+    .. code-block:: text
 
                           (write samples to)
                          ┌─────────────────┐

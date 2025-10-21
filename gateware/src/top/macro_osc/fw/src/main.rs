@@ -360,7 +360,7 @@ fn main() -> ! {
             }
 
             if on_help_page {
-                persist.set_persist(128);
+                persist.set_persist(256);
                 persist.set_decay(1);
             } else {
                 persist.set_persist(opts.beam.persist.value);

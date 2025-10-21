@@ -229,7 +229,6 @@ fn main() -> ! {
     let hue = 5u8;
 
     palette::ColorPalette::default().write_to_hardware(&mut display);
-    persist.set_persist(64);
 
     handler!(timer0 = || timer0_handler(&app));
 
@@ -273,6 +272,7 @@ fn main() -> ! {
 
             // Draw UI elements
             if on_help_page {
+                persist.set_persist(128);
                 draw::draw_options(&mut display, &opts, h_active/2-30, v_active-100, hue).ok();
                 draw::draw_name(&mut display, h_active/2, v_active-50, hue,
                                 &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
@@ -284,6 +284,7 @@ fn main() -> ! {
                     opts.help.scroll.value,
                     hue).ok();
             } else {
+                persist.set_persist(64);
                 draw::draw_options(&mut display, &opts, 100, v_active/2, hue).ok();
                 draw::draw_name(&mut display, h_active/2, v_active-50, hue,
                                 &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
