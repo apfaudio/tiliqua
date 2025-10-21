@@ -156,25 +156,14 @@ fn main() -> ! {
             }
 
             if draw_options {
-                draw::draw_options(&mut display, &opts, h_active-200, v_active/2, opts.beam.ui_hue.value).ok();
+                let (x, y) = if opts.tracker.page.value == Page::Help {
+                    (h_active/2-30, v_active-135)
+                } else {
+                    (h_active-200, v_active/2)
+                };
+                draw::draw_options(&mut display, &opts, x, y, opts.beam.ui_hue.value).ok();
                 draw::draw_name(&mut display, h_active/2, v_active-50, opts.beam.ui_hue.value,
                                 &bootinfo.manifest.name, &bootinfo.manifest.tag, &modeline).ok();
-            }
-
-            if save_opts {
-                if let Some(ref mut flash_persist) = flash_persist_opt {
-                    flash_persist.save_options(&opts).unwrap();
-                }
-            }
-
-            if wipe_opts {
-                critical_section::with(|cs| {
-                    let mut app = app.borrow_ref_mut(cs);
-                    app.ui.opts = Opts::default();
-                    if let Some(ref mut flash_persist) = flash_persist_opt {
-                        flash_persist.erase_all().unwrap();
-                    }
-                });
             }
 
             if opts.tracker.page.value == Page::Help {
@@ -194,6 +183,23 @@ fn main() -> ! {
             } else {
                 persist.set_persist(opts.beam.persist.value);
                 persist.set_decay(opts.beam.decay.value);
+            }
+
+
+            if save_opts {
+                if let Some(ref mut flash_persist) = flash_persist_opt {
+                    flash_persist.save_options(&opts).unwrap();
+                }
+            }
+
+            if wipe_opts {
+                critical_section::with(|cs| {
+                    let mut app = app.borrow_ref_mut(cs);
+                    app.ui.opts = Opts::default();
+                    if let Some(ref mut flash_persist) = flash_persist_opt {
+                        flash_persist.erase_all().unwrap();
+                    }
+                });
             }
 
             vscope.xoffset().write(|w| unsafe { w.value().bits(opts.vector.x_offset.value as u16) } );

@@ -242,7 +242,7 @@ where
     use crate::mono_6x12_optimized::MONO_6X12_OPTIMIZED;
     use tiliqua_hal::embedded_graphics::mono_font::ascii::FONT_7X13;
 
-    let font_normal = MonoTextStyle::new(&FONT_7X13, HI8::new(hue, 12));
+    let font_normal = MonoTextStyle::new(&FONT_7X13, HI8::new(hue, 10));
     let font_small = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 10));
     let font_small_white = MonoTextStyle::new(&MONO_6X12_OPTIMIZED, HI8::new(hue, 15));
 
@@ -320,7 +320,7 @@ where
     }
 
     if has_lines_below {
-        let arrow_y = current_y;
+        let arrow_y = y + 13*max_visible_lines-8;
         Text::with_alignment(
             "▾",
             Point::new(arrow_x as i32, arrow_y as i32),
