@@ -239,6 +239,18 @@ pub fn draw_help<D>(d: &mut D, x: u32, y: u32, scroll: u8, help_text: &str, hue:
 where
     D: DrawTarget<Color = HI8>,
 {
+    // Draw a sliding window of a long multiline docstring.
+    //
+    // 2 fonts are used here. A larger one for text, and a smaller one with
+    // some unicode box drawing characters for flowcharts / diagrams.
+    //
+    // The goal is for flowcharts to be small enough to fit on the screen,
+    // and for the rest of the text to still be readable.
+    //
+    // Be careful that the unicode font fits inside the blitter peripheral's
+    // sprite memory, otherwise the HAL falls back to per-pixel drawing, which
+    // is massively slower.
+
     use crate::mono_6x12_optimized::MONO_6X12_OPTIMIZED;
     use tiliqua_hal::embedded_graphics::mono_font::ascii::FONT_7X13;
 
@@ -260,13 +272,12 @@ where
 
     for _i in 0..max_visible_lines {
         if let Some(line) = lines_iter.next() {
-            // Count leading spaces
+            // Dumb heuristic for sphinx `.. note::` or `.. text::` blocks --
+            // - Lines indented 8+ spaces
+            // - Lines that start with indent + ".."
+            // Small font is selected for these blocks.
             let leading_spaces = line.len() - line.trim_start().len();
             let trimmed = line.trim_start();
-
-            // Use small font for:
-            // - Lines indented 8+ spaces
-            // - Lines that start with indent + ".." (Sphinx directives)
             let use_small_font = leading_spaces >= 8 ||
                                  (leading_spaces > 0 && trimmed.starts_with(".."));
 
@@ -291,7 +302,6 @@ where
     let has_lines_above = skip_lines > 0;
     let has_lines_below = lines_iter.next().is_some();
 
-    // Center arrows horizontally - approximate text width is 80 chars * 7 pixels
     let text_width = 80 * 7;
     let arrow_x = x + (text_width / 2);
 
@@ -299,6 +309,9 @@ where
         .stroke_color(HI8::new(hue, 10))
         .stroke_width(1)
         .build();
+
+    // If there is unseen text, show an up or down arrow like -- ^ --
+    // at top and bottom of the sliding window.
 
     if has_lines_above {
         let arrow_y = y.saturating_sub(1 * line_spacing_small);
@@ -308,7 +321,6 @@ where
             font_small_white,
             Alignment::Center,
         ).draw(d)?;
-        // Draw horizontal lines either side of arrow
         Line::new(
             Point::new((arrow_x - 60) as i32, arrow_y as i32 - 3),
             Point::new((arrow_x - 10) as i32, arrow_y as i32 - 3)
@@ -327,7 +339,6 @@ where
             font_small_white,
             Alignment::Center,
         ).draw(d)?;
-        // Draw horizontal lines either side of arrow
         Line::new(
             Point::new((arrow_x - 60) as i32, arrow_y as i32 - 2),
             Point::new((arrow_x - 10) as i32, arrow_y as i32 - 2)
@@ -353,8 +364,9 @@ pub fn draw_help_page<D>(
 where
     D: DrawTarget<Color = HI8>,
 {
+    // Draw the sliding help window with the 'mini tiliqua' above it that
+    // shows the IO mapping.
     draw_help(d, h_active/2-280, v_active/2-150, scroll, help_text, hue)?;
-
     if let Some(help) = manifest_help {
         draw_tiliqua(
             d,
@@ -365,7 +377,6 @@ where
             help.io_right.each_ref().map(|s| s.as_str())
         )?;
     }
-
     Ok(())
 }
 
