@@ -947,8 +947,8 @@ fn main() -> ! {
                 if let Some(ref manifest) = manifests[n] {
                     if let Some(ref help) = manifest.help {
                         draw::draw_tiliqua(&mut display,
-                            h_active/2+30,
-                            v_active/2-40,
+                            (h_active/2+30) as i32,
+                            (v_active/2-40) as i32,
                             0,
                             help.io_left.each_ref().map(|s| s.as_str()),
                             help.io_right.each_ref().map(|s| s.as_str())

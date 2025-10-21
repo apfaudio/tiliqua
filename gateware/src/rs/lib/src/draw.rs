@@ -251,14 +251,14 @@ where
     let line_spacing_small = 12;   // Spacing for MONO_6X12_OPTIMIZED
     let max_visible_lines = 28;
 
-    let mut lines_iter = help_text.lines();
+    let lines_iter = help_text.lines();
 
     // Skip to the starting line
     let mut lines_iter = lines_iter.skip(skip_lines);
 
     let mut current_y = y;
 
-    for i in 0..max_visible_lines {
+    for _i in 0..max_visible_lines {
         if let Some(line) = lines_iter.next() {
             // Count leading spaces
             let leading_spaces = line.len() - line.trim_start().len();

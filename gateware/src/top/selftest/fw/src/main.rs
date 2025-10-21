@@ -534,7 +534,7 @@ fn main() -> ! {
                     }
                 };
                 if let Some(ref help) = bootinfo.manifest.help {
-                    draw::draw_tiliqua(&mut display, h_active/2-80, v_active/2-250, hue,
+                    draw::draw_tiliqua(&mut display, (h_active/2-80) as i32, (v_active/2-250) as i32, hue,
                         help.io_left.each_ref().map(|s| s.as_str()),
                         help.io_right.each_ref().map(|s| s.as_str())
                     ).ok();
