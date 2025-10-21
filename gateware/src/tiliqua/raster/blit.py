@@ -157,8 +157,8 @@ class Peripheral(wiring.Component):
         m.d.comb += [
             # full = FIFO can't accept new commands
             self._status.f.full.r_data.eq(~cmd_fifo.i.ready),
-            # empty = FIFO is empty (safe to change spritesheet)
-            self._status.f.empty.r_data.eq(~cmd_fifo.o.valid),
+            # empty = FIFO is empty and no command executing (safe to change spritesheet)
+            self._status.f.empty.r_data.eq(~cmd_fifo.o.valid & cmd_fifo.o.ready),
             self._status.f.mem_words.r_data.eq(self.memory_words),
         ]
 
