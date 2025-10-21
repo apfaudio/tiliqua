@@ -170,7 +170,7 @@ fn main() -> ! {
 
             if on_help_page {
                 draw::draw_help_page(&mut display,
-                    HELP_TEXT,
+                    MODULE_DOCSTRING,
                     bootinfo.manifest.help.as_ref(),
                     h_active,
                     v_active,

@@ -90,6 +90,7 @@ lines, USB streams).  Some usage ideas:
 """
 
 import os
+import sys
 
 from amaranth import *
 from amaranth.lib import data, fifo, stream, wiring
@@ -175,6 +176,10 @@ class XbeamPeripheral(wiring.Component):
 
 class XbeamSoc(TiliquaSoc):
 
+    # Used by `tiliqua_soc.py` to create a MODULE_DOCSTRING rust constant used by the 'help' page.
+    __doc__ = sys.modules[__name__].__doc__
+
+    # Stored in manifest and used by bootloader for brief summary of each bitstream.
     bitstream_help = BitstreamHelp(
         brief="Graphical vectorscope and oscilloscope.",
         io_left=['x / in0', 'y / in1', 'intensity / in2', 'color / in3', 'out0', 'out1', 'out2', 'out3'],
@@ -187,10 +192,6 @@ class XbeamSoc(TiliquaSoc):
         super().__init__(finalize_csr_bridge=False, **kwargs)
 
         # Extract module docstring for help page
-        import sys
-        help_text = sys.modules[__name__].__doc__ or ""
-        # Inject as Rust constant (raw string literal handles special chars)
-        self.add_rust_constant(f'pub const HELP_TEXT: &str = r###"{help_text}"###;\n')
 
         self.vector_periph_base = 0x00001000
         self.scope_periph_base  = 0x00001100

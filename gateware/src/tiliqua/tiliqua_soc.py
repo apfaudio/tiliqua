@@ -473,6 +473,8 @@ class TiliquaSoc(Component):
             f.write(f"pub const BLIT_MEM_BASE: usize = 0x{self.blit_mem_base:x};\n")
 
             f.write("// Extra constants specified by an SoC subclass:\n")
+            if hasattr(self, '__doc__'):
+                f.write(f'pub const MODULE_DOCSTRING: &str = r###"{self.__doc__}"###;\n')
             for l in self.extra_rust_constants:
                 f.write(l)
 
