@@ -395,7 +395,8 @@ class TiliquaSoc(Component):
 
             # generate our domain clocks/resets
             m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
-            m.d.comb += car.reset_dvi_pll.eq(~self.fb.fbp.enable)
+            if platform.version_major >= 4:
+                m.d.comb += car.reset_dvi_pll.eq(~self.fb.fbp.enable)
 
             if platform.version_major >= 5:
                 # LED driver outputs wired ON on R5+
