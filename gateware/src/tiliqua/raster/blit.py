@@ -273,12 +273,15 @@ class Peripheral(wiring.Component):
 
             with m.State('CHECK_PIXEL'):
                 with m.If(draw_pixel):
-                    # Send request to plotting backend, wait until it is accepted.
-                    m.d.comb += self.o.valid.eq(1),
-                    with m.If(self.o.ready):
-                        m.next = 'NEXT_PIXEL'
+                    m.next = 'PLOT'
                 with m.Else():
                     # Pixel is transparent - skip to next
+                    m.next = 'NEXT_PIXEL'
+
+            with m.State('PLOT'):
+                # Send request to plotting backend, wait until it is accepted.
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
                     m.next = 'NEXT_PIXEL'
 
             with m.State('NEXT_PIXEL'):

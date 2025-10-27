@@ -226,7 +226,7 @@ class RasterTests(unittest.TestCase):
             # Collect all the blitted points into an ASCII grid, and print it
             ctx.set(dut.o.ready, 1)
             points = set()
-            for _ in range(5000):
+            for _ in range(8000):
                 if ctx.get(dut.o.valid):
                     p_x = ctx.get(dut.o.payload.x)
                     p_y = ctx.get(dut.o.payload.y)
