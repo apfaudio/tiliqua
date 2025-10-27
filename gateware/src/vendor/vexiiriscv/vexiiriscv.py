@@ -58,6 +58,7 @@ CPU_VARIANTS = {
         '--with-btb',
         '--relaxed-btb',
         '--with-late-alu',
+        '--relaxed-branch',
     ],
     # Most performant variant that reasonably fits on the
     # ECP5-25, consumes about half the LUTs and has FPU
@@ -70,6 +71,7 @@ CPU_VARIANTS = {
         '--fpu-ignore-subnormal',
         '--with-btb',
         '--relaxed-btb',
+        '--relaxed-branch',
         '--with-late-alu',
         '--lsu-l1-ways=2',
         '--lsu-l1-sets=16',
