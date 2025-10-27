@@ -218,13 +218,10 @@ class Peripheral(wiring.Component):
         # a nice way to make them a bit easier to read...
         bytes_per_row = Signal(16)
         byte_addr = Signal(16)
-        sprite_memory_addr = Signal(self.memory_addr_width)
         pixel_bit_index = Signal(5)
         m.d.comb += [
             bytes_per_row.eq((sheet_width_px + 7) >> 3),
             byte_addr.eq(sprite_y * bytes_per_row + (sprite_x >> 3)),
-            sprite_memory_addr.eq(byte_addr>>2),
-            pixel_bit_index.eq(((byte_addr & 3) << 3) | (sprite_x & 7)),
         ]
 
         # Check if current pixel should be drawn (handle MSB-first bytes in little-endian words, as we
@@ -243,8 +240,6 @@ class Peripheral(wiring.Component):
             self.o.payload.blend.eq(BlendMode.REPLACE),
             self.o.payload.offset.eq(OffsetMode.ABSOLUTE),
         ]
-
-        m.d.comb += sprite_r_port.addr.eq(sprite_memory_addr)
 
         with m.FSM() as fsm:
 
@@ -271,16 +266,26 @@ class Peripheral(wiring.Component):
                             m.next = 'READ_SPRITE_DATA'
 
             with m.State('READ_SPRITE_DATA'):
-                m.next = 'CHECK_PIXEL'
+                m.d.comb += [
+                    sprite_r_port.en.eq(1),
+                    sprite_r_port.addr.eq(byte_addr>>2),
+                ]
+                m.d.sync += [
+                    pixel_bit_index.eq(((byte_addr & 3) << 3) | (sprite_x & 7)),
+                ]
+                m.next = 'SHOULD_DRAW'
 
-            with m.State('CHECK_PIXEL'):
+            with m.State('SHOULD_DRAW'):
                 with m.If(draw_pixel):
-                    # Send request to plotting backend, wait until it is accepted.
-                    m.d.comb += self.o.valid.eq(1),
-                    with m.If(self.o.ready):
-                        m.next = 'NEXT_PIXEL'
+                    m.next = 'DRAW_PIXEL'
                 with m.Else():
                     # Pixel is transparent - skip to next
+                    m.next = 'NEXT_PIXEL'
+
+            with m.State('DRAW_PIXEL'):
+                # Send request to plotting backend, wait until it is accepted.
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
                     m.next = 'NEXT_PIXEL'
 
             with m.State('NEXT_PIXEL'):
