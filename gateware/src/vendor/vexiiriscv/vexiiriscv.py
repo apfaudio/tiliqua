@@ -71,6 +71,7 @@ CPU_VARIANTS = {
         '--fpu-ignore-subnormal',
         '--with-btb',
         '--relaxed-btb',
+        '--relaxed-branch',
         '--with-late-alu',
         '--lsu-l1-ways=2',
         '--lsu-l1-sets=16',
