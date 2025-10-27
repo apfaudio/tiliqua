@@ -301,6 +301,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
 
     def __init__(self, settings: ClockSettings):
         super().__init__()
+        self.reset_dvi_pll = Signal(init=0)
         self.settings = settings
 
     def prettyprint(self):
@@ -340,7 +341,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             m.domains.expll_clk1 = ClockDomain()
 
         clk48 = platform.request(platform.default_clk, dir='i').i
-        reset  = Signal(init=0)
+        reset = Signal(init=0)
 
         m.d.comb += [
             ClockSignal("raw48")     .eq(clk48),
@@ -438,7 +439,7 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             m.domains.dvi5x = ClockDomain()
 
             locked_dvi = Signal()
-            m.submodules.pll_dvi = create_dynamic_dvi_pll(reset, locked_dvi)
+            m.submodules.pll_dvi = create_dynamic_dvi_pll(self.reset_dvi_pll, locked_dvi)
 
             m.d.comb += [
                 ResetSignal("dvi")  .eq(~locked_dvi),
