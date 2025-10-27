@@ -344,7 +344,9 @@ class TiliquaSoc(Component):
         reset_dvi = Signal()
         m.submodules.en_ff = cdc.FFSynchronizer(
                 i=~self.fb.fbp.enable, o=reset_dvi, o_domain="dvi", reset=1)
-        m.submodules.fb = ResetInserter({'sync': ~self.fb.fbp.enable, 'dvi': reset_dvi, 'dvi5x': reset_dvi})(self.fb)
+        m.submodules.fb = ResetInserter({'sync': ~self.fb.fbp.enable,
+                                         'dvi': reset_dvi | ResetSignal('dvi'),
+                                         'dvi5x': reset_dvi | ResetSignal('dvi5x')})(self.fb)
         m.submodules.framebuffer_periph = self.framebuffer_periph
 
         # video periph / persist
