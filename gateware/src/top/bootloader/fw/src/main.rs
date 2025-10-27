@@ -686,6 +686,14 @@ fn main() -> ! {
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
 
+    if USE_EXTERNAL_PLL {
+        // Disable all external PLL outputs as early as possible, in case
+        // they are in some unknown state.
+        let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
+        let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
+        si5351drv.flush_output_enabled().ok();
+    }
+
     crate::handlers::logger_init(serial);
 
     info!("Hello from Tiliqua bootloader!");
