@@ -207,10 +207,6 @@ class Peripheral(wiring.Component):
         plot_y = Signal(8)
         sprite_x = Signal(16)
         sprite_y = Signal(16)
-        m.d.comb += [
-            sprite_x.eq(current_src_x + plot_x),
-            sprite_y.eq(current_src_y + plot_y),
-        ]
 
         # Calculate sprite memory address and bit position (in sprite memory) for current source pixel
         # TODO/WARN: currently this will only work if width (px) is divisible by 8!
@@ -264,6 +260,8 @@ class Peripheral(wiring.Component):
                             m.d.sync += [
                                 plot_x.eq(0),
                                 plot_y.eq(0),
+                                sprite_x.eq(current_src_x),
+                                sprite_y.eq(current_src_y),
                                 current_dst_x.eq(cmd_fifo.o.payload.params.blit.dst_x),
                                 current_dst_y.eq(cmd_fifo.o.payload.params.blit.dst_y),
                                 current_pixel.eq(cmd_fifo.o.payload.params.blit.pixel),
@@ -286,13 +284,16 @@ class Peripheral(wiring.Component):
             with m.State('NEXT_PIXEL'):
                 with m.If(plot_x == (current_width - 1)):
                     m.d.sync += plot_x.eq(0)
+                    m.d.sync += sprite_x.eq(current_src_x)
                     with m.If(plot_y == (current_height - 1)):
                         m.next = 'IDLE'
                     with m.Else():
                         m.d.sync += plot_y.eq(plot_y + 1)
+                        m.d.sync += sprite_y.eq(sprite_y + 1)
                         m.next = 'READ_SPRITE_DATA'
                 with m.Else():
                     m.d.sync += plot_x.eq(plot_x + 1)
+                    m.d.sync += sprite_x.eq(sprite_x + 1)
                     m.next = 'READ_SPRITE_DATA'
 
         return m
