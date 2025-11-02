@@ -50,6 +50,8 @@ jobs:
           pdm install
           pdm dsp build
         working-directory: gateware
+        env:
+          PYTHONIOENCODING: utf-8
 
   unit-tests-amaranth:
     needs: build-docker-image
@@ -93,7 +95,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-container
       - name: Build all SoC bitstreams (${{ matrix.hw_rev }})
-        run: ./scripts/build_bitstreams_soc.sh --hw=${{ matrix.hw_rev }}
+        run: |
+          rm .env.toolchain # Use yosys/nextpnr from oss-cad-suite instead of yowasp-yosys for speed
+          ./scripts/build_bitstreams_soc.sh --hw=${{ matrix.hw_rev }}
         working-directory: gateware
       - name: Generate build summary
         if: always()
@@ -137,7 +141,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-container
       - name: Build all non-SoC bitstreams (${{ matrix.hw_rev }})
-        run: ./scripts/build_bitstreams_no_soc.sh --hw=${{ matrix.hw_rev }}
+        run: |
+          rm .env.toolchain # Use yosys/nextpnr from oss-cad-suite instead of yowasp-yosys for speed
+          ./scripts/build_bitstreams_no_soc.sh --hw=${{ matrix.hw_rev }}
         working-directory: gateware
       - name: Generate build summary
         if: always()
