@@ -35,6 +35,16 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/tiliqua-builder:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/tiliqua-builder:buildcache,mode=max
 
+  minimal-bitstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pdm-project/setup-pdm@v4
+      - run: |
+          pdm install
+          pdm dsp build
+        working-directory: gateware
+
   unit-tests-amaranth:
     needs: build-docker-image
     runs-on: ubuntu-latest
