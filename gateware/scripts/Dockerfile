@@ -15,15 +15,17 @@ RUN DEBIAN_FRONTEND="noninteractive" \
     && rm -rf /var/lib/apt/lists/*
 
 # Rust and dependencies from https://apfaudio.github.io/tiliqua/install.html
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
     && . /root/.cargo/env \
-    && rustup default stable \
     && rustup component add rustfmt clippy llvm-tools \
     && rustup target add riscv32im-unknown-none-elf riscv32imafc-unknown-none-elf \
-    && cargo install cargo-binutils form svd2rust --locked
+    && cargo install cargo-binutils form svd2rust --locked \
+    && rustup default stable
 
 # Make sure cargo binaries are available in PATH
 ENV PATH="/root/.cargo/bin:${PATH}"
+ENV CARGO_HOME="/root/.cargo"
+ENV RUSTUP_HOME="/root/.rustup"
 
 # Install PDM
 RUN curl -sSL https://pdm-project.org/install-pdm.py | python3 -
@@ -36,10 +38,11 @@ RUN curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/download/202
     tar -xz -C /opt
 ENV PATH="/opt/oss-cad-suite/bin:${PATH}"
 
-# Pre-populate PDM cache by installing dependencies from the repo
+# Pre-populate PDM and Cargo caches by installing dependencies from the repo
 RUN git clone --depth 1 https://github.com/apfaudio/tiliqua.git /tmp/tiliqua && \
     cd /tmp/tiliqua/gateware && \
     pdm install && \
+    pdm selftest build --skip-build && \
     rm -rf /tmp/tiliqua
 
 RUN git config --global --add safe.directory /tiliqua
