@@ -17,6 +17,7 @@ RUN DEBIAN_FRONTEND="noninteractive" \
 # Rust and dependencies from https://apfaudio.github.io/tiliqua/install.html
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && . /root/.cargo/env \
+    && rustup default stable \
     && rustup component add rustfmt clippy llvm-tools \
     && rustup target add riscv32im-unknown-none-elf riscv32imafc-unknown-none-elf \
     && cargo install cargo-binutils form svd2rust --locked
@@ -35,6 +36,12 @@ RUN curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/download/202
     tar -xz -C /opt
 ENV PATH="/opt/oss-cad-suite/bin:${PATH}"
 
+# Pre-populate PDM cache by installing dependencies from the repo
+RUN git clone --depth 1 https://github.com/apfaudio/tiliqua.git /tmp/tiliqua && \
+    cd /tmp/tiliqua/gateware && \
+    pdm install && \
+    rm -rf /tmp/tiliqua
+
 RUN git config --global --add safe.directory /tiliqua
 
 # TODO move to top
@@ -42,7 +49,5 @@ RUN DEBIAN_FRONTEND="noninteractive" \
     apt-get update -qq && \
     apt-get install -qq --no-install-recommends \
     parallel
-
-RUN rustup default stable
 
 WORKDIR /tiliqua/gateware
