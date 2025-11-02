@@ -9,7 +9,7 @@ jobs:
       contents: read
       packages: write
     outputs:
-      image: ${{ steps.meta.outputs.tags }}
+      image: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - name: Log in to GitHub Container Registry
@@ -18,41 +18,33 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}/tiliqua-builder
-          tags: |
-            type=sha,prefix={{branch}}-
-            type=ref,event=branch
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: gateware/scripts
           file: gateware/scripts/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ github.ref_name }}
 
   unit-tests-amaranth:
+    needs: build-docker-image
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pdm-project/setup-pdm@v4
       - run: |
           pdm install
           pdm test
         working-directory: gateware
 
   unit-tests-rust:
+    needs: build-docker-image
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: rustfmt, clippy, llvm-tools
       - run: | # fake generated SoC constants from lib
           touch src/generated_constants.rs
           RUST_LOG=debug cargo test
