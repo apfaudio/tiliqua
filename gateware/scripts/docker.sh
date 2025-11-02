@@ -38,6 +38,11 @@ DOCKERFILE=$(cat <<-'EOF'
     # Make sure cargo binaries are available in PATH
     ENV PATH="/root/.local/bin:${PATH}"
 
+    # Install OSS CAD Suite
+    RUN curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-11-02/oss-cad-suite-linux-x64-20251102.tgz | \
+        tar -xz -C /opt
+    ENV PATH="/opt/oss-cad-suite/bin:${PATH}"
+
     RUN git config --global --add safe.directory /tiliqua
 EOF
 )
