@@ -37,4 +37,12 @@ ENV PATH="/opt/oss-cad-suite/bin:${PATH}"
 
 RUN git config --global --add safe.directory /tiliqua
 
+# TODO move to top
+RUN DEBIAN_FRONTEND="noninteractive" \
+    apt-get update -qq && \
+    apt-get install -qq --no-install-recommends \
+    parallel
+
+RUN rustup default stable
+
 WORKDIR /tiliqua/gateware
