@@ -42,6 +42,8 @@ jobs:
       image: ${{ needs.build-docker-image.outputs.image }}
     steps:
       - uses: actions/checkout@v4
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: |
           pdm install
           pdm test
@@ -54,6 +56,8 @@ jobs:
       image: ${{ needs.build-docker-image.outputs.image }}
     steps:
       - uses: actions/checkout@v4
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: | # fake generated SoC constants from lib
           touch src/generated_constants.rs
           RUST_LOG=debug cargo test
@@ -73,6 +77,8 @@ jobs:
         hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: git submodule update --init --recursive
       - name: Install PDM dependencies
         run: pdm install
@@ -96,6 +102,8 @@ jobs:
         hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: git submodule update --init --recursive
       - name: Install PDM dependencies
         run: pdm install
@@ -124,6 +132,8 @@ jobs:
         hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: git submodule update --init --recursive
       - name: Install PDM dependencies
         run: pdm install
