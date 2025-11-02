@@ -12,6 +12,7 @@ RUN DEBIAN_FRONTEND="noninteractive" \
     python3 \
     python3-pip \
     python3-venv \
+    parallel \
     && rm -rf /var/lib/apt/lists/*
 
 # Rust and dependencies from https://apfaudio.github.io/tiliqua/install.html
@@ -37,13 +38,5 @@ ENV PATH="/root/.local/bin:${PATH}"
 RUN curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-11-02/oss-cad-suite-linux-x64-20251102.tgz | \
     tar -xz -C /opt
 ENV PATH="/opt/oss-cad-suite/bin:${PATH}"
-
-RUN git config --global --add safe.directory /tiliqua
-
-# TODO move to top
-RUN DEBIAN_FRONTEND="noninteractive" \
-    apt-get update -qq && \
-    apt-get install -qq --no-install-recommends \
-    parallel
 
 WORKDIR /tiliqua/gateware
