@@ -38,13 +38,6 @@ RUN curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/download/202
     tar -xz -C /opt
 ENV PATH="/opt/oss-cad-suite/bin:${PATH}"
 
-# Pre-populate PDM and Cargo caches by installing dependencies from the repo
-RUN git clone --depth 1 https://github.com/apfaudio/tiliqua.git /tmp/tiliqua && \
-    cd /tmp/tiliqua/gateware && \
-    pdm install && \
-    pdm selftest build --skip-build && \
-    rm -rf /tmp/tiliqua
-
 RUN git config --global --add safe.directory /tiliqua
 
 # TODO move to top
