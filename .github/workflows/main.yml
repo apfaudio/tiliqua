@@ -55,16 +55,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-container
       - run: | # fake generated SoC constants from lib
-          . /root/.cargo/env
           touch src/generated_constants.rs
           RUST_LOG=debug cargo test
         working-directory: gateware/src/rs/lib
       - run: |
-          . /root/.cargo/env
           RUST_LOG=debug cargo test_linux
         working-directory: gateware/src/rs/hal
       - run: |
-          . /root/.cargo/env
           RUST_LOG=debug cargo test
         working-directory: gateware/src/rs/opts
 
@@ -79,8 +76,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-container
-        with:
-          init-submodules: 'true'
       - name: Build all SoC bitstreams (${{ matrix.hw_rev }})
         run: ./scripts/build_bitstreams_soc.sh --hw=${{ matrix.hw_rev }}
         working-directory: gateware
@@ -125,8 +120,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-container
-        with:
-          init-submodules: 'true'
       - name: Build all non-SoC bitstreams (${{ matrix.hw_rev }})
         run: ./scripts/build_bitstreams_no_soc.sh --hw=${{ matrix.hw_rev }}
         working-directory: gateware
@@ -176,8 +169,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-container
-        with:
-          init-submodules: 'true'
       - name: Build ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
         run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
         working-directory: gateware

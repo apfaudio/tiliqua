@@ -1,10 +1,5 @@
 name: 'Setup Container Environment'
 description: 'Common setup steps for container-based jobs'
-inputs:
-  init-submodules:
-    description: 'Initialize git submodules'
-    required: false
-    default: 'false'
 
 runs:
   using: 'composite'
@@ -20,7 +15,6 @@ runs:
         rustup default stable 2>/dev/null || true
 
     - name: Initialize submodules
-      if: inputs.init-submodules == 'true'
       shell: sh
       run: git submodule update --init --recursive
 
