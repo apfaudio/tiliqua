@@ -4,7 +4,7 @@ set -e
 
 TAG=tiliqua_builder
 SCRIPT_DIR=$(dirname $(readlink -f $0))
-TILIQUA_ROOT=$(dirname $(dirname $(readlink -f $0)))
+TILIQUA_ROOT=$(dirname $(dirname $(dirname $(readlink -f $0))))
 
 # Build mode: ./docker.sh build
 if [ "$1" = "build" ]; then
