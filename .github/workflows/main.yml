@@ -9,9 +9,14 @@ jobs:
       contents: read
       packages: write
     outputs:
-      image: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ github.ref_name }}
+      image: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ steps.sanitize.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+      - name: Sanitize branch name for Docker tag
+        id: sanitize
+        run: |
+          TAG=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -24,7 +29,7 @@ jobs:
           context: gateware/scripts
           file: gateware/scripts/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ github.ref_name }}
+          tags: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ steps.sanitize.outputs.tag }}
 
   unit-tests-amaranth:
     needs: build-docker-image
