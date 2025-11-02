@@ -3,6 +3,38 @@ name: build & test
 on: [push]
 
 jobs:
+  build-docker-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/tiliqua-builder
+          tags: |
+            type=sha,prefix={{branch}}-
+            type=ref,event=branch
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: gateware/scripts
+          file: gateware/scripts/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
   unit-tests-amaranth:
     runs-on: ubuntu-latest
     steps:
@@ -31,22 +63,16 @@ jobs:
         working-directory: gateware/src/rs/opts
 
   build-bitstreams-soc:
+    needs: build-docker-image
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
     strategy:
       matrix:
         hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
-      - uses: pdm-project/setup-pdm@v4
       - run: git submodule update --init --recursive
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: rustfmt, clippy, llvm-tools
-          targets: riscv32im-unknown-none-elf, riscv32imafc-unknown-none-elf
-      - run: |
-          cargo install cargo-binutils form
-          cargo install svd2rust --locked
       - name: Install PDM dependencies
         run: pdm install
         working-directory: gateware
@@ -60,13 +86,15 @@ jobs:
           retention-days: 1
 
   build-bitstreams-no-soc:
+    needs: build-docker-image
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
     strategy:
       matrix:
         hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
-      - uses: pdm-project/setup-pdm@v4
       - run: git submodule update --init --recursive
       - name: Install PDM dependencies
         run: pdm install
@@ -81,7 +109,10 @@ jobs:
           retention-days: 1
 
   sim-bitstream:
+    needs: build-docker-image
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
     strategy:
       matrix:
         config:
@@ -92,8 +123,6 @@ jobs:
         hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
-      - uses: pdm-project/setup-pdm@v4
-      - uses: YosysHQ/setup-oss-cad-suite@v3
       - run: git submodule update --init --recursive
       - name: Install PDM dependencies
         run: pdm install
