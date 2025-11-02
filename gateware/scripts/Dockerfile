@@ -39,14 +39,4 @@ RUN curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/download/202
     tar -xz -C /opt
 ENV PATH="/opt/oss-cad-suite/bin:${PATH}"
 
-# Prime PDM and cargo cache with most required dependencies
-RUN python3 --version && \
-    git clone --depth 1 https://github.com/apfaudio/tiliqua.git /tmp/tiliqua && \
-    cd /tmp/tiliqua/gateware && \
-    git submodule update --init --recursive && \
-    pdm install && \
-    pdm bootloader build --skip-build --fw-location=spiflash && \
-    pdm selftest build --skip-build && \
-    rm -rf /tmp/tiliqua
-
 WORKDIR /tiliqua/gateware
