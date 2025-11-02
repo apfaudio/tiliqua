@@ -84,6 +84,30 @@ jobs:
       - name: Build all SoC bitstreams (${{ matrix.hw_rev }})
         run: ./scripts/build_bitstreams_soc.sh --hw=${{ matrix.hw_rev }}
         working-directory: gateware
+      - name: Generate build summary
+        if: always()
+        run: |
+          echo "## SoC Bitstreams Build Summary (${{ matrix.hw_rev }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for timfile in build/*/*.tim; do
+            if [ -f "$timfile" ]; then
+              design=$(basename $(dirname "$timfile"))
+              echo "### $design" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+
+              # Extract device utilization
+              sed -n '/Info: Device utilisation:/,/^$/p' "$timfile" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+
+              # Extract timing info
+              grep -E "Info: Max frequency for clock|Warning: Max frequency for clock" "$timfile" >> $GITHUB_STEP_SUMMARY || true
+
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+        working-directory: gateware
       - uses: actions/upload-artifact@v4
         with:
           name: bitstreams-soc-${{ matrix.hw_rev }}.zip
@@ -105,6 +129,30 @@ jobs:
           init-submodules: 'true'
       - name: Build all non-SoC bitstreams (${{ matrix.hw_rev }})
         run: ./scripts/build_bitstreams_no_soc.sh --hw=${{ matrix.hw_rev }}
+        working-directory: gateware
+      - name: Generate build summary
+        if: always()
+        run: |
+          echo "## Non-SoC Bitstreams Build Summary (${{ matrix.hw_rev }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for timfile in build/*/*.tim; do
+            if [ -f "$timfile" ]; then
+              design=$(basename $(dirname "$timfile"))
+              echo "### $design" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+
+              # Extract device utilization
+              sed -n '/Info: Device utilisation:/,/^$/p' "$timfile" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+
+              # Extract timing info
+              grep -E "Info: Max frequency for clock|Warning: Max frequency for clock" "$timfile" >> $GITHUB_STEP_SUMMARY || true
+
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
         working-directory: gateware
       - uses: actions/upload-artifact@v4
         with:
