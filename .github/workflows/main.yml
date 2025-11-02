@@ -12,6 +12,8 @@ jobs:
       image: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ steps.sanitize.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Sanitize branch name for Docker tag
         id: sanitize
         run: |
@@ -30,6 +32,8 @@ jobs:
           file: gateware/scripts/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ steps.sanitize.outputs.tag }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/tiliqua-builder:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/tiliqua-builder:buildcache,mode=max
 
   unit-tests-amaranth:
     needs: build-docker-image
