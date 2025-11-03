@@ -4,8 +4,8 @@
 *.vcd
 
 # vectorscope sim dumps
-*.bmp
-*.png
+frame*.bmp
+frame*.png
 *.svg
 
 # Byte-compiled / optimized / DLL files
