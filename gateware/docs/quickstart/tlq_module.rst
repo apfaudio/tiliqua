@@ -104,8 +104,8 @@ Flashing/Updating Bitstreams
 You have 2 options:
 
 - Use the **tiliqua-webflash** `(LINK) <https://apfaudio.github.io/tiliqua-webflash/>`_ tool, which works in any Chromium-based browser and allows you to flash bitstream archives to Tiliqua using any OS.
-    - Note: on mac / windows this should work out of the box. On Linux, make sure you have udev rules configured so the device is accessible without ``sudo``!
-- Using our ``pdm flash`` **command line tool**, which requires setting up the Tiliqua development environment first. More details in :doc:`../gettingstarted/building_flashing`.
+    - Note: on mac / windows this should work out of the box. On Linux, make sure you have udev rules configured so the device is accessible without ``sudo`` by Chrome! See 'Check USB device permissions' in :doc:`../install`.
+- Using our ``pdm flash`` **command line tool**, which requires setting up the Tiliqua development environment first. More details in :doc:`../install`.
 
 .. note::
 
