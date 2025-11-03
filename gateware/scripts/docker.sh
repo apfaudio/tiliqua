@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+#
+# Simple wrapper for useful Docker commands.
+#
+# Build and tag a docker image locally:
+#
+# $ ./scripts/docker.sh build
+#
+# Run a command inside it:
+#
+# $ ./scripts/docker.sh pdm dsp build
+#
+# Note: flashing commands won't work inside the container unless you forward
+# your USB device into it first. This looks a bit different on every OS.
 
 set -e
 
