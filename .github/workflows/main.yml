@@ -3,55 +3,125 @@ name: build & test
 on: [push]
 
 jobs:
-  unit-tests-amaranth:
+  build-docker-image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ steps.sanitize.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pdm-project/setup-pdm@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Sanitize branch name for Docker tag
+        id: sanitize
+        run: |
+          TAG=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: gateware/scripts
+          file: gateware/scripts/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/tiliqua-builder:${{ steps.sanitize.outputs.tag }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/tiliqua-builder:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/tiliqua-builder:buildcache,mode=max
+
+  minimal-bitstream:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PDM
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: '3.13'
       - run: |
           pdm install
-          pdm test
+          pdm dsp build
+        working-directory: gateware
+        env:
+          PYTHONIOENCODING: utf-8
+
+  unit-tests-amaranth:
+    needs: build-docker-image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-container
+      - run: pdm test
         working-directory: gateware
 
   unit-tests-rust:
+    needs: build-docker-image
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: rustfmt, clippy, llvm-tools
+      - uses: ./.github/actions/setup-container
       - run: | # fake generated SoC constants from lib
           touch src/generated_constants.rs
           RUST_LOG=debug cargo test
         working-directory: gateware/src/rs/lib
-      - run: RUST_LOG=debug cargo test_linux
+      - run: |
+          RUST_LOG=debug cargo test_linux
         working-directory: gateware/src/rs/hal
-      - run: RUST_LOG=debug cargo test
+      - run: |
+          RUST_LOG=debug cargo test
         working-directory: gateware/src/rs/opts
 
   build-bitstreams-soc:
+    needs: build-docker-image
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
     strategy:
       matrix:
         hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
-      - uses: pdm-project/setup-pdm@v4
-      - run: git submodule update --init --recursive
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: rustfmt, clippy, llvm-tools
-          targets: riscv32im-unknown-none-elf, riscv32imafc-unknown-none-elf
-      - run: |
-          cargo install cargo-binutils form
-          cargo install svd2rust --locked
-      - name: Install PDM dependencies
-        run: pdm install
-        working-directory: gateware
+      - uses: ./.github/actions/setup-container
       - name: Build all SoC bitstreams (${{ matrix.hw_rev }})
-        run: ./scripts/build_bitstreams_soc.sh --hw=${{ matrix.hw_rev }}
+        run: |
+          rm .env.toolchain # Use yosys/nextpnr from oss-cad-suite instead of yowasp-yosys for speed
+          ./scripts/build_bitstreams_soc.sh --hw=${{ matrix.hw_rev }}
+        working-directory: gateware
+      - name: Generate build summary
+        if: always()
+        run: |
+          echo "## SoC Bitstreams Build Summary (${{ matrix.hw_rev }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for timfile in build/*/*.tim; do
+            if [ -f "$timfile" ]; then
+              design=$(basename $(dirname "$timfile"))
+              echo "### $design" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+
+              # Extract device utilization
+              sed -n '/Info: Device utilisation:/,/^$/p' "$timfile" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+
+              # Extract timing info
+              grep -E "Info: Max frequency for clock|Warning: Max frequency for clock" "$timfile" >> $GITHUB_STEP_SUMMARY || true
+
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
         working-directory: gateware
       - uses: actions/upload-artifact@v4
         with:
@@ -60,19 +130,44 @@ jobs:
           retention-days: 1
 
   build-bitstreams-no-soc:
+    needs: build-docker-image
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
     strategy:
       matrix:
         hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
-      - uses: pdm-project/setup-pdm@v4
-      - run: git submodule update --init --recursive
-      - name: Install PDM dependencies
-        run: pdm install
-        working-directory: gateware
+      - uses: ./.github/actions/setup-container
       - name: Build all non-SoC bitstreams (${{ matrix.hw_rev }})
-        run: ./scripts/build_bitstreams_no_soc.sh --hw=${{ matrix.hw_rev }}
+        run: |
+          rm .env.toolchain # Use yosys/nextpnr from oss-cad-suite instead of yowasp-yosys for speed
+          ./scripts/build_bitstreams_no_soc.sh --hw=${{ matrix.hw_rev }}
+        working-directory: gateware
+      - name: Generate build summary
+        if: always()
+        run: |
+          echo "## Non-SoC Bitstreams Build Summary (${{ matrix.hw_rev }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for timfile in build/*/*.tim; do
+            if [ -f "$timfile" ]; then
+              design=$(basename $(dirname "$timfile"))
+              echo "### $design" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+
+              # Extract device utilization
+              sed -n '/Info: Device utilisation:/,/^$/p' "$timfile" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+
+              # Extract timing info
+              grep -E "Info: Max frequency for clock|Warning: Max frequency for clock" "$timfile" >> $GITHUB_STEP_SUMMARY || true
+
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
         working-directory: gateware
       - uses: actions/upload-artifact@v4
         with:
@@ -81,7 +176,10 @@ jobs:
           retention-days: 1
 
   sim-bitstream:
+    needs: build-docker-image
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build-docker-image.outputs.image }}
     strategy:
       matrix:
         config:
@@ -92,12 +190,7 @@ jobs:
         hw_rev: ["r2", "r3", "r4", "r5"]
     steps:
       - uses: actions/checkout@v4
-      - uses: pdm-project/setup-pdm@v4
-      - uses: YosysHQ/setup-oss-cad-suite@v3
-      - run: git submodule update --init --recursive
-      - name: Install PDM dependencies
-        run: pdm install
-        working-directory: gateware
+      - uses: ./.github/actions/setup-container
       - name: Build ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
         run: pdm ${{ matrix.config.cmd }} --hw ${{ matrix.hw_rev }}
         working-directory: gateware

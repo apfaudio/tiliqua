@@ -1,0 +1,24 @@
+name: 'Setup Container Environment'
+description: 'Common setup steps for container-based jobs'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure git safe directory
+      shell: sh
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+    - name: Setup Rust environment
+      shell: sh
+      run: |
+        . /root/.cargo/env
+        rustup default stable 2>/dev/null || true
+
+    - name: Initialize submodules
+      shell: sh
+      run: git submodule update --init --recursive
+
+    - name: Install PDM dependencies
+      shell: sh
+      working-directory: gateware
+      run: pdm install
