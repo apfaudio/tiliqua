@@ -19,11 +19,13 @@ from amaranth.back            import verilog
 from amaranth_future          import fixed
 from amaranth_soc             import wishbone
 
-from tiliqua.tiliqua_platform import *
-from tiliqua                  import eurorack_pmod, dsp, sim, dvi
-from tiliqua.eurorack_pmod    import ASQ
-from tiliqua.cli              import top_level_cli
-from tiliqua.sim              import FakeTiliquaDomainGenerator
+from tiliqua.periph           import eurorack_pmod
+from tiliqua                  import dsp
+from tiliqua.dsp              import ASQ
+from tiliqua.build.cli        import top_level_cli
+from tiliqua.build            import sim
+from tiliqua.platform         import RebootProvider
+from tiliqua.video            import dvi
 
 class BeamRaceInputs(wiring.Signature):
     def __init__(self):
@@ -311,9 +313,7 @@ class Checkers(wiring.Component):
 
 class BeamRaceTop(Elaboratable):
 
-    def __init__(self, *, default_modeline, clock_settings):
-
-        self.fixed_modeline = default_modeline
+    def __init__(self, *, clock_settings):
 
         self.clock_settings = clock_settings
 
@@ -337,7 +337,7 @@ class BeamRaceTop(Elaboratable):
             wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
             m.d.comb += self.pmod0.codec_mute.eq(reboot.mute)
         else:
-            m.submodules.car = FakeTiliquaDomainGenerator()
+            m.submodules.car = sim.FakeTiliquaDomainGenerator()
 
         m.submodules.pmod0 = pmod0 = self.pmod0
 
@@ -345,9 +345,9 @@ class BeamRaceTop(Elaboratable):
 
         m.submodules.dvi_tgen = dvi_tgen = self.dvi_tgen
 
-        if self.fixed_modeline is not None:
+        if self.clock_settings.modeline is not None:
             for member in dvi_tgen.timings.signature.members:
-                m.d.comb += getattr(dvi_tgen.timings, member).eq(getattr(self.fixed_modeline, member))
+                m.d.comb += getattr(dvi_tgen.timings, member).eq(getattr(self.clock_settings.modeline, member))
 
         # Instantiate the beamracer core
         m.submodules.core = core = self.core

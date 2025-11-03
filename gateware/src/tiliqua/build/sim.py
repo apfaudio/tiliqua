@@ -149,19 +149,10 @@ def simulate(fragment, ports, harness, hw_platform, clock_settings, tracing=Fals
 
     tracing_flags = ["--trace-fst", "--trace-structs"] if tracing else []
 
-    if hasattr(fragment, "fb"):
+    if hasattr(fragment, "fb") or hasattr(fragment, "dvi_tgen"):
         dvi_clk_hz = clock_settings.frequencies.dvi
-        dvi_h_active = fragment.fb.fixed_modeline.h_active
-        dvi_v_active = fragment.fb.fixed_modeline.v_active
-        video_cflags = [
-           "-CFLAGS", f"-DDVI_H_ACTIVE={dvi_h_active}",
-           "-CFLAGS", f"-DDVI_V_ACTIVE={dvi_v_active}",
-           "-CFLAGS", f"-DDVI_CLK_HZ={dvi_clk_hz}",
-        ]
-    elif hasattr(fragment, "dvi_tgen"):
-        dvi_clk_hz = clock_settings.frequencies.dvi
-        dvi_h_active = fragment.fixed_modeline.h_active
-        dvi_v_active = fragment.fixed_modeline.v_active
+        dvi_h_active = clock_settings.modeline.h_active
+        dvi_v_active = clock_settings.modeline.v_active
         video_cflags = [
            "-CFLAGS", f"-DDVI_H_ACTIVE={dvi_h_active}",
            "-CFLAGS", f"-DDVI_V_ACTIVE={dvi_v_active}",
