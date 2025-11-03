@@ -3,13 +3,12 @@ Electrical Design
 
 Tiliqua consists of 3 PCBAs. All of these are open-hardware designs built in KiCAD and stored in separate repositories.
 
-Block Diagram (Tiliqua R4)
+Block Diagram (Tiliqua R5)
 --------------------------
 
 Below is high-level picture of how all the different electrical components of Tiliqua are connected.
 
-.. image:: /_static/tiliqua_block_diagram.svg
-  :width: 800
+.. figure:: /_static/cards/tiliqua_block.jpeg
 
 Some connections are omitted for simplicity (example: some ex0/ex1 pins are connected to both the ECP5 and RP2040, not shown).
 
@@ -53,7 +52,7 @@ FPGA SoM (`soldiercrab`)
 - 128 Mbit (16 MByte) SPI flash for user bitstreams
 - High-speed USB HS PHY (ULPI)
 
-Audio Interface (`eurorack-pmod R3.3`)
+Audio Interface (`eurorack-pmod R3.5`)
 --------------------------------------
 
 **Repository:** `eurorack-pmod <https://github.com/apfaudio/eurorack-pmod/tree/master/hardware>`_
