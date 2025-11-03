@@ -313,14 +313,14 @@ class Checkers(wiring.Component):
 
 class BeamRaceTop(Elaboratable):
 
-    def __init__(self, *, clock_settings):
+    def __init__(self, beamrace_core, clock_settings):
 
         self.clock_settings = clock_settings
 
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
 
         self.dvi_tgen = dvi.DVITimingGen()
-        self.core = DomainRenamer("dvi")(Checkers())
+        self.core = DomainRenamer("dvi")(beamrace_core())
 
         super().__init__()
 
@@ -379,6 +379,14 @@ class BeamRaceTop(Elaboratable):
 
         return m
 
+# Different beamrace cores that can be selected at top-level CLI.
+CORES = {
+    "stripes":   Stripes,
+    "sillyscope": SillyScope,
+    "balls":     Balls,
+    "checkers":  Checkers,
+}
+
 def simulation_ports(fragment):
     return {
         "clk_sync":       (ClockSignal("sync"),              None),
@@ -399,10 +407,29 @@ def simulation_ports(fragment):
         "dvi_b":          (fragment.core.o.b,                None),
     }
 
+def argparse_callback(parser):
+    parser.add_argument('--core', type=str, default="checkers",
+                        help=f"One of {list(CORES)}")
+
+def argparse_fragment(args):
+    # Additional arguments to be provided to BeamRaceTop
+    if args.core not in CORES:
+        print(f"provided '--core {args.core}' is not one of {list(CORES)}")
+        import sys
+        sys.exit(-1)
+
+    cls_name = CORES[args.core]
+    args.name = args.name + '-' + args.core.upper().replace('_','-')
+    return {
+        "beamrace_core": cls_name,
+    }
+
 if __name__ == "__main__":
     this_path = os.path.dirname(os.path.realpath(__file__))
     top_level_cli(
         BeamRaceTop,
         sim_ports=simulation_ports,
         sim_harness="../../src/top/beamrace/sim.cpp",
+        argparse_callback=argparse_callback,
+        argparse_fragment=argparse_fragment,
     )
