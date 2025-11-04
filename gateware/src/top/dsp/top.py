@@ -187,42 +187,6 @@ class QuadNCO(wiring.Component):
 
         return m
 
-class DWO(wiring.Component):
-
-    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
-    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
-
-    def elaborate(self, platform):
-
-        m = Module()
-
-        m.submodules.split4 = split4 = dsp.Split(
-                n_channels=4, source=wiring.flipped(self.i))
-        m.submodules.merge4 = merge4 = dsp.Merge(
-                n_channels=4, sink=wiring.flipped(self.o))
-
-        split4.wire_ready(m, [1, 2, 3])
-        merge4.wire_valid(m, [1, 2, 3])
-
-        N = 16
-
-        m.submodules.matrix_mix = matrix_mix = dsp.MatrixMix(
-            i_channels=N, o_channels=1,
-            coefficients=[[1/N]]*N)
-        m.submodules.imix = imix = dsp.Merge(
-                n_channels=N, sink=matrix_mix.i)
-
-        m.submodules.server = server = dsp.mac.RingMACServer()
-        for n in range(N):
-            dwo = dsp.oscillators.DWO(c=0.98+0.001*n, macp=server.new_client())
-            m.submodules += dwo
-            wiring.connect(m, dwo.o, imix.i[n])
-
-        wiring.connect(m, matrix_mix.o, merge4.i[0])
-
-        return m
-
-
 class Resampler(wiring.Component):
 
     """
@@ -1064,6 +1028,56 @@ class Noise(wiring.Component):
         merge4.wire_valid(m, [1, 2, 3])
         return m
 
+class DWO(wiring.Component):
+
+    """
+    Superimposed detuned sinusoids from a digital waveguide oscillator.
+
+    Not tunable, but an interesting experiment.
+    """
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    bitstream_help = BitstreamHelp(
+        brief="Waveguide oscillator, 16 voices",
+        io_left=['', '', '', '', 'waves out', '', '', ''],
+        io_right=['', '', '', '', '', '']
+    )
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        m.submodules.split4 = split4 = dsp.Split(
+                n_channels=4, source=wiring.flipped(self.i))
+        m.submodules.merge4 = merge4 = dsp.Merge(
+                n_channels=4, sink=wiring.flipped(self.o))
+
+        split4.wire_ready(m, [0, 1, 2, 3]) # inputs do nothing ATM
+        merge4.wire_valid(m, [1, 2, 3])
+
+        # Number of superimposed detuned sinusoids
+        N = 16
+
+        # Downmixer of all voices
+        m.submodules.matrix_mix = matrix_mix = dsp.MatrixMix(
+            i_channels=N, o_channels=1,
+            coefficients=[[1/N]]*N)
+        m.submodules.imix = imix = dsp.Merge(
+                n_channels=N, sink=matrix_mix.i)
+
+        # All share a single multiplier.
+        m.submodules.server = server = dsp.mac.RingMACServer()
+        for n in range(N):
+            dwo = dsp.oscillators.DWO(c=0.98+0.001*n, macp=server.new_client())
+            m.submodules += dwo
+            wiring.connect(m, dwo.o, imix.i[n])
+
+        wiring.connect(m, matrix_mix.o, merge4.i[0])
+
+        return m
+
 class CoreTop(Elaboratable):
 
     def __init__(self, dsp_core, enable_touch, clock_settings):
@@ -1125,7 +1139,6 @@ CORES = {
     #                 (touch, class name)
     "mirror":         (False, Mirror),
     "nco":            (False, QuadNCO),
-    "dwo":            (False, DWO),
     "svf":            (False, ResonantFilter),
     "vca":            (False, DualVCA),
     "pitch":          (False, Pitch),
@@ -1143,6 +1156,7 @@ CORES = {
     "stft_mirror":    (False, STFTMirror),
     "vocode":         (False, Vocoder),
     "noise":          (False, Noise),
+    "dwo":            (False, DWO),
 }
 
 def simulation_ports(fragment):

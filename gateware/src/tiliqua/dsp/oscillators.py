@@ -60,7 +60,14 @@ class SawNCO(wiring.Component):
 class WhiteNoise(wiring.Component):
 
     """
-    https://www.musicdsp.org/en/latest/Synthesis/216-fast-whitenoise-generator.html
+    Simple white noise generator.
+
+    See: https://www.musicdsp.org/en/latest/Synthesis/216-fast-whitenoise-generator.html
+
+    Members
+    -------
+    o : :py:`Out(stream.Signature(ASQ))`
+        Output stream of white noise.
     """
 
     o: Out(stream.Signature(ASQ))
@@ -100,6 +107,11 @@ class DWO(wiring.Component):
 
     For details, see Fig. 3 from:
         https://ccrma.stanford.edu/~jos/wgo/Second_Order_Waveguide_Filter.html
+
+    Members
+    -------
+    o : :py:`Out(stream.Signature(ASQ))`
+        Output stream of sinusoid samples.
     """
 
     o: Out(stream.Signature(ASQ))

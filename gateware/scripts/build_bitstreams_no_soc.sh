@@ -23,6 +23,7 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm dsp build --dsp-core=noise" \
   "pdm dsp build --dsp-core=stft_mirror" \
   "pdm dsp build --dsp-core=vocode" \
+  "pdm dsp build --dsp-core=dwo" \
   "pdm beamrace build --core=stripes" \
   "pdm beamrace build --core=balls" \
   "pdm beamrace build --core=checkers" \
