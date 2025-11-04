@@ -23,6 +23,9 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm dsp build --dsp-core=noise" \
   "pdm dsp build --dsp-core=stft_mirror" \
   "pdm dsp build --dsp-core=vocode" \
+  "pdm beamrace build --core=stripes" \
+  "pdm beamrace build --core=balls" \
+  "pdm beamrace build --core=checkers" \
   "pdm vectorscope_no_soc build --fs-192khz" \
   "pdm vectorscope_no_soc build --fs-192khz --spectrogram --name=spectrogram" \
   "pdm bootstub build" \

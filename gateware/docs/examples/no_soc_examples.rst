@@ -8,6 +8,10 @@ dsp
 ^^^
 .. automodule:: top.dsp.top
 
+beamrace
+^^^^^^^^
+.. automodule:: top.beamrace.top
+
 usb_audio
 ^^^^^^^^^
 

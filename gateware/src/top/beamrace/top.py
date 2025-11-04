@@ -1,6 +1,27 @@
 # Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
+"""
+Simple video generation cores 'racing the beam', where the color of every pixel
+is calculated right before it is sent to the screen.
+
+Every 'pattern core' takes the signals in ``BeamRaceInputs`` (current pixel, current
+audio samples), and emits the signals in ``BeamRaceOutputs`` (output pixel color).
+
+Each 'pattern core' is wrapped by ``BeamRaceTop`` depending on which one is selected
+via the CLI, for example ``pdm beamracer build --core=stripes`` will build a
+``BeamRaceTop`` that contains the ``Stripes`` pattern core. The mapping is in ``CORES``
+below.
+
+Inside each 'pattern core', signals can be considered already synchronized into the 'dvi'
+domain - a ``DomainRenamer`` maps this to the ``sync`` domain in each pattern core. So,
+inside the pattern cores, you can assume everything is in the ``sync`` domain, which is
+at the pixel clock.
+
+A simulation testbench ``sim.cpp`` is provided, so you can simulate new cores by using
+``pdm beamrace sim --core=<my_core>``, which will emit bitmaps for the simulated frames.
+In the simulation testbench, sine and cosine waves are sent into the 'fake' audio inputs.
+"""
 
 import os
 import math
@@ -26,8 +47,12 @@ from tiliqua.build.cli        import top_level_cli
 from tiliqua.build            import sim
 from tiliqua.platform         import RebootProvider
 from tiliqua.video            import dvi
+from tiliqua.build.types      import BitstreamHelp
 
 class BeamRaceInputs(wiring.Signature):
+    """
+    Inputs into a beamracing core, all in the 'dvi' domain (at the pixel clock).
+    """
     def __init__(self):
         super().__init__({
             # Video timing inputs
@@ -44,6 +69,9 @@ class BeamRaceInputs(wiring.Signature):
         })
 
 class BeamRaceOutputs(wiring.Signature):
+    """
+    Outputs from a beamracing core, all in the 'dvi' domain (at the pixel clock).
+    """
     def __init__(self):
         super().__init__({
             "r":     Out(8),
@@ -54,6 +82,7 @@ class BeamRaceOutputs(wiring.Signature):
 class Stripes(wiring.Component):
 
     """
+    Beamracing pattern core.
     Translated from 'Stripes' from https://vga-playground.com
 
     Original attribution:
@@ -63,6 +92,12 @@ class Stripes(wiring.Component):
 
     i: In(BeamRaceInputs())
     o: Out(BeamRaceOutputs())
+
+    bitstream_help = BitstreamHelp(
+        brief="Beamracing 'Stripes' pattern",
+        io_left=['', '', '', '', 'in0 (copy)', 'in1 (copy)', 'in2 (copy)', 'in3 (copy)'],
+        io_right=['', '', 'video (fixed)', '', '', '']
+    )
 
     def elaborate(self, platform):
 
@@ -87,31 +122,10 @@ class Stripes(wiring.Component):
 
         return m
 
-class SillyScope(wiring.Component):
-
-    i: In(BeamRaceInputs())
-    o: Out(BeamRaceOutputs())
-
-    def elaborate(self, platform):
-
-        m = Module()
-
-        dist = Signal(16)
-        m.d.comb += dist.eq(abs((self.i.audio_in0 >> 7) - (self.i.x - 360)))
-        m.d.comb += self.o.g.eq(self.i.audio_in1 >> 8)
-        m.d.comb += self.o.r.eq(0xff ^ self.i.audio_in1 ^ 0xDE)
-        with m.If(dist < 10):
-            m.d.comb += [
-                self.o.b.eq(0xff),
-                self.o.g.eq(self.i.audio_in0 << 8),
-                self.o.r.eq(self.i.audio_in0 ^ 0xDE),
-            ]
-
-        return m
-
 class Balls(wiring.Component):
 
     """
+    Beamracing pattern core.
     Translated from 'Balls' from vga-playground.com
 
     Edits: some added registers to make timing more FPGA friendly.
@@ -124,6 +138,12 @@ class Balls(wiring.Component):
 
     i: In(BeamRaceInputs())
     o: Out(BeamRaceOutputs())
+
+    bitstream_help = BitstreamHelp(
+        brief="Beamracing 'Balls' pattern",
+        io_left=['', '', '', '', 'in0 (copy)', 'in1 (copy)', 'in2 (copy)', 'in3 (copy)'],
+        io_right=['', '', 'video (fixed)', '', '', '']
+    )
 
     def elaborate(self, platform):
 
@@ -199,6 +219,7 @@ class Balls(wiring.Component):
 class Checkers(wiring.Component):
 
     """
+    Beamracing pattern core.
     Translated from 'Checkers' from vga-playground.com
 
     Edits: 1 layer removed, some added registers for friendlier timing.
@@ -212,6 +233,12 @@ class Checkers(wiring.Component):
     i: In(BeamRaceInputs())
     o: Out(BeamRaceOutputs())
 
+    bitstream_help = BitstreamHelp(
+        brief="Beamracing 'Checkers' pattern",
+        io_left=['position', 'color1', 'color2', 'color3', 'in0 (copy)', 'in1 (copy)', 'in2 (copy)', 'in3 (copy)'],
+        io_right=['', '', 'video (fixed)', '', '', '']
+    )
+
     def elaborate(self, platform):
 
         m = Module()
@@ -223,7 +250,7 @@ class Checkers(wiring.Component):
         # Detect rising edge of vsync
         m.d.sync += l_vsync.eq(self.i.vsync)
         with m.If(self.i.vsync & ~l_vsync):
-            m.d.sync += counter.eq(counter + (self.i.audio_in0 >> 9))
+            m.d.sync += counter.eq(counter + (self.i.audio_in0 >> 10))
 
         # Animated layer positions
         layer_a_x = Signal(10)
@@ -313,14 +340,28 @@ class Checkers(wiring.Component):
 
 class BeamRaceTop(Elaboratable):
 
-    def __init__(self, beamrace_core, clock_settings):
+    """
+    Wrapper structure around beamracing cores.
+
+    Provides the clock, DVI timing generation and PHY, and interface to the audio IOs
+    (synchronized to the video domain), as well as 'hold to enter bootloader' logic.
+    """
+
+    def __init__(self, clock_settings, beamrace_core: wiring.Component):
+
+        # This core only works with static modelines
+        assert clock_settings.modeline is not None
 
         self.clock_settings = clock_settings
-
         self.pmod0 = eurorack_pmod.EurorackPmod(self.clock_settings.audio_clock)
-
         self.dvi_tgen = dvi.DVITimingGen()
+
+        # Instantiate the provided beamracing core, for us to wrap it
         self.core = DomainRenamer("dvi")(beamrace_core())
+
+        # Forward bitstream_help from the core if it exists
+        if hasattr(self.core, "bitstream_help"):
+            self.bitstream_help = self.core.bitstream_help
 
         super().__init__()
 
@@ -341,21 +382,24 @@ class BeamRaceTop(Elaboratable):
 
         m.submodules.pmod0 = pmod0 = self.pmod0
 
+        # Mirror audio inputs to audio outputs
         wiring.connect(m, pmod0.o_cal, pmod0.i_cal)
 
         m.submodules.dvi_tgen = dvi_tgen = self.dvi_tgen
 
-        if self.clock_settings.modeline is not None:
-            for member in dvi_tgen.timings.signature.members:
-                m.d.comb += getattr(dvi_tgen.timings, member).eq(getattr(self.clock_settings.modeline, member))
+        # Configure the DVI timing generator to match the selected resolution
+        for member in dvi_tgen.timings.signature.members:
+            m.d.comb += getattr(dvi_tgen.timings, member).eq(getattr(self.clock_settings.modeline, member))
 
-        # Instantiate the beamracer core
+        # Beamracer core itself
         m.submodules.core = core = self.core
+
+        # Synchronize audio inputs into DVI domain and provide them to the beamracer core.
         for ch in range(4):
             m.submodules += FFSynchronizer(
                     i=pmod0.o_cal.payload[ch].as_value(), o=getattr(core.i, f"audio_in{ch}"), o_domain="dvi")
 
-        # Hook up beamracer inputs
+        # Hook up the remaining beamracer inputs (already in DVI domain)
         m.d.comb += [
             core.i.vsync.eq(dvi_tgen.ctrl.vsync),
             core.i.hsync.eq(dvi_tgen.ctrl.hsync),
@@ -364,7 +408,7 @@ class BeamRaceTop(Elaboratable):
             core.i.y.eq(dvi_tgen.y),
         ]
 
-        # Hook up the DVI PHY
+        # Hook up DVI PHY to the beamracer outputs
         if sim.is_hw(platform):
             m.submodules.dvi_gen = dvi_gen = dvi.DVIPHY()
             m.d.dvi += [
@@ -379,15 +423,15 @@ class BeamRaceTop(Elaboratable):
 
         return m
 
-# Different beamrace cores that can be selected at top-level CLI.
+# Different beamrace cores that can be selected using e.g. `pdm beamracer build --core=stripes`.
 CORES = {
     "stripes":   Stripes,
-    "sillyscope": SillyScope,
     "balls":     Balls,
     "checkers":  Checkers,
 }
 
 def simulation_ports(fragment):
+    # Ports required by `sim.cpp` for end-to-end simulation of these cores.
     return {
         "clk_sync":       (ClockSignal("sync"),              None),
         "rst_sync":       (ResetSignal("sync"),              None),
@@ -419,7 +463,7 @@ def argparse_fragment(args):
         sys.exit(-1)
 
     cls_name = CORES[args.core]
-    args.name = args.name + '-' + args.core.upper().replace('_','-')
+    args.name = 'BR-' + args.core.upper().replace('_','-')
     return {
         "beamrace_core": cls_name,
     }
