@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SoC Projects &mdash; Tiliqua  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/platformpicker.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="../_static/platformpicker.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="non-SoC projects" href="no_soc_examples.html" />
+    <link rel="prev" title="Example Projects" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Tiliqua
+              <img src="../_static/logo.jpg" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Quickstart</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/tlq_module.html">Tiliqua Module [<code class="docutils literal notranslate"><span class="pre">TLQ-MODULE</span></code>]</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/tlq_screen.html">Tiliqua Screen [<code class="docutils literal notranslate"><span class="pre">TLQ-SCREEN</span></code>]</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/tlq_expander.html">Expander / Euro-PMOD [<code class="docutils literal notranslate"><span class="pre">TLQ-EXPANDER</span></code>]</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart/tlq_soldiercrab.html">Soldiercrab SoM [<code class="docutils literal notranslate"><span class="pre">TLQ-SOLDIERCRAB</span></code>]</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gettingstarted/index.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../calibration.html">Calibration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bootloader.html">Bootloader</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Example Projects</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">SoC Projects</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#background-tiliqua-soc-designs">Background: Tiliqua SoC designs</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#psram">PSRAM</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#all-projects">All Projects</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#polysyn">polysyn</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xbeam">xbeam</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#macro-osc">macro_osc</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sid">sid</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#selftest">selftest</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-top.bootloader.top">bootloader</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="no_soc_examples.html">non-SoC projects</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Hardware Details</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../hardware_design.html">Electrical Design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../hardware_changes.html">Changelist</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dsp/index.html">DSP Library</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Keep Updated</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../devlog/index.html">Development Blog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../community.html">Community</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../foss_funding.html">Funding &amp; Open Source</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://apfaudio.github.io/tiliqua-webflash/">Tiliqua Webflasher</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://www.crowdsupply.com/apfaudio/tiliqua">Tiliqua on Crowd Supply</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/apfaudio/tiliqua">Tiliqua on GitHub</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://apf.audio/">Homepage (apf.audio)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Tiliqua</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Example Projects</a></li>
+      <li class="breadcrumb-item active">SoC Projects</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/examples/soc_examples.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-tiliqua.tiliqua_soc">
+<span id="soc-projects"></span><h1>SoC Projects<a class="headerlink" href="#module-tiliqua.tiliqua_soc" title="Link to this heading"></a></h1>
+<section id="background-tiliqua-soc-designs">
+<h2>Background: Tiliqua SoC designs<a class="headerlink" href="#background-tiliqua-soc-designs" title="Link to this heading"></a></h2>
+<p>Many Tiliqua projects contain an SoC alongside the DSP logic, in an arrangement like this:</p>
+<a class="reference internal image-reference" href="../_images/tiliquasoc.png"><img alt="../_images/tiliquasoc.png" src="../_images/tiliquasoc.png" style="width: 800px;" /></a>
+<section id="overview">
+<h3>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h3>
+<p>At a very high level, we have a vexriscv RISCV softcore running firmware (written
+in Rust), that interfaces with a bunch of peripherals through CSR registers. As
+the Vex also runs the menu system, often there is a dedicated peripheral with
+CSRs used to tweak parameters of the DSP pipeline.</p>
+</section>
+<section id="psram">
+<h3>PSRAM<a class="headerlink" href="#psram" title="Link to this heading"></a></h3>
+<p>PSRAM bandwidth is important to keep under control. For this reason, the SoC
+only interfaces with the PSRAM for text/line draw operations. Normal instruction
+and data fetches are to a local SRAM and so do not touch external PSRAM (which
+is usually hammered with video traffic).</p>
+<p>TODO: describe each peripheral in detail</p>
+</section>
+</section>
+<section id="all-projects">
+<h2>All Projects<a class="headerlink" href="#all-projects" title="Link to this heading"></a></h2>
+<section id="polysyn">
+<span id="id1"></span><h3>polysyn<a class="headerlink" href="#polysyn" title="Link to this heading"></a></h3>
+<p id="module-top.polysyn.top">8-voice polyphonic synthesizer with video display and menu system.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Pitch / Touch         Audio / CV
+             ┌────┐
+C2    touch0 │in0 │◄─ phase modulation
+G2    touch1 │in1 │◄─ -
+C3    touch2 │in2 │◄─ -
+Eb3   touch3 │in3 │◄─ -
+             └────┘
+             ┌────┐
+G3    touch4 │out0│─► -
+C4    touch5 │out1│─► -
+-     touch6 │out2│─► audio out (L)
+-     touch7 │out3│─► audio out (R)
+             └────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>The synthesizer can be controlled through touching jacks 0-5 or using a MIDI
+keyboard (TRS MIDI or USB host is supported). The control source must be
+selected in the menu system.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Output audio is sent to output channels 2 and 3 (last 2 jacks).</p></li>
+<li><p>In touch mode, the touch magnitude controls the filter envelopes of each
+voice. In MIDI mode, the velocity of each note as well as the value of the
+modulation wheel affects the filter envelopes.</p></li>
+<li><p>Input jack 0 also controls phase modulation of all oscillators, so you can
+patch input jack 0 to an LFO for retro-sounding slow vibrato, or to an
+oscillator for some wierd FM effects.</p></li>
+</ul>
+</div></blockquote>
+<p>Each voice is hard panned left or right in the stereo field, with 2 end-of-chain
+effects: distortion and diffusion (delay), both of which can be mixed in with
+the UI.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>      USB MIDI   TRS MIDI
+         ─────┐ ┌─────  (`usb-host` setting)
+        ┌─────▼─▼─────┐
+touch──►│Voice Tracker├──►┌─────────┐
+        └─────────────┘   │ Voices  │
+            ┌─────────┐   │  (x8)   │ (resonance =
+     cv in0─►Phase Mod├──►│NCO + SVF│ (`reso` setting)
+            └─────────┘   └─────────┘
+                          ┌────▼────┐
+                          │Mix L/R  │
+                          │(stereo) │
+                          └────┬────┘
+                          ┌────▼────┐ (wet/dry mix =
+                          │Diffuser │  `diffuse` setting)
+                          └────┬────┘
+                          ┌────▼────┐
+                          │  Drive  │ (`drive` setting)
+                          └────┬────┘
+                          ┌────┴───┐
+                          │Audio   │
+                          │OUT (4x)├──────► out2 (L)
+                          └────────┴──────► out3 (R)
+</pre></div>
+</div>
+</div></blockquote>
+<dl class="py class">
+<dt class="sig sig-object py" id="top.polysyn.top.PolySoc">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">top.polysyn.top.</span></span><span class="sig-name descname"><span class="pre">PolySoc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src_loc_at</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#top.polysyn.top.PolySoc" title="Link to this definition"></a></dt>
+<dd><p>8-voice polyphonic synthesizer with video display and menu system.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Pitch / Touch         Audio / CV
+             ┌────┐
+C2    touch0 │in0 │◄─ phase modulation
+G2    touch1 │in1 │◄─ -
+C3    touch2 │in2 │◄─ -
+Eb3   touch3 │in3 │◄─ -
+             └────┘
+             ┌────┐
+G3    touch4 │out0│─► -
+C4    touch5 │out1│─► -
+-     touch6 │out2│─► audio out (L)
+-     touch7 │out3│─► audio out (R)
+             └────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>The synthesizer can be controlled through touching jacks 0-5 or using a MIDI
+keyboard (TRS MIDI or USB host is supported). The control source must be
+selected in the menu system.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Output audio is sent to output channels 2 and 3 (last 2 jacks).</p></li>
+<li><p>In touch mode, the touch magnitude controls the filter envelopes of each
+voice. In MIDI mode, the velocity of each note as well as the value of the
+modulation wheel affects the filter envelopes.</p></li>
+<li><p>Input jack 0 also controls phase modulation of all oscillators, so you can
+patch input jack 0 to an LFO for retro-sounding slow vibrato, or to an
+oscillator for some wierd FM effects.</p></li>
+</ul>
+</div></blockquote>
+<p>Each voice is hard panned left or right in the stereo field, with 2 end-of-chain
+effects: distortion and diffusion (delay), both of which can be mixed in with
+the UI.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>      USB MIDI   TRS MIDI
+         ─────┐ ┌─────  (`usb-host` setting)
+        ┌─────▼─▼─────┐
+touch──►│Voice Tracker├──►┌─────────┐
+        └─────────────┘   │ Voices  │
+            ┌─────────┐   │  (x8)   │ (resonance =
+     cv in0─►Phase Mod├──►│NCO + SVF│ (`reso` setting)
+            └─────────┘   └─────────┘
+                          ┌────▼────┐
+                          │Mix L/R  │
+                          │(stereo) │
+                          └────┬────┘
+                          ┌────▼────┐ (wet/dry mix =
+                          │Diffuser │  `diffuse` setting)
+                          └────┬────┘
+                          ┌────▼────┐
+                          │  Drive  │ (`drive` setting)
+                          └────┬────┘
+                          ┌────┴───┐
+                          │Audio   │
+                          │OUT (4x)├──────► out2 (L)
+                          └────────┴──────► out3 (R)
+</pre></div>
+</div>
+</div></blockquote>
+</dd></dl>
+
+</section>
+<section id="xbeam">
+<span id="id2"></span><h3>xbeam<a class="headerlink" href="#xbeam" title="Link to this heading"></a></h3>
+<p id="module-top.xbeam.top">Vectorscope/oscilloscope with menu system, USB audio and tunable delay lines.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>In <strong>vectorscope mode</strong>, rasterize X/Y, intensity and color to a simulated
+CRT, with adjustable beam settings, scale and offset for each channel.</p></li>
+<li><p>In <strong>oscilloscope mode</strong>, all 4 input channels are plotted simultaneosly
+with adjustable timebase, trigger settings and so on.</p></li>
+</ul>
+</div></blockquote>
+<p>The channels are assigned as follows:</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>         Vectorscope │ Oscilloscope
+┌────┐               │
+│in0 │◄─ x           │ channel 0 + trig
+│in1 │◄─ y           │ channel 1
+│in2 │◄─ intensity   │ channel 2
+│in3 │◄─ color       │ channel 3
+└────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>A USB audio interface, tunable delay lines, and series of switches is included
+in the signal path to open up more applications. The overall signal flow looks
+like this:</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>in0/x ───────►┌───────┐
+in1/y ───────►│Audio  │
+in2/i ───────►│IN (4x)│
+in3/c ───────►└───┬───┘
+                  ▼
+         ┌───◄─[SPLIT]─►────┐
+         │        │         ▼
+         │        ▼  ┌──────────────┐     ┌────────┐
+         │        │  │4in/4out USB  ├────►│Computer│
+         │        │  │Audio I/F     │◄────│(USB2)  │
+         │        │  └──────┬───────┘     └────────┘
+         │        └───┐ ┌───┘
+         │ usb=bypass ▼ ▼ usb=enabled
+         │           [MUX]
+         │      ┌──────────────┐
+         │      │4x Delay Lines│ (tunable)
+         │      └──────┬───────┘
+         │             ▼
+         └────┐ ┌─◄─[SPLIT]─►────┐
+              │ │                │
+   src=inputs ▼ ▼ src=outputs    │
+             [MUX]               │
+               │                 ▼
+         ┌─────▼──────┐     ┌────────┬──────► out0
+         │Vectorscope/│     │Audio   ├──────► out1
+         │Oscilloscope│     │OUT (4x)├──────► out2
+         └────────────┘     └────────┴──────► out3
+</pre></div>
+</div>
+</div></blockquote>
+<p>The <code class="docutils literal notranslate"><span class="pre">[MUX]</span></code> elements pictured above can be switched by the menu system, for
+viewing different parts of the signal path (i.e inputs or outputs to delay
+lines, USB streams).  Some usage ideas:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>With <code class="docutils literal notranslate"><span class="pre">plot_src=inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">usb_mode=bypass</span></code>, we can visualize our
+analog audio inputs.</p></li>
+<li><p>With <code class="docutils literal notranslate"><span class="pre">plot_src=outputs</span></code> and <code class="docutils literal notranslate"><span class="pre">usb_mode=bypass</span></code>, we can visualize our
+analog audio inputs after being affected by the delay lines (this is fun
+to get patterns out of duplicated mono signals)</p></li>
+<li><p>With <code class="docutils literal notranslate"><span class="pre">plot_src=outputs</span></code> and <code class="docutils literal notranslate"><span class="pre">usb_mode=enable</span></code>, we can visualize a USB
+audio stream as it is sent to the analog outputs. This is perfect for
+visualizing oscilloscope music being streamed from a computer.</p></li>
+<li><p>With <code class="docutils literal notranslate"><span class="pre">plot_src=inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">usb_mode=enable</span></code>, we can visualize what we
+are sending back to the computer on our analog inputs.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The USB audio interface will always enumerate if it is connected to a
+computer, however it is only part of the signal flow if
+<code class="docutils literal notranslate"><span class="pre">usb_mode=enabled</span></code> in the menu system.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default, this core builds for <code class="docutils literal notranslate"><span class="pre">48kHz/16bit</span></code> sampling.  However,
+Tiliqua is shipped with <code class="docutils literal notranslate"><span class="pre">--fs-192khz</span></code> enabled, which provides much
+higher fidelity plots. If you’re feeling adventurous, you can also
+synthesize with the environment variable <code class="docutils literal notranslate"><span class="pre">TILIQUA_ASQ_WIDTH=24</span></code> to use
+a completely 24-bit audio path.  This mostly works, but might break the
+scope triggering and use a bit more FPGA resources.</p>
+</div>
+</div></blockquote>
+<dl class="py class">
+<dt class="sig sig-object py" id="top.xbeam.top.XbeamSoc">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">top.xbeam.top.</span></span><span class="sig-name descname"><span class="pre">XbeamSoc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src_loc_at</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#top.xbeam.top.XbeamSoc" title="Link to this definition"></a></dt>
+<dd><p>Vectorscope/oscilloscope with menu system, USB audio and tunable delay lines.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>In <strong>vectorscope mode</strong>, rasterize X/Y, intensity and color to a simulated
+CRT, with adjustable beam settings, scale and offset for each channel.</p></li>
+<li><p>In <strong>oscilloscope mode</strong>, all 4 input channels are plotted simultaneosly
+with adjustable timebase, trigger settings and so on.</p></li>
+</ul>
+</div></blockquote>
+<p>The channels are assigned as follows:</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>         Vectorscope │ Oscilloscope
+┌────┐               │
+│in0 │◄─ x           │ channel 0 + trig
+│in1 │◄─ y           │ channel 1
+│in2 │◄─ intensity   │ channel 2
+│in3 │◄─ color       │ channel 3
+└────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>A USB audio interface, tunable delay lines, and series of switches is included
+in the signal path to open up more applications. The overall signal flow looks
+like this:</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>in0/x ───────►┌───────┐
+in1/y ───────►│Audio  │
+in2/i ───────►│IN (4x)│
+in3/c ───────►└───┬───┘
+                  ▼
+         ┌───◄─[SPLIT]─►────┐
+         │        │         ▼
+         │        ▼  ┌──────────────┐     ┌────────┐
+         │        │  │4in/4out USB  ├────►│Computer│
+         │        │  │Audio I/F     │◄────│(USB2)  │
+         │        │  └──────┬───────┘     └────────┘
+         │        └───┐ ┌───┘
+         │ usb=bypass ▼ ▼ usb=enabled
+         │           [MUX]
+         │      ┌──────────────┐
+         │      │4x Delay Lines│ (tunable)
+         │      └──────┬───────┘
+         │             ▼
+         └────┐ ┌─◄─[SPLIT]─►────┐
+              │ │                │
+   src=inputs ▼ ▼ src=outputs    │
+             [MUX]               │
+               │                 ▼
+         ┌─────▼──────┐     ┌────────┬──────► out0
+         │Vectorscope/│     │Audio   ├──────► out1
+         │Oscilloscope│     │OUT (4x)├──────► out2
+         └────────────┘     └────────┴──────► out3
+</pre></div>
+</div>
+</div></blockquote>
+<p>The <code class="docutils literal notranslate"><span class="pre">[MUX]</span></code> elements pictured above can be switched by the menu system, for
+viewing different parts of the signal path (i.e inputs or outputs to delay
+lines, USB streams).  Some usage ideas:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>With <code class="docutils literal notranslate"><span class="pre">plot_src=inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">usb_mode=bypass</span></code>, we can visualize our
+analog audio inputs.</p></li>
+<li><p>With <code class="docutils literal notranslate"><span class="pre">plot_src=outputs</span></code> and <code class="docutils literal notranslate"><span class="pre">usb_mode=bypass</span></code>, we can visualize our
+analog audio inputs after being affected by the delay lines (this is fun
+to get patterns out of duplicated mono signals)</p></li>
+<li><p>With <code class="docutils literal notranslate"><span class="pre">plot_src=outputs</span></code> and <code class="docutils literal notranslate"><span class="pre">usb_mode=enable</span></code>, we can visualize a USB
+audio stream as it is sent to the analog outputs. This is perfect for
+visualizing oscilloscope music being streamed from a computer.</p></li>
+<li><p>With <code class="docutils literal notranslate"><span class="pre">plot_src=inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">usb_mode=enable</span></code>, we can visualize what we
+are sending back to the computer on our analog inputs.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The USB audio interface will always enumerate if it is connected to a
+computer, however it is only part of the signal flow if
+<code class="docutils literal notranslate"><span class="pre">usb_mode=enabled</span></code> in the menu system.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default, this core builds for <code class="docutils literal notranslate"><span class="pre">48kHz/16bit</span></code> sampling.  However,
+Tiliqua is shipped with <code class="docutils literal notranslate"><span class="pre">--fs-192khz</span></code> enabled, which provides much
+higher fidelity plots. If you’re feeling adventurous, you can also
+synthesize with the environment variable <code class="docutils literal notranslate"><span class="pre">TILIQUA_ASQ_WIDTH=24</span></code> to use
+a completely 24-bit audio path.  This mostly works, but might break the
+scope triggering and use a bit more FPGA resources.</p>
+</div>
+</div></blockquote>
+</dd></dl>
+
+</section>
+<section id="macro-osc">
+<span id="id3"></span><h3>macro_osc<a class="headerlink" href="#macro-osc" title="Link to this heading"></a></h3>
+<p id="module-top.macro_osc.top">‘Macro-Oscillator’ runs a downsampled version of the DSP code from a famous
+Eurorack module (credits below), on a softcore, to demonstrate the compute
+capabilities available if you do everything in software, using a really large
+CPU that has big caches and an FPU.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>┌────┐
+│in0 │◄─ frequency modulation
+│in1 │◄─ trigger
+│in2 │◄─ timbre modulation
+│in3 │◄─ morph modulation
+└────┘
+┌────┐
+│out0│─► -
+│out1│─► -
+│out2│─► &#39;out&#39; output (mono)
+│out3│─► &#39;aux&#39; output (mono)
+└────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>Most engines are available for tweaking and patching via the UI.  A couple of
+engines use a bit more compute and may cause the UI to slow down or audio to
+glitch, so these ones are disabled.  A scope and vectorscope is included and
+hooked up to the oscillator outputs so you can visualize exactly what the
+softcore is spitting out.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>                  (write samples to)
+                 ┌─────────────────┐
+                 │                 ▼
+ poll       ┌────┴─────┐┌───────────────────┐
+audio/ ────►│VexiiRiscv││AudioFifoPeripheral│
+  CV        └──────────┘└──────────┬────────┘
+             (plaits               ▼
+               engines)      ┌──[SPLIT]────────►
+                             │             (audio out)
+                             ▼
+                    ┌────────────┐
+                    │Vectorscope/│
+                    │Oscilloscope│
+                    └────────────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>The original module was designed to run at 48kHz. Here, we instantiate a
+powerful (rv32imafc) softcore (this one includes an FPU), which is enough to run
+most engines at ~24kHz-48kHz, however with the video and menu system running
+simultaneously, it’s necessary to clock this down to 24kHz. Surprisingly, most
+engines still sound reasonable.  The resampling from 24kHz &lt;-&gt; 48kHz is
+performed in hardware below.</p>
+<p>There is quite some heavy compute here and RAM usage, as a result, the audio
+buffers are too big to fit in BRAM. In this demo, both the firmware and the DSP
+buffers are allocated from external PSRAM.</p>
+<p>Credits to Emilie Gillet for the original Plaits module and firmware.</p>
+<dl class="simple">
+<dt>Credits to Oliver Rockstedt for the Rust port of said firmware:</dt><dd><p><a class="reference external" href="https://github.com/sourcebox/mi-plaits-dsp-rs">https://github.com/sourcebox/mi-plaits-dsp-rs</a></p>
+</dd>
+</dl>
+<p>The Rust port is what is running on this softcore.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="top.macro_osc.top.MacroOscSoc">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">top.macro_osc.top.</span></span><span class="sig-name descname"><span class="pre">MacroOscSoc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src_loc_at</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#top.macro_osc.top.MacroOscSoc" title="Link to this definition"></a></dt>
+<dd><p>‘Macro-Oscillator’ runs a downsampled version of the DSP code from a famous
+Eurorack module (credits below), on a softcore, to demonstrate the compute
+capabilities available if you do everything in software, using a really large
+CPU that has big caches and an FPU.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>┌────┐
+│in0 │◄─ frequency modulation
+│in1 │◄─ trigger
+│in2 │◄─ timbre modulation
+│in3 │◄─ morph modulation
+└────┘
+┌────┐
+│out0│─► -
+│out1│─► -
+│out2│─► &#39;out&#39; output (mono)
+│out3│─► &#39;aux&#39; output (mono)
+└────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>Most engines are available for tweaking and patching via the UI.  A couple of
+engines use a bit more compute and may cause the UI to slow down or audio to
+glitch, so these ones are disabled.  A scope and vectorscope is included and
+hooked up to the oscillator outputs so you can visualize exactly what the
+softcore is spitting out.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>                  (write samples to)
+                 ┌─────────────────┐
+                 │                 ▼
+ poll       ┌────┴─────┐┌───────────────────┐
+audio/ ────►│VexiiRiscv││AudioFifoPeripheral│
+  CV        └──────────┘└──────────┬────────┘
+             (plaits               ▼
+               engines)      ┌──[SPLIT]────────►
+                             │             (audio out)
+                             ▼
+                    ┌────────────┐
+                    │Vectorscope/│
+                    │Oscilloscope│
+                    └────────────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>The original module was designed to run at 48kHz. Here, we instantiate a
+powerful (rv32imafc) softcore (this one includes an FPU), which is enough to run
+most engines at ~24kHz-48kHz, however with the video and menu system running
+simultaneously, it’s necessary to clock this down to 24kHz. Surprisingly, most
+engines still sound reasonable.  The resampling from 24kHz &lt;-&gt; 48kHz is
+performed in hardware below.</p>
+<p>There is quite some heavy compute here and RAM usage, as a result, the audio
+buffers are too big to fit in BRAM. In this demo, both the firmware and the DSP
+buffers are allocated from external PSRAM.</p>
+<p>Credits to Emilie Gillet for the original Plaits module and firmware.</p>
+<dl class="simple">
+<dt>Credits to Oliver Rockstedt for the Rust port of said firmware:</dt><dd><p><a class="reference external" href="https://github.com/sourcebox/mi-plaits-dsp-rs">https://github.com/sourcebox/mi-plaits-dsp-rs</a></p>
+</dd>
+</dl>
+<p>The Rust port is what is running on this softcore.</p>
+</dd></dl>
+
+</section>
+<section id="sid">
+<span id="id4"></span><h3>sid<a class="headerlink" href="#sid" title="Link to this heading"></a></h3>
+<p id="module-top.sid.top">This example instantiates a SID chip, which can be modulated via CV.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>┌────┐
+│in0 │◄─ modulation source 0
+│in1 │◄─ modulation source 1
+│in2 │◄─ modulation source 2
+│in3 │◄─ modulation source 3
+└────┘
+┌────┐
+│out0│─► voice 0 (solo)
+│out1│─► voice 1 (solo)
+│out2│─► voice 2 (solo)
+│out3│─► voices 0-2 (sum)
+└────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>Using the menu system, each input channel can be assigned to a modulation target
+(i.e pitch / gate of specific voices or multiple voices).</p>
+<p>The soft CPU then uses this mapping to redirect CV to perform specific register
+writes on the SID chip. To add new modulation types or for more complex
+modulation, only the rust firmware needs to be changed.</p>
+<p>The audio routing out the SID chip to the audio outputs however is pure
+gateware. The softcore is only used for register writes.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>                ┌──────────┐  ┌───┐
+(poll CV) ─────►│VexiiRiscv│  │SID│ ─────► (audio out)
+                └────┬─────┘  └───┘
+                     │          ▲
+                     └──────────┘
+                   (register writes)
+</pre></div>
+</div>
+</div></blockquote>
+<p>There is a lot of design space left to explore here. For example, adding MIDI
+input, more modulation sources, adding end of chain effects and so on…</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="top.sid.top.SIDSoc">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">top.sid.top.</span></span><span class="sig-name descname"><span class="pre">SIDSoc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src_loc_at</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#top.sid.top.SIDSoc" title="Link to this definition"></a></dt>
+<dd><p>This example instantiates a SID chip, which can be modulated via CV.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>┌────┐
+│in0 │◄─ modulation source 0
+│in1 │◄─ modulation source 1
+│in2 │◄─ modulation source 2
+│in3 │◄─ modulation source 3
+└────┘
+┌────┐
+│out0│─► voice 0 (solo)
+│out1│─► voice 1 (solo)
+│out2│─► voice 2 (solo)
+│out3│─► voices 0-2 (sum)
+└────┘
+</pre></div>
+</div>
+</div></blockquote>
+<p>Using the menu system, each input channel can be assigned to a modulation target
+(i.e pitch / gate of specific voices or multiple voices).</p>
+<p>The soft CPU then uses this mapping to redirect CV to perform specific register
+writes on the SID chip. To add new modulation types or for more complex
+modulation, only the rust firmware needs to be changed.</p>
+<p>The audio routing out the SID chip to the audio outputs however is pure
+gateware. The softcore is only used for register writes.</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>                ┌──────────┐  ┌───┐
+(poll CV) ─────►│VexiiRiscv│  │SID│ ─────► (audio out)
+                └────┬─────┘  └───┘
+                     │          ▲
+                     └──────────┘
+                   (register writes)
+</pre></div>
+</div>
+</div></blockquote>
+<p>There is a lot of design space left to explore here. For example, adding MIDI
+input, more modulation sources, adding end of chain effects and so on…</p>
+</dd></dl>
+
+</section>
+<section id="selftest">
+<span id="id5"></span><h3>selftest<a class="headerlink" href="#selftest" title="Link to this heading"></a></h3>
+<p id="module-top.selftest.top">Collect some information about Tiliqua health, display it on the video
+output and log it over serial. This is mostly used to check for
+hardware issues and for calibration.</p>
+</section>
+<section id="module-top.bootloader.top">
+<span id="bootloader"></span><h3>bootloader<a class="headerlink" href="#module-top.bootloader.top" title="Link to this heading"></a></h3>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Example Projects" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="no_soc_examples.html" class="btn btn-neutral float-right" title="non-SoC projects" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024—2025, S. Holzapfel and Tiliqua contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
