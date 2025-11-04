@@ -368,6 +368,20 @@ class DSPTests(unittest.TestCase):
         with sim.write_vcd(vcd_file=open("test_nco.vcd", "w")):
             sim.run()
 
+    def test_dwo(self):
+
+        dut = dsp.DWO()
+
+        async def testbench(ctx):
+            for n in range(0, 400):
+                result = await stream.get(ctx, dut.o)
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open("test_dwo.vcd", "w")):
+            sim.run()
+
     def test_boxcar(self):
 
         boxcar = delay_effect.Boxcar(n=32, hpf=True)
