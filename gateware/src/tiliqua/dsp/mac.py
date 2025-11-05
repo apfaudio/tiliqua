@@ -51,8 +51,6 @@ from . import ASQ
 
 # Native 18-bit multiplier type.
 SQNative = fixed.SQ(3, ASQ.f_bits)
-# Native 36-bit result type
-SQRNative = fixed.SQ(3*2, 2*ASQ.f_bits)
 
 class MAC(wiring.Component):
 
@@ -63,15 +61,17 @@ class MAC(wiring.Component):
     Subclasses use this through :py:`mac.Multiply(m, ...)`
     """
 
-    a: In(SQNative)
-    b: In(SQNative)
-    z: Out(SQRNative)
-
-    # Assert strobe when a, b are valid. Keep a, b
-    # valid and strobe asserted until `valid` is strobed,
-    # at which point z can be considered valid.
-    strobe: Out(1)
-    valid: Out(1)
+    def __init__(self, mtype = SQNative, **kwargs):
+        super().__init__({
+            "a": In(mtype),
+            "b": In(mtype),
+            "z": Out(fixed.SQ(mtype.i_bits*2, mtype.f_bits*2))
+            # Assert strobe when a, b are valid. Keep a, b
+            # valid and strobe asserted until `valid` is strobed,
+            # at which point z can be considered valid.
+            "strobe": Out(1),
+            "valid": Out(1),
+        }, **kwargs)
 
     def Multiply(self, m, a, b):
         """
@@ -117,32 +117,28 @@ class RingMessage(data.Struct):
     a server.
     """
 
-    TAG_BITS = 4
-
     class Kind(enum.Enum, shape=unsigned(1)):
         INVALID     = 0
-        MUL         = 1
+        VALID       = 1
 
     class Source(enum.Enum, shape=unsigned(1)):
         CLIENT     = 0
         SERVER     = 1
 
-    class MulClientPayload(data.Struct):
-        """A MAC computation request."""
-        a: SQNative
-        b: SQNative
-
-    class MulServerPayload(data.Struct):
-        """A MAC computation result."""
-        z: SQRNative
-
-    source  : Source
-    kind    : Kind
-    tag     : unsigned(TAG_BITS) # TODO parameterize in __init__
-    payload : data.UnionLayout({
-        "mul_client": MulClientPayload,
-        "mul_server": MulServerPayload,
-    })
+    def __init__(self,
+                 max_clients,
+                 payload_client: data.Struct,
+                 payload_server: data.Struct):
+        self.tag_bits = exact_log2(max_clients)
+        super().__init__({
+            "source"  : Source,
+            "kind"    : Kind,
+            "tag"     : unsigned(tag_bits),
+            "payload" : data.UnionLayout({
+                "client": payload_client,
+                "server": payload_server,
+            }),
+        }
 
 class RingSignature(wiring.Signature):
 
@@ -151,10 +147,10 @@ class RingSignature(wiring.Signature):
     Messages shift in on :py:`i` and out on :py:`o`.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__({
-            "i":  In(RingMessage),
-            "o":  Out(RingMessage),
+            "i":  In(RingMessage(**kwargs)),
+            "o":  Out(RingMessage(**kwargs)),
         })
 
 class RingMAC(MAC):
@@ -181,22 +177,29 @@ class RingMAC(MAC):
     instantiated inside this :py:`RingMAC`.
     """
 
-    ring: Out(RingSignature())
-    tag:  In(RingMessage.TAG_BITS)
+    def __init__(self, tag: int, **kwargs):
+        self.tag = tag
+        self.ring_client = RingClient(**kwargs)
+        # TODO mtype = self.ring_client.i.signature.type
+        super().__init__(mtype=mtype, {
+            "ring": Out(RingSignature(**kwargs)),
+        })
 
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.ring_client = ring_client = RingClient()
-        wiring.connect(m, wiring.flipped(self.ring), ring_client.ring)
+        # TODO: assert self.tag < self.ring.signature.tag_bits
+
+        m.submodules.ring_client = self.ring_client
+        wiring.connect(m, wiring.flipped(self.ring), self.ring_client.ring)
 
         m.d.comb += [
-            ring_client.tag.eq(self.tag),
-            ring_client.i.a.eq(self.a),
-            ring_client.i.b.eq(self.b),
-            ring_client.strobe.eq(self.strobe),
-            self.z.eq(ring_client.o.z),
-            self.valid.eq(ring_client.valid),
+            self.ring_client.tag.eq(self.tag),
+            self.ring_client.i.a.eq(self.a),
+            self.ring_client.i.b.eq(self.b),
+            self.ring_client.strobe.eq(self.strobe),
+            self.z.eq(self.ring_client.o.z),
+            self.valid.eq(self.ring_client.valid),
         ]
 
         return m
@@ -218,14 +221,17 @@ class RingClient(wiring.Component):
     :py:`valid` until an appropriate response has arrived.
     """
 
-    ring:   Out(RingSignature())
+    def __init__(self, **kwargs):
+        super().__init__({
+            "ring":   Out(RingSignature(**kwargs)),
 
-    i:      In(RingMessage.MulClientPayload)
-    o:      Out(RingMessage.MulServerPayload)
+            "i":      In(RingMessage.MulClientPayload),
+            "o":      Out(RingMessage.MulServerPayload),
 
-    tag:    In(RingMessage.TAG_BITS)
-    strobe: In(1)
-    valid:  Out(1)
+            "tag":    In(RingMessage.TAG_BITS),
+            "strobe": In(1),
+            "valid":  Out(1),
+        })
 
     def elaborate(self, platform):
         m = Module()
@@ -245,19 +251,19 @@ class RingClient(wiring.Component):
             m.d.sync += [
                 wait.eq(1),
                 ring.o.source.eq(RingMessage.Source.CLIENT),
-                ring.o.kind.eq(RingMessage.Kind.MUL),
+                ring.o.kind.eq(RingMessage.Kind.VALID),
                 ring.o.tag.eq(self.tag),
-                ring.o.payload.mul_client.eq(self.i),
+                ring.o.payload.client.eq(self.i),
             ]
 
-        with m.If((ring.i.kind == RingMessage.Kind.MUL) &
+        with m.If((ring.i.kind == RingMessage.Kind.VALID) &
                   (ring.i.source == RingMessage.Source.SERVER) &
                   (ring.i.tag == self.tag) &
                   wait):
 
             m.d.comb += [
                 self.valid.eq(1),
-                self.o.eq(ring.i.payload.mul_server),
+                self.o.eq(ring.i.payload.server),
             ]
 
             m.d.sync += [
