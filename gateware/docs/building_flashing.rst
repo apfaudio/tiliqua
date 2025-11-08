@@ -70,14 +70,36 @@ As we have built a simple audio-only bitstream without a CPU, there are only 2 a
     - ``top.bit``: the synthesized bitstream to configure the FPGA
     - ``manifest.json``: Metadata about the bitstream, used to display the bootloader help screen, IO assignments, for example.
 
-Both of these end up in ``build/dsp-mirror-r5/``, however, they are finally zipped together into ``dsp-mirror-9cd67c90-r5.tar.gz`` - which is a *Bitstream Archive*. This archive (bitstream + dependencies + metadata) is what can be flashed into a Tiliqua slot and seen by the bootloader. Details on the inner workings of these archives can be found in the :doc:`../bootloader` section.
+Both of these end up in ``build/dsp-mirror-r5/``, however, they are finally zipped together into ``dsp-mirror-9cd67c90-r5.tar.gz`` - which is a *Bitstream Archive*. This archive (bitstream + dependencies + metadata) is what can be flashed into a Tiliqua slot and seen by the bootloader.
 
-Verbosity and Logs
-------------------
+.. note::
 
-After building a bitstream, the most interesting logs are found in ``build/<my_bitstream>/top.tim``. There you will find a resource utilization report (how much of the FPGA was used) as well as a timing report, both emitted by ``nextpnr-ecp5``.
+    For details on the format of these *Bitstream Archives* and how they are used, see :doc:`../bootloader`.
 
-Optionally, you can build with the ``--verbose`` flag, which will print the ``yosys`` and ``nextpnr`` log output while synthesis is happening. This can be useful for larger bitstreams.
+Logs and useful flags
+---------------------
+
+After building a bitstream, the most interesting log is found in ``build/<my_bitstream>/top.tim``. There you will find a resource utilization report (how much of the FPGA was used) as well as a timing report, both emitted by ``nextpnr-ecp5``.
+
+When building bitstreams for ECP5, it's often the block RAMs, multipliers or combinational logic that is exhausted first, as shown in an excerpt from ``top.tim`` below:
+
+.. code-block:: bash
+
+    Info: Device utilisation:
+    <...>
+    Info: 	              DP16KD:       0/     56     0% # amount of block RAMs used
+    <...>
+    Info: 	          MULT18X18D:       1/     28     3% # amount of multipliers (DSP tiles) used
+    <...>
+    Info: 	          TRELLIS_FF:     731/  24288     3%
+    Info: 	        TRELLIS_COMB:    1702/  24288     7% # amount of combination logic used
+    Info: 	        TRELLIS_RAMW:      39/   3036     1%
+
+Some more flags useful for development are:
+
+    - ``--verbose``: print the ``yosys`` and ``nextpnr`` log output to the terminal while synthesis is happening.
+    - ``--noflatten``: synthesize the design without flattening all modules together. This will lead to a larger, unoptimized design, but the benefit is that the Yosys logs ``build/<my_bitstream>/top.rpt`` will contain a separate synthesis report for each module in your design - so you can see roughly how many resources each component is using.
+    - ``--debug-verilog``: dump a verilog translation of the entire project to ``build/<my_bitstream>/top.debug.v``. Note that normally, the Amaranth toolchain does not emit any verilog but instead translates your project directly into an intermediate language called RTLIL which is passed to Yosys. However, if you are familiar with verilog, this can be useful for understanding what is going on under the hood.
 
 Flashing to a Bitstream Slot
 ----------------------------
@@ -104,7 +126,11 @@ Webflasher
 
 Another option for flashing bitstreams is `tiliqua-webflash <https://apfaudio.github.io/tiliqua-webflash>`_, which lets you flash a bitstream archive from Chrome on any OS.
 
-You can upload bitstream archives from your computer, or flash one from the server from the latest release package. Generally, using the web flasher is a bit slower than using ``pdm flash``.
+You can upload bitstream archives from your computer, or flash one from the server from the latest release package.
+
+.. note::
+
+    Generally, using the web flasher is a bit slower than using ``pdm flash``.
 
 Flashing to SRAM
 ----------------
