@@ -1,5 +1,7 @@
-Tutorial 1: ``dsp`` example bitstreams
-======================================
+Tutorial 1: Audio cores (``top.dsp``)
+=====================================
+
+In this tutorial, we'll take a look at the structure of ``top.dsp`` audio-only bitstreams, as well as how to build and simulate them.
 
 In `gateware/src/top/dsp <https://github.com/apfaudio/tiliqua/tree/main/gateware/src/top/dsp>`_, we have 2 files:
 
