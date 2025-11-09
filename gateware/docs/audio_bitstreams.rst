@@ -1,10 +1,5 @@
-Tutorial 1: Audio Bitstreams
-============================
-
-In this tutorial we will create our own audio DSP core.
-
-The ``dsp`` top-level project
------------------------------
+Tutorial 1: ``dsp`` example bitstreams
+======================================
 
 In `gateware/src/top/dsp <https://github.com/apfaudio/tiliqua/tree/main/gateware/src/top/dsp>`_, we have 2 files:
 
@@ -185,3 +180,14 @@ Then, if you right click on one of the signals in the 'Time' column, select ``Da
 .. figure:: /_static/simx_mirror.png
 
 Because in the ``Mirror`` case there are no unique nets inside the core (we are just connecting inputs to outputs), there are no interesting signals for us to look at inside it.
+
+If we instead run:
+
+.. code-block:: bash
+
+    # `nco` is a quad VCO with 4 wave types
+    pdm dsp sim --dsp-core=nco --trace-fst
+
+And then open up ``sim-i2s-outputs.svg``, you will see sine, saw, triangle and square waves all phase modulated by the channel 0 sine wave input:
+
+.. figure:: /_static/nco.png
