@@ -89,19 +89,17 @@ class MAC(wiring.Component):
             "valid": Out(1),
         } | attrs)
 
-    def Multiply(self, m, a, b):
+    def Multiply(self, m, **operands):
         """
         Contents of an FSM state, computing `z = a*b`.
-        Ensure a, b will NOT change until the operation completes.
+        Ensure operands will NOT change until the operation completes.
 
         Returns a context object which may be used to perform more
         actions in the same clock the MAC is complete.
         """
-        m.d.comb += [
-            self.operands.a.eq(a),
-            self.operands.b.eq(b),
-            self.strobe.eq(1),
-        ]
+        for name, value in operands.items():
+            m.d.comb += getattr(self.operands, name).eq(value)
+        m.d.comb += self.strobe.eq(1)
         return m.If(self.valid)
 
     def default():
