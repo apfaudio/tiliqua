@@ -44,8 +44,11 @@ with the 'server' DSP tile busy for N out of N+1 of those clocks.
 from amaranth import *
 from amaranth.lib import data, enum, wiring
 from amaranth.lib.wiring import In, Out
+from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
+
+from dataclasses import dataclass
 
 from . import ASQ
 
@@ -61,17 +64,17 @@ class MAC(wiring.Component):
     Subclasses use this through :py:`mac.Multiply(m, ...)`
     """
 
-    def __init__(self, mtype = SQNative, **kwargs):
+    def __init__(self, mtype = SQNative, attrs={}):
         super().__init__({
             "a": In(mtype),
             "b": In(mtype),
-            "z": Out(fixed.SQ(mtype.i_bits*2, mtype.f_bits*2))
+            "z": Out(fixed.SQ(mtype.i_bits*2, mtype.f_bits*2)),
             # Assert strobe when a, b are valid. Keep a, b
             # valid and strobe asserted until `valid` is strobed,
             # at which point z can be considered valid.
             "strobe": Out(1),
             "valid": Out(1),
-        }, **kwargs)
+        } | attrs)
 
     def Multiply(self, m, a, b):
         """
@@ -109,36 +112,47 @@ class MuxMAC(MAC):
         ]
         return m
 
-class RingMessage(data.Struct):
+class RingMessageKind(enum.Enum, shape=unsigned(1)):
+    INVALID     = 0
+    VALID       = 1
 
+class RingMessageSource(enum.Enum, shape=unsigned(1)):
+    CLIENT     = 0
+    SERVER     = 1
+
+@dataclass
+class RingMeta:
     """
-    Layout of a single message on a message ring.
-    This message may be populated by a client or
-    a server.
+    Metadata associated with a RingMessageLayout.
     """
+    tag_bits: int
+    payload_type_client: data.StructLayout
+    payload_type_server: data.StructLayout
 
-    class Kind(enum.Enum, shape=unsigned(1)):
-        INVALID     = 0
-        VALID       = 1
+    @property
+    def max_clients(self):
+        return 1 << self.tag_bits
 
-    class Source(enum.Enum, shape=unsigned(1)):
-        CLIENT     = 0
-        SERVER     = 1
+def RingMessageLayout(meta: RingMeta):
+    """
+    Factory function for creating a message ring message layout.
+    This message may be populated by a client or a server.
 
-    def __init__(self,
-                 max_clients,
-                 payload_client: data.Struct,
-                 payload_server: data.Struct):
-        self.tag_bits = exact_log2(max_clients)
-        super().__init__({
-            "source"  : Source,
-            "kind"    : Kind,
-            "tag"     : unsigned(tag_bits),
-            "payload" : data.UnionLayout({
-                "client": payload_client,
-                "server": payload_server,
-            }),
-        }
+    Returns a data.StructLayout configured for the given metadata.
+    The layout also has a .meta attribute containing the RingMeta.
+    """
+    layout = data.StructLayout({
+        "source"  : RingMessageSource,
+        "kind"    : RingMessageKind,
+        "tag"     : unsigned(meta.tag_bits),
+        "payload" : data.UnionLayout({
+            "client": meta.payload_type_client,
+            "server": meta.payload_type_server,
+        }),
+    })
+
+    layout.meta = meta
+    return layout
 
 class RingSignature(wiring.Signature):
 
@@ -147,10 +161,10 @@ class RingSignature(wiring.Signature):
     Messages shift in on :py:`i` and out on :py:`o`.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, msg_layout: data.StructLayout):
         super().__init__({
-            "i":  In(RingMessage(**kwargs)),
-            "o":  Out(RingMessage(**kwargs)),
+            "i":  In(msg_layout),
+            "o":  Out(msg_layout),
         })
 
 class RingMAC(MAC):
@@ -177,12 +191,12 @@ class RingMAC(MAC):
     instantiated inside this :py:`RingMAC`.
     """
 
-    def __init__(self, tag: int, **kwargs):
+    def __init__(self, tag: int, msg_layout: data.StructLayout):
         self.tag = tag
-        self.ring_client = RingClient(**kwargs)
-        # TODO mtype = self.ring_client.i.signature.type
-        super().__init__(mtype=mtype, {
-            "ring": Out(RingSignature(**kwargs)),
+        self.ring_client = RingClient(msg_layout)
+        mtype = self.ring_client.i.a.shape()
+        super().__init__(mtype=mtype, attrs={
+            "ring": Out(RingSignature(msg_layout)),
         })
 
     def elaborate(self, platform):
@@ -221,14 +235,14 @@ class RingClient(wiring.Component):
     :py:`valid` until an appropriate response has arrived.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, msg_layout: data.StructLayout):
         super().__init__({
-            "ring":   Out(RingSignature(**kwargs)),
+            "ring":   Out(RingSignature(msg_layout)),
 
-            "i":      In(RingMessage.MulClientPayload),
-            "o":      Out(RingMessage.MulServerPayload),
+            "i":      In(msg_layout.meta.payload_type_client),
+            "o":      Out(msg_layout.meta.payload_type_server),
 
-            "tag":    In(RingMessage.TAG_BITS),
+            "tag":    In(unsigned(msg_layout.meta.tag_bits)),
             "strobe": In(1),
             "valid":  Out(1),
         })
@@ -247,17 +261,17 @@ class RingClient(wiring.Component):
         # TODO: latch message after strobe until bus free?
         # => not really needed assuming current contract in MAC() baseclass.
 
-        with m.If((ring.i.kind == RingMessage.Kind.INVALID) & self.strobe & ~wait):
+        with m.If((ring.i.kind == RingMessageKind.INVALID) & self.strobe & ~wait):
             m.d.sync += [
                 wait.eq(1),
-                ring.o.source.eq(RingMessage.Source.CLIENT),
-                ring.o.kind.eq(RingMessage.Kind.VALID),
+                ring.o.source.eq(RingMessageSource.CLIENT),
+                ring.o.kind.eq(RingMessageKind.VALID),
                 ring.o.tag.eq(self.tag),
                 ring.o.payload.client.eq(self.i),
             ]
 
-        with m.If((ring.i.kind == RingMessage.Kind.VALID) &
-                  (ring.i.source == RingMessage.Source.SERVER) &
+        with m.If((ring.i.kind == RingMessageKind.VALID) &
+                  (ring.i.source == RingMessageSource.SERVER) &
                   (ring.i.tag == self.tag) &
                   wait):
 
@@ -267,7 +281,7 @@ class RingClient(wiring.Component):
             ]
 
             m.d.sync += [
-                ring.o.kind.eq(RingMessage.Kind.INVALID),
+                ring.o.kind.eq(RingMessageKind.INVALID),
                 wait.eq(0),
             ]
 
@@ -286,15 +300,26 @@ class RingMACServer(wiring.Component):
     is instantiated to serve requests.
     """
 
-    def __init__(self):
+    def __init__(self, max_clients=16, mtype=SQNative):
         self.clients = []
+        meta = RingMeta(
+            tag_bits=exact_log2(max_clients),
+            payload_type_client=data.StructLayout({
+                "a": mtype,
+                "b": mtype,
+            }),
+            payload_type_server=data.StructLayout({
+                "z": fixed.SQ(mtype.i_bits*2, mtype.f_bits*2),
+            }),
+        )
+        self.msg_layout = RingMessageLayout(meta)
         super().__init__({
-            "ring": Out(RingSignature())
+            "ring": Out(RingSignature(self.msg_layout))
         })
 
     def new_client(self):
-        self.clients.append(RingMAC())
-        assert len(self.clients) <= 2**RingMessage.TAG_BITS
+        assert len(self.clients) < self.msg_layout.meta.max_clients
+        self.clients.append(RingMAC(tag=len(self.clients), msg_layout=self.msg_layout))
         return self.clients[-1]
 
     def elaborate(self, platform):
@@ -322,13 +347,13 @@ class RingMACServer(wiring.Component):
 
         # Respond to MAC requests
 
-        with m.If((ring.i.kind == RingMessage.Kind.MUL) &
-                  (ring.i.source == RingMessage.Source.CLIENT)):
+        with m.If((ring.i.kind == RingMessageKind.VALID) &
+                  (ring.i.source == RingMessageSource.CLIENT)):
             m.d.sync += [
-                ring.o.source.eq(RingMessage.Source.SERVER),
-                ring.o.payload.mul_server.z.eq(
-                    ring.i.payload.mul_client.a *
-                    ring.i.payload.mul_client.b),
+                ring.o.source.eq(RingMessageSource.SERVER),
+                ring.o.payload.server.z.eq(
+                    ring.i.payload.client.a *
+                    ring.i.payload.client.b),
             ]
 
         return m
