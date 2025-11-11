@@ -64,17 +64,32 @@ class MAC(wiring.Component):
     Subclasses use this through :py:`mac.Multiply(m, ...)`
     """
 
+    @staticmethod
+    def operand(mtype):
+        return {
+            "a": mtype,
+            "b": mtype,
+        }
+
+    @staticmethod
+    def result(mtype):
+        return {
+            "z": fixed.SQ(mtype.i_bits*2, mtype.f_bits*2),
+        }
+
     def __init__(self, mtype = SQNative, attrs={}):
-        super().__init__({
-            "a": In(mtype),
-            "b": In(mtype),
-            "z": Out(fixed.SQ(mtype.i_bits*2, mtype.f_bits*2)),
-            # Assert strobe when a, b are valid. Keep a, b
-            # valid and strobe asserted until `valid` is strobed,
-            # at which point z can be considered valid.
-            "strobe": Out(1),
-            "valid": Out(1),
-        } | attrs)
+        sig = {}
+        for name, field_type in self.operand(mtype).items():
+            sig[name] = In(field_type)
+        for name, field_type in self.result(mtype).items():
+            sig[name] = Out(field_type)
+        # Assert strobe when a, b are valid. Keep a, b
+        # valid and strobe asserted until `valid` is strobed,
+        # at which point z can be considered valid.
+        sig["strobe"] = Out(1)
+        sig["valid"] = Out(1)
+
+        super().__init__(sig | attrs)
 
     def Multiply(self, m, a, b):
         """
@@ -126,12 +141,20 @@ class RingMeta:
     Metadata associated with a RingMessageLayout.
     """
     tag_bits: int
-    payload_type_client: data.StructLayout
-    payload_type_server: data.StructLayout
+    payload_fields_client: dict
+    payload_fields_server: dict
 
     @property
     def max_clients(self):
         return 1 << self.tag_bits
+
+    @property
+    def payload_type_client(self):
+        return data.StructLayout(self.payload_fields_client)
+
+    @property
+    def payload_type_server(self):
+        return data.StructLayout(self.payload_fields_server)
 
 def RingMessageLayout(meta: RingMeta):
     """
@@ -304,13 +327,8 @@ class RingMACServer(wiring.Component):
         self.clients = []
         meta = RingMeta(
             tag_bits=exact_log2(max_clients),
-            payload_type_client=data.StructLayout({
-                "a": mtype,
-                "b": mtype,
-            }),
-            payload_type_server=data.StructLayout({
-                "z": fixed.SQ(mtype.i_bits*2, mtype.f_bits*2),
-            }),
+            payload_fields_client=MAC.operand(mtype),
+            payload_fields_server=MAC.result(mtype),
         )
         self.msg_layout = RingMessageLayout(meta)
         super().__init__({
