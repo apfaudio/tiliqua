@@ -113,12 +113,12 @@ class BlockLPF(wiring.Component):
 
             with m.State("MAC1"):
                 with mp.Multiply(m, a=mem_rd.data, b=self.beta):
-                    m.d.sync += mem_wr.data.eq(mp.z)
+                    m.d.sync += mem_wr.data.eq(mp.result.z)
                     m.next = "MAC2"
 
             with m.State("MAC2"):
                 with mp.Multiply(m, a=l_in, b=(fixed.Const(1.0, shape=self.shape, clamp=True)-self.beta)):
-                    m.d.sync += mem_wr.data.eq(mem_wr.data + mp.z)
+                    m.d.sync += mem_wr.data.eq(mem_wr.data + mp.result.z)
                     m.next = "UPDATE"
 
             with m.State("UPDATE"):

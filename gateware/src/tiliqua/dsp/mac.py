@@ -54,6 +54,7 @@ from . import ASQ
 
 # Native 18-bit multiplier type.
 SQNative = fixed.SQ(3, ASQ.f_bits)
+SQRNative = fixed.SQ(SQNative.i_bits*2, SQNative.f_bits*2)
 
 class MAC(wiring.Component):
 
@@ -65,31 +66,28 @@ class MAC(wiring.Component):
     """
 
     @staticmethod
-    def operand(mtype):
-        return {
+    def operands_layout(mtype):
+        return data.StructLayout({
             "a": mtype,
             "b": mtype,
-        }
+        })
 
     @staticmethod
-    def result(mtype):
-        return {
+    def result_layout(mtype):
+        return data.StructLayout({
             "z": fixed.SQ(mtype.i_bits*2, mtype.f_bits*2),
-        }
+        })
 
     def __init__(self, mtype = SQNative, attrs={}):
-        sig = {}
-        for name, field_type in self.operand(mtype).items():
-            sig[name] = In(field_type)
-        for name, field_type in self.result(mtype).items():
-            sig[name] = Out(field_type)
-        # Assert strobe when a, b are valid. Keep a, b
-        # valid and strobe asserted until `valid` is strobed,
-        # at which point z can be considered valid.
-        sig["strobe"] = Out(1)
-        sig["valid"] = Out(1)
-
-        super().__init__(sig | attrs)
+        super().__init__({
+            "operands": In(MAC.operands_layout(mtype)),
+            "result": Out(MAC.result_layout(mtype)),
+            # Assert strobe when operands are valid. Keep operands
+            # valid and strobe asserted until `valid` is strobed,
+            # at which point result can be considered valid.
+            "strobe": Out(1),
+            "valid": Out(1),
+        } | attrs)
 
     def Multiply(self, m, a, b):
         """
@@ -100,8 +98,8 @@ class MAC(wiring.Component):
         actions in the same clock the MAC is complete.
         """
         m.d.comb += [
-            self.a.eq(a),
-            self.b.eq(b),
+            self.operands.a.eq(a),
+            self.operands.b.eq(b),
             self.strobe.eq(1),
         ]
         return m.If(self.valid)
@@ -122,7 +120,7 @@ class MuxMAC(MAC):
     def elaborate(self, platform):
         m = Module()
         m.d.comb += [
-            self.z.eq(self.a * self.b),
+            self.result.z.eq(self.operands.a * self.operands.b),
             self.valid.eq(1),
         ]
         return m
@@ -141,20 +139,12 @@ class RingMeta:
     Metadata associated with a RingMessageLayout.
     """
     tag_bits: int
-    payload_fields_client: dict
-    payload_fields_server: dict
+    payload_type_client: data.StructLayout
+    payload_type_server: data.StructLayout
 
     @property
     def max_clients(self):
         return 1 << self.tag_bits
-
-    @property
-    def payload_type_client(self):
-        return data.StructLayout(self.payload_fields_client)
-
-    @property
-    def payload_type_server(self):
-        return data.StructLayout(self.payload_fields_server)
 
 def RingMessageLayout(meta: RingMeta):
     """
@@ -217,7 +207,7 @@ class RingMAC(MAC):
     def __init__(self, tag: int, msg_layout: data.StructLayout):
         self.tag = tag
         self.ring_client = RingClient(msg_layout)
-        mtype = self.ring_client.i.a.shape()
+        mtype = msg_layout.meta.payload_type_client["a"].shape
         super().__init__(mtype=mtype, attrs={
             "ring": Out(RingSignature(msg_layout)),
         })
@@ -232,10 +222,9 @@ class RingMAC(MAC):
 
         m.d.comb += [
             self.ring_client.tag.eq(self.tag),
-            self.ring_client.i.a.eq(self.a),
-            self.ring_client.i.b.eq(self.b),
+            self.ring_client.i.eq(self.operands),
             self.ring_client.strobe.eq(self.strobe),
-            self.z.eq(self.ring_client.o.z),
+            self.result.eq(self.ring_client.o),
             self.valid.eq(self.ring_client.valid),
         ]
 
@@ -327,8 +316,8 @@ class RingMACServer(wiring.Component):
         self.clients = []
         meta = RingMeta(
             tag_bits=exact_log2(max_clients),
-            payload_fields_client=MAC.operand(mtype),
-            payload_fields_server=MAC.result(mtype),
+            payload_type_client=MAC.operands_layout(mtype),
+            payload_type_server=MAC.result_layout(mtype),
         )
         self.msg_layout = RingMessageLayout(meta)
         super().__init__({
@@ -358,18 +347,13 @@ class RingMACServer(wiring.Component):
         for n in range(len(self.clients)-1):
             m.d.comb += self.clients[n+1].ring.i.eq(self.clients[n].ring.o)
 
-        # Assign client tag IDs
-
-        for n in range(len(self.clients)):
-            m.d.comb += self.clients[n].tag.eq(n)
-
         # Respond to MAC requests
 
         with m.If((ring.i.kind == RingMessageKind.VALID) &
                   (ring.i.source == RingMessageSource.CLIENT)):
             m.d.sync += [
                 ring.o.source.eq(RingMessageSource.SERVER),
-                ring.o.payload.server.z.eq(
+                ring.o.payload.server.eq(
                     ring.i.payload.client.a *
                     ring.i.payload.client.b),
             ]

@@ -143,8 +143,8 @@ class DWO(wiring.Component):
             with m.State('MAC'):
                 with mp.Multiply(m, a=(x1+x2), b=C):
                     m.d.sync += [
-                        x1.eq(mp.z - x2),
-                        x2.eq(mp.z + x1),
+                        x1.eq(mp.result.z - x2),
+                        x2.eq(mp.result.z + x1),
                     ]
                     m.next = 'WAIT-READY'
 
