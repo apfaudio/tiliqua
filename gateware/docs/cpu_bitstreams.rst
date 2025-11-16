@@ -42,6 +42,20 @@ As with other bitstreams, you may want to add some flags depending on what you w
 
     $ pdm xbeam build --fs-192khz --modeline 1920x1080p30
 
+Flashing, Logs
+--------------
+
+This can then be flashed straight to a bitstream slot as previously seen. Sometimes, you'll want to see the serial traffic emitted by the CPU in ``info!`` or other logging statements, for example:
+
+.. code-block:: bash
+
+   # Open the RP2040 serial port in one terminal, use whatever serial client you like
+   $ picocom -b 115200 /dev/ttyACM0
+   # In another terminal, flash the bitstream
+   $ pdm flash archive build/xbeam-r5/xbeam*.tar.gz --slot 6 --noconfirm
+   # First, you'll see a bunch of logs from the bootloader.
+   # On selecting this bitstream, you'll see the logs from loading and then running it.
+
 Faster builds - only updating firmware
 --------------------------------------
 

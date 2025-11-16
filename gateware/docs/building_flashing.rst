@@ -159,3 +159,17 @@ Flash Status
    pdm flash status
 
 This will dump every manifest currently flashed to Tiliqua, so you can see what is flashed in which slot. This command simply does a readback, it does not write to the SPI flash.
+
+Debug / Serial logs
+-------------------
+
+When Tiliqua is plugged in, you may notice some extra serial ports appear. Tiliqua's bootloader (and some user bitstreams, if they include a CPU) have a logger that will emit serial traffic on one of the FPGA pins.
+
+By default, the RP2040 includes (in addition to the ``dirtyJtag`` adapter) a usb-to-serial CDC device. Upon opening it and restarting the bootloader (by holding down the encoder for 3sec), you will see a full log of some of the decision the bootloader has made, for example a list of all the bitstreams it found, any errors occuring during bitstream loading, or how it determined the current screen resolution. At the moment, only 115200 baud is supported. On Linux, I like to use ``picocom``, for example:
+
+.. code-block:: bash
+
+   $ picocom -b 115200 /dev/ttyACM0
+   <... logs from Tiliqua appear here...>
+
+However, you're free to use any serial client. Note that the special baud rate ``1200`` will reset the RP2040 and put it back in its bootloader. You probably don't want that under normal use, but it can be useful if you don't want unscrew Tiliqua from a rack to be able to press the BOOTSEL button for RP2040 updates. Technical details on the role of the RP2040 in the bootloading process and updating it can be found in :doc:`bootloader`
