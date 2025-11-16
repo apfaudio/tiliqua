@@ -154,7 +154,7 @@ class RingMAC(MAC):
         self.ring_client = ringnoc.Client(cfg)
         mtype = cfg.payload_type_client["a"].shape
         super().__init__(mtype=mtype, attrs={
-            "ring": Out(ringnoc.Signature(cfg)),
+            "ring": Out(ringnoc.NodeSignature(cfg)),
         })
 
     def elaborate(self, platform):

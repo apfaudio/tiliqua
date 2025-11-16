@@ -4,12 +4,28 @@
 #
 
 """
-Basic 'Message Ring' Network-on-Chip (NoC) implementation.
+'Message Ring' Network-on-Chip (NoC) implementation.
 
-Provides message ring components for connecting clients and a server
-in a circular shift register topology. This enables efficient resource
-sharing (e.g., DSP tiles) across many components without consuming
-huge multiplexers or routing resources.
+Components for connecting N 'clients' and 1 'server' in a circular shift
+register topology. This enables efficient resource sharing (e.g., DSP tiles)
+across many components without needing huge muxes. For example:
+
+    .. code-block:: text
+
+        ┌───────┐  ┌───────┐  ┌───────┐  ┌───────┐
+        │client0┼──►client1┼──►client2┼──►client3│
+        └───▲───┘  └───────┘  └───────┘  └───┬───┘
+            │                                │
+            │            ┌──────┐            │
+            └────────────┼server│◄───────────┘
+                         └──────┘
+
+On the message ring, messages are shifted in a large circular shift register
+by one node every clock. Each message is of layout ``Config.msg_layout``.
+
+To use this, you will want to create your components building on ``ringnoc.Client``
+and ``ringnoc.Server``. An example of this (sharing DSP tiles) is found in
+this repository as ``mac.RingMAC`` (client) and ``mac.RingMACServer``.
 """
 
 from dataclasses import dataclass
@@ -19,20 +35,29 @@ from amaranth.lib import data, enum, wiring
 from amaranth.lib.wiring import In, Out
 
 class MessageKind(enum.Enum, shape=unsigned(1)):
+    # This message may be ignored.
     INVALID     = 0
+    # This message must be forwarded (by clients)
+    # or processed (by the server)
     VALID       = 1
 
 class MessageSource(enum.Enum, shape=unsigned(1)):
+    # This message came from a Client.
     CLIENT     = 0
+    # This message is the Server responding to a Client
     SERVER     = 1
 
 @dataclass
 class Config:
     """
-    Metadata associated with a message ring.
+    Configuration (message layout) of a message ring.
     """
+    # Number of bits in unique message tag. Affects the maximum
+    # number of clients on the ring.
     tag_bits: int
+    # Data in a client message (shifted out by clients)
     payload_type_client: data.StructLayout
+    # Data in a server message (shifted out by the server)
     payload_type_server: data.StructLayout
 
     @property
@@ -41,12 +66,6 @@ class Config:
 
     @property
     def msg_layout(self):
-        """
-        Message ring message layout.
-        This message may be populated by a client or a server on the NoC.
-
-        Returns a data.StructLayout configured for this metadata.
-        """
         return data.StructLayout({
             "source"  : MessageSource,
             "kind"    : MessageKind,
@@ -57,11 +76,14 @@ class Config:
             }),
         })
 
-class Signature(wiring.Signature):
+class NodeSignature(wiring.Signature):
 
     """
-    Connection of a Client or Server to a message ring.
-    Messages shift in on :py:`i` and out on :py:`o`.
+    Both Client and Server nodes must have these connections in order to participate
+    in the message ring.
+
+    Messages shift in on :py:`i` and out on :py:`o`. ``Server`` is currently responsible
+    for connecting these as appropriate after all ``Client`` instances are created.
     """
 
     def __init__(self, cfg: Config):
@@ -73,11 +95,10 @@ class Signature(wiring.Signature):
 class Client(wiring.Component):
 
     """
-    Message ring client participant.
+    Client node. Nominally transparent (shifting incoming messages
+    to outgoing messages unmodified).
 
-    :py:`ring` should connect to the ring bus.
-
-    To issue a request, :py:`i` and :py:`tag` should be set,
+    To issue a request, :py:`i` should be set,
     and :py:`strobe` asserted, until :py:`valid` is asserted. On
     the same clock that :py:`valid` is asserted, :py:`o` contains
     the answer from the server to our request.
@@ -89,16 +110,21 @@ class Client(wiring.Component):
 
     def __init__(self, cfg: Config):
         super().__init__({
-            # Connection to Ring NoC
-            "ring":   Out(Signature(cfg)),
+            # Connection to Ring NoC (`Server` handles this)
+            "ring":   Out(NodeSignature(cfg)),
 
-            # Connections to the NoC participant (your logic).
-            "i":      In(cfg.payload_type_client),
-            "o":      Out(cfg.payload_type_server),
+            # Connections to your logic.
 
+            # Unique ID of this client. Must be set by a superclass.
             "tag":    In(unsigned(cfg.tag_bits)),
+
+            # Outgoing request shifted out to server
+            "i":      In(cfg.payload_type_client),
             "strobe": In(1),
+
+            # Incoming request arriving from server
             "valid":  Out(1),
+            "o":      Out(cfg.payload_type_server),
         })
 
     def elaborate(self, platform):
@@ -115,6 +141,7 @@ class Client(wiring.Component):
         # TODO: latch message after strobe until bus free?
         # => not really needed assuming current contract in MAC() baseclass.
 
+        # Client: If no pending message on our input, we can shift a message out onto the ring.
         with m.If((ring.i.kind == MessageKind.INVALID) & self.strobe & ~wait):
             m.d.sync += [
                 wait.eq(1),
@@ -124,6 +151,7 @@ class Client(wiring.Component):
                 ring.o.payload.client.eq(self.i),
             ]
 
+        # Client: If a message arrives from the server with our tag, we can consume it.
         with m.If((ring.i.kind == MessageKind.VALID) &
                   (ring.i.source == MessageSource.SERVER) &
                   (ring.i.tag == self.tag) &
@@ -143,29 +171,20 @@ class Client(wiring.Component):
 
 class Server(wiring.Component):
     """
-    Generic message ring server that manages the ring topology and processes requests.
+    Process client requests. This component also manages the ring topology by
+    creating clients and wiring them into a ring. When a valid client message
+    arrives, ``process_request`` is used to compute a response.
 
-    Takes a list of clients and wires them into a ring. When a VALID CLIENT message
-    arrives, calls the process_request callback to compute the response.
-
-    The process_request callback receives the Module and client payload, and should
-    return the server payload expression.
+    ``client_class`` can be any class that exposes a ``NodeSignature``, as
+    long as it has a constructor that can take ``tag: int`` and ``cfg: Config``.
+    A new instance of this is created whenever the user calls ``new_client``.
     """
 
     def __init__(self, cfg: Config, process_request, client_class):
-        """
-        Args:
-            cfg: Ring configuration (defines message layout, max clients, etc)
-            process_request: Callback function(m, client_payload) -> server_payload
-            client_class: Class to instantiate for new clients (called with tag=, cfg=)
-        """
         self.cfg = cfg
         self.client_class = client_class
         self.clients = []
         self.process_request = process_request
-        super().__init__({
-            "ring": Out(Signature(cfg))
-        })
 
     def new_client(self):
         """Create and add a new client to the ring."""
@@ -180,12 +199,13 @@ class Server(wiring.Component):
 
         assert len(self.clients) > 0, "Server must have at least one client"
 
-        ring = self.ring
+        # The Server's own ring connections (i / o)
+        ring = NodeSignature(self.cfg).create()
 
-        # Default: pass messages through
+        # Server: default behavior: pass messages through
         m.d.sync += ring.o.eq(ring.i)
 
-        # Wire up the ring topology
+        # Wire up all clients in a ring, inserting ourselves at the end.
         m.d.comb += [
             self.clients[0].ring.i.eq(ring.o),
             ring.i.eq(self.clients[-1].ring.o),
@@ -193,7 +213,7 @@ class Server(wiring.Component):
         for n in range(len(self.clients)-1):
             m.d.comb += self.clients[n+1].ring.i.eq(self.clients[n].ring.o)
 
-        # Process incoming CLIENT requests
+        # Server: valid client message: respond to it.
         with m.If((ring.i.kind == MessageKind.VALID) &
                   (ring.i.source == MessageSource.CLIENT)):
             result = self.process_request(m, ring.i.payload.client)
