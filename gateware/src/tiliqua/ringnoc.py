@@ -140,3 +140,66 @@ class Client(wiring.Component):
             ]
 
         return m
+
+class Server(wiring.Component):
+    """
+    Generic message ring server that manages the ring topology and processes requests.
+
+    Takes a list of clients and wires them into a ring. When a VALID CLIENT message
+    arrives, calls the process_request callback to compute the response.
+
+    The process_request callback receives the Module and client payload, and should
+    return the server payload expression.
+    """
+
+    def __init__(self, cfg: Config, process_request, client_class):
+        """
+        Args:
+            cfg: Ring configuration (defines message layout, max clients, etc)
+            process_request: Callback function(m, client_payload) -> server_payload
+            client_class: Class to instantiate for new clients (called with tag=, cfg=)
+        """
+        self.cfg = cfg
+        self.client_class = client_class
+        self.clients = []
+        self.process_request = process_request
+        super().__init__({
+            "ring": Out(Signature(cfg))
+        })
+
+    def new_client(self):
+        """Create and add a new client to the ring."""
+        tag = len(self.clients)
+        assert len(self.clients) < self.cfg.max_clients
+        client = self.client_class(tag=tag, cfg=self.cfg)
+        self.clients.append(client)
+        return client
+
+    def elaborate(self, platform):
+        m = Module()
+
+        assert len(self.clients) > 0, "Server must have at least one client"
+
+        ring = self.ring
+
+        # Default: pass messages through
+        m.d.sync += ring.o.eq(ring.i)
+
+        # Wire up the ring topology
+        m.d.comb += [
+            self.clients[0].ring.i.eq(ring.o),
+            ring.i.eq(self.clients[-1].ring.o),
+        ]
+        for n in range(len(self.clients)-1):
+            m.d.comb += self.clients[n+1].ring.i.eq(self.clients[n].ring.o)
+
+        # Process incoming CLIENT requests
+        with m.If((ring.i.kind == MessageKind.VALID) &
+                  (ring.i.source == MessageSource.CLIENT)):
+            result = self.process_request(m, ring.i.payload.client)
+            m.d.sync += [
+                ring.o.source.eq(MessageSource.SERVER),
+                ring.o.payload.server.eq(result),
+            ]
+
+        return m

@@ -175,10 +175,9 @@ class RingMAC(MAC):
 
         return m
 
-class RingMACServer(wiring.Component):
-
+def RingMACServer(max_clients=16, mtype=SQNative):
     """
-    MAC message ring server and connections between clients.
+    Factory function for creating a MAC message ring server.
 
     Prior to elaboration, :py:`new_client()` may be used to
     add additional client nodes to this ring.
@@ -186,51 +185,16 @@ class RingMACServer(wiring.Component):
     During elaboration, all clients (and this server) are
     connected in a ring, and a single shared DSP tile
     is instantiated to serve requests.
-    """
 
-    def __init__(self, max_clients=16, mtype=SQNative):
-        self.clients = []
-        self.cfg = ringnoc.Config(
+    Returns:
+        ringnoc.Server configured for MAC operations
+    """
+    return ringnoc.Server(
+        cfg=ringnoc.Config(
             tag_bits=exact_log2(max_clients),
             payload_type_client=MAC.operands_layout(mtype),
             payload_type_server=MAC.result_layout(mtype),
-        )
-        super().__init__({
-            "ring": Out(ringnoc.Signature(self.cfg))
-        })
-
-    def new_client(self):
-        assert len(self.clients) < self.cfg.max_clients
-        self.clients.append(RingMAC(tag=len(self.clients), cfg=self.cfg))
-        return self.clients[-1]
-
-    def elaborate(self, platform):
-        m = Module()
-
-        ring = self.ring
-
-        m.d.sync += [
-            ring.o.eq(ring.i)
-        ]
-
-        # Create the ring (TODO better ordering heuristics?)
-
-        m.d.comb += [
-            self.clients[0].ring.i.eq(ring.o),
-            ring.i.eq(self.clients[-1].ring.o),
-        ]
-        for n in range(len(self.clients)-1):
-            m.d.comb += self.clients[n+1].ring.i.eq(self.clients[n].ring.o)
-
-        # Respond to MAC requests
-
-        with m.If((ring.i.kind == ringnoc.MessageKind.VALID) &
-                  (ring.i.source == ringnoc.MessageSource.CLIENT)):
-            m.d.sync += [
-                ring.o.source.eq(ringnoc.MessageSource.SERVER),
-                ring.o.payload.server.eq(
-                    ring.i.payload.client.a *
-                    ring.i.payload.client.b),
-            ]
-
-        return m
+        ),
+        process_request=lambda m, operands: operands.a * operands.b,
+        client_class=RingMAC,
+    )
