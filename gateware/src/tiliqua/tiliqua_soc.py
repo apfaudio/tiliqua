@@ -6,31 +6,32 @@
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 
 """
+At a very high level, we have a VexiiRiscv softcore running firmware (written
+in Rust), that interfaces with a bunch of peripherals through CSR registers,
+over a Wishbone bus.
+
 Background: Tiliqua SoC designs
 -------------------------------
 
-Many Tiliqua projects contain an SoC alongside the DSP logic, in an arrangement like this:
+For Tiliqua projects which contain an SoC alongside the DSP logic, they will often inherit
+from ``tiliqua.TiliquaSoc``, which is an Amaranth component which contains:
+
+    - A **CPU instance**: `VexiiRiscv <https://github.com/SpinalHDL/VexiiRiscv>`_
+    - Some **Peripheral cores**: For UART, I2C, SPI flash and more.
+    - An **SoC bus/CSR system**: for connecting the CPU to the various peripheral cores - in our case, a Wishbone bus as implemented by `amaranth-soc <https://github.com/amaranth-lang/amaranth-soc>`_
+    - Some **Video / DMA cores**: These are special peripheral cores that can directly access the system memory: useful for the video framebuffer, and for hardware-accelerated text/line drawing.
+    - **Build infrastructure** for automatically generating a PAC (Rust register declarations) from the SoC layout, building your custom firmware, and integrating it into the final design.
+
+A typical SoC design might look something like this:
 
 .. image:: /_static/tiliquasoc.png
   :width: 800
 
-Overview
-^^^^^^^^
+As shown above, ``TiliquaSoc`` may form the heart of a design, however it is
+extensible: in the above example, ``TiliquaSoc`` has been subclassed and
+a new ``Polysynth`` peripheral has been added, so that the CPU can see
+and tweak properties of a custom DSP pipeline.
 
-At a very high level, we have a vexriscv RISCV softcore running firmware (written
-in Rust), that interfaces with a bunch of peripherals through CSR registers. As
-the Vex also runs the menu system, often there is a dedicated peripheral with
-CSRs used to tweak parameters of the DSP pipeline.
-
-PSRAM
-^^^^^
-
-PSRAM bandwidth is important to keep under control. For this reason, the SoC
-only interfaces with the PSRAM for text/line draw operations. Normal instruction
-and data fetches are to a local SRAM and so do not touch external PSRAM (which
-is usually hammered with video traffic).
-
-TODO: describe each peripheral in detail
 """
 
 import os

@@ -3,7 +3,7 @@ Tutorial 3: Video cores (``top.beamrace``)
 
 .. warning::
 
-   This tutorial is not finished yet. It only contains the basics of building and simulating beamrace cores.
+   This tutorial is not finished yet.
 
 'Beamracing' is a simple method for creating interesting video patterns, by calculating the color of each pixel right before it is needed. It's especially well-suited to FPGAs as we can build custom logic just for computing the value of each pixel, at the full video clock rate.
 
@@ -83,3 +83,8 @@ These have the following structure:
 In this fashion, each core already has the current audio sample and position in the frame, as well as timing signals, to use for pattern generation.
 
 Note that all signals are already synchronized into the video domain, with the ``dvi`` domain already remapped to ``sync``, so from the perspective of your own pattern-generating core, you can do everything in the ``sync`` domain.
+
+TODO
+----
+
+Finish writing this.
