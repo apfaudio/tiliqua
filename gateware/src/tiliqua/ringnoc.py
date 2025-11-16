@@ -12,6 +12,7 @@ across many components without needing huge muxes. For example:
 
     .. code-block:: text
 
+          tag=0      tag=1      tag=2      tag=3
         ┌───────┐  ┌───────┐  ┌───────┐  ┌───────┐
         │client0┼──►client1┼──►client2┼──►client3│
         └───▲───┘  └───────┘  └───────┘  └───┬───┘
@@ -22,6 +23,17 @@ across many components without needing huge muxes. For example:
 
 On the message ring, messages are shifted in a large circular shift register
 by one node every clock. Each message is of layout ``Config.msg_layout``.
+
+A client may only send a message if there is an INVALID message being shifted
+into it. This keeps latency bounded and removes the need for extra storage.
+A server may 'respond' to a client message by shifting in the payload and
+shifting out the response. Each message contains a unique ``tag`` per client,
+so servers know where a request came from, and clients know if an incoming
+message is destined for it.
+
+Assuming all N clients send a request message in the same clock, and the
+server processes one request per clock, the result will arrive at all clients
+N+1 clocks later, with the server busy for N out of N+1 of those clocks.
 
 To use this, you will want to create your components building on ``ringnoc.Client``
 and ``ringnoc.Server``. An example of this (sharing DSP tiles) is found in
