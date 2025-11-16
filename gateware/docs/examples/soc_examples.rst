@@ -1,8 +1,6 @@
 SoC Projects
 ============
 
-.. automodule:: tiliqua.tiliqua_soc
-
 All Projects
 ------------
 

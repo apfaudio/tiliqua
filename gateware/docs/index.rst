@@ -23,14 +23,24 @@ Tiliqua is a **Eurorack Module**, which contains a debugger, FPGA and high-fidel
    quickstart/tlq_soldiercrab.rst
 
 .. toctree::
-   :caption: Development
+   :caption: Development Guide
    :maxdepth: 3
 
    install
-   gettingstarted/index
-   calibration
+   building_flashing
+   audio_bitstreams
+   custom_dsp
+   beamrace_video
+   cpu_bitstreams
    bootloader
+
+.. toctree::
+   :caption: Reference
+   :maxdepth: 3
+
    examples/index
+   dsp/index
+   calibration
 
 .. toctree::
    :caption: Hardware Details
@@ -39,19 +49,14 @@ Tiliqua is a **Eurorack Module**, which contains a debugger, FPGA and high-fidel
    hardware_design
    hardware_changes
 
-.. toctree::
-   :caption: Reference
-   :maxdepth: 3
-
-   dsp/index
 
 .. toctree::
    :caption: Keep Updated
    :maxdepth: 2
 
-   devlog/index
    community
    foss_funding
+   devlog/index
 
 .. toctree::
    :caption: Links
