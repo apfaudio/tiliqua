@@ -21,24 +21,6 @@ For audio rate signals, where sample rates are low and the desired
 amount of separate functional blocks is high, sharing DSP tiles is
 essential. Without sharing DSP tiles, multipliers are often the first
 FPGA resource (by far) to be exhausted.
-
-MAC Message Ring
-----------------
-
-Each node on the message ring nominally shifts its input message
-to its output. Each node is connected in a circular shift register,
-with N 'clients' (may ask MAC questions) and 1 'server' (may have
-a single DSP tile and respond to MAC questions). A client may
-only send a message if there is an INVALID message being shifted
-into it. This keeps latency bounded and removes the need for
-extra storage. A server may 'convert' a MAC question into a MAC
-answer by shifting in the question and shifting out the answer.
-Each message is tagged by the generator of the MAC question, so
-clients can identify and consume their own MAC answers.
-
-Assuming all N participants ask for a MAC computation on the same
-clock, the result will arrive at all participants N+1 clocks later,
-with the 'server' DSP tile busy for N out of N+1 of those clocks.
 """
 
 from amaranth import *
@@ -46,25 +28,25 @@ from amaranth.lib import data, enum, wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
-from amaranth_future import fixed
-
-from .. import ringnoc
-
 from dataclasses import dataclass
 
-from . import ASQ
+from amaranth_future import fixed
 
-# Native 18-bit multiplier type.
+from . import ASQ
+from .. import ringnoc
+
+# Maximum multiplier argument for native 18-bit multipliers..
 SQNative = fixed.SQ(3, ASQ.f_bits)
+# Maximum multiplier result for native 18-bit multipliers.
 SQRNative = fixed.SQ(SQNative.i_bits*2, SQNative.f_bits*2)
 
 class MAC(wiring.Component):
 
     """
-    Base class for MAC strategies.
-    Subclasses provide the concrete strategy.
+    Base class for MAC strategies. Subclasses provide the concrete strategy.
 
-    Subclasses use this through :py:`mac.Multiply(m, ...)`
+    Users of this component perform multiplications using :py:`MAC.Multiply(m, ...)`,
+    which may have different latency depending on the concrete strategy.
     """
 
     @staticmethod
@@ -93,11 +75,28 @@ class MAC(wiring.Component):
 
     def Multiply(self, m, **operands):
         """
-        Contents of an FSM state, computing `z = a*b`.
-        Ensure operands will NOT change until the operation completes.
+        Compute ``z = a*b``, returning a context object which is active
+        in the same clock that the answer is available on ``self.result.z``.
 
-        Returns a context object which may be used to perform more
-        actions in the same clock the MAC is complete.
+        Ensure operands do NOT change until the operation completes.
+
+        For example:
+
+        .. code-block:: python
+
+            s_a = fixed.Const(0.5, shape=mac.SQNative)
+            s_b = fixed.Const(0.25, shape=mac.SQNative)
+            s_z = Signal(ASQ)
+
+            with m.FSM() as fsm:
+                # ... some states ...
+                with m.State('MAC'):
+                    # Set up multiplication
+                    # Read as: ``m.If(result_available)``
+                    with mp.Multiply(m, a=s_a, b=s_b):
+                        m.d.sync += s_z.eq(mp.result.z)
+                        m.next = 'DONE'
+                # ... some more states ...
         """
         for name, value in operands.items():
             m.d.comb += getattr(self.operands, name).eq(value)
@@ -114,7 +113,10 @@ class MuxMAC(MAC):
     A Multiplexing MAC provider.
 
     Instantiates a single multiplier, shared between users of this
-    MuxMAC effectively using a Mux.
+    MuxMAC using time division multiplexing.
+
+    When sharing amongst lots of cores, the required multiplexer
+    size can quickly become unusably large.
     """
 
     def elaborate(self, platform):
@@ -137,8 +139,9 @@ class RingMAC(MAC):
 
     The common pattern here is that each functional block tends
     to use a single :py:`RingMAC`, even if it has multiple MAC
-    steps. That is, the :py:`RingMAC` itself is Mux'd, however
-    all requests land on the same shared bus.
+    steps. That is, the :py:`RingMAC` itself is Mux'd *within* a
+    core, however all requests land on the same shared bus
+    which is a message ring connecting *different* cores.
 
     This provides near-optimal scheduling for message rings composed
     of components that have the same state machines.
@@ -146,7 +149,9 @@ class RingMAC(MAC):
     Contains no multiplier, :py:`ring` must be hooked up to a
     message ring on which a :py:`RingMACServer` can be found.
     :py:`tag` MUST uniquely identify the underlying :py:`ringnoc.Client`
-    instantiated inside this :py:`RingMAC`.
+    instantiated inside this :py:`RingMAC`. If you are careful to only
+    use :py:`RingMACServer.new_client()` to create these, all of
+    these assumptions will be held.
     """
 
     def __init__(self, tag: int, cfg: ringnoc.Config):
@@ -177,14 +182,13 @@ class RingMAC(MAC):
 
 def RingMACServer(max_clients=16, mtype=SQNative):
     """
-    Factory function for creating a MAC message ring server.
+    Factory for creating a MAC message ring.
 
-    Prior to elaboration, :py:`new_client()` may be used to
+    Prior to elaboration, :py:`Server.new_client()` may be used to
     add additional client nodes to this ring.
 
-    During elaboration, all clients (and this server) are
-    connected in a ring, and a single shared DSP tile
-    is instantiated to serve requests.
+    During elaboration, all clients (and this server) are connected in
+    a ring, and a single shared DSP tile is instantiated to serve requests.
 
     Returns:
         ringnoc.Server configured for MAC operations
