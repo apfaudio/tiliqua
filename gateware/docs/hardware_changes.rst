@@ -23,6 +23,7 @@ R5.1 changes (compared to R4)
     - Add 33R series resistors on all expansion header pins.
     - Add more ESD protection to USB1/USB2 pins.
     - Pinswaps: see ``tiliqua_platform.py`` in the main repository.
+    - ECOs: Added 909R resistor in parallel with C34 to prevent backward leakage current across U9. All production units have this ECO applied.
 
 Tiliqua R4
 ==========

@@ -19,10 +19,10 @@ Pinouts and schematics
 
 We now follow with a summary of the core functions of each of the Tiliqua PCBAs.
 
-Tiliqua Motherboard
--------------------
+Tiliqua Motherboard (and panel)
+-------------------------------
 
-**Repository:** `tiliqua-motherboard <https://github.com/apfaudio/tiliqua/tree/main/hardware>`_
+**Repository:** `tiliqua-hardware <https://github.com/apfaudio/tiliqua-hardware>`_
 
 .. image:: _static/tiliqua_motherboard_without_som.jpg
   :width: 800
