@@ -74,19 +74,19 @@ class SVF(wiring.Component):
             with m.State('MAC0'):
                 # alp = abp*kK + alp
                 with mp.Multiply(m, a=abp, b=kK):
-                    m.d.sync += alp.eq(mp.z + alp)
+                    m.d.sync += alp.eq(mp.result.z + alp)
                     m.next = 'MAC1'
 
             with m.State('MAC1'):
                 # ahp = abp*-kQinv + (x - alp)
                 with mp.Multiply(m, a=abp, b=-kQinv):
-                    m.d.sync += ahp.eq(mp.z + (x - alp))
+                    m.d.sync += ahp.eq(mp.result.z + (x - alp))
                     m.next = 'MAC2'
 
             with m.State('MAC2'):
                 # abp = ahp*kK + abp
                 with mp.Multiply(m, a=ahp, b=kK):
-                    m.d.sync += abp.eq(mp.z + abp)
+                    m.d.sync += abp.eq(mp.result.z + abp)
                     m.next = 'OVER'
 
             with m.State('OVER'):
@@ -153,7 +153,7 @@ class DCBlock(wiring.Component):
 
             with m.State('MAC0'):
                 with mp.Multiply(m, a=y, b=kA):
-                    m.d.sync += acc.eq((acc - mp.z) + x)
+                    m.d.sync += acc.eq((acc - mp.result.z) + x)
                     m.next = 'WAIT-READY'
 
             with m.State('WAIT-READY'):

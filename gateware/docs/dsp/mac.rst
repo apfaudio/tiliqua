@@ -1,10 +1,12 @@
-MAC Operations
---------------
+Multiplier sharing (``dsp.mac``)
+--------------------------------
 
-Utilities for sharing FPGA DSP tiles.
+``dsp.mac``: DSP tile sharing
+#############################
 
-.. autoclass:: tiliqua.dsp.mac.MAC
-.. autoclass:: tiliqua.dsp.mac.MuxMAC
-.. autoclass:: tiliqua.dsp.mac.RingMAC
-.. autoclass:: tiliqua.dsp.mac.RingClient
-.. autoclass:: tiliqua.dsp.mac.RingMACServer
+.. automodule:: tiliqua.dsp.mac
+
+``ringnoc``: Message Ring implementation
+########################################
+
+.. automodule:: tiliqua.ringnoc

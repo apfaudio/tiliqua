@@ -105,12 +105,12 @@ class WaveShaper(wiring.Component):
 
             with m.State('MAC0'):
                 with mp.Multiply(m, a=read0, b=x-x.truncate()):
-                    m.d.sync += y.eq(mp.z)
+                    m.d.sync += y.eq(mp.result.z)
                     m.next = 'MAC1'
 
             with m.State('MAC1'):
                 with mp.Multiply(m, a=read1, b=(x.truncate()-x+1)):
-                    m.d.sync += self.o.payload.eq(y + mp.z)
+                    m.d.sync += self.o.payload.eq(y + mp.result.z)
                     m.next = 'WAIT-READY'
 
             with m.State('WAIT-READY'):
@@ -229,11 +229,11 @@ class PitchShift(wiring.Component):
                 m.next = 'MAC0'
             with m.State('MAC0'):
                 with mp.Multiply(m, a=sample0, b=env0):
-                    m.d.sync += self.o.payload.eq(mp.z)
+                    m.d.sync += self.o.payload.eq(mp.result.z)
                     m.next = 'MAC1'
             with m.State('MAC1'):
                 with mp.Multiply(m, a=sample1, b=env1):
-                    m.d.sync += self.o.payload.eq(self.o.payload + mp.z)
+                    m.d.sync += self.o.payload.eq(self.o.payload + mp.result.z)
                     m.next = 'WAIT-READY'
             with m.State('WAIT-READY'):
                 m.d.comb += self.o.valid.eq(1),

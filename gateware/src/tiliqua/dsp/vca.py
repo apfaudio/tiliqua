@@ -44,7 +44,7 @@ class VCA(wiring.Component):
 
             with m.State('MAC'):
                 with mp.Multiply(m, a=self.i.payload[0], b=self.i.payload[1]):
-                    m.d.sync += self.o.payload.eq(mp.z.saturate(self.o.payload.shape()))
+                    m.d.sync += self.o.payload.eq(mp.result.z.saturate(self.o.payload.shape()))
                     m.next = 'WAIT-READY'
 
             with m.State('WAIT-READY'):
