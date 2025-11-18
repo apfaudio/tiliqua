@@ -113,7 +113,14 @@ class MuxMAC(MAC):
     A Multiplexing MAC provider.
 
     Instantiates a single multiplier, shared between users of this
-    MuxMAC using time division multiplexing.
+    MuxMAC using time division multiplexing, as follows:
+
+    .. code-block:: text
+
+        a₁*b₁ ───►│                ├───► result₁
+        a₂*b₂ ───►├──►[DSP Tile]──►┼───► result₂
+        a₃*b₃ ───►│                ├───► result₃
+                 mux             demux
 
     When sharing amongst lots of cores, the required multiplexer
     size can quickly become unusably large.
@@ -130,21 +137,54 @@ class MuxMAC(MAC):
 class RingMAC(MAC):
 
     """
-    A message-ring-backed MAC provider.
-
-    Normally these should only be created from an existing server
-    using :py:`RingMACServer.new_client()`. This automatically
-    hooks up the :py:`ring` and :py:`tag` attributes, but does
-    NOT add it as a submodule for elaboration (you must do this).
+    A message-ring-backed MAC provider. DSP tiles are shared
 
     The common pattern here is that each functional block tends
     to use a single :py:`RingMAC`, even if it has multiple MAC
     steps. That is, the :py:`RingMAC` itself is Mux'd *within* a
     core, however all requests land on the same shared bus
-    which is a message ring connecting *different* cores.
+    which is a message ring connecting *different* cores. This
+    keeps multiplexers local to each core:
+
+    .. code-block:: text
+
+                          ┌─────────────────────────────┐
+                          │                             │
+        ┌─────────────────┼─────────────────────┐       │
+        │                 │                     │       │
+        │a₁b₁ ───►│       │        ├───► result₁│       │
+        │a₂b₂ ───►├──[RingClient]─►┼───► result₂│       │
+        │a₃b₃ ───►│       ▲        ├───► result₃│       │
+        │        mux      │      demux          │       │
+        └─────────────────┼─────────────────────┘       │
+        Component1        │                             │
+                          │                             │
+        ┌─────────────────┼─────────────────────┐       ▼
+        │                 │                     │   ┌──────────┐
+        │a₁b₁ ───►│       │        ├───► result₁│   │          │
+        │a₂b₂ ───►├──[RingClient]─►┼───► result₂│   │[DSP Tile]│
+        │a₃b₃ ───►│       ▲        ├───► result₃│   │          │
+        │        mux      │      demux          │   └──────────┘
+        └─────────────────┼─────────────────────┘   RingMACServer
+        Component2        │                             │
+                          │                             │
+        ┌─────────────────┼─────────────────────┐       │
+        │                 │                     │       │
+        │a₁b₁ ───►│       │        ├───► result₁│       │
+        │a₂b₂ ───►├──[RingClient]─►┼───► result₂│       │
+        │a₃b₃ ───►│       ▲        ├───► result₃│       │
+        │        mux      │      demux          │       │
+        └─────────────────┼─────────────────────┘       │
+        Component3        │                             │
+                          └─────────────────────────────┘
 
     This provides near-optimal scheduling for message rings composed
     of components that have the same state machines.
+
+    Normally these should only be created from an existing server
+    using :py:`RingMACServer.new_client()`. This automatically
+    hooks up the :py:`ring` and :py:`tag` attributes, but does
+    NOT add it as a submodule for elaboration (you must do this).
 
     Contains no multiplier, :py:`ring` must be hooked up to a
     message ring on which a :py:`RingMACServer` can be found.
@@ -185,13 +225,11 @@ def RingMACServer(max_clients=16, mtype=SQNative):
     Factory for creating a MAC message ring.
 
     Prior to elaboration, :py:`Server.new_client()` may be used to
-    add additional client nodes to this ring.
-
-    During elaboration, all clients (and this server) are connected in
+    add additional client nodes to this ring. During elaboration, all clients (and this server) are connected in
     a ring, and a single shared DSP tile is instantiated to serve requests.
 
     Returns:
-        ringnoc.Server configured for MAC operations
+        ringnoc.Server configured for DSP tile sharing of ``operands.a * operands.b``.
     """
     return ringnoc.Server(
         cfg=ringnoc.Config(
