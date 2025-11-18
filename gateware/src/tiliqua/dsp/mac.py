@@ -4,23 +4,22 @@
 #
 
 """
-Some utilities for resource-efficient MAC (multiply, accumulate)
-operations. This file provides mechanisms for sharing DSP tiles
-amongst multiple components using 2 different strategies:
-
-    1) :py:`MuxMAC`: One DSP tile is Mux'd in time. Latency relatively
-       low, however sharing >3x MACs quickly blows up resource usage.
-
-    2) :py:`RingMAC`: Message ring sharing. Multiple components (and
-       MACs) are connected in a message ring (essentially a large
-       circular shift register). On each ring, there is a single
-       DSP tile processing MAC requests. DSP tile throughput of
-       near 100% is still achievable, however latency is higher.
-
 For audio rate signals, where sample rates are low and the desired
 amount of separate functional blocks is high, sharing DSP tiles is
 essential. Without sharing DSP tiles, multipliers are often the first
-FPGA resource (by far) to be exhausted.
+FPGA resource to be exhausted.
+
+This file provides mechanisms for sharing DSP tiles (multipliers)
+amongst multiple components using 2 different strategies:
+
+    1) :py:`MuxMAC`: One DSP tile is time multiplexed. Latency relatively
+       low, however sharing >3x MACs quickly blows up resource usage.
+
+    2) :py:`RingMAC`: Message ring sharing. Multiple components are connected
+       in a message ring (essentially a large circular shift register).
+       On each ring, there is a single DSP tile processing multiplies. DSP tile
+       throughput of near 100% is still achievable, however latency is higher.
+
 """
 
 from amaranth import *
@@ -110,7 +109,7 @@ class MAC(wiring.Component):
 class MuxMAC(MAC):
 
     """
-    A Multiplexing MAC provider.
+    A Multiplexing multiplication provider.
 
     Instantiates a single multiplier, shared between users of this
     MuxMAC using time division multiplexing, as follows:
@@ -137,7 +136,8 @@ class MuxMAC(MAC):
 class RingMAC(MAC):
 
     """
-    A message-ring-backed MAC provider. DSP tiles are shared
+    A message-ring-backed multiplication provider, where DSP
+    tiles are shared between many components.
 
     The common pattern here is that each functional block tends
     to use a single :py:`RingMAC`, even if it has multiple MAC
