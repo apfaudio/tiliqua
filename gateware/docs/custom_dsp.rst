@@ -354,13 +354,6 @@ Because we haven't integrated any video logic, there will only be audio output. 
 
 TODO (figure)
 
-Adding more blocks
-------------------
-
-.. warning::
-
-    **TODO: write this section on adding more DSP blocks to the above example**.
-
 Side quest: squashing multipliers
 ---------------------------------
 
@@ -465,4 +458,12 @@ To share one tile amongst both statements, we could split them into a state mach
 
     **TODO: write this section on multiplier sharing**.
 
-    For now, if you are curious to see some examples of multiplier sharing, I suggest taking a look at the implementation of :class:`tiliqua.dsp.SVF` and :doc:`dsp/mac` module as used in the `polysyn` example bitstream. You'll find mechanisms for sharing multipliers both within and amongst different cores (e.g. sharing 1 multiplier amongst 8 different DSP blocks).
+    For now, if you are curious to see some examples of multiplier sharing, I suggest taking a look the :doc:`dsp/mac` module, and how it is used in :class:`tiliqua.dsp.SVF` and instantiated in the ``top.polysyn`` example bitstream. You'll find mechanisms for sharing multipliers both within and amongst different cores (e.g. sharing 1 multiplier amongst N different DSP blocks).
+
+Adding more blocks
+------------------
+
+.. warning::
+
+    **TODO: write this section on adding more DSP blocks to the above example**.
+
