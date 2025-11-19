@@ -352,7 +352,7 @@ Which we can upload to a bitstream slot of our choosing:
 
 Because we haven't integrated any video logic, there will only be audio output. If I connect the outputs over to a second Tiliqua (or an oscilloscope in XY mode), then we get our nice Lorenz attractor shape:
 
-TODO (figure)
+TODO (add nice picture of xbeam visualizing the attractor)
 
 Side quest: squashing multipliers
 ---------------------------------
