@@ -3,12 +3,12 @@ Tutorial 2: DSP blocks (``tiliqua.dsp``)
 
 When building audio pipelines, you have the option of re-using cores already present in Tiliqua's DSP library (connecting them together in different ways), or of building your own DSP blocks from scratch to add to the library.
 
-In this tutorial, we'll start by implementing our own custom DSP block (an oscillator, from scratch), and then integrate it with some of the existing blocks. The goal of this tutorial is to add a new DSP block to the library and use it in a new example bitstream in `gateware/src/top/dsp <https://github.com/apfaudio/tiliqua/tree/main/gateware/src/top/dsp>`_, so we can run it on Tiliqua hardware.
+In this tutorial, we'll start by implementing our own custom DSP block (a 'chaos oscillator', from scratch), and then integrate it with some of the existing blocks. The goal of this tutorial is to add a new DSP block to the library and use it in a new example bitstream in `gateware/src/top/dsp <https://github.com/apfaudio/tiliqua/tree/main/gateware/src/top/dsp>`_, so we can run it on Tiliqua hardware.
 
 Fixed-point Lorenz Attractor
 ----------------------------
 
-We'll start by building a new type of 'chaos oscillator' from scratch - a `Lorenz Attractor <https://en.wikipedia.org/wiki/Lorenz_system>`_. This is a system of equations which, when solved, create an interesting time-evolving 3D pattern like this:
+First, let's construct a new DSP block. We'll be implementing a `Lorenz Attractor <https://en.wikipedia.org/wiki/Lorenz_system>`_. This is a system of equations which, when solved, create an interesting time-evolving 3D pattern like this:
 
 .. figure:: /_static/test_lorenz_plot2.png
 
@@ -75,11 +75,11 @@ Next, we'll implement the oscillator logic at the ``TODO`` point above. To start
 
 .. note::
 
-    Note that the ``sq`` type has more integer bits than the native audio sample format (which only has 1 integer bit), because the calculations span approximately ``(-30..30)``, which would overflow 1 integer bit, as we'll see during simulation.
+    Note that the ``sq`` type has more integer bits than the native audio sample format (which only has 1 integer bit), because the Lorenz calculations span approximately ``(-30..30)``, which would overflow 1 integer bit, as we'll see during simulation.
 
 .. note::
 
-    Be careful when picking fixed-point types, as one ECP5 multiplier takes a maximum width of 18 bits - if your type is larger, more multipliers might be consumed than you expect.
+    Be careful when picking fixed-point types, as **one ECP5 multiplier takes a maximum width of 18 bits** - if your type is larger, more multipliers might be consumed than you expect.
 
 For calculating each iteration and scaling the outputs, we'll need 2 more constants:
 
@@ -87,9 +87,6 @@ For calculating each iteration and scaling the outputs, we'll need 2 more consta
 
         # Timestep - this is how fast our output point X, Y, Z moves around - which is
         # directly proportional to the oscillator frequency
-        #
-        # Here represented as an 'inverse' (or reciprocal) timestep, so we can use
-        # multiplication instead of division later on.
         dt_inv = fixed.Const(0.01, shape=sq)
 
         # Output scale - Since the equations will emit results between ``(-30..30)`` and
@@ -357,8 +354,8 @@ Because we haven't integrated any video logic, there will only be audio output. 
 
 TODO (figure)
 
-Optimizing multiplier usage
----------------------------
+Side quest: squashing multipliers
+---------------------------------
 
 Looking closely at the synthesis report from our last build ``build/dsp-lorenz-r5/top.tim``, we are consuming loads of multipliers:
 
@@ -375,7 +372,7 @@ Looking closely at the synthesis report from our last build ``build/dsp-lorenz-r
 
 This is to be expected, as we have made no effort to:
 
-    - Share one multiplier tile amongst the various calculations or
+    - Share multiplier tiles amongst the various calculations or
     - Simplify the calculations to optimize out unnecessary multipliers
 
 .. note::
@@ -455,4 +452,8 @@ So, the 2 tiles are used by these variable-by-variable multiplies:
     - On line 2: ``x * (rho - z)``
     - On line 3: ``x * y``
 
-To share one multiplier tile amongst both of these lines, we could split them into a state machine and do one after the other. For example:
+To share one tile amongst both statements, we could split them into a state machine and do one after the other. What's is the left-hand side remains the same, so the input only needs to be multiplexed on the right-hand side.
+
+.. warning::
+
+    **TODO**: Finish this section on multiplier sharing. For now, if you are curious to see some examples of multiplier sharing, I suggest taking a look at the implementation of :class:`tiliqua.dsp.SVF` and how it is used with :class:`tiliqua.dsp.mac.RingClient` in the `polysyn` example bitstream.
