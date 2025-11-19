@@ -156,7 +156,7 @@ class DWO(wiring.Component):
 
         return m
 
-class Lorenz(wiring.Component):
+class SimpleLorenz(wiring.Component):
 
     """
     Lorenz Attractor.
@@ -177,24 +177,18 @@ class Lorenz(wiring.Component):
 
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 3)))
 
-    def __init__(self, dt=1/256, output_scale=1/64):
-        super().__init__()
-        self.dt_log2 = exact_log2(int(1/dt))
-        self.scale_log2 = exact_log2(int(1/output_scale))
-
     def elaborate(self, platform):
         m = Module()
 
         # Type used for internal computations.
-        sq = fixed.SQ(9, 9)
+        sq = fixed.SQ(8, 8)
 
-        # System parameters
+        # System parameters. Power of 2 saves multipliers.
         sigma = fixed.Const(16.0, shape=sq)
         rho   = fixed.Const(32.0, shape=sq)
         beta  = fixed.Const(2.0, shape=sq)
 
-        # Timestep and output scale
-        # Selecting a power of 2 for these saves multipliers.
+        # Timestep and output scale. Power of 2 saves multipliers.
         dt    = fixed.Const(1.0/256.0, shape=sq)
         scale = fixed.Const(1.0/64.0, shape=sq)
 
