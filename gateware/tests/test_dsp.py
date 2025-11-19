@@ -382,33 +382,6 @@ class DSPTests(unittest.TestCase):
         with sim.write_vcd(vcd_file=open("test_dwo.vcd", "w")):
             sim.run()
 
-    def test_lorenz(self):
-
-        dut = dsp.oscillators.Lorenz()
-
-        points = []
-
-        async def testbench(ctx):
-            for n in range(0, 5000):
-                result = await stream.get(ctx, dut.o)
-                points.append([r.as_float() for r in result])
-
-        sim = Simulator(dut)
-        sim.add_clock(1e-6)
-        sim.add_testbench(testbench)
-        with sim.write_vcd(vcd_file=open("test_lorenz.vcd", "w")):
-            sim.run()
-
-        # Plot the points to an image.
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D
-        import numpy as np
-        points = np.array(points)
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection='3d')
-        ax.plot(points[:, 0], points[:, 1], points[:, 2], lw=0.5)
-        plt.savefig('test_lorenz_plot.png', dpi=150, bbox_inches='tight')
-
     def test_boxcar(self):
 
         boxcar = delay_effect.Boxcar(n=32, hpf=True)

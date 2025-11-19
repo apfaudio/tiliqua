@@ -5,7 +5,6 @@
 from amaranth import *
 from amaranth.lib import data, stream, wiring
 from amaranth.lib.wiring import In, Out
-from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
 
@@ -153,45 +152,5 @@ class DWO(wiring.Component):
                 m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
                     m.next = 'MAC'
-
-        return m
-
-class Lorenz(wiring.Component):
-
-    o: Out(stream.Signature(data.ArrayLayout(ASQ, 3)))
-
-    def elaborate(self, platform):
-
-        m = Module()
-
-        sq = fixed.SQ(8, 8)
-
-        sigma  = fixed.Const(10.0, shape=sq)
-        rho    = fixed.Const(28.0, shape=sq)
-        beta   = fixed.Const(8.0/3.0, shape=sq)
-        dt_inv = fixed.Const(0.01, shape=sq)
-        scale  = fixed.Const(0.015, shape=sq)
-
-        x = Signal(sq, init=fixed.Const(2.0, shape=sq))
-        y = Signal(sq, init=fixed.Const(1.0, shape=sq))
-        z = Signal(sq, init=fixed.Const(1.0, shape=sq))
-
-        dx = sigma * (y - x)
-        dy = x * (rho - z) - y
-        dz = x * y - beta * z
-
-        with m.If(self.o.ready):
-            m.d.sync += [
-                x.eq(x + dx * dt_inv),
-                y.eq(y + dy * dt_inv),
-                z.eq(z + dz * dt_inv),
-            ]
-
-        m.d.comb += [
-            self.o.payload[0].eq(x * scale),
-            self.o.payload[1].eq(y * scale),
-            self.o.payload[2].eq(z * scale),
-            self.o.valid.eq(1),
-        ]
 
         return m
