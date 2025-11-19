@@ -1106,18 +1106,12 @@ class LorenzAttractor(wiring.Component):
 
         m.submodules.lorenz = lorenz = dsp.oscillators.Lorenz()
         m.submodules.split3 = split3 = dsp.Split(n_channels=3, source=lorenz.o)
-        m.submodules.merge3 = merge3 = dsp.Merge(n_channels=3, sink=lorenz.i)
-
-        wiring.connect(m, split4.o[0], merge3.i[0])
-        wiring.connect(m, split4.o[1], merge3.i[1])
-        wiring.connect(m, split4.o[2], merge3.i[2])
-
         wiring.connect(m, split3.o[0], merge4.i[0])
         wiring.connect(m, split3.o[1], merge4.i[1])
         wiring.connect(m, split3.o[2], merge4.i[2])
 
+        split4.wire_ready(m, [0, 1, 2, 3])
         merge4.wire_valid(m, [3])
-        split4.wire_ready(m, [3])
 
         return m
 
