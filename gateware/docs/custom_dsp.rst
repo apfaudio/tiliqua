@@ -354,6 +354,13 @@ Because we haven't integrated any video logic, there will only be audio output. 
 
 TODO (figure)
 
+Adding more blocks
+------------------
+
+.. warning::
+
+    **TODO: write this section on adding more DSP blocks to the above example**.
+
 Side quest: squashing multipliers
 ---------------------------------
 
@@ -452,8 +459,10 @@ So, the 2 tiles are used by these variable-by-variable multiplies:
     - On line 2: ``x * (rho - z)``
     - On line 3: ``x * y``
 
-To share one tile amongst both statements, we could split them into a state machine and do one after the other. What's is the left-hand side remains the same, so the input only needs to be multiplexed on the right-hand side.
+To share one tile amongst both statements, we could split them into a state machine and do one after the other. What's nice is the left-hand side remains the same, so the input only needs to be multiplexed on the right-hand side.
 
 .. warning::
 
-    **TODO**: Finish this section on multiplier sharing. For now, if you are curious to see some examples of multiplier sharing, I suggest taking a look at the implementation of :class:`tiliqua.dsp.SVF` and how it is used with :class:`tiliqua.dsp.mac.RingClient` in the `polysyn` example bitstream.
+    **TODO: write this section on multiplier sharing**.
+
+    For now, if you are curious to see some examples of multiplier sharing, I suggest taking a look at the implementation of :class:`tiliqua.dsp.SVF` and :doc:`dsp/mac` module as used in the `polysyn` example bitstream. You'll find mechanisms for sharing multipliers both within and amongst different cores (e.g. sharing 1 multiplier amongst 8 different DSP blocks).
