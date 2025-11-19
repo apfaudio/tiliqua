@@ -156,61 +156,37 @@ class DWO(wiring.Component):
 
         return m
 
-class SimpleLorenz(wiring.Component):
-
-    """
-    Lorenz Attractor.
-
-    Generates a chaotic 3D trajectory based on the Lorenz system of
-    differential equations.
-
-    Equations:
-        dx/dt = σ * (y - x)
-        dy/dt = x * (ρ - z) - y
-        dz/dt = x * y - β * z
-
-    Members
-    -------
-    o : :py:`Out(stream.Signature(data.ArrayLayout(ASQ, 3)))`
-        Output stream of 3D trajectory samples [x, y, z].
-    """
+class Lorenz(wiring.Component):
 
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 3)))
 
     def elaborate(self, platform):
+
         m = Module()
 
-        # Type used for internal computations.
         sq = fixed.SQ(8, 8)
 
-        # System parameters. Power of 2 saves multipliers.
-        sigma = fixed.Const(16.0, shape=sq)
-        rho   = fixed.Const(32.0, shape=sq)
-        beta  = fixed.Const(2.0, shape=sq)
+        sigma  = fixed.Const(10.0, shape=sq)
+        rho    = fixed.Const(28.0, shape=sq)
+        beta   = fixed.Const(8.0/3.0, shape=sq)
+        dt_inv = fixed.Const(0.01, shape=sq)
+        scale  = fixed.Const(0.015, shape=sq)
 
-        # Timestep and output scale. Power of 2 saves multipliers.
-        dt    = fixed.Const(1.0/256.0, shape=sq)
-        scale = fixed.Const(1.0/64.0, shape=sq)
-
-        # State variables and initial conditions
         x = Signal(sq, init=fixed.Const(2.0, shape=sq))
         y = Signal(sq, init=fixed.Const(1.0, shape=sq))
         z = Signal(sq, init=fixed.Const(1.0, shape=sq))
 
-        # Compute derivatives
         dx = sigma * (y - x)
         dy = x * (rho - z) - y
         dz = x * y - beta * z
 
         with m.If(self.o.ready):
-            # Update state based on derivatives only when output is consumed.
             m.d.sync += [
-                x.eq(x + dx * dt),
-                y.eq(y + dy * dt),
-                z.eq(z + dz * dt),
+                x.eq(x + dx * dt_inv),
+                y.eq(y + dy * dt_inv),
+                z.eq(z + dz * dt_inv),
             ]
 
-        # Scale all outputs to fit in [-1, +1]
         m.d.comb += [
             self.o.payload[0].eq(x * scale),
             self.o.payload[1].eq(y * scale),
