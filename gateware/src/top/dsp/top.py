@@ -1078,6 +1078,49 @@ class DWO(wiring.Component):
 
         return m
 
+class LorenzAttractor(wiring.Component):
+
+    """
+    Lorenz attractor chaotic oscillator.
+
+    Outputs x, y, z on channels 0, 1, 2 respectively.
+    """
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
+
+    bitstream_help = BitstreamHelp(
+        brief="Lorenz attractor (audio-only!)",
+        io_left=['', '', '', '', 'x out', 'y out', 'z out', ''],
+        io_right=['', '', '', '', '', '']
+    )
+
+    def elaborate(self, platform):
+
+        m = Module()
+
+        m.submodules.split4 = split4 = dsp.Split(
+                n_channels=4, source=wiring.flipped(self.i))
+        m.submodules.merge4 = merge4 = dsp.Merge(
+                n_channels=4, sink=wiring.flipped(self.o))
+
+        m.submodules.lorenz = lorenz = dsp.oscillators.Lorenz()
+        m.submodules.split3 = split3 = dsp.Split(n_channels=3, source=lorenz.o)
+        m.submodules.merge3 = merge3 = dsp.Merge(n_channels=3, sink=lorenz.i)
+
+        wiring.connect(m, split4.o[0], merge3.i[0])
+        wiring.connect(m, split4.o[1], merge3.i[1])
+        wiring.connect(m, split4.o[2], merge3.i[2])
+
+        wiring.connect(m, split3.o[0], merge4.i[0])
+        wiring.connect(m, split3.o[1], merge4.i[1])
+        wiring.connect(m, split3.o[2], merge4.i[2])
+
+        merge4.wire_valid(m, [3])
+        split4.wire_ready(m, [3])
+
+        return m
+
 class CoreTop(Elaboratable):
 
     def __init__(self, dsp_core, enable_touch, clock_settings):
@@ -1157,6 +1200,7 @@ CORES = {
     "vocode":         (False, Vocoder),
     "noise":          (False, Noise),
     "dwo":            (False, DWO),
+    "lorenz":         (False, LorenzAttractor),
 }
 
 def simulation_ports(fragment):

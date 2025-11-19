@@ -5,6 +5,7 @@
 from amaranth import *
 from amaranth.lib import data, stream, wiring
 from amaranth.lib.wiring import In, Out
+from amaranth.utils import exact_log2
 
 from amaranth_future import fixed
 
@@ -152,5 +153,94 @@ class DWO(wiring.Component):
                 m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
                     m.next = 'MAC'
+
+        return m
+
+class Lorenz(wiring.Component):
+
+    """
+    Lorenz Attractor.
+
+    Generates a chaotic 3D trajectory based on the Lorenz system of
+    differential equations.
+
+    Equations:
+        dx/dt = σ * (y - x)
+        dy/dt = x * (ρ - z) - y
+        dz/dt = x * y - β * z
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(data.ArrayLayout(ASQ, 3)))`
+        Input stream of parameters to tweak sigma / rho / beta.
+    o : :py:`Out(stream.Signature(data.ArrayLayout(ASQ, 3)))`
+        Output stream of 3D trajectory samples [x, y, z].
+        Scaled to fit approximately in the range [-1, +1].
+    """
+
+    i: In(stream.Signature(data.ArrayLayout(ASQ, 3)))
+    o: Out(stream.Signature(data.ArrayLayout(ASQ, 3)))
+
+    def __init__(self, dt=1/256, output_scale=1/64, sigma=10.0, rho=28.0, beta=8.0/3.0, ):
+        super().__init__()
+        self.dt_log2 = exact_log2(int(1/dt))
+        self.scale_log2 = exact_log2(int(1/output_scale))
+        self.sigma = sigma
+        self.rho = rho
+        self.beta = beta
+
+    def elaborate(self, platform):
+        m = Module()
+
+        # Type used for internal computations.
+        sq = fixed.SQ(9, 9)
+
+        # System parameter defaults
+        SIGMA = fixed.Const(self.sigma, shape=sq)
+        RHO   = fixed.Const(self.rho, shape=sq)
+        BETA  = fixed.Const(self.beta, shape=sq)
+
+        # System parameters after tweaking
+        sigma = Signal(shape=sq, init=SIGMA)
+        rho   = Signal(shape=sq, init=RHO)
+        beta  = Signal(shape=sq, init=BETA)
+
+        m.d.comb += self.i.ready.eq(1)
+        with m.If(self.i.valid):
+            m.d.sync += [
+                sigma.eq(SIGMA + (self.i.payload[0]<<3)),
+                rho.eq(RHO + (self.i.payload[1]<<4)),
+                beta.eq(BETA + (self.i.payload[2]<<1)),
+            ]
+
+        # State variables and initial conditions
+        x = Signal(sq, init=fixed.Const(2.0, shape=sq))
+        y = Signal(sq, init=fixed.Const(1.0, shape=sq))
+        z = Signal(sq, init=fixed.Const(1.0, shape=sq))
+
+        m.submodules.noise = noise = WhiteNoise()
+
+        # Compute derivatives
+        dx = sigma * (y - x)
+        dy = x * (rho - z) - y
+        dz = x * y - beta * z
+
+        with m.If(self.o.ready):
+            # Update state based on derivatives only when output is consumed.
+            m.d.comb += noise.o.ready.eq(1)
+            m.d.sync += [
+                x.eq(x + (dx >> self.dt_log2) + (noise.o.payload >> 10)),
+                y.eq(y + (dy >> self.dt_log2)- (noise.o.payload >> 9) ),
+                z.eq(z + (dz >> self.dt_log2)),
+            ]
+
+        # Scale all outputs to fit in [-1, +1]
+        m.d.comb += [
+            self.o.payload[0].eq(x >> self.scale_log2),
+            self.o.payload[1].eq(y >> self.scale_log2),
+            # Center at 0 rather than ~+0.45
+            self.o.payload[2].eq((z >> self.scale_log2) - fixed.Const(0.45, shape=ASQ)),
+            self.o.valid.eq(1),
+        ]
 
         return m

@@ -8,6 +8,9 @@ frame*.bmp
 frame*.png
 *.svg
 
+# lorenz sim dumps
+*lorenz*.png
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
