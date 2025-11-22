@@ -9,25 +9,34 @@ from colorama import Fore, Style
 
 from amaranth import *
 from amaranth.sim import *
-from luna.gateware.test.contrib import usb_packet as testp
 from parameterized import parameterized
 
 from tiliqua.usb_host import *
 from tiliqua.test import stream
 
+from luna.gateware.test.contrib import usb_packet as testp
+from luna.gateware.usb.usb2.packet import USBPacketID
 from luna.usb2 import USBDevice, USBStreamInEndpoint
 from usb_protocol.emitters import DeviceDescriptorCollection
 
-from luna.gateware.usb.usb2.packet import USBPacketID
 
 class USBPcapWriter:
+
+    """
+    Utility class for writing raw USB packets to a .pcap file readable
+    in Packtree or Wireshark.
+    """
 
     LINKTYPE_USB_2_0 = 288
     PCAP_NSEC_MAGIC = 0xa1b23c4d
 
     def __init__(self, filename):
-        self.f = open(filename, 'wb')
+        self.filename = filename
+
+    def __enter__(self):
+        self.f = open(self.filename, 'wb')
         self._write_header()
+        return self
 
     def _write_header(self):
         header = struct.pack('<IHHIIII',
@@ -40,8 +49,8 @@ class USBPcapWriter:
 
     def write_packet(self, timestamp_ns: int, data: bytes):
         packet_data = bytes(data)
-        ts_sec = timestamp_ns // 1000000000
-        ts_nsec = timestamp_ns % 1000000000
+        ts_sec = timestamp_ns // int(1e9)
+        ts_nsec = timestamp_ns % int(1e9)
         pcap_header = struct.pack('<IIII',
             ts_sec,               # timestamp seconds
             ts_nsec,              # timestamp nanoseconds
@@ -50,12 +59,15 @@ class USBPcapWriter:
         self.f.write(pcap_header)
         self.f.write(packet_data)
 
-    def close(self):
-        if self.f:
-            self.f.close()
-            self.f = None
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.f.close()
 
 class USBDeviceExample(Elaboratable):
+
+    """
+    Simple USB device only used for integration test below.
+    Exposes a bulk OUT endpoint that emits upcounting data.
+    """
 
     def __init__(self):
         self.utmi = UTMIInterface()
@@ -189,14 +201,14 @@ class UsbTests(unittest.TestCase):
     def test_usb_integration(self):
 
         """
-        Integration test to inspect what packets are spat out
-        by SimpleUSBMIDIHost, and that things are sufficiently
-        wired together for a functioning system.
+        Integration test, connects SimpleUSBMIDIHost through a fake UTMI bridge
+        to a LUNA USBDevice, runs host and device stacks against each other
+        through the enumeration sequence and then dump all exchanged packets
+        to a .pcap file that may be inspected in Packetree or Wireshark.
         """
 
         m = Module()
-        m.submodules.hst = hst = DomainRenamer({"usb": "sync"})(
-                                               SimpleUSBMIDIHost(sim=True))
+        m.submodules.hst = hst = DomainRenamer({"usb": "sync"})(SimpleUSBMIDIHost(sim=True))
         m.submodules.dev = dev = DomainRenamer({"usb": "sync"})(USBDeviceExample())
 
         def connect_utmi(m, src_utmi, snk_utmi):
@@ -204,9 +216,8 @@ class UsbTests(unittest.TestCase):
             Simulate a USB connection between 2 UTMI PHY interfaces by forwarding
             packets between them. No effort is made to simulate other line states.
 
-            This is definitely NOT adhering to the UTMI spec, however it is enough
-            for LUNA gateware to be happy talking to our simulated host, which means
-            we can test the higher layers of a host stack against a device stack.
+            This is definitely NOT adhering to the UTMI spec, however it is the bare
+            minimum for LUNA gateware to be happy on either side of the link.
             """
             m.d.comb += [
                 snk_utmi.rx_active.eq(0),
@@ -240,31 +251,36 @@ class UsbTests(unittest.TestCase):
             print(':'.join(f"{byte:02x}" for byte in packet))
 
         async def testbench(ctx):
-            pcap = USBPcapWriter("test_usb_integration.pcap")
             packet_hst = []
             packet_dev = []
             cycle_count = 0
-            for i in range(0, 100000):
-                timestamp_ns = int(1e9*(cycle_count/60e6))
-                # Host and device transfer attempts should never overlap.
-                assert not ctx.get(dev.utmi.rx_active & hst.utmi.rx_active)
-                # Monitor Host->Device traffic
-                if ctx.get(dev.utmi.rx_valid):
-                    packet_hst.append(int(ctx.get(dev.utmi.rx_data)))
-                if packet_hst and ctx.get(~dev.utmi.rx_active):
-                    prettyprint_packet(f"{Fore.GREEN}HST{Style.RESET_ALL}", timestamp_ns, packet_hst)
-                    pcap.write_packet(timestamp_ns, packet_hst)
-                    packet_hst = []
-                # Monitor Device->Host traffic
-                if ctx.get(hst.utmi.rx_valid):
-                    packet_dev.append(int(ctx.get(hst.utmi.rx_data)))
-                if packet_dev and ctx.get(~hst.utmi.rx_active):
-                    prettyprint_packet(f"{Fore.RED}DEV{Style.RESET_ALL}", timestamp_ns, packet_dev)
-                    pcap.write_packet(timestamp_ns, packet_dev)
-                    packet_dev = []
-                cycle_count += 1
-                await ctx.tick()
-            pcap.close()
+            bulk_out_bytes = 0
+            with USBPcapWriter("test_usb_integration.pcap") as pcap:
+                for i in range(0, 100000):
+                    timestamp_ns = int(1e9*(cycle_count/60e6))
+                    # Host and device transfer attempts should never overlap.
+                    assert not ctx.get(dev.utmi.rx_active & hst.utmi.rx_active)
+                    # Monitor Host->Device traffic
+                    if ctx.get(dev.utmi.rx_valid):
+                        packet_hst.append(int(ctx.get(dev.utmi.rx_data)))
+                    if packet_hst and ctx.get(~dev.utmi.rx_active):
+                        prettyprint_packet(f"{Fore.GREEN}HST{Style.RESET_ALL}", timestamp_ns, packet_hst)
+                        pcap.write_packet(timestamp_ns, packet_hst)
+                        packet_hst = []
+                    # Monitor Device->Host traffic
+                    if ctx.get(hst.utmi.rx_valid):
+                        packet_dev.append(int(ctx.get(hst.utmi.rx_data)))
+                    if packet_dev and ctx.get(~hst.utmi.rx_active):
+                        prettyprint_packet(f"{Fore.RED}DEV{Style.RESET_ALL}", timestamp_ns, packet_dev)
+                        pcap.write_packet(timestamp_ns, packet_dev)
+                        packet_dev = []
+                    # Monitor MIDI bulk out bytes (only appear if entire enumeration sequence succeeds)
+                    if ctx.get(hst.o_midi_bytes.valid):
+                        bulk_out_bytes += 1
+                    cycle_count += 1
+                    await ctx.tick()
+            # Did the entire enumeration sequence succeed?
+            self.assertNotEqual(bulk_out_bytes, 0)
 
         sim = Simulator(m)
         sim.add_clock(1/60e6)  # 60 MHz clock
