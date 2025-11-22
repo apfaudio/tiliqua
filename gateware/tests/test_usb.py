@@ -234,6 +234,11 @@ class UsbTests(unittest.TestCase):
         # Drain all outgoing USB-MIDI data.
         m.d.comb += hst.o_midi_bytes.ready.eq(1)
 
+        def prettyprint_packet(prefix, timestamp_ns, packet):
+            packet_id = USBPacketID.from_int(packet[0])
+            print(f'[{prefix} t={timestamp_ns/1e9:.6f} {packet_id.name}]', end=' ')
+            print(':'.join(f"{byte:02x}" for byte in packet))
+
         async def testbench(ctx):
             pcap = USBPcapWriter("test_usb_integration.pcap")
             packet_hst = []
@@ -247,18 +252,14 @@ class UsbTests(unittest.TestCase):
                 if ctx.get(dev.utmi.rx_valid):
                     packet_hst.append(int(ctx.get(dev.utmi.rx_data)))
                 if packet_hst and ctx.get(~dev.utmi.rx_active):
-                    print(f'[{Fore.GREEN}HST{Style.RESET_ALL} t={timestamp_ns/1e9:.6f}] ', end='')
-                    print(':'.join(f"{byte:02x}" for byte in packet_hst), end=' ')
-                    print(USBPacketID.from_int(packet_hst[0]).name)
+                    prettyprint_packet(f"{Fore.GREEN}HST{Style.RESET_ALL}", timestamp_ns, packet_hst)
                     pcap.write_packet(timestamp_ns, packet_hst)
                     packet_hst = []
                 # Monitor Device->Host traffic
                 if ctx.get(hst.utmi.rx_valid):
                     packet_dev.append(int(ctx.get(hst.utmi.rx_data)))
                 if packet_dev and ctx.get(~hst.utmi.rx_active):
-                    print(f'[{Fore.RED}DEV{Style.RESET_ALL} t={timestamp_ns/1e9:.6f}] ', end='')
-                    print(':'.join(f"{byte:02x}" for byte in packet_dev), end=' ')
-                    print(USBPacketID.from_int(packet_dev[0]).name)
+                    prettyprint_packet(f"{Fore.RED}DEV{Style.RESET_ALL}", timestamp_ns, packet_dev)
                     pcap.write_packet(timestamp_ns, packet_dev)
                     packet_dev = []
                 cycle_count += 1
