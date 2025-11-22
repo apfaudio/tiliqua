@@ -529,6 +529,7 @@ class SimpleUSBMIDIHost(Elaboratable):
                         m.d.usb += enqueued.eq(1)
                     with m.If(enqueued & token_generator.txa):
                         m.d.usb += enqueued.eq(0)
+                        m.d.usb += Print("fsm_tx_token", state_id, pid)
                         m.next = next_state_id
 
             def fsm_tx_data_stage(state_id, data_shape, data_pid, data_payload, next_state_id):
@@ -562,6 +563,7 @@ class SimpleUSBMIDIHost(Elaboratable):
                     with m.If(transmitter.stream.ready):
                         m.d.usb += ix.eq(ix+1)
                         with m.If(ix == len(data_view) - 1):
+                            m.d.usb += Print("fsm_tx_data_stage", state_id, data_pid)
                             m.next = next_state_id
 
             def fsm_sequence_zlp_out(state_id, next_state_id, data_pid=1):
@@ -587,8 +589,10 @@ class SimpleUSBMIDIHost(Elaboratable):
                 with m.State(f'{state_id}-WAIT-ACK'):
                     # FIXME: detect lack of token packet (timeout failure)
                     with m.If(handshake_detector.detected.ack):
+                        m.d.usb += Print("fsm_sequence_zlp_out ACK", state_id, data_pid)
                         m.next = next_state_id
                     with m.If(handshake_detector.detected.nak):
+                        m.d.usb += Print("fsm_sequence_zlp_out NAK", state_id, data_pid)
                         m.next = state_id
 
             def fsm_sequence_rx_in_stage_ignore(state_id, state_ok, state_err, addr=0, endp=0):
@@ -615,6 +619,7 @@ class SimpleUSBMIDIHost(Elaboratable):
                     with m.If(receiver.packet_complete):
                         m.next = f'{state_id}-ACK-PKT'
                     with m.If(handshake_detector.detected.nak):
+                        m.d.usb += Print("fsm_sequence_rx_in_stage_ignore NAK", state_id)
                         m.next = state_err
 
                 with m.State(f'{state_id}-ACK-PKT'):
@@ -625,8 +630,10 @@ class SimpleUSBMIDIHost(Elaboratable):
                         m.d.comb += handshake_generator.issue_ack.eq(1)
                         with m.If(byte_cnt == max_packet_size):
                             # More data, continue fetching.
+                            m.d.usb += Print("fsm_sequence_rx_in_stage_ignore CNT", state_id)
                             m.next = state_id
                         with m.Else():
+                            m.d.usb += Print("fsm_sequence_rx_in_stage_ignore OK", state_id)
                             m.next = state_ok
 
             def fsm_sequence_setup(state_id, state_ok, state_err, setup_payload, addr=0, endp=0):
@@ -648,9 +655,11 @@ class SimpleUSBMIDIHost(Elaboratable):
 
                 with m.State(f'{state_id}-WAIT-ACK'):
                     with m.If(handshake_detector.detected.ack):
+                        m.d.usb += Print("fsm_sequence_setup ACK", state_id)
                         m.next = state_ok
                     with m.If(token_generator.timer.rx_timeout |
                               handshake_detector.detected.nak):
+                        m.d.usb += Print("fsm_sequence_setup NAK/TO", state_id)
                         m.next = state_err
 
             def fsm_state_bus_reset(state_id, state_next):
@@ -671,6 +680,7 @@ class SimpleUSBMIDIHost(Elaboratable):
                     m.d.usb += se0_cycles.eq(se0_cycles+1)
                     with m.If(se0_cycles == _BUS_RESET_HOLD_CYCLES):
                         m.d.usb += se0_cycles.eq(0)
+                        m.d.usb += Print("fsm_state_bus_reset DONE", state_id)
                         m.next = state_next
 
             if not self.sim:

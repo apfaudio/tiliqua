@@ -12,6 +12,63 @@ from parameterized import parameterized
 from tiliqua.usb_host import *
 from tiliqua.test import stream
 
+from luna.usb2 import USBDevice, USBStreamInEndpoint
+from usb_protocol.emitters import DeviceDescriptorCollection
+
+class USBDeviceExample(Elaboratable):
+
+    def __init__(self):
+        self.utmi = UTMIInterface()
+        super().__init__()
+
+    def create_descriptors(self):
+        descriptors = DeviceDescriptorCollection()
+        with descriptors.DeviceDescriptor() as d:
+            d.idVendor           = 0x16d0
+            d.idProduct          = 0xf3b
+            d.iManufacturer      = "LUNA"
+            d.iProduct           = "Test Device"
+            d.iSerialNumber      = "1234"
+            d.bNumConfigurations = 1
+
+        with descriptors.ConfigurationDescriptor() as c:
+            with c.InterfaceDescriptor() as i:
+                i.bInterfaceNumber = 0
+                with i.EndpointDescriptor() as e:
+                    e.bEndpointAddress = 0x01
+                    e.wMaxPacketSize   = 64
+                with i.EndpointDescriptor() as e:
+                    e.bEndpointAddress = 0x81
+                    e.wMaxPacketSize   = 64
+        return descriptors
+
+    def elaborate(self, platform):
+
+        m = Module()
+        m.submodules.usb = usb = USBDevice(bus=self.utmi)
+        descriptors = self.create_descriptors()
+        usb.add_standard_control_endpoint(descriptors)
+
+        # Counting endpoint OUT
+        stream_ep = USBStreamInEndpoint(
+            endpoint_number=1,
+            max_packet_size=64
+        )
+        usb.add_endpoint(stream_ep)
+        counter = Signal(8)
+        with m.If(stream_ep.stream.ready):
+            m.d.usb += counter.eq(counter + 1)
+        m.d.comb += [
+            stream_ep.stream.valid    .eq(1),
+            stream_ep.stream.payload  .eq(counter)
+        ]
+
+        m.d.comb += [
+            usb.connect          .eq(1),
+            usb.full_speed_only  .eq(1),
+        ]
+        return m
+
 
 class UsbTests(unittest.TestCase):
 
@@ -97,22 +154,53 @@ class UsbTests(unittest.TestCase):
         wired together for a functioning system.
         """
 
-        dut = DomainRenamer({"usb": "sync"})(
-                SimpleUSBMIDIHost(sim=True))
+        m = Module()
+        m.submodules.dut = dut = DomainRenamer({"usb": "sync"})(
+                                               SimpleUSBMIDIHost(sim=True))
+        m.submodules.dev = dev = DomainRenamer({"usb": "sync"})(USBDeviceExample())
+        m.d.comb += [
+            dev.utmi.rx_valid.eq(dut.utmi.tx_valid & dut.utmi.tx_ready),
+            dev.utmi.rx_data.eq(dut.utmi.tx_data),
+
+            dut.utmi.rx_valid.eq(dev.utmi.tx_valid & dev.utmi.tx_ready),
+            dut.utmi.rx_data.eq(dev.utmi.tx_data),
+        ]
+
+        m.d.comb += dev.utmi.rx_active.eq(0)
+        sync_cnt_dut = Signal(2, init=0)
+        with m.If(dut.utmi.tx_valid):
+            m.d.comb += dev.utmi.rx_active.eq(1)
+            with m.If(sync_cnt_dut == 0x3):
+                m.d.comb += dut.utmi.tx_ready.eq(1)
+            with m.Else():
+                m.d.sync += sync_cnt_dut.eq(sync_cnt_dut + 1)
+        with m.Else():
+            m.d.sync += sync_cnt_dut.eq(0)
+
+        m.d.comb += dut.utmi.rx_active.eq(0)
+        sync_cnt_dev = Signal(2, init=0)
+        with m.If(dev.utmi.tx_valid):
+            m.d.comb += dut.utmi.rx_active.eq(1)
+            with m.If(sync_cnt_dev == 0x3):
+                m.d.comb += dev.utmi.tx_ready.eq(1)
+            with m.Else():
+                m.d.sync += sync_cnt_dev.eq(sync_cnt_dev + 1)
+        with m.Else():
+            m.d.sync += sync_cnt_dev.eq(0)
+
+        m.d.comb += dut.o_midi_bytes.ready.eq(1)
 
         async def testbench(ctx):
-            for i in range(0, 10):
+            for i in range(0, 100):
                 data = []
-                ctx.set(dut.utmi.tx_ready, 1)
                 while ctx.get(~dut.utmi.tx_valid):
                     await ctx.tick()
                 while ctx.get(dut.utmi.tx_valid):
                     data.append(int(ctx.get(dut.utmi.tx_data)))
                     await ctx.tick()
-                ctx.set(dut.utmi.tx_ready, 0)
                 print("[packet]", [hex(d) for d in data])
 
-        sim = Simulator(dut)
+        sim = Simulator(m)
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_usb_integration.vcd", "w")):
