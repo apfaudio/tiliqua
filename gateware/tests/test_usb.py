@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import unittest
+import struct
+import time
 
 from amaranth import *
 from amaranth.sim import *
@@ -14,6 +16,73 @@ from tiliqua.test import stream
 
 from luna.usb2 import USBDevice, USBStreamInEndpoint
 from usb_protocol.emitters import DeviceDescriptorCollection
+
+class USBPcapWriter:
+    """
+    Writes USB packets to a PCAP file that can be opened in Packetry.
+    Uses LINKTYPE_USB_2_0 (288) format with nanosecond timestamps.
+    The packet data is written directly with no additional USB header wrapping.
+    """
+
+    LINKTYPE_USB_2_0 = 288
+    PCAP_NSEC_MAGIC = 0xa1b23c4d
+
+    def __init__(self, filename, clock_freq_hz=60e6):
+        self.f = open(filename, 'wb')
+        self.clock_freq_hz = clock_freq_hz
+        self.ns_per_cycle = 1e9 / clock_freq_hz
+        self._write_header()
+
+    def _write_header(self):
+        # PCAP Global Header (nanosecond resolution)
+        header = struct.pack('<IHHIIII',
+            self.PCAP_NSEC_MAGIC,  # magic (nanosecond timestamps)
+            2, 4,                   # version major, minor
+            0, 0,                   # thiszone, sigfigs
+            65535,                  # snaplen
+            self.LINKTYPE_USB_2_0)  # network (link type)
+        self.f.write(header)
+
+    def write_packet(self, data, cycle_count, host_to_device=True):
+        """
+        Write a USB packet to the PCAP file.
+
+        Args:
+            data: List or bytes of packet data (raw USB packet bytes from UTMI)
+            cycle_count: Simulation cycle count when this packet completed
+            host_to_device: True if packet is from host to device, False otherwise
+                           (note: direction info is not stored in this format,
+                           it's encoded in the packet data itself)
+        """
+        if not data:
+            return
+
+        # Convert to bytes if needed
+        if isinstance(data, list):
+            packet_data = bytes(data)
+        else:
+            packet_data = data
+
+        # Calculate timestamp in nanoseconds from cycle count
+        ts_ns_total = int(cycle_count * self.ns_per_cycle)
+        ts_sec = ts_ns_total // 1000000000
+        ts_nsec = ts_ns_total % 1000000000
+
+        # PCAP packet record header (16 bytes)
+        # For nanosecond format: ts_sec, ts_nsec, incl_len, orig_len
+        pcap_header = struct.pack('<IIII',
+            ts_sec,               # timestamp seconds
+            ts_nsec,              # timestamp nanoseconds
+            len(packet_data),     # number of octets saved
+            len(packet_data))     # actual length
+
+        self.f.write(pcap_header)
+        self.f.write(packet_data)
+
+    def close(self):
+        if self.f:
+            self.f.close()
+            self.f = None
 
 class USBDeviceExample(Elaboratable):
 
@@ -191,8 +260,10 @@ class UsbTests(unittest.TestCase):
         m.d.comb += dut.o_midi_bytes.ready.eq(1)
 
         async def testbench(ctx):
+            pcap = USBPcapWriter("test_usb_integration.pcap", clock_freq_hz=60e6)
             data_hd = []
             data_dh = []
+            cycle_count = 0
             for i in range(0, 100000):
                 if ctx.get(dev.utmi.rx_valid):
                     data_hd.append(int(ctx.get(dev.utmi.rx_data)))
@@ -200,14 +271,18 @@ class UsbTests(unittest.TestCase):
                     data_dh.append(int(ctx.get(dut.utmi.rx_data)))
                 if data_hd and ctx.get(~dev.utmi.rx_active):
                     print("[H->D]", [hex(d) for d in data_hd])
+                    pcap.write_packet(data_hd, cycle_count, host_to_device=True)
                     data_hd = []
                 if data_dh and ctx.get(~dut.utmi.rx_active):
                     print("[D->H]", [hex(d) for d in data_dh])
+                    pcap.write_packet(data_dh, cycle_count, host_to_device=False)
                     data_dh = []
+                cycle_count += 1
                 await ctx.tick()
+            pcap.close()
 
         sim = Simulator(m)
-        sim.add_clock(1e-6)
+        sim.add_clock(1/60e6)  # 60 MHz clock
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open("test_usb_integration.vcd", "w")):
             sim.run()
