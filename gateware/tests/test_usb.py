@@ -5,6 +5,7 @@
 import unittest
 import struct
 import time
+from colorama import Fore, Style
 
 from amaranth import *
 from amaranth.sim import *
@@ -17,65 +18,35 @@ from tiliqua.test import stream
 from luna.usb2 import USBDevice, USBStreamInEndpoint
 from usb_protocol.emitters import DeviceDescriptorCollection
 
+from luna.gateware.usb.usb2.packet import USBPacketID
+
 class USBPcapWriter:
-    """
-    Writes USB packets to a PCAP file that can be opened in Packetry.
-    Uses LINKTYPE_USB_2_0 (288) format with nanosecond timestamps.
-    The packet data is written directly with no additional USB header wrapping.
-    """
 
     LINKTYPE_USB_2_0 = 288
     PCAP_NSEC_MAGIC = 0xa1b23c4d
 
-    def __init__(self, filename, clock_freq_hz=60e6):
+    def __init__(self, filename):
         self.f = open(filename, 'wb')
-        self.clock_freq_hz = clock_freq_hz
-        self.ns_per_cycle = 1e9 / clock_freq_hz
         self._write_header()
 
     def _write_header(self):
-        # PCAP Global Header (nanosecond resolution)
         header = struct.pack('<IHHIIII',
             self.PCAP_NSEC_MAGIC,  # magic (nanosecond timestamps)
-            2, 4,                   # version major, minor
-            0, 0,                   # thiszone, sigfigs
-            65535,                  # snaplen
-            self.LINKTYPE_USB_2_0)  # network (link type)
+            2, 4,                  # version major, minor
+            0, 0,                  # thiszone, sigfigs
+            65535,                 # snaplen
+            self.LINKTYPE_USB_2_0) # network (link type)
         self.f.write(header)
 
-    def write_packet(self, data, cycle_count, host_to_device=True):
-        """
-        Write a USB packet to the PCAP file.
-
-        Args:
-            data: List or bytes of packet data (raw USB packet bytes from UTMI)
-            cycle_count: Simulation cycle count when this packet completed
-            host_to_device: True if packet is from host to device, False otherwise
-                           (note: direction info is not stored in this format,
-                           it's encoded in the packet data itself)
-        """
-        if not data:
-            return
-
-        # Convert to bytes if needed
-        if isinstance(data, list):
-            packet_data = bytes(data)
-        else:
-            packet_data = data
-
-        # Calculate timestamp in nanoseconds from cycle count
-        ts_ns_total = int(cycle_count * self.ns_per_cycle)
-        ts_sec = ts_ns_total // 1000000000
-        ts_nsec = ts_ns_total % 1000000000
-
-        # PCAP packet record header (16 bytes)
-        # For nanosecond format: ts_sec, ts_nsec, incl_len, orig_len
+    def write_packet(self, timestamp_ns: int, data: bytes):
+        packet_data = bytes(data)
+        ts_sec = timestamp_ns // 1000000000
+        ts_nsec = timestamp_ns % 1000000000
         pcap_header = struct.pack('<IIII',
             ts_sec,               # timestamp seconds
             ts_nsec,              # timestamp nanoseconds
             len(packet_data),     # number of octets saved
             len(packet_data))     # actual length
-
         self.f.write(pcap_header)
         self.f.write(packet_data)
 
@@ -224,59 +195,72 @@ class UsbTests(unittest.TestCase):
         """
 
         m = Module()
-        m.submodules.dut = dut = DomainRenamer({"usb": "sync"})(
+        m.submodules.hst = hst = DomainRenamer({"usb": "sync"})(
                                                SimpleUSBMIDIHost(sim=True))
         m.submodules.dev = dev = DomainRenamer({"usb": "sync"})(USBDeviceExample())
-        m.d.comb += [
-            dev.utmi.rx_valid.eq(dut.utmi.tx_valid & dut.utmi.tx_ready),
-            dev.utmi.rx_data.eq(dut.utmi.tx_data),
 
-            dut.utmi.rx_valid.eq(dev.utmi.tx_valid & dev.utmi.tx_ready),
-            dut.utmi.rx_data.eq(dev.utmi.tx_data),
-        ]
+        def connect_utmi(m, src_utmi, snk_utmi):
+            """
+            Simulate a USB connection between 2 UTMI PHY interfaces by forwarding
+            packets between them. No effort is made to simulate other line states.
 
-        m.d.comb += dev.utmi.rx_active.eq(0)
-        sync_cnt_dut = Signal(2, init=0)
-        with m.If(dut.utmi.tx_valid):
-            m.d.comb += dev.utmi.rx_active.eq(1)
-            with m.If(sync_cnt_dut == 0x3):
-                m.d.comb += dut.utmi.tx_ready.eq(1)
+            This is definitely NOT adhering to the UTMI spec, however it is enough
+            for LUNA gateware to be happy talking to our simulated host, which means
+            we can test the higher layers of a host stack against a device stack.
+            """
+            m.d.comb += [
+                snk_utmi.rx_active.eq(0),
+                snk_utmi.rx_valid.eq(src_utmi.tx_valid & src_utmi.tx_ready),
+                snk_utmi.rx_data.eq(src_utmi.tx_data),
+            ]
+            # Simulate `rx_active` being asserted for a few cycles before `tx_ready`
+            # is asserted. This is kind of simulating the packet sync preamble arriving
+            # before the real data bytes arrive, which the LUNA depacketizer expects.
+            preamble_cnt = Signal(2, init=0)
+            with m.If(src_utmi.tx_valid):
+                m.d.comb += snk_utmi.rx_active.eq(1)
+                with m.If(preamble_cnt == 0x3):
+                    m.d.comb += src_utmi.tx_ready.eq(1)
+                with m.Else():
+                    m.d.sync += preamble_cnt.eq(preamble_cnt + 1)
             with m.Else():
-                m.d.sync += sync_cnt_dut.eq(sync_cnt_dut + 1)
-        with m.Else():
-            m.d.sync += sync_cnt_dut.eq(0)
+                m.d.sync += preamble_cnt.eq(0)
 
-        m.d.comb += dut.utmi.rx_active.eq(0)
-        sync_cnt_dev = Signal(2, init=0)
-        with m.If(dev.utmi.tx_valid):
-            m.d.comb += dut.utmi.rx_active.eq(1)
-            with m.If(sync_cnt_dev == 0x3):
-                m.d.comb += dev.utmi.tx_ready.eq(1)
-            with m.Else():
-                m.d.sync += sync_cnt_dev.eq(sync_cnt_dev + 1)
-        with m.Else():
-            m.d.sync += sync_cnt_dev.eq(0)
+        # host TX -> device RX streams
+        connect_utmi(m, hst.utmi, dev.utmi)
+        # device TX -> host RX streams
+        connect_utmi(m, dev.utmi, hst.utmi)
 
-        m.d.comb += dut.o_midi_bytes.ready.eq(1)
+        # Drain all outgoing USB-MIDI data.
+        m.d.comb += hst.o_midi_bytes.ready.eq(1)
 
         async def testbench(ctx):
-            pcap = USBPcapWriter("test_usb_integration.pcap", clock_freq_hz=60e6)
-            data_hd = []
-            data_dh = []
+            pcap = USBPcapWriter("test_usb_integration.pcap")
+            packet_hst = []
+            packet_dev = []
             cycle_count = 0
             for i in range(0, 100000):
+                timestamp_ns = int(1e9*(cycle_count/60e6))
+                # Host and device transfer attempts should never overlap.
+                assert not ctx.get(dev.utmi.rx_active & hst.utmi.rx_active)
+                # Monitor Host->Device traffic
                 if ctx.get(dev.utmi.rx_valid):
-                    data_hd.append(int(ctx.get(dev.utmi.rx_data)))
-                if ctx.get(dut.utmi.rx_valid):
-                    data_dh.append(int(ctx.get(dut.utmi.rx_data)))
-                if data_hd and ctx.get(~dev.utmi.rx_active):
-                    print("[H->D]", [hex(d) for d in data_hd])
-                    pcap.write_packet(data_hd, cycle_count, host_to_device=True)
-                    data_hd = []
-                if data_dh and ctx.get(~dut.utmi.rx_active):
-                    print("[D->H]", [hex(d) for d in data_dh])
-                    pcap.write_packet(data_dh, cycle_count, host_to_device=False)
-                    data_dh = []
+                    packet_hst.append(int(ctx.get(dev.utmi.rx_data)))
+                if packet_hst and ctx.get(~dev.utmi.rx_active):
+                    print(f'[{Fore.GREEN}HST{Style.RESET_ALL} t={timestamp_ns/1e9:.6f}] ', end='')
+                    print(':'.join(f"{byte:02x}" for byte in packet_hst), end=' ')
+                    print(USBPacketID.from_int(packet_hst[0]).name)
+                    pcap.write_packet(timestamp_ns, packet_hst)
+                    packet_hst = []
+                # Monitor Device->Host traffic
+                if ctx.get(hst.utmi.rx_valid):
+                    packet_dev.append(int(ctx.get(hst.utmi.rx_data)))
+                if packet_dev and ctx.get(~hst.utmi.rx_active):
+                    print(f'[{Fore.RED}DEV{Style.RESET_ALL} t={timestamp_ns/1e9:.6f}] ', end='')
+                    print(':'.join(f"{byte:02x}" for byte in packet_dev), end=' ')
+                    print(USBPacketID.from_int(packet_dev[0]).name)
+                    pcap.write_packet(timestamp_ns, packet_dev)
+                    packet_dev = []
                 cycle_count += 1
                 await ctx.tick()
             pcap.close()
