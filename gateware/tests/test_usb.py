@@ -191,14 +191,20 @@ class UsbTests(unittest.TestCase):
         m.d.comb += dut.o_midi_bytes.ready.eq(1)
 
         async def testbench(ctx):
-            for i in range(0, 100):
-                data = []
-                while ctx.get(~dut.utmi.tx_valid):
-                    await ctx.tick()
-                while ctx.get(dut.utmi.tx_valid):
-                    data.append(int(ctx.get(dut.utmi.tx_data)))
-                    await ctx.tick()
-                print("[packet]", [hex(d) for d in data])
+            data_hd = []
+            data_dh = []
+            for i in range(0, 100000):
+                if ctx.get(dev.utmi.rx_valid):
+                    data_hd.append(int(ctx.get(dev.utmi.rx_data)))
+                if ctx.get(dut.utmi.rx_valid):
+                    data_dh.append(int(ctx.get(dut.utmi.rx_data)))
+                if data_hd and ctx.get(~dev.utmi.rx_active):
+                    print("[H->D]", [hex(d) for d in data_hd])
+                    data_hd = []
+                if data_dh and ctx.get(~dut.utmi.rx_active):
+                    print("[D->H]", [hex(d) for d in data_dh])
+                    data_dh = []
+                await ctx.tick()
 
         sim = Simulator(m)
         sim.add_clock(1e-6)
