@@ -15,8 +15,11 @@ pub enum ColorPalette {
     Exp,
     #[default]
     Linear,
+    Dim,
     Gray,
     InvGray,
+    Inferno,
+    Hueswap,
 }
 
 fn hue2rgb(p: f32, q: f32, mut t: f32) -> f32 {
@@ -90,6 +93,11 @@ impl ColorPalette {
                 hsl2rgb((h as f32)/(n_h as f32), 0.9f32,
                         (i as f32)/(n_h as f32))
             },
+            ColorPalette::Dim => {
+                let rgb = hsl2rgb((h as f32)/(n_h as f32), 0.9f32,
+                                  (i as f32)/(n_h as f32));
+                RGB { r: rgb.r / 2, g: rgb.g / 2, b: rgb.b / 2 }
+            },
             ColorPalette::Gray => {
                 let gray: u8 = (i * 16) as u8;
                 RGB { r: gray, g: gray, b: gray }
@@ -97,6 +105,40 @@ impl ColorPalette {
             ColorPalette::InvGray => {
                 let gray: u8 = 255u8 - (i * 16) as u8;
                 RGB { r: gray, g: gray, b: gray }
+            },
+            ColorPalette::Inferno => {
+                // Inferno colormap from matplotlib, sampled at 16 points
+                // Maps intensity to color, ignoring hue (sequential colormap)
+                const INFERNO: [(u8, u8, u8); 16] = [
+                    (0, 0, 4),
+                    (10, 7, 34),
+                    (32, 12, 74),
+                    (60, 9, 101),
+                    (87, 16, 110),
+                    (114, 25, 110),
+                    (140, 41, 99),
+                    (165, 62, 79),
+                    (187, 86, 57),
+                    (206, 114, 36),
+                    (222, 143, 17),
+                    (234, 176, 5),
+                    (242, 210, 37),
+                    (248, 238, 85),
+                    (252, 252, 139),
+                    (252, 255, 164),
+                ];
+                let (r, g, b) = INFERNO[i as usize];
+                RGB { r, g, b }
+            },
+            ColorPalette::Hueswap => {
+                // Like Linear but with intensity and hue axes swapped
+                // Lowest intensity level (i=0) is black
+                if i == 0 {
+                    RGB { r: 0, g: 0, b: 0 }
+                } else {
+                    hsl2rgb((i as f32)/(n_i as f32), 0.9f32,
+                            (h as f32)/(n_h as f32))
+                }
             }
         }
     }
@@ -107,6 +149,42 @@ impl ColorPalette {
                 let rgb = self.compute_color(i, h);
                 video.set_palette_rgb(i as u8, h as u8, rgb.r, rgb.g, rgb.b);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{ImageBuffer, RgbImage, Rgb};
+    use strum::IntoEnumIterator;
+
+    const BLOCK_SIZE: u32 = 8;
+
+    /// Test to draw every pallette to an image file for previewing.
+    #[test]
+    fn test_plot_all_palettes() {
+        let width = PX_HUE_MAX as u32 * BLOCK_SIZE;
+        let height = PX_INTENSITY_MAX as u32 * BLOCK_SIZE;
+        for palette in ColorPalette::iter() {
+            let mut img: RgbImage = ImageBuffer::new(width, height);
+            for h in 0..PX_HUE_MAX {
+                for i in 0..PX_INTENSITY_MAX {
+                    let rgb = palette.compute_color(i, h);
+                    let pixel = Rgb([rgb.r, rgb.g, rgb.b]);
+                    let x_start = h as u32 * BLOCK_SIZE;
+                    let y_start = (PX_INTENSITY_MAX as u32 - 1 - i as u32) * BLOCK_SIZE;
+                    for dy in 0..BLOCK_SIZE {
+                        for dx in 0..BLOCK_SIZE {
+                            img.put_pixel(x_start + dx, y_start + dy, pixel);
+                        }
+                    }
+                }
+            }
+
+            let palette_name: &'static str = palette.into();
+            let filename = format!("palette_{}.png", palette_name);
+            img.save(&filename).unwrap();
         }
     }
 }
