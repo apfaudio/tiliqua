@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: CERN-OHL-S-2.0
 """
-Extremely bare-bones gateware-only USB MIDI host to CV. EXPERIMENTAL.
+Gateware-only USB MIDI host to CV converter.
 
 ***WARN*** because there is no SoC to do USB CC negotiation, this demo
 hardwires the VBUS output to ON !!!
@@ -18,14 +18,13 @@ from amaranth.build import *
 from amaranth.lib.cdc import FFSynchronizer
 from amaranth.lib import wiring
 
+from guh.engines.midi import USBMIDIHost
+
 from tiliqua import midi
 from tiliqua.build.cli import top_level_cli
 from tiliqua.build.types import BitstreamHelp
 from tiliqua.periph import eurorack_pmod
 from tiliqua.platform import RebootProvider
-from guh.engines.midi import USBMIDIHost
-from vendor.ila import AsyncSerialILA
-
 
 class USB2HostTest(Elaboratable):
 
