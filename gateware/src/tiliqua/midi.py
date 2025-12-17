@@ -169,7 +169,7 @@ class MidiDecode(wiring.Component):
                 with m.If(timeout == 0):
                     m.next = 'WAIT-VALID'
                 with m.Elif(self.i.valid):
-                    m.d.sync += self.o.payload.as_value()[16:24].eq(self.i.payload)
+                    m.d.sync += self.o.payload.as_value()[16:24].eq(i_payload)
                     m.next = 'WAIT-READY'
             with m.State('WAIT-READY'):
                 # Skip if it's a command we don't know how to parse.

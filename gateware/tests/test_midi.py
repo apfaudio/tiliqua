@@ -23,11 +23,17 @@ class MidiTests(unittest.TestCase):
         dut = midi.MidiDecode(usb=is_usb)
 
         async def testbench(ctx):
+
             if is_usb:
-                await stream.put(ctx, dut.i, 0x00)
-            await stream.put(ctx, dut.i, 0x92)
-            await stream.put(ctx, dut.i, 0x48)
-            await stream.put(ctx, dut.i, 0x96)
+                await stream.put(ctx, dut.i, {'first': 1, 'last': 0, 'data': 0x00}) # jack (ignored)
+                await stream.put(ctx, dut.i, {'first': 0, 'last': 0, 'data': 0x92})
+                await stream.put(ctx, dut.i, {'first': 0, 'last': 0, 'data': 0x48})
+                await stream.put(ctx, dut.i, {'first': 0, 'last': 1, 'data': 0x96})
+            else:
+                await stream.put(ctx, dut.i, 0x92)
+                await stream.put(ctx, dut.i, 0x48)
+                await stream.put(ctx, dut.i, 0x96)
+
             p = await stream.get(ctx, dut.o)
             self.assertEqual(p.midi_type, midi.MessageType.NOTE_ON)
             self.assertEqual(p.midi_channel, 2)
