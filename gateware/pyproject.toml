@@ -27,6 +27,11 @@ dependencies = [
     "colorama>=0.4.6",
 ]
 
+[tool.pdm.resolution.overrides]
+# note: guh depends on cyntion, which requires upstream luna-soc
+# this override resolves this dependency.
+luna-soc = "git+https://github.com/vk2seb/luna-soc@6ec272"
+
 [tool.pdm.dev-dependencies]
 test = [
     "pytest",
