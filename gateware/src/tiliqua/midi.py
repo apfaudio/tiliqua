@@ -12,6 +12,8 @@ from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 from amaranth_stdio.serial import AsyncSerialRX
 
+from luna.gateware.stream.future import Packet
+
 from amaranth_future import fixed
 
 from .dsp import ASQ  # hardware native fixed-point sample type
@@ -103,15 +105,16 @@ class MidiDecode(wiring.Component):
 
     By default, this core expects 3-byte RS232-style MIDI
     byte streams. If :py:`usb == True`, this core expects
-    4-byte USB-style MIDI byte streams.
+    4-byte 'Packet'-ized USB-style MIDI byte streams.
     """
 
-    i: In(stream.Signature(unsigned(8)))
-    o: Out(stream.Signature(MidiMessage))
 
     def __init__(self, usb=False):
         self.usb = usb
-        super().__init__()
+        super().__init__({
+            "i": In(stream.Signature(Packet(unsigned(8)) if usb else unsigned(8))),
+            "o": Out(stream.Signature(MidiMessage)),
+        })
 
     def elaborate(self, platform):
         m = Module()
@@ -122,20 +125,22 @@ class MidiDecode(wiring.Component):
         timeout_cycles = 60000 # 1msec
         m.d.sync += timeout.eq(timeout-1)
 
+        i_payload = self.i.payload.data if self.usb else self.i.payload
+
         with m.FSM() as fsm:
             with m.State('WAIT-VALID'):
                 m.d.comb += self.i.ready.eq(1),
                 # all valid command messages have highest bit set
                 if self.usb:
                     # 4-byte sequence
-                    with m.If(self.i.valid):
+                    with m.If(self.i.valid & self.i.payload.first):
                         m.d.sync += timeout.eq(timeout_cycles)
                         m.next = 'READU'
                 else:
                     # 3-byte sequence
-                    with m.If(self.i.valid & self.i.payload[7]):
+                    with m.If(self.i.valid & i_payload[7]):
                         m.d.sync += timeout.eq(timeout_cycles)
-                        m.d.sync += self.o.payload.as_value()[:8].eq(self.i.payload)
+                        m.d.sync += self.o.payload.as_value()[:8].eq(i_payload)
                         m.next = 'READ0'
 
             with m.State('READU'):
@@ -143,14 +148,14 @@ class MidiDecode(wiring.Component):
                 with m.If(timeout == 0):
                     m.next = 'WAIT-VALID'
                 with m.Elif(self.i.valid):
-                    m.d.sync += self.o.payload.as_value()[:8].eq(self.i.payload)
+                    m.d.sync += self.o.payload.as_value()[:8].eq(i_payload)
                     m.next = 'READ0'
             with m.State('READ0'):
                 m.d.comb += self.i.ready.eq(1),
                 with m.If(timeout == 0):
                     m.next = 'WAIT-VALID'
                 with m.Elif(self.i.valid):
-                    m.d.sync += self.o.payload.as_value()[8:16].eq(self.i.payload)
+                    m.d.sync += self.o.payload.as_value()[8:16].eq(i_payload)
                     with m.Switch(self.o.payload.midi_type):
                         # 1-byte payload
                         with m.Case(MessageType.CHANNEL_PRESSURE,
@@ -164,7 +169,7 @@ class MidiDecode(wiring.Component):
                 with m.If(timeout == 0):
                     m.next = 'WAIT-VALID'
                 with m.Elif(self.i.valid):
-                    m.d.sync += self.o.payload.as_value()[16:24].eq(self.i.payload)
+                    m.d.sync += self.o.payload.as_value()[16:24].eq(i_payload)
                     m.next = 'WAIT-READY'
             with m.State('WAIT-READY'):
                 # Skip if it's a command we don't know how to parse.

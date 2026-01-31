@@ -76,6 +76,8 @@ from amaranth.lib.fifo import SyncFIFOBuffered
 from amaranth.lib.wiring import In, Out, connect, flipped
 from amaranth_soc import csr
 
+from guh.engines.midi import USBMIDIHost
+
 from tiliqua import dsp, midi
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
@@ -84,8 +86,6 @@ from tiliqua.dsp import ASQ
 from tiliqua.raster import scope
 from tiliqua.raster.plot import FramebufferPlotter
 from tiliqua.tiliqua_soc import TiliquaSoc
-from tiliqua.usb_host import SimpleUSBMIDIHost
-
 
 class Diffuser(wiring.Component):
 
@@ -473,17 +473,11 @@ class PolySoc(TiliquaSoc):
 
             # USB MIDI host (experimental)
             ulpi = platform.request(platform.default_usb_connection)
-            m.submodules.usb = usb = SimpleUSBMIDIHost(
+            m.submodules.usb = usb = USBMIDIHost(
                     bus=ulpi,
-                    hardcoded_configuration_id=1,
-                    hardcoded_midi_endpoint=1,
             )
             m.submodules.midi_decode_usb = midi_decode_usb = midi.MidiDecode(usb=True)
-            wiring.connect(m, usb.o_midi_bytes, midi_decode_usb.i)
-            m.d.comb += [
-                usb.configuration_id.eq(self.synth_periph.usb_midi_cfg_id),
-                usb.midi_endpoint_id.eq(self.synth_periph.usb_midi_endpt_id),
-            ]
+            wiring.connect(m, usb.o_midi, midi_decode_usb.i)
 
             # Only enable VBUS if MIDI HOST is enabled.
             vbus_o = platform.request("usb_vbus_en").o
