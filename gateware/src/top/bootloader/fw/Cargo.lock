@@ -367,6 +367,7 @@ dependencies = [
  "heapless",
  "log",
  "micromath",
+ "num-traits",
  "opts-derive",
  "postcard",
  "sequential-storage",
