@@ -378,7 +378,7 @@ class Pitch(wiring.Component):
             psram_backed=True,
             write_triggers_read=False,
             addr_width_o=self.bus.addr_width,
-            base=0x00000,
+            base=0x0,
         )
 
         m.submodules.pitch_shift = pitch_shift = dsp.PitchShift(
@@ -556,14 +556,14 @@ class PSRAMPingPongDelay(wiring.Component):
             max_delay=0x4000, # careful this doesn't collide with delayln2.base!
             psram_backed=True,
             addr_width_o=self.bus.addr_width,
-            base=0x00000,
+            base=0x0,
         )
 
         self.delayln2 = dsp.DelayLine(
             max_delay=0x4000,
             psram_backed=True,
             addr_width_o=self.bus.addr_width,
-            base=0x4000,
+            base=0x4,
         )
 
         # Both delay lines share our memory bus round-robin for all operations.
@@ -677,25 +677,25 @@ class PSRAMDiffuser(wiring.Component):
                 max_delay=0x10000,
                 psram_backed=True,
                 addr_width_o=self.bus.addr_width,
-                base=0x00000,
+                base=0x000000,
             ),
             dsp.DelayLine(
                 max_delay=0x10000,
                 psram_backed=True,
                 addr_width_o=self.bus.addr_width,
-                base=0x10000,
+                base=0x100000,
             ),
             dsp.DelayLine(
                 max_delay=0x10000,
                 psram_backed=True,
                 addr_width_o=self.bus.addr_width,
-                base=0x20000,
+                base=0x200000,
             ),
             dsp.DelayLine(
                 max_delay=0x10000,
                 psram_backed=True,
                 addr_width_o=self.bus.addr_width,
-                base=0x30000,
+                base=0x300000,
             ),
         ]
 
@@ -826,7 +826,7 @@ class PSRAMMultiDiffuser(wiring.Component):
                             max_delay=max_delay,
                             psram_backed=True,
                             addr_width_o=self.bus.addr_width,
-                            base=n*spacing + max_delay*ix,
+                            base=2*(n*spacing + max_delay*ix),
                         )
                     )
                 else:
