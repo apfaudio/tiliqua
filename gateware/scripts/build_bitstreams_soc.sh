@@ -10,4 +10,5 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm selftest build" \
   "pdm xbeam build --fs-192khz" \
   "pdm macro_osc build" \
-  "pdm sid build"
+  "pdm sid build" \
+  "pdm sampler build"
