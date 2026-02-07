@@ -763,6 +763,63 @@ where
     Ok(())
 }
 
+// Helper to draw waveform peaks at a certain position given
+// an array of samples. No effort made to compute absolute magnitude
+// based on adjacent peaks, but this seems to look fine.
+// Currently only used in sampler bitstream.
+pub fn draw_waveform<D>(
+    d: &mut D,
+    x: u32, y: u32,
+    width: u32, height: u32,
+    hue: u8,
+    samples: &[i16],
+) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    let stroke = PrimitiveStyleBuilder::new()
+        .stroke_color(HI8::new(hue, 12))
+        .stroke_width(1)
+        .build();
+    let center_y = y + height / 2;
+    let half_height = (height / 2) as i32;
+    let sample_width = if samples.len() > 0 { width / samples.len() as u32 } else { 1 };
+    for (i, &sample) in samples.iter().enumerate() {
+        let x_pos = x + (i as u32 * sample_width);
+        let scaled = (sample as i32 * half_height) / 32768;
+        let y_top = (center_y as i32 - scaled.abs()) as i32;
+        let y_bot = (center_y as i32 + scaled.abs()) as i32;
+        Line::new(
+            Point::new(x_pos as i32, y_top),
+            Point::new(x_pos as i32, y_bot)
+        ).into_styled(stroke).draw(d)?;
+    }
+
+    Ok(())
+}
+
+// Single vertical line useful for position marks.
+pub fn draw_vline<D>(
+    d: &mut D,
+    x: u32, y: u32,
+    height: u32,
+    hue: u8,
+    intensity: u8,
+) -> Result<(), D::Error>
+where
+    D: DrawTarget<Color = HI8>,
+{
+    let stroke = PrimitiveStyleBuilder::new()
+        .stroke_color(HI8::new(hue, intensity))
+        .stroke_width(1)
+        .build();
+    Line::new(
+        Point::new(x as i32, y as i32),
+        Point::new(x as i32, (y + height) as i32)
+    ).into_styled(stroke).draw(d)?;
+    Ok(())
+}
+
 pub fn draw_benchmark_lines<D>(
     d: &mut D, count: u32, rng: &mut Rng) -> Result<(), D::Error>
 where
