@@ -441,9 +441,18 @@ class TiliquaDomainGeneratorPLLExternal(Elaboratable):
             locked_dvi = Signal()
             m.submodules.pll_dvi = create_dynamic_dvi_pll(self.reset_dvi_pll, locked_dvi)
 
+            # XXX/HACK: ensure clean reset deassertion.
+            # FFSync should be able to accomplish this, but for some reason, it did not.
+            # Tested by rebuilding all bitstreams, switching back and forth with power
+            # cycles about 100 times, no dvi domain initialization glitches seen.
+            m.domains += ClockDomain("_dvi_rstsync", reset_less=True, local=True)
+            m.d.comb += ClockSignal("_dvi_rstsync").eq(ClockSignal("dvi"))
+            lock_pipe = Signal(2, init=0)
+            m.d._dvi_rstsync += lock_pipe.eq(Cat(locked_dvi, lock_pipe[0]))
+
             m.d.comb += [
-                ResetSignal("dvi")  .eq(~locked_dvi),
-                ResetSignal("dvi5x").eq(~locked_dvi),
+                ResetSignal("dvi")  .eq(~locked_dvi | ~lock_pipe[1]),
+                ResetSignal("dvi5x").eq(~locked_dvi | ~lock_pipe[1]),
             ]
 
             # LED off when DVI PLL locked
