@@ -28,6 +28,12 @@ sid
 ^^^
 .. automodule:: top.sid.top
 
+.. _sampler:
+
+sampler
+^^^^^^^^
+.. automodule:: top.sampler.top
+
 .. _selftest:
 
 selftest

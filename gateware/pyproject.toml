@@ -54,6 +54,7 @@ selftest           = "src/top/selftest/top.py"
 xbeam              = "src/top/xbeam/top.py"
 macro_osc          = "src/top/macro_osc/top.py"
 sid                = "src/top/sid/top.py"
+sampler            = "src/top/sampler/top.py"
 # (Non-SoC bitstreams)
 dsp                = "src/top/dsp/top.py"
 beamrace           = "src/top/beamrace/top.py"
