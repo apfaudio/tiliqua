@@ -234,6 +234,9 @@ class _FramebufferBackend(wiring.Component):
                     final_y.eq(self.fbp.timings.v_active - 1 - abs_x),
                 ]
 
+        # pipeline: break critical path between rotation / pixel position.
+        final_x_r = Signal(signed(16))
+        final_y_r = Signal(signed(16))
 
         # Finally, compute pixel address in framebuffer.
         # NOTE: single multiplier used here!
@@ -243,9 +246,9 @@ class _FramebufferBackend(wiring.Component):
         pixel_addr = Signal(unsigned(32))
 
         m.d.comb += [
-            pixel_index.eq(final_x[0:2]),
-            x_offs.eq(final_x >> 2),
-            y_offs.eq(final_y),
+            pixel_index.eq(final_x_r[0:2]),
+            x_offs.eq(final_x_r >> 2),
+            y_offs.eq(final_y_r),
         ]
         fb_hwords = ((self.fbp.timings.h_active * self.pixel_bytes)
                      // self.pixels_per_word)
@@ -264,7 +267,14 @@ class _FramebufferBackend(wiring.Component):
                 m.d.comb += self.i.ready.eq(1)
                 with m.If(self.i.valid):
                     m.d.sync += current_req.eq(self.i.payload)
-                    m.next = 'CHECK-BOUNDS'
+                    m.next = 'TRANSFORM'
+
+            with m.State('TRANSFORM'):
+                m.d.sync += [
+                    final_x_r.eq(final_x),
+                    final_y_r.eq(final_y),
+                ]
+                m.next = 'CHECK-BOUNDS'
 
             with m.State('CHECK-BOUNDS'):
                 m.d.sync += [
