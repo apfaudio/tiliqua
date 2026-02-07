@@ -421,6 +421,9 @@ class WishboneAdapter(wiring.Component):
     """
     Adapter between external (dw=32) and internal (dw=ASQ.width) buses of DelayLine.
     Used to adapt the internal bus to the correct size for external memory.
+
+    The base address is specified in bytes. Internally, this is converted to
+    32-bit word addresses for the external bus.
     """
 
     def __init__(self, addr_width_i, addr_width_o, base, data_width_internal):
@@ -428,6 +431,7 @@ class WishboneAdapter(wiring.Component):
         # FIXME: this component should be parameterizable beyond 16-bit samples.
         # 16-bit samples are nice because 2 evenly fit in a 32-bit WB bus.
         assert data_width_internal == 16
+        assert (base & 0x3) == 0, "base address must be 4-byte aligned"
         super().__init__({
             "i": In(wishbone.Signature(addr_width=addr_width_i,
                                        data_width=data_width_internal,
@@ -440,9 +444,11 @@ class WishboneAdapter(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
+        # base is in bytes, output address is in 32-bit words
+        # sample index >> 1 because two 16-bit samples fit in one 32-bit word
         m.d.comb += [
             self.i.ack.eq(self.o.ack),
-            self.o.adr.eq((self.base<<2) + (self.i.adr>>1)),
+            self.o.adr.eq((self.base>>2) + (self.i.adr>>1)),
             self.o.we.eq(self.i.we),
             self.o.cyc.eq(self.i.cyc),
             self.o.stb.eq(self.i.stb),
