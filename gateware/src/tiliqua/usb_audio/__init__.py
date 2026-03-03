@@ -59,6 +59,7 @@ class USB2AudioInterface(wiring.Component):
     def __init__(self, *, audio_clock: pll.AudioClock, nr_channels):
         self.fs = 192000 if audio_clock.is_192khz() else 48000
         self.nr_channels = nr_channels
+        self.channel_config = (1 << nr_channels) - 1
         self.max_packet_size = int(32 * (self.fs // 48000) * self.nr_channels)
         super().__init__({
             "i":  In(stream.Signature(data.ArrayLayout(eurorack_pmod.ASQ, self.nr_channels))),
@@ -83,8 +84,8 @@ class USB2AudioInterface(wiring.Component):
 
             d.iManufacturer      = "apf.audio"
             d.iProduct           = "Tiliqua"
-            d.iSerialNumber      = "beta-0000"
-            d.bcdDevice          = 0.01
+            d.iSerialNumber      = "xbeam-ex0"
+            d.bcdDevice          = 0.02
 
             d.bNumConfigurations = 1
 
@@ -125,11 +126,8 @@ class USB2AudioInterface(wiring.Component):
         inputTerminal               = uac2.InputTerminalDescriptorEmitter()
         inputTerminal.bTerminalID   = 2
         inputTerminal.wTerminalType = uac2.USBTerminalTypes.USB_STREAMING
-        # The number of channels needs to be 2 here in order to be recognized
-        # default audio out device by Windows. We provide an alternate
-        # setting with the full channel count, which also references
-        # this terminal ID
         inputTerminal.bNrChannels   = self.nr_channels
+        inputTerminal.bmChannelConfig = self.channel_config
         inputTerminal.bCSourceID    = 1
         audioControlInterface.add_subordinate_descriptor(inputTerminal)
 
@@ -146,6 +144,7 @@ class USB2AudioInterface(wiring.Component):
         inputTerminal.bTerminalID   = 4
         inputTerminal.wTerminalType = uac2.InputTerminalTypes.MICROPHONE
         inputTerminal.bNrChannels   = self.nr_channels
+        inputTerminal.bmChannelConfig = self.channel_config
         inputTerminal.bCSourceID    = 1
         audioControlInterface.add_subordinate_descriptor(inputTerminal)
 
@@ -174,6 +173,7 @@ class USB2AudioInterface(wiring.Component):
         audioStreamingInterface.bFormatType   = uac2.FormatTypes.FORMAT_TYPE_I
         audioStreamingInterface.bmFormats     = uac2.TypeIFormats.PCM
         audioStreamingInterface.bNrChannels   = nr_channels
+        audioStreamingInterface.bmChannelConfig = self.channel_config
         c.add_subordinate_descriptor(audioStreamingInterface)
 
         # AudioStreaming Interface Descriptor (Type I)
@@ -216,13 +216,10 @@ class USB2AudioInterface(wiring.Component):
         quietAudioStreamingInterface.bAlternateSetting = 0
         c.add_subordinate_descriptor(quietAudioStreamingInterface)
 
-        # we need the default alternate setting to be stereo
-        # out for windows to automatically recognize
-        # and use this audio interface
         self.create_output_streaming_interface(c, nr_channels=self.nr_channels, alt_setting_nr=1)
 
 
-    def create_input_streaming_interface(self, c, *, nr_channels, alt_setting_nr, channel_config=0):
+    def create_input_streaming_interface(self, c, *, nr_channels, alt_setting_nr):
         # Interface Descriptor (Streaming, IN, active setting)
         activeAudioStreamingInterface = uac2.AudioStreamingInterfaceDescriptorEmitter()
         activeAudioStreamingInterface.bInterfaceNumber  = 2
@@ -236,7 +233,7 @@ class USB2AudioInterface(wiring.Component):
         audioStreamingInterface.bFormatType     = uac2.FormatTypes.FORMAT_TYPE_I
         audioStreamingInterface.bmFormats       = uac2.TypeIFormats.PCM
         audioStreamingInterface.bNrChannels     = nr_channels
-        audioStreamingInterface.bmChannelConfig = channel_config
+        audioStreamingInterface.bmChannelConfig = self.channel_config
         c.add_subordinate_descriptor(audioStreamingInterface)
 
         # AudioStreaming Interface Descriptor (Type I)
@@ -269,8 +266,8 @@ class USB2AudioInterface(wiring.Component):
         quietAudioStreamingInterface.bAlternateSetting = 0
         c.add_subordinate_descriptor(quietAudioStreamingInterface)
 
-        # Windows wants a stereo pair as default setting, so let's have it
-        self.create_input_streaming_interface(c, nr_channels=self.nr_channels, alt_setting_nr=1, channel_config=0x3)
+        self.create_input_streaming_interface(c, nr_channels=self.nr_channels, alt_setting_nr=1)
+
 
     def elaborate(self, platform):
         m = Module()

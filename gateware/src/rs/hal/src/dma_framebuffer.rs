@@ -362,6 +362,8 @@ macro_rules! impl_dma_framebuffer {
                 fn draw_line_solid(&mut self, start_x: i32, start_y: i32, end_x: i32, end_y: i32,
                                    stroke_width: u32, color: Self::Color) -> bool {
 
+                    return false;
+
                     // TODO: Check bounds? Bresenham hardware might do wierd stuff
                     // or stall forever if the line endpoints are off the screen...
 
