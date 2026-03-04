@@ -43,9 +43,9 @@ CPU_VARIANTS = {
     # enough performance for most control plane use
     # cases, assuming we are running from PSRAM
     "tiliqua_rv32im": CPU_BASE + [
-        '--lsu-l1-sets=8',
+        '--lsu-l1-sets=4',
         '--lsu-l1-ways=1',
-        '--fetch-l1-sets=8',
+        '--fetch-l1-sets=4',
         '--fetch-l1-ways=1',
     ],
     # special variant with big icache, necessary if

@@ -9,7 +9,6 @@ use core::cell::RefCell;
 
 use tiliqua_fw::*;
 use tiliqua_lib::*;
-use tiliqua_lib::dsp::OnePoleSmoother;
 use pac::constants::*;
 use tiliqua_lib::calibration::*;
 
@@ -93,6 +92,22 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
+    #[cfg(expander_ex0)]
+    {
+        info!("Loading calibration for expander EX0...");
+        let mut i2c_ex0 = I2cEx0::new(peripherals.I2C2);
+        let mut ex0_pmod = EurorackPmodEx0::new(peripherals.EX0_PMOD_PERIPH);
+        CalibrationConstants::load_or_default(&mut i2c_ex0, &mut ex0_pmod);
+    }
+
+    #[cfg(expander_ex1)]
+    {
+        info!("Loading calibration for expander EX1...");
+        let mut i2c_ex1 = I2cEx1::new(peripherals.I2C3);
+        let mut ex1_pmod = EurorackPmodEx1::new(peripherals.EX1_PMOD_PERIPH);
+        CalibrationConstants::load_or_default(&mut i2c_ex1, &mut ex1_pmod);
+    }
+
     //
     // Start up TUSB322 in UFP/Device mode
     //
@@ -125,8 +140,6 @@ fn main() -> ! {
     let app = Mutex::new(RefCell::new(App::new(opts)));
 
     handler!(timer0 = || timer0_handler(&app));
-
-    let mut delay_smoothers = [OnePoleSmoother::new(0.05f32); 4];
 
     irq::scope(|s| {
 
@@ -196,7 +209,7 @@ fn main() -> ! {
                     v_active,
                     opts.help.scroll.value,
                     opts.beam.ui_hue.value).ok();
-                persist.set_persist(128);
+                persist.set_persist(256);
                 persist.set_decay(1);
             } else {
                 persist.set_persist(opts.beam.persist.value);
@@ -262,10 +275,19 @@ fn main() -> ! {
                 }
             });
 
+            let plot_io_val: u8 = match opts.misc.plot_io.value {
+                PlotIO::Builtin => 0,
+                #[cfg(expander_ex0)]
+                PlotIO::Ex0 => 1,
+                #[cfg(expander_ex1)]
+                PlotIO::Ex1 => 2,
+            };
+
             xbeam_mux.flags().write(
                 |w| { w.usb_en().bit(opts.misc.usb_mode.value == USBMode::Enable);
                       w.show_outputs().bit(opts.misc.plot_src.value == PlotSrc::Outputs);
-                      w.usb_connect().bit(usb_cc_attached)
+                      w.usb_connect().bit(usb_cc_attached);
+                      unsafe { w.plot_io().bits(plot_io_val) }
                 } );
 
             // Grid overlay style/pixel (changes with options)
@@ -280,15 +302,6 @@ fn main() -> ! {
                 w.grid_style().bits(grid_style);
                 w.grid_pixel().bits(((opts.beam.grid_i.value as u8) << 4) | opts.beam.ui_hue.value)
             });
-
-            xbeam_mux.delay0().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[0].proc_u16(opts.delay.delay_x.value)) });
-            xbeam_mux.delay1().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[1].proc_u16(opts.delay.delay_y.value)) });
-            xbeam_mux.delay2().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[2].proc_u16(opts.delay.delay_i.value)) });
-            xbeam_mux.delay3().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[3].proc_u16(opts.delay.delay_c.value)) });
 
             display.rotate(&opts.misc.rotation.value);
 
