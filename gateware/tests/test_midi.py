@@ -20,12 +20,12 @@ class MidiTests(unittest.TestCase):
     ])
     def test_midi_decode(self, name, is_usb):
 
-        dut = midi.MidiDecode(usb=is_usb)
+        dut = midi.MidiDecodeUSB() if is_usb else midi.MidiDecodeSerial()
 
         async def testbench(ctx):
 
             if is_usb:
-                await stream.put(ctx, dut.i, {'first': 1, 'last': 0, 'data': 0x00}) # jack (ignored)
+                await stream.put(ctx, dut.i, {'first': 1, 'last': 0, 'data': 0x09}) # CIN=NOTE_ON
                 await stream.put(ctx, dut.i, {'first': 0, 'last': 0, 'data': 0x92})
                 await stream.put(ctx, dut.i, {'first': 0, 'last': 0, 'data': 0x48})
                 await stream.put(ctx, dut.i, {'first': 0, 'last': 1, 'data': 0x96})
@@ -35,8 +35,8 @@ class MidiTests(unittest.TestCase):
                 await stream.put(ctx, dut.i, 0x96)
 
             p = await stream.get(ctx, dut.o)
-            self.assertEqual(p.midi_type, midi.MessageType.NOTE_ON)
-            self.assertEqual(p.midi_channel, 2)
+            self.assertEqual(p.status.kind, midi.Status.Kind.NOTE_ON)
+            self.assertEqual(p.status.nibble.channel, 2)
             self.assertEqual(p.midi_payload.note_on.note, 0x48)
             self.assertEqual(p.midi_payload.note_on.velocity, 0x96)
 
@@ -44,6 +44,133 @@ class MidiTests(unittest.TestCase):
         sim.add_clock(1e-6)
         sim.add_testbench(testbench)
         with sim.write_vcd(vcd_file=open(f"test_midi_decode_{name}.vcd", "w")):
+            sim.run()
+
+    def test_midi_decode_rt(self):
+
+        dut = midi.MidiDecodeSerial(forward_rt=True)
+
+        async def testbench(ctx):
+
+            # Test 1: RT CLOCK between status and note
+            await stream.put(ctx, dut.i, 0x92)        # NOTE_ON ch2
+            await stream.put(ctx, dut.i, 0xF8)        # RT CLOCK
+            await stream.put(ctx, dut.i, 0x48)        # note
+            await stream.put(ctx, dut.i, 0x96)        # velocity
+
+            p = await stream.get(ctx, dut.o)
+            self.assertEqual(p.status.kind, midi.Status.Kind.NOTE_ON)
+            self.assertEqual(p.status.nibble.channel, 2)
+            self.assertEqual(p.midi_payload.note_on.note, 0x48)
+            self.assertEqual(p.midi_payload.note_on.velocity, 0x96)
+
+            rt = await stream.get(ctx, dut.o_rt)
+            self.assertEqual(rt, midi.Status.RT.CLOCK)
+
+            # Test 2: RT CLOCK and RT START status / note bytes
+            await stream.put(ctx, dut.i, 0x93)        # NOTE_ON ch3
+            await stream.put(ctx, dut.i, 0x50)        # note
+            await stream.put(ctx, dut.i, 0xFA)        # RT START
+            await stream.put(ctx, dut.i, 0xF8)        # RT CLOCK
+            await stream.put(ctx, dut.i, 0x7F)        # velocity
+
+            p = await stream.get(ctx, dut.o)
+            self.assertEqual(p.status.kind, midi.Status.Kind.NOTE_ON)
+            self.assertEqual(p.status.nibble.channel, 3)
+            self.assertEqual(p.midi_payload.note_on.note, 0x50)
+            self.assertEqual(p.midi_payload.note_on.velocity, 0x7F)
+
+            rt = await stream.get(ctx, dut.o_rt)
+            self.assertEqual(rt, midi.Status.RT.START)
+            rt = await stream.get(ctx, dut.o_rt)
+            self.assertEqual(rt, midi.Status.RT.CLOCK)
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open("test_midi_decode_rt.vcd", "w")):
+            sim.run()
+
+    def test_midi_decode_running_status(self):
+
+        dut = midi.MidiDecodeSerial()
+
+        async def testbench(ctx):
+            await stream.put(ctx, dut.i, 0x92)        # NOTE_ON ch2
+            await stream.put(ctx, dut.i, 0x48)        # note
+            await stream.put(ctx, dut.i, 0x60)        # velocity
+
+            p = await stream.get(ctx, dut.o)
+            self.assertEqual(p.status.kind, midi.Status.Kind.NOTE_ON)
+            self.assertEqual(p.midi_payload.note_on.note, 0x48)
+            self.assertEqual(p.midi_payload.note_on.velocity, 0x60)
+
+            # no status byte, just data
+            await stream.put(ctx, dut.i, 0x4C)        # note
+            await stream.put(ctx, dut.i, 0x70)        # velocity
+
+            p = await stream.get(ctx, dut.o)
+            self.assertEqual(p.status.kind, midi.Status.Kind.NOTE_ON)
+            self.assertEqual(p.status.nibble.channel, 2)
+            self.assertEqual(p.midi_payload.note_on.note, 0x4C)
+            self.assertEqual(p.midi_payload.note_on.velocity, 0x70)
+
+            # different note, vel
+            await stream.put(ctx, dut.i, 0x3A)        # note
+            await stream.put(ctx, dut.i, 0x61)        # velocity
+
+            p = await stream.get(ctx, dut.o)
+            self.assertEqual(p.status.kind, midi.Status.Kind.NOTE_ON)
+            self.assertEqual(p.status.nibble.channel, 2)
+            self.assertEqual(p.midi_payload.note_on.note, 0x3A)
+            self.assertEqual(p.midi_payload.note_on.velocity, 0x61)
+
+            # Normal status byte again (full msg) on a different channel
+            await stream.put(ctx, dut.i, 0x93)        # NOTE_ON ch3
+            await stream.put(ctx, dut.i, 0x48)        # note
+            await stream.put(ctx, dut.i, 0x60)        # velocity
+
+            p = await stream.get(ctx, dut.o)
+            self.assertEqual(p.status.kind, midi.Status.Kind.NOTE_ON)
+            self.assertEqual(p.status.nibble.channel, 3)
+            self.assertEqual(p.midi_payload.note_on.note, 0x48)
+            self.assertEqual(p.midi_payload.note_on.velocity, 0x60)
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open("test_midi_decode_running_status.vcd", "w")):
+            sim.run()
+
+    def test_midi_decode_sysex_strip(self):
+
+        dut = midi.MidiDecodeSerial()
+
+        async def testbench(ctx):
+
+            # Sysex: should be silently consumed, not cause backpressure.
+            await stream.put(ctx, dut.i, 0xF0)        # sysex start
+            await stream.put(ctx, dut.i, 0x7E)        # data
+            await stream.put(ctx, dut.i, 0x01)        # data
+            await stream.put(ctx, dut.i, 0x23)        # data
+            await stream.put(ctx, dut.i, 0xF7)        # sysex end
+
+            # Normal channel message
+            await stream.put(ctx, dut.i, 0x93)        # NOTE_ON ch3
+            await stream.put(ctx, dut.i, 0x50)        # note
+            await stream.put(ctx, dut.i, 0x7F)        # velocity
+
+            # Should only see the channel message
+            p = await stream.get(ctx, dut.o)
+            self.assertEqual(p.status.kind, midi.Status.Kind.NOTE_ON)
+            self.assertEqual(p.status.nibble.channel, 3)
+            self.assertEqual(p.midi_payload.note_on.note, 0x50)
+            self.assertEqual(p.midi_payload.note_on.velocity, 0x7F)
+
+        sim = Simulator(dut)
+        sim.add_clock(1e-6)
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open("test_midi_decode_sysex_strip.vcd", "w")):
             sim.run()
 
     def test_midi_voice_tracker(self):
@@ -56,8 +183,10 @@ class MidiTests(unittest.TestCase):
             """Send some MIDI NOTE_ON events."""
             for note in note_range:
                 await stream.put(ctx, dut.i, {
-                    'midi_type': midi.MessageType.NOTE_ON,
-                    'midi_channel': 1,
+                    'status': {
+                        'kind': midi.Status.Kind.NOTE_ON,
+                        'nibble': {'channel': 1},
+                    },
                     'midi_payload': {
                         'note_on': {
                             'note': note,
@@ -70,8 +199,10 @@ class MidiTests(unittest.TestCase):
 
             for note in note_range:
                 await stream.put(ctx, dut.i, {
-                    'midi_type': midi.MessageType.NOTE_OFF,
-                    'midi_channel': 1,
+                    'status': {
+                        'kind': midi.Status.Kind.NOTE_OFF,
+                        'nibble': {'channel': 1},
+                    },
                     'midi_payload': {
                         'note_off': {
                             'note': note,

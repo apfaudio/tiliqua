@@ -51,7 +51,7 @@ class USB2HostTest(Elaboratable):
                 bus=ulpi,
         )
 
-        m.submodules.midi_decode = midi_decode = midi.MidiDecode(usb=True)
+        m.submodules.midi_decode = midi_decode = midi.MidiDecodeUSB()
         wiring.connect(m, usb.o_midi, midi_decode.i)
 
         m.submodules.pmod0_provider = pmod0_provider = eurorack_pmod.FFCProvider()

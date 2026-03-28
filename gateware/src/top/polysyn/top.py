@@ -566,7 +566,7 @@ class PolySoc(TiliquaSoc):
             midi_pins = platform.request("midi")
             m.submodules.serialrx = serialrx = midi.SerialRx(
                     system_clk_hz=60e6, pins=midi_pins)
-            m.submodules.midi_decode_trs = midi_decode_trs = midi.MidiDecode()
+            m.submodules.midi_decode_trs = midi_decode_trs = midi.MidiDecodeSerial()
             wiring.connect(m, serialrx.o, midi_decode_trs.i)
 
             # USB MIDI host (experimental)
@@ -574,7 +574,7 @@ class PolySoc(TiliquaSoc):
             m.submodules.usb = usb = USBMIDIHost(
                     bus=ulpi,
             )
-            m.submodules.midi_decode_usb = midi_decode_usb = midi.MidiDecode(usb=True)
+            m.submodules.midi_decode_usb = midi_decode_usb = midi.MidiDecodeUSB()
             wiring.connect(m, usb.o_midi, midi_decode_usb.i)
 
             # Only enable VBUS if MIDI HOST is enabled.

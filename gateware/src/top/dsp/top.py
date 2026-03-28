@@ -1126,7 +1126,7 @@ class CoreTop(Elaboratable):
             midi_pins = platform.request("midi")
             m.submodules.serialrx = serialrx = midi.SerialRx(
                     system_clk_hz=60e6, pins=midi_pins)
-            m.submodules.midi_decode = midi_decode = midi.MidiDecode()
+            m.submodules.midi_decode = midi_decode = midi.MidiDecodeSerial()
             wiring.connect(m, serialrx.o, midi_decode.i)
             wiring.connect(m, midi_decode.o, self.core.i_midi)
 
