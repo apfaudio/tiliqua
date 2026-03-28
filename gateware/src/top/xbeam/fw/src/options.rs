@@ -3,7 +3,6 @@ use strum_macros::{EnumIter, IntoStaticStr};
 use tiliqua_lib::palette::ColorPalette;
 pub use tiliqua_lib::scope::{Timebase, VScale};
 use tiliqua_hal::dma_framebuffer::Rotate;
-use tiliqua_pac::constants::AUDIO_FS;
 use serde_derive::{Serialize, Deserialize};
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
@@ -12,7 +11,6 @@ pub enum Page {
     #[default]
     Help,
     Vector,
-    Delay,
     Beam,
     Misc,
     Scope1,
@@ -61,6 +59,17 @@ pub enum HelpPage {
 
 #[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
+pub enum PlotIO {
+    #[default]
+    Builtin,
+    #[cfg(expander_ex0)]
+    Ex0,
+    #[cfg(expander_ex1)]
+    Ex1,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[strum(serialize_all = "kebab-case")]
 pub enum GridOverlay {
     Off,
     Grid,
@@ -68,7 +77,6 @@ pub enum GridOverlay {
     Cross,
 }
 
-int_params!(DelayParams<u16>      { step: 8, min: 0, max: 512, format: IntFormat::Scaled { divisor: AUDIO_FS / 1000, precision: 1, suffix: "ms" } });
 int_params!(PCScaleParams<u8>     { step: 1, min: 0, max: 15 });
 int_params!(PersistParams<u16>    { step: 32, min: 32, max: 4096 });
 int_params!(DecayParams<u8>       { step: 1, min: 0, max: 15 });
@@ -108,18 +116,6 @@ pub struct VectorOpts {
 }
 
 #[derive(OptionPage, Clone)]
-pub struct DelayOpts {
-    #[option(0)]
-    pub delay_x: IntOption<DelayParams>,
-    #[option(0)]
-    pub delay_y: IntOption<DelayParams>,
-    #[option(0)]
-    pub delay_i: IntOption<DelayParams>,
-    #[option(0)]
-    pub delay_c: IntOption<DelayParams>,
-}
-
-#[derive(OptionPage, Clone)]
 pub struct BeamOpts {
     #[option(32)]
     pub persist: IntOption<PersistParams>,
@@ -141,6 +137,8 @@ pub struct MiscOpts {
     pub plot_type: EnumOption<PlotType>,
     #[option]
     pub plot_src: EnumOption<PlotSrc>,
+    #[option]
+    pub plot_io: EnumOption<PlotIO>,
     #[option]
     pub usb_mode: EnumOption<USBMode>,
     #[option]
@@ -197,8 +195,6 @@ pub struct Opts {
 
     #[page(Page::Vector)]
     pub vector: VectorOpts,
-    #[page(Page::Delay)]
-    pub delay: DelayOpts,
     #[page(Page::Beam)]
     pub beam: BeamOpts,
 }

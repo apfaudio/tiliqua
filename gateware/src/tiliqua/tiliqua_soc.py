@@ -239,7 +239,7 @@ class TiliquaSoc(Component):
 
         # Pixel plotting, blending, rotation backend (no CSR interface)
         self.framebuffer_plotter = plot.FramebufferPlotter(
-            bus_signature=self.psram_periph.bus.signature.flip(), n_ports=3)
+            bus_signature=self.psram_periph.bus.signature.flip(), n_ports=2)
         self.psram_periph.add_master(self.framebuffer_plotter.bus)
 
         # Pixel plotter CSR interface
@@ -356,12 +356,12 @@ class TiliquaSoc(Component):
         m.submodules.pixel_plot = self.pixel_plot
         m.submodules.framebuffer_plotter = self.framebuffer_plotter
         m.submodules.blit = self.blit
-        m.submodules.line = self.line
+        #m.submodules.line = self.line
 
         # Connect peripherals to plotter ports
         wiring.connect(m, self.pixel_plot.o, self.framebuffer_plotter.i[0])
         wiring.connect(m, self.blit.o, self.framebuffer_plotter.i[1])
-        wiring.connect(m, self.line.o, self.framebuffer_plotter.i[2])
+        #wiring.connect(m, self.line.o, self.framebuffer_plotter.i[2])
 
         # Connect static/dynamic framebuffer properties to components that need them
         if self.clock_settings.modeline:
@@ -393,7 +393,7 @@ class TiliquaSoc(Component):
             wiring.connect(m, self.pmod0.pins, pmod0_provider.pins)
 
             # die temperature
-            m.submodules.dtr0 = self.dtr0
+            # m.submodules.dtr0 = self.dtr0
 
             # generate our domain clocks/resets
             m.submodules.car = car = platform.clock_domain_generator(self.clock_settings)
@@ -409,7 +409,7 @@ class TiliquaSoc(Component):
                 m.d.comb += platform.request("mobo_leds_oe").o.eq(1),
 
             # Connect encoder button to RebootProvider
-            m.submodules.reboot = reboot = RebootProvider(self.clock_settings.frequencies.sync)
+            m.submodules.reboot = self.reboot = reboot = RebootProvider(self.clock_settings.frequencies.sync)
             m.d.comb += reboot.button.eq(self.encoder0._button.f.button.r_data)
             m.d.comb += self.pmod0_periph.mute.eq(reboot.mute)
         else:
