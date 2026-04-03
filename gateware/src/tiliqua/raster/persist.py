@@ -32,6 +32,7 @@ class Persistance(wiring.Component):
             # Tweakables
             "holdoff": In(16, init=holdoff_default),
             "decay": In(4, init=1),
+            "skip": In(8, init=0),
             # DMA bus / fb
             "bus":  Out(bus_signature),
             "fbp": In(DMAFramebuffer.Properties()),
@@ -70,10 +71,20 @@ class Persistance(wiring.Component):
 
         # Latched version of decay speed control input
         decay_latch = Signal.like(self.decay)
+        # Latched version of skip probability control input
+        skip_latch = Signal.like(self.skip)
         # Track delay between read/write bursts
         holdoff_count = Signal(32)
         # Incoming pixel array (read from FIFO)
         pixels_r = Signal(data.ArrayLayout(Pixel, 4))
+
+        # Free-running LFSR for probabilistic pixel skipping.
+        lfsr0 = Signal(unsigned(32), init=0x67452301)
+        lfsr1 = Signal(unsigned(32), init=0xefcdab89)
+        lfsr1_next = Signal(unsigned(32))
+        m.d.comb += lfsr1_next.eq(lfsr1 + lfsr0)
+        m.d.sync += lfsr1.eq(lfsr1_next)
+        m.d.sync += lfsr0.eq(lfsr0 ^ lfsr1_next)
 
         m.d.comb += self.fifo.w_data.eq(bus.dat_r)
 
@@ -101,6 +112,7 @@ class Persistance(wiring.Component):
 
             with m.State('BURST-IN'):
                 m.d.sync += decay_latch.eq(self.decay)
+                m.d.sync += skip_latch.eq(self.skip)
                 m.d.comb += [
                     bus.stb.eq(1),
                     bus.cyc.eq(1),
@@ -135,12 +147,17 @@ class Persistance(wiring.Component):
 
             with m.State('BURST-OUT'):
                 # The actual persistance calculation. 4 pixels at a time.
+                #
+                # Per-pixel LFSR comparison decides whether to decay or
+                # write back unchanged (probabilistic skip).
                 pixels_w = Signal(data.ArrayLayout(Pixel, 4))
                 for n in range(4):
-                    # color
+                    skip_this = Signal(name=f"skip_{n}")
+                    m.d.comb += skip_this.eq(lfsr1[n*8:(n*8)+8] < skip_latch)
                     m.d.comb += pixels_w[n].color.eq(pixels_r[n].color)
-                    # intensity
-                    with m.If(pixels_r[n].intensity >= decay_latch):
+                    with m.If(skip_this):
+                        m.d.comb += pixels_w[n].intensity.eq(pixels_r[n].intensity)
+                    with m.Elif(pixels_r[n].intensity >= decay_latch):
                         m.d.comb += pixels_w[n].intensity.eq(pixels_r[n].intensity - decay_latch)
                     with m.Else():
                         m.d.comb += pixels_w[n].intensity.eq(0)
@@ -184,6 +201,9 @@ class Peripheral(wiring.Component):
     class DecayReg(csr.Register, access="w"):
         decay: csr.Field(csr.action.W, unsigned(8))
 
+    class SkipReg(csr.Register, access="w"):
+        skip: csr.Field(csr.action.W, unsigned(8))
+
     def __init__(self, bus_dma):
         self.en = Signal()
         self.persist = Persistance(bus_signature=bus_dma.bus.signature.flip())
@@ -193,6 +213,7 @@ class Peripheral(wiring.Component):
 
         self._persist      = regs.add("persist",      self.PersistReg(),     offset=0x0)
         self._decay        = regs.add("decay",        self.DecayReg(),       offset=0x4)
+        self._skip         = regs.add("skip",         self.SkipReg(),        offset=0x8)
 
         self._bridge = csr.Bridge(regs.as_memory_map())
 
@@ -215,5 +236,8 @@ class Peripheral(wiring.Component):
 
         with m.If(self._decay.f.decay.w_stb):
             m.d.sync += self.persist.decay.eq(self._decay.f.decay.w_data)
+
+        with m.If(self._skip.f.skip.w_stb):
+            m.d.sync += self.persist.skip.eq(self._skip.f.skip.w_data)
 
         return m
