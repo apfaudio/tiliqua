@@ -106,10 +106,11 @@ can also be used to control most of these through CCs as follows:
 
         BEAM    persist       40  phosphor decay speed (high = slow)
         BEAM    decay         41  phosphor decay amount (low = slow)
-        BEAM    ui-hue        42  menu and grid overlay hue
-        BEAM    palette       43  color palette
-        BEAM    grid          44  grid overlay style
-        BEAM    grid-i        45  grid overlay intensity
+        BEAM    skip          42  probabilistic decay skip (high = more)
+        BEAM    ui-hue        43  menu and grid overlay hue
+        BEAM    palette       44  color palette
+        BEAM    grid          45  grid overlay style
+        BEAM    grid-i        46  grid overlay intensity
 
         MISC    plot-type     50  vectorscope or oscilloscope
         MISC    plot-src      51  plot inputs or outputs

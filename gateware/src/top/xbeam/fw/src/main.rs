@@ -60,13 +60,14 @@ fn build_cc_mapper(opts: &Opts) -> MidiCcMapper {
     m.add(31, global_index(opts, &opts.delay.delay_y),    CcMapMode::Absolute);
     m.add(32, global_index(opts, &opts.delay.delay_i),    CcMapMode::Absolute);
     m.add(33, global_index(opts, &opts.delay.delay_c),    CcMapMode::Absolute);
-    // Beam page (CC 40-45)
+    // Beam page (CC 40-46)
     m.add(40, global_index(opts, &opts.beam.persist),     CcMapMode::Absolute);
     m.add(41, global_index(opts, &opts.beam.decay),       CcMapMode::Absolute);
-    m.add(42, global_index(opts, &opts.beam.ui_hue),      CcMapMode::Absolute);
-    m.add(43, global_index(opts, &opts.beam.palette),     CcMapMode::Absolute);
-    m.add(44, global_index(opts, &opts.beam.grid),        CcMapMode::Absolute);
-    m.add(45, global_index(opts, &opts.beam.grid_i),      CcMapMode::Absolute);
+    m.add(42, global_index(opts, &opts.beam.skip),        CcMapMode::Absolute);
+    m.add(43, global_index(opts, &opts.beam.ui_hue),      CcMapMode::Absolute);
+    m.add(44, global_index(opts, &opts.beam.palette),     CcMapMode::Absolute);
+    m.add(45, global_index(opts, &opts.beam.grid),        CcMapMode::Absolute);
+    m.add(46, global_index(opts, &opts.beam.grid_i),      CcMapMode::Absolute);
     // Misc page (CC 50-52)
     m.add(50, global_index(opts, &opts.misc.plot_type),   CcMapMode::Absolute);
     m.add(51, global_index(opts, &opts.misc.plot_src),    CcMapMode::Absolute);
@@ -283,9 +284,11 @@ fn main() -> ! {
                     opts.beam.ui_hue.value).ok();
                 persist.set_persist(128);
                 persist.set_decay(1);
+                persist.set_skip(0);
             } else {
                 persist.set_persist(opts.beam.persist.value);
                 persist.set_decay(opts.beam.decay.value);
+                persist.set_skip(opts.beam.skip.value);
             }
 
 

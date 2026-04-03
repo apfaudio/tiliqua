@@ -1,6 +1,7 @@
 pub trait Persist {
     fn set_persist(&mut self, value: u16);
     fn set_decay(&mut self, value: u8);
+    fn set_skip(&mut self, value: u8);
 }
 
 #[macro_export]
@@ -27,6 +28,10 @@ macro_rules! impl_persist {
 
                 fn set_decay(&mut self, value: u8)  {
                     self.registers.decay().write(|w| unsafe { w.decay().bits(value) } );
+                }
+
+                fn set_skip(&mut self, value: u8)  {
+                    self.registers.skip().write(|w| unsafe { w.skip().bits(value) } );
                 }
 
             }
