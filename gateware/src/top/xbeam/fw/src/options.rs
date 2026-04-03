@@ -147,7 +147,7 @@ pub struct BeamOpts {
     #[option(1)]
     pub decay: IntOption<DecayParams>,
     #[option(0)]
-    pub skip: IntOption<SkipParams>,
+    pub rnd_skip: IntOption<SkipParams>,
     #[option(10)]
     pub ui_hue: IntOption<HueParams>,
     #[option]

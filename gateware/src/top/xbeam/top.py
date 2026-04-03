@@ -106,7 +106,7 @@ can also be used to control most of these through CCs as follows:
 
         BEAM    persist       40  phosphor decay speed (high = slow)
         BEAM    decay         41  phosphor decay amount (low = slow)
-        BEAM    skip          42  probabilistic decay skip (high = more)
+        BEAM    rnd-skip      42  probabilistic decay skip (high = more)
         BEAM    ui-hue        43  menu and grid overlay hue
         BEAM    palette       44  color palette
         BEAM    grid          45  grid overlay style

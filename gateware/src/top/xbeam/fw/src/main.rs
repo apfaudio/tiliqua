@@ -63,7 +63,7 @@ fn build_cc_mapper(opts: &Opts) -> MidiCcMapper {
     // Beam page (CC 40-46)
     m.add(40, global_index(opts, &opts.beam.persist),     CcMapMode::Absolute);
     m.add(41, global_index(opts, &opts.beam.decay),       CcMapMode::Absolute);
-    m.add(42, global_index(opts, &opts.beam.skip),        CcMapMode::Absolute);
+    m.add(42, global_index(opts, &opts.beam.rnd_skip),        CcMapMode::Absolute);
     m.add(43, global_index(opts, &opts.beam.ui_hue),      CcMapMode::Absolute);
     m.add(44, global_index(opts, &opts.beam.palette),     CcMapMode::Absolute);
     m.add(45, global_index(opts, &opts.beam.grid),        CcMapMode::Absolute);
@@ -288,7 +288,7 @@ fn main() -> ! {
             } else {
                 persist.set_persist(opts.beam.persist.value);
                 persist.set_decay(opts.beam.decay.value);
-                persist.set_skip(opts.beam.skip.value);
+                persist.set_skip(opts.beam.rnd_skip.value);
             }
 
 
