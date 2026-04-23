@@ -16,16 +16,43 @@ from . import ASQ, mac
 class WaveShaper(wiring.Component):
 
     """
-    Waveshaper that maps x to f(x), where the function must be
-    stateless so we can precompute a mapping lookup table.
+    ``Waveshaper`` maps every sample ``x`` to ``f(x)``, where ``f``
+    can be any arbitrary python function.
 
-    Linear interpolation is used between lut elements.
+    ``f(x)`` is evaluated at ``N=lut_size`` points at elaboration time,
+    to create a LUT (lookup table ROM) mapping the input domain (``ASQ``)
+    to output samples. For any input sample that sits between elements in the
+    ROM, linear interpolation is used to determine the output sample.
+
+    This can be used for waveshaping, but is also useful for arbitrary
+    remapping of samples, for example tanh-based soft clipping, linear-
+    to exponential or linear-to-log space conversion.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(ASQ))`
+        Input stream for sending samples to the waveshaper.
+
+    o : :py:`In(stream.Signature(ASQ))`
+        Output stream for getting samples from the waveshaper.
     """
 
     i: In(stream.Signature(ASQ))
     o: Out(stream.Signature(ASQ))
 
     def __init__(self, lut_function=None, lut_size=512, continuous=False, macp=None):
+        """
+        lut_function : function
+            Function taking and emitting ``float`` values in a valid ``ASQ`` range.
+        lut_size : int
+            Size of the LUT ROM in elements. Larger provides a better approximation.
+        continuous : bool
+            Behavior of linear interpolation at ``ASQ`` endpoints. For ``ASQ.i_bits==1``
+            and for a function where ``f(+1) ~= f(-1)``, this should be used to ensure an
+            incoming saw results in a continuous output.
+        macp : mac.MAC
+            Optional shared MAC provider.
+        """
         self.lut_size = lut_size
         self.lut_addr_width = exact_log2(lut_size)
         self.continuous = continuous
