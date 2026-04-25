@@ -154,16 +154,44 @@ class WaveShaper(wiring.Component):
 class PitchShift(wiring.Component):
 
     """
-    Granular pitch shifter. Works by crossfading 2 separately
-    tracked taps on a delay line. As a result, maximum grain
-    size is the delay line 'max_delay' // 2.
+    Granular pitch shifter. Works by crossfading 2 separately tracked taps on
+    a delay line - both tap positions are moving towards the write head (for
+    pitching up) or away from the write head (for pitching down). Whenever
+    the tap positions are close to overflowing, the discontinuity is smoothed
+    by a crossfade of length ``xfade``.
 
-    The delay line tap itself must be hooked up to the input
-    source from outside this component (this allows multiple
-    shifters to share a single delay line).
+    Maximum pitch-shifting grain size is the delay line 'max_delay' // 2. Smaller
+    grain sizes or crossfades result in a 'fluttering' effect, but have lower latency.
+    To reduce fluttering at low latency, one can dynamically track the ``grain_sz``
+    based on the input frequency.
+
+    The delay line write head must be hooked up to the input source from outside this
+    component (this allows multiple shifters to share a single delay line).
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(StructLayout({"pitch": ..., "grain_sz": ...}))`
+        Input stream, one element per desired output sample. ``pitch`` is a
+        ``fixed.SQ``i where 0 is no pitch shift, positive shifts up (e.g. 1 is 2x speed),
+        negative shifts down. ``grain_sz`` is the length of audio grain used for pitch
+        shifting - up to the ``tap.max_delay``
+
+    o : :py:`In(stream.Signature(ASQ))`
+        Output stream of pitch shifted samples.
     """
 
     def __init__(self, tap, xfade=256, macp=None):
+        """
+        tap : delay_line.DelayLineTap()
+            ``DelayLineTap`` which pitch shifter reads at 2 tap positions for every
+            output sample. The delayline write head must be hooked up to the input source.
+        xfade : int
+            Crossfade length between taps, in samples. Crossfades occur at every
+            transition where we switch from one part of the delayline to the other.
+            Longer crossfades and grain sizes produce less 'fluttering'.
+        macp : mac.MAC
+            Optional shared MAC provider.
+        """
         assert xfade <= (tap.max_delay // 4)
         self.tap        = tap
         self.xfade      = xfade
