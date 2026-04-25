@@ -172,7 +172,7 @@ class PitchShift(wiring.Component):
     -------
     i : :py:`In(stream.Signature(StructLayout({"pitch": ..., "grain_sz": ...}))`
         Input stream, one element per desired output sample. ``pitch`` is a
-        ``fixed.SQ``i where 0 is no pitch shift, positive shifts up (e.g. 1 is 2x speed),
+        ``fixed.SQ`` i where 0 is no pitch shift, positive shifts up (e.g. 1 is 2x speed),
         negative shifts down. ``grain_sz`` is the length of audio grain used for pitch
         shifting - up to the ``tap.max_delay``
 

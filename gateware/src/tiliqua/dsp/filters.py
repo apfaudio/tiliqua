@@ -16,16 +16,32 @@ from . import ASQ, mac
 class SVF(wiring.Component):
 
     """
-    Oversampled Chamberlin State Variable Filter.
+    Oversampled Chamberlin State Variable Filter. Provides tunable high-, low-, and
+    band-pass outputs given a stream of input samples. Filter ``cutoff`` and
+    ``resonance`` are tunable at the system sample rate, with highpass, lowpass,
+    bandpass outputs available on stream payloads `hp`, `lp`, `bp`.
 
-    Filter `cutoff` and `resonance` are tunable at the system sample rate.
-
-    Highpass, lowpass, bandpass routed out on stream payloads `hp`, `lp`, `bp`.
+    Includes 2x oversampling internally for improved stability close to Nyquist
+    / at high resonances. Each output sample uses 6 multiplies.
 
     Reference: Fig.3 in https://arxiv.org/pdf/2111.05592
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(StructLayout({"x": sq, "cutoff": sq, "resonance": sq}))`
+        Input stream for sending input ``x`` and tuning values ``cutoff``, ``resonance`` to the filter.
+
+    o : :py:`Out(stream.Signature(StructLayout({"lp": sq, "hp": sq, "bp": sq}))`
+        Output stream for getting high-, low-, bandpass samples from the filter.
     """
 
     def __init__(self, sq=ASQ, macp=None):
+        """
+        sq : fixed.SQ
+            Data type for all input/output payloads of the SVF.
+        macp : mac.MAC
+            Optional shared MAC provider.
+        """
         self.sq = sq
         self.macp = macp or mac.MAC.default()
         super().__init__({
@@ -112,11 +128,23 @@ class SVF(wiring.Component):
 class DCBlock(wiring.Component):
 
     """
+    DC blocker (single-pole IIR with a cutoff near DC). Useful before components
+    that can stack DC and overflow (e.g. matrix mixers). Only needs a single multiply
+    per sample.
+
     Loosely based on:
     https://dspguru.com/dsp/tricks/fixed-point-dc-blocking-filter-with-noise-shaping/
     """
 
     def __init__(self, pole=0.999, sq=ASQ, macp=None):
+        """
+        pole : float
+            Filter cutoff. Closer to 1 is closer to DC.
+        sq : fixed.SQ
+            Data type for all input/output payloads of the filter.
+        macp : mac.MAC
+            Optional shared MAC provider.
+        """
         self.macp = macp or mac.MAC.default()
         self.pole = pole
         self.sq = sq
@@ -168,14 +196,33 @@ class DCBlock(wiring.Component):
 class OnePole(wiring.Component):
 
     """
-    Simple lowpass using no multipliers.
+    Simple lowpass using no multipliers. This is useful for cheap smoothing of
+    e.g. step changes in control signals.
 
-    ``output += (input - output) >> shift``
+    Each output sample is computed as  ``output += (input - output) >> shift``
 
-    :py:`shift` is dynamic: 0 is passthrough, higher values give more smoothing.
+    Members
+    -------
+    i : :py:`In(stream.Signature(ASQ))`
+        Input stream of samples for the filter.
+
+    o : :py:`Out(stream.Signature(ASQ))`
+        Output stream of samples from the filter.
+
+    shift : :py:`In(unsigned(4))`
+        Optionally dynamic amount of smoothing. 0 is passthrough, higher
+        values give exponentially more smoothing. TODO: add default value for
+        ``self.shift`` so it doesn't need to be hooked up?
     """
 
     def __init__(self, sq=ASQ, extra_bits=10):
+        """
+        sq : fixed.SQ
+            Data type for all input/output payloads of the filter.
+        extra_bits : int
+            Extra fractional bits on top of ``sq`` for internal data types. This
+            is needed to reduce quantization of the input samples.
+        """
         self.sq = sq
         self.sqw = fixed.SQ(sq.i_bits, sq.f_bits + extra_bits)
         super().__init__({
