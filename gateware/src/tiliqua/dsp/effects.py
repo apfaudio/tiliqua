@@ -16,16 +16,43 @@ from . import ASQ, mac
 class WaveShaper(wiring.Component):
 
     """
-    Waveshaper that maps x to f(x), where the function must be
-    stateless so we can precompute a mapping lookup table.
+    ``Waveshaper`` maps every sample ``x`` to ``f(x)``, where ``f``
+    can be any arbitrary python function.
 
-    Linear interpolation is used between lut elements.
+    ``f(x)`` is evaluated at ``N=lut_size`` points at elaboration time,
+    to create a LUT (lookup table ROM) mapping the input domain (``ASQ``)
+    to output samples. For any input sample that sits between elements in the
+    ROM, linear interpolation is used to determine the output sample.
+
+    This can be used for waveshaping, but is also useful for arbitrary
+    remapping of samples, for example tanh-based soft clipping, linear-
+    to exponential or linear-to-log space conversion.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(ASQ))`
+        Input stream for sending samples to the waveshaper.
+
+    o : :py:`In(stream.Signature(ASQ))`
+        Output stream for getting samples from the waveshaper.
     """
 
     i: In(stream.Signature(ASQ))
     o: Out(stream.Signature(ASQ))
 
     def __init__(self, lut_function=None, lut_size=512, continuous=False, macp=None):
+        """
+        lut_function : function
+            Function taking and emitting ``float`` values in a valid ``ASQ`` range.
+        lut_size : int
+            Size of the LUT ROM in elements. Larger provides a better approximation.
+        continuous : bool
+            Behavior of linear interpolation at ``ASQ`` endpoints. For ``ASQ.i_bits==1``
+            and for a function where ``f(+1) ~= f(-1)``, this should be used to ensure an
+            incoming saw results in a continuous output.
+        macp : mac.MAC
+            Optional shared MAC provider.
+        """
         self.lut_size = lut_size
         self.lut_addr_width = exact_log2(lut_size)
         self.continuous = continuous
@@ -127,16 +154,44 @@ class WaveShaper(wiring.Component):
 class PitchShift(wiring.Component):
 
     """
-    Granular pitch shifter. Works by crossfading 2 separately
-    tracked taps on a delay line. As a result, maximum grain
-    size is the delay line 'max_delay' // 2.
+    Granular pitch shifter. Works by crossfading 2 separately tracked taps on
+    a delay line - both tap positions are moving towards the write head (for
+    pitching up) or away from the write head (for pitching down). Whenever
+    the tap positions are close to overflowing, the discontinuity is smoothed
+    by a crossfade of length ``xfade``.
 
-    The delay line tap itself must be hooked up to the input
-    source from outside this component (this allows multiple
-    shifters to share a single delay line).
+    Maximum pitch-shifting grain size is the delay line 'max_delay' // 2. Smaller
+    grain sizes or crossfades result in a 'fluttering' effect, but have lower latency.
+    To reduce fluttering at low latency, one can dynamically track the ``grain_sz``
+    based on the input frequency.
+
+    The delay line write head must be hooked up to the input source from outside this
+    component (this allows multiple shifters to share a single delay line).
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(StructLayout({"pitch": ..., "grain_sz": ...}))`
+        Input stream, one element per desired output sample. ``pitch`` is a
+        ``fixed.SQ`` i where 0 is no pitch shift, positive shifts up (e.g. 1 is 2x speed),
+        negative shifts down. ``grain_sz`` is the length of audio grain used for pitch
+        shifting - up to the ``tap.max_delay``
+
+    o : :py:`In(stream.Signature(ASQ))`
+        Output stream of pitch shifted samples.
     """
 
     def __init__(self, tap, xfade=256, macp=None):
+        """
+        tap : delay_line.DelayLineTap()
+            ``DelayLineTap`` which pitch shifter reads at 2 tap positions for every
+            output sample. The delayline write head must be hooked up to the input source.
+        xfade : int
+            Crossfade length between taps, in samples. Crossfades occur at every
+            transition where we switch from one part of the delayline to the other.
+            Longer crossfades and grain sizes produce less 'fluttering'.
+        macp : mac.MAC
+            Optional shared MAC provider.
+        """
         assert xfade <= (tap.max_delay // 4)
         self.tap        = tap
         self.xfade      = xfade

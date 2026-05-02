@@ -28,12 +28,30 @@ class PingPongDelay(wiring.Component):
 
     Delay lines are created external to this component, and may be
     SRAM-backed or PSRAM-backed depending on the application.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(data.ArrayLayout(ASQ, 2)))`
+        Stereo sample pairs into ping-pong delay.
+
+    o : :py:`Out(stream.Signature(data.ArrayLayout(ASQ, 2)))`
+        Stereo sample pairs out of ping-pong delay. One per input.
     """
 
     i: In(stream.Signature(data.ArrayLayout(ASQ, 2)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 2)))
 
     def __init__(self, delayln1, delayln2, delay_samples=15000):
+        """
+        delayln1 : delay_line.DelayLine
+            First delay line, must have max length > ``delay_samples``, and have
+            been created with ``DelayLine.write_triggers_read == True``.
+        delayln2 : delay_line.DelayLine
+            Second delay line, must have max length > ``delay_samples``, and have
+            been created with ``DelayLine.write_triggers_read == True``.
+        delay_samples : int
+            Length of each ping-pong section in samples.
+        """
         super().__init__()
 
         self.delayln1 = delayln1
@@ -104,12 +122,28 @@ class Diffuser(wiring.Component):
 
     Delay lines are created external to this component, and may be
     SRAM-backed or PSRAM-backed depending on the application.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(data.ArrayLayout(ASQ, 4)))`
+        Sample array into the delay effect.
+
+    o : :py:`Out(stream.Signature(data.ArrayLayout(ASQ, 4)))`
+        Sample array out of the delay effect. One is produced per input.
     """
 
     i: In(stream.Signature(data.ArrayLayout(ASQ, 4)))
     o: Out(stream.Signature(data.ArrayLayout(ASQ, 4)))
 
     def __init__(self, delay_lines, delays=None):
+        """
+        delay_lines : [delay_line.DelayLine]
+            Array of 4 delay lines used for feedback. Each delay line must be
+            at least as long as the corresponding entry in ``delays``.
+        delays : [int]
+            Fixed tap delay of each feedback path - one for each delay line.
+            If not provided, some default tap lengths are used.
+        """
         super().__init__()
 
         if delays is None:
@@ -197,9 +231,27 @@ class Boxcar(wiring.Component):
     no multiplies but instead requiring space for N samples.
 
     Can be used in low- or high-pass mode.
+
+    Members
+    -------
+    i : :py:`In(stream.Signature(sq))`
+        Samples into the boxcar averager.
+
+    o : :py:`Out(stream.Signature(sq))`
+        Samples out of the boxcar averager, one produced per input.
     """
 
     def __init__(self, n: int=32, hpf=False, sq=ASQ):
+        """
+        n : int
+            Delay line size and window length of the averager.
+        hpf : bool
+            High-pass mode - if true, the average value is subtracted from the
+            last sample and we emit the difference, rather than emitting the
+            average value itself. Almost no extra cost, useful for other applications.
+        sq : fixed.SQ
+            Fixed-point type used for underlying inputs, outputs and storage.
+        """
         # pow2 constraint on N allows us to shift instead of divide
         assert(2**exact_log2(n) == n)
         self.n = n

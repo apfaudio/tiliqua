@@ -15,12 +15,15 @@ class SawNCO(wiring.Component):
     """
     Sawtooth Numerically Controlled Oscillator.
 
-    Often this can be simply routed into a LUT waveshaper for any other waveform type.
+    Frequency is linearly proportional to ``i.payload.freq_inc``, with optional
+    phase modulation on ``i.payload.phase``. One output sample per input sample.
+
+    Often a saw is used routed into a waveshaper for arbitrary waveform types.
 
     Members
     -------
     i : :py:`In(stream.Signature(data.StructLayout)`
-        Input stream, with fields :py:`freq_inc` (linear frequency) and
+        Input stream - :py:`freq_inc` (linear frequency) and
         :py:`phase` (phase offset). One output sample is produced for each
         input sample.
     o : :py:`Out(stream.Signature(ASQ))`
@@ -60,14 +63,14 @@ class SawNCO(wiring.Component):
 class WhiteNoise(wiring.Component):
 
     """
-    Simple white noise generator.
+    Simple white noise generator based on an LFSR.
 
     See: https://www.musicdsp.org/en/latest/Synthesis/216-fast-whitenoise-generator.html
 
     Members
     -------
     o : :py:`Out(stream.Signature(ASQ))`
-        Output stream of white noise.
+        Output stream of white noise. Throttled by output backpressure on ``o.ready``.
     """
 
     o: Out(stream.Signature(ASQ))
@@ -111,12 +114,20 @@ class DWO(wiring.Component):
     Members
     -------
     o : :py:`Out(stream.Signature(ASQ))`
-        Output stream of sinusoid samples.
+        Output stream of sinusoid samples. Throttled by output backpressure on ``o.ready``.
     """
 
     o: Out(stream.Signature(ASQ))
 
     def __init__(self, sq=None, macp=None, c=0.99):
+        """
+        sq : fixed.SQ
+            Fixed-point type of internal waveguide calculations.
+        macp : mac.MAC
+            (optional) shared multiplier provider.
+        c : float
+            Tuning coefficient ``C = cos(2*pi*f/fs)``
+        """
         super().__init__()
         self.c = c
         self.sq = sq or self.o.payload.shape()
@@ -129,7 +140,6 @@ class DWO(wiring.Component):
 
         m.submodules.macp = mp = self.macp
 
-        # Frequency tuning coefficient: `C = cos(2*pi*f/fs)`.
         C = fixed.Const(self.c, shape=sq)
 
         # Initial conditions (determines output amplitude)
