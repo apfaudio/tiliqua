@@ -30,7 +30,7 @@ use tiliqua_hal::embedded_graphics::prelude::*;
 
 use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
-use hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState};
+use hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState, AccessoryType};
 
 use tiliqua_fw::wavetable;
 
@@ -365,6 +365,7 @@ fn main() -> ! {
         let mut last_jack = pmod.jack();
 
         let mut usb_cc_attached_as_src = false;
+        let mut last_attached_state = AttachedState::NotAttached;
 
         loop {
 
@@ -380,17 +381,33 @@ fn main() -> ! {
 
                 // Type-C hotplugging detection
                 //
-                // Only enable VBUS if the TUSB322 Type-C controller says we are attached as a source.
-                // This is an extra safeguard against applying VBUS if we're accidentally connecting host<->host.
+                // Only enable VBUS if the TUSB322 Type-C controller says we are attached as:
+                // - Attached.SRC
+                // - Attached.ACCESSORY && AccessoryType.DebugDfp
+                //
+                // It seems some USB-C adapters will enumerate as a DebugDfp accessory. Enabling VBUS
+                // is still safe in this situation, as we can only land in DebugDfp if the CC
+                // controller is sure we are a DFP. It's not sufficient to just check
+                // Attached.ACCESSORY as we could also enumerate as an UFP accessory against a host!
+                //
+                // This is essentially a safeguard against applying VBUS if we're accidentally connecting host<->host.
                 //
 
-                if let Ok(status) = tusb322.read_connection_status_control() {
+                if let Ok(ctrl) = tusb322.read_connection_status_control() {
                     // Only update on valid reads to reduce risk of unintended toggling mid-stream
-                    let new_state = status.attached_state == AttachedState::AttachedSrc;
-                    if new_state != usb_cc_attached_as_src {
-                        info!("USB CC hotplug: {:?}", status);
-                        usb_cc_attached_as_src = new_state;
+                    // TODO: move read_connection_status() into above gate.
+                    let conn = tusb322.read_connection_status().ok();
+                    if ctrl.attached_state != last_attached_state {
+                        match &conn {
+                            Some(c) => info!("USB CC change: {:?} | {:?}", ctrl, c),
+                            None    => info!("USB CC change: {:?} | <status read failed>", ctrl),
+                        }
+                        last_attached_state = ctrl.attached_state;
                     }
+
+                    let debug_dfp = ctrl.attached_state == AttachedState::AttachedAccessory
+                        && conn.as_ref().map_or(false, |c| c.accessory == AccessoryType::DebugDfp);
+                    usb_cc_attached_as_src = ctrl.attached_state == AttachedState::AttachedSrc || debug_dfp;
                 }
                 let usb_vbus_enabled = usb_cc_attached_as_src && (app.ui.opts.misc.usb_host.value == UsbHost::On);
                 app.synth.usb_midi_host(usb_vbus_enabled, 1, 1);
