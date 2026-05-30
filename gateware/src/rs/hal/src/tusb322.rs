@@ -200,8 +200,6 @@ impl<I2C: I2c> TUSB322Driver<I2C> {
     }
 
     pub fn soft_reset(&mut self) -> Result<(), I2C::Error> {
-        // Read-modify-write so the reset bit doesn't clobber MODE_SELECT in the same register.
-        let reg = self.read_register(0x0A)?;
-        self.write_register(0x0A, reg | 0x08)
+        self.write_register(0x0A, 0x08)
     }
 }

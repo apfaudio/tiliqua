@@ -394,20 +394,16 @@ fn main() -> ! {
                 //
 
                 if let Ok(ctrl) = tusb322.read_connection_status_control() {
-                    // Only update on valid reads to reduce risk of unintended toggling mid-stream
-                    // TODO: move read_connection_status() into above gate.
-                    let conn = tusb322.read_connection_status().ok();
-                    if ctrl.attached_state != last_attached_state {
-                        match &conn {
-                            Some(c) => info!("USB CC change: {:?} | {:?}", ctrl, c),
-                            None    => info!("USB CC change: {:?} | <status read failed>", ctrl),
+                    if let Ok(conn) = tusb322.read_connection_status() {
+                        // Only update on valid reads to reduce risk of unintended toggling mid-stream
+                        if ctrl.attached_state != last_attached_state {
+                            info!("USB hotplug: {:?} | {:?}", ctrl, conn);
+                            last_attached_state = ctrl.attached_state;
                         }
-                        last_attached_state = ctrl.attached_state;
+                        let debug_dfp = (ctrl.attached_state == AttachedState::AttachedAccessory) &&
+                                        (conn.accessory == AccessoryType::DebugDfp);
+                        usb_cc_attached_as_src = ctrl.attached_state == AttachedState::AttachedSrc || debug_dfp;
                     }
-
-                    let debug_dfp = ctrl.attached_state == AttachedState::AttachedAccessory
-                        && conn.as_ref().map_or(false, |c| c.accessory == AccessoryType::DebugDfp);
-                    usb_cc_attached_as_src = ctrl.attached_state == AttachedState::AttachedSrc || debug_dfp;
                 }
                 let usb_vbus_enabled = usb_cc_attached_as_src && (app.ui.opts.misc.usb_host.value == UsbHost::On);
                 app.synth.usb_midi_host(usb_vbus_enabled, 1, 1);
