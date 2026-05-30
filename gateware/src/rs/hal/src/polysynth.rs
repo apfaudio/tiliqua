@@ -101,6 +101,12 @@ macro_rules! impl_polysynth {
                     self.registers.usb_midi_cfg().write(|w| unsafe { w.value().bits(cfg_id) } );
                     self.registers.usb_midi_endp().write(|w| unsafe { w.value().bits(endpt_id) } );
                 }
+
+                // `None` listens on all channels.
+                pub fn set_midi_channel_filter(&mut self, channel: Option<u8>)  {
+                    let value = channel.unwrap_or(0);
+                    self.registers.midi_ch_filter().write(|w| unsafe { w.value().bits(value) } );
+                }
             }
         )+
     };

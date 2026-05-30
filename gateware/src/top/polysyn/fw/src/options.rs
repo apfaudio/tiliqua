@@ -76,6 +76,28 @@ pub enum CcHighlight {
     On,
 }
 
+#[repr(u8)]
+#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[strum(serialize_all = "kebab-case")]
+pub enum MidiChannel {
+    #[default]
+    All,
+    Ch1,  Ch2,  Ch3,  Ch4,
+    Ch5,  Ch6,  Ch7,  Ch8,
+    Ch9,  Ch10, Ch11, Ch12,
+    Ch13, Ch14, Ch15, Ch16,
+}
+
+impl MidiChannel {
+    pub fn to_filter(self) -> Option<u8> {
+        match self {
+            /// HAL wants `None` => for listening on all channels.
+            MidiChannel::All => None,
+            _ => Some(self as u8),
+        }
+    }
+}
+
 int_params!(PageNumParams<u16>    { step: 1, min: 0, max: 0 });
 int_params!(ProcAmtParams<u16>   { step: 1, min: 0, max: 50, format: IntFormat::Scaled { divisor: 10, precision: 1, suffix: "" } });
 int_params!(DriveParams<u16>    { step: 2048, min: 0, max: 32768, format: IntFormat::Scaled { divisor: 32768, precision: 2, suffix: "" } });
@@ -154,6 +176,8 @@ pub struct MiscOpts {
     pub touch_ctrl: EnumOption<TouchControl>,
     #[option]
     pub cc_highlight: EnumOption<CcHighlight>,
+    #[option]
+    pub midi_ch: EnumOption<MidiChannel>,
     #[option]
     pub usb_host: EnumOption<UsbHost>,
     #[option]

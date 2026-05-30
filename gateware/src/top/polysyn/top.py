@@ -114,6 +114,7 @@ can also be used to control most of these through CCs as follows:
 
         MISC    touch-ctrl     -  enable/disable jacktouch input
         MISC    cc-highlight   -  highlight changed on CC input
+        MISC    midi-ch        -  filter MIDI to specific channel (default: all)
         MISC    usb-host       -  enable USB host MIDI (disables TRS)
         MISC    serial-debug   -  dump MIDI data out serial port
         MISC    save-opts      -  save all options to flash
@@ -388,6 +389,10 @@ class SynthPeripheral(wiring.Component):
         # Hardcoded MIDI streaming endpoint location (device specific)
         value: csr.Field(csr.action.W, unsigned(4))
 
+    class MidiChannelFilter(csr.Register, access="w"):
+        """Channel filter. 0 = no filter, 1..16 = single MIDI channel."""
+        value: csr.Field(csr.action.W, unsigned(5))
+
     def __init__(self, synth=None):
         self.synth = synth
         regs = csr.Builder(addr_width=7, data_width=8)
@@ -410,6 +415,7 @@ class SynthPeripheral(wiring.Component):
         self._wt_addr       = regs.add("wt_addr",       self.WavetableAddr(), offset=voices_csr_end + 0x2C)
         self._wt_data       = regs.add("wt_data",       self.WavetableData(), offset=voices_csr_end + 0x30)
         self._lfo           = regs.add("lfo",           self.Lfo(),           offset=voices_csr_end + 0x34)
+        self._midi_ch_filt  = regs.add("midi_ch_filter",self.MidiChannelFilter(), offset=voices_csr_end + 0x38)
         self._bridge = csr.Bridge(regs.as_memory_map())
         super().__init__({
             "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
@@ -487,6 +493,11 @@ class SynthPeripheral(wiring.Component):
                 self.synth.diffuser.matrix.c.valid.eq(0),
             ]
 
+        m.submodules.midi_ch_filt = midi_ch_filt = midi.MidiChannelFilter()
+        wiring.connect(m, wiring.flipped(self.i_midi), midi_ch_filt.i)
+        with m.If(self._midi_ch_filt.f.value.w_stb):
+            m.d.sync += midi_ch_filt.channel.eq(self._midi_ch_filt.f.value.w_data)
+
         # MIDI injection and arbiter between SoC MIDI and HW MIDI -> synth MIDI.
         m.submodules.soc_midi_fifo = soc_midi_fifo = SyncFIFOBuffered(
             width=24, depth=8)
@@ -494,17 +505,17 @@ class SynthPeripheral(wiring.Component):
             soc_midi_fifo.w_data.eq(self._midi_write.f.msg.w_data),
             soc_midi_fifo.w_en.eq(self._midi_write.element.w_stb),
         ]
-        wiring.connect(m, wiring.flipped(self.i_midi), self.synth.i_midi)
+        wiring.connect(m, midi_ch_filt.o, self.synth.i_midi)
         with m.If(soc_midi_fifo.r_stream.valid):
             wiring.connect(m, soc_midi_fifo.r_stream, self.synth.i_midi)
 
-        # Pipe TRS MIDI -> SoC read FIFO so SoC can inspect external
-        # MIDI traffic
+        # Pipe filtered MIDI -> SoC read FIFO so SoC can inspect external
+        # MIDI traffic.
         m.submodules.read_midi_fifo = read_midi_fifo = SyncFIFOBuffered(
             width=24, depth=8)
         m.d.comb += [
-            read_midi_fifo.w_data.eq(self.i_midi.payload),
-            read_midi_fifo.w_en.eq(self.i_midi.valid & self.i_midi.ready),
+            read_midi_fifo.w_data.eq(midi_ch_filt.o.payload),
+            read_midi_fifo.w_en.eq(midi_ch_filt.o.valid & midi_ch_filt.o.ready),
             read_midi_fifo.r_en.eq(self._midi_read.element.r_stb),
         ]
 
