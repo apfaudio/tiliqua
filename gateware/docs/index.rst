@@ -41,6 +41,7 @@ Tiliqua is a **Eurorack Module**, which contains a debugger, FPGA and high-fidel
    examples/index
    dsp/index
    calibration
+   usb_troubleshooting
 
 .. toctree::
    :caption: Hardware Details

@@ -72,9 +72,9 @@ Out of the box, Tiliqua ships with the following example bitstreams flashed. Man
 - :ref:`MACRO-OSC <macro_osc>`
 - :ref:`SID <sid>`
 - :doc:`SELFTEST <../calibration>`
+- :ref:`SAMPLER <sampler>`
 - :class:`DSP-MDIFF <top.dsp.top.PSRAMMultiDiffuser>`
-- :class:`DSP-NCO <top.dsp.top.QuadNCO>`
-- ``VEXIITOR``: Bonus bitstream, flashed to most Tiliquas, not quite ready to merge yet :)
+- `VSYNTH <https://github.com/apfaudio/tiliqua/issues/160>`_ (preview!)
 
 .. warning::
 
@@ -101,6 +101,10 @@ USB: the ``dbg`` and ``usb2`` ports
 -----------------------------------
 
 For flashing bitstreams, you want the ``dbg`` USB port. This is routed to the on-board RP2040. For USB audio or USB device / host usage from bitstreams, you want the ``usb2`` USB port. This is routed through a ULPI PHY directly to the FPGA fabric.
+
+.. note::
+
+   **If you are having trouble with the ``usb2`` port for USB audio streaming or as a MIDI host**, I have collected some :doc:`USB troubleshooting tips here <../usb_troubleshooting>`.
 
 Flashing/Updating Bitstreams
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
