@@ -1,7 +1,7 @@
 USB troubleshooting
 ===================
 
-This page collects some tips I have collected after seeing a couple of users fight with rare compatibility issues on Tiliqua's USB-C ports.
+This page collects some tips I have collected after helping a couple of users fight with Tiliqua's USB-C ports on different operating systems.
 
 .. figure:: /_static/tiliqua_usb.png
 
