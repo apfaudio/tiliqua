@@ -96,8 +96,11 @@ macro_rules! impl_polysynth {
                     self.registers.midi_read().read().bits()
                 }
 
-                pub fn usb_midi_host(&mut self, enable: bool, cfg_id: u8, endpt_id: u8)  {
+                pub fn usb_host_vbus(&mut self, enable: bool)  {
                     self.registers.usb_midi_host().write(|w| unsafe { w.host().bit(enable) } );
+                }
+
+                pub fn usb_host_midi(&mut self, cfg_id: u8, endpt_id: u8)  {
                     self.registers.usb_midi_cfg().write(|w| unsafe { w.value().bits(cfg_id) } );
                     self.registers.usb_midi_endp().write(|w| unsafe { w.value().bits(endpt_id) } );
                 }
