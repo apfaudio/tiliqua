@@ -125,6 +125,8 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         app.synth.set_matrix_coefficient(2, 6, coeff_wet);
         app.synth.set_matrix_coefficient(3, 7, coeff_wet);
 
+        app.synth.set_midi_channel_filter(opts.misc.midi_ch.value.to_filter());
+
         // ADSR params
         app.synth.set_attack_rate(adsr_ui_to_rate(opts.adsr.attack.value));
         app.synth.set_decay_rate(adsr_ui_to_rate(opts.adsr.decay.value));

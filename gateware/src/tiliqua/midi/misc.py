@@ -164,6 +164,33 @@ class MidiClockDivider(wiring.Component):
 
         return m
 
+class MidiChannelFilter(wiring.Component):
+
+    i: In(stream.Signature(MidiMessage))
+    o: Out(stream.Signature(MidiMessage))
+
+    # 0 = pass all channels; 1..16 = pass only messages on that channel.
+    channel: In(unsigned(5))
+
+    def elaborate(self, platform):
+        m = Module()
+
+        status = self.i.payload.status
+        pass_msg = Signal()
+        m.d.comb += pass_msg.eq(
+            (status.kind == Status.Kind.SYSEX) |
+            (self.channel == 0) |
+            (status.nibble.channel == (self.channel - 1))
+        )
+
+        m.d.comb += [
+            self.o.payload.eq(self.i.payload),
+            self.o.valid.eq(self.i.valid & pass_msg),
+            self.i.ready.eq(Mux(pass_msg, self.o.ready, 1)),
+        ]
+
+        return m
+
 class CCFilter(wiring.Component):
 
     """
