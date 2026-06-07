@@ -14,6 +14,10 @@ For updates, subscribe to the [Crowd Supply page](https://www.crowdsupply.com/ap
 
 Participants in this project are expected to adhere to the [Berlin Code of Conduct](https://berlincodeofconduct.org/).
 
+# Contributing
+
+For contribution guidelines and our policy on AI/LLM usage, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 # Acknowledgements
 
 This project would be nothing without the hard work of many (awesome) open-source projects. An exhaustive list would take pages, here I mention only a crucial subset:
