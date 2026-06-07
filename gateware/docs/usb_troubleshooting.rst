@@ -77,4 +77,15 @@ In ``POLYSYN``, if your MIDI device never receives power from Tiliqua despite ha
 
     .. note::
 
-        This is a known bug that manifests with rare combinations of adapters in firmware v1.2.1. An experimental build which should fix this `is linked here <https://github.com/apfaudio/tiliqua/issues/170#issuecomment-4551905560>`_ if you want to try it out!
+        This is a known bug that manifests with rare combinations of adapters in firmware v1.2.1 and earlier. A fix `is linked here <https://github.com/apfaudio/tiliqua/issues/170#issuecomment-4551905560>`_ if you want to try it out already, but will be included in v1.2.2+!
+
+USB MIDI Host - Device powers up but no response to MIDI events
+---------------------------------------------------------------
+
+- Try re-plugging the device or cycling the ``usb-host`` option while it is plugged in.
+- **Device is a USB Hub:** You could be trying to use a MIDI device which has a built-in USB hub, that is, the device has a built-in USB hub, and the MIDI device is behind it. **Tiliqua does not support this**. This is rare, so far I only saw this on a Boss RC-600 Loop station, because it has a built-in sound card and MIDI device behind an integrated USB hub. **In such cases I suggest using DIN/TRS MIDI instead**. You can check this on Linux in dmesg or in Windows in device manager.
+
+USB MIDI Host - Device powers up but MIDI events are glitchy / have missing notes
+---------------------------------------------------------------------------------
+
+- There was a **known bug in POLYSYN v1.1.1 and earlier** with how Sysex and Clock messages were handled. This is now fixed in the latest versions.
