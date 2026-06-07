@@ -182,9 +182,12 @@ impl<I2C: I2c> TUSB322Driver<I2C> {
         })
     }
 
+    pub fn disable_term(&mut self) -> Result<(), I2C::Error> {
+        self.write_register(0x0A, 0x01)
+    }
+
     pub fn set_mode(&mut self, mode: TUSB322Mode) -> Result<(), I2C::Error> {
-        // First disable termination
-        self.write_register(0x0A, 0x01)?;
+        self.disable_term()?;
 
         // Set mode (device/host)
         let mode_bits = match mode {
