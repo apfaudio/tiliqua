@@ -53,6 +53,11 @@ pub const PIXEL_CLK_MIN_KHZ: u32 = 24_000u32;
 pub const PIXEL_CLK_MAX_KHZ: u32 = CLOCK_DVI_HZ / 1000u32;
 pub const SPREAD_SPECTRUM_MAX: f32 = 0.0025;
 
+// Address of the RP2040's software i2c target.
+// This is used for bitstream reconfigurations on rp2040/apfbug
+// firmware versions > beta5
+pub const RP2040_APFBUG_ADDR: u8 = 0x17;
+
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum BitstreamError {
@@ -655,8 +660,18 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     // from arbitrary addresses, but this requires reverse engineering the
                     // bitstream structure a bit more than I have time for at the moment.
                     //
-                    // TODO: use a longer codeword for this with less chance of collision?
-                    info!("BITSTREAM{}\n\r", n);
+                    //
+                    // RP2040 apfbug versions > beta5 accept reconfiguration requests over I2C,
+                    // which should be more robust. We trigger both I2C and UART
+                    // reconfigurations to retain backwards compatibility with old RP2040 firmware.
+                    let mut i2cdev0 = unsafe { I2c0::summon() };
+                    let i2c_reconfig_result = i2cdev0.transaction(
+                        RP2040_APFBUG_ADDR, &mut [Operation::Write(&[0u8, 0x5A, n as u8])]);
+                    if i2c_reconfig_result.is_err() {
+                        warn!("apfbug/rp2040: i2c reconfig request NAK (apfbug <= beta5?)");
+                    }
+                    // Older apfbug/rp2040: issue UART reconfig request
+                    info!("Enter BITSTREAM{}\n\r", n);
                     loop {}
                 }
             }
