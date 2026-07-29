@@ -8,6 +8,9 @@ tiliqua-hal = { path="../../../rs/hal", default-features = false }
 tiliqua-lib = { path = "../../../rs/lib" }
 tiliqua-pac = { path="../pac", default-features = false, features = ["critical-section", "vexriscv"] }
 opts = { path = "../../../rs/opts" }
+guh-dma = { git = "https://github.com/apfaudio/guh", rev = "32e7f0d" }
+guh-usb-msc = { git = "https://github.com/apfaudio/guh", rev = "32e7f0d", default-features = false, features = ["fatfs"] }
+fatfs = { git = "https://github.com/vk2seb/rust-fatfs.git", branch = "seb/dma-geo", default-features = false }
 
 log = "0.4.17"
 embedded-hal = "=1.0.0"
@@ -33,5 +36,5 @@ debug = true
 debug-assertions = false
 incremental = false
 lto = true
-opt-level = 2
+opt-level = "s"
 overflow-checks = false
