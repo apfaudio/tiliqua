@@ -96,5 +96,5 @@ if __name__ == "__main__":
     top_level_cli(BootloaderSoc, path=this_path,
                   argparse_fragment=lambda _: {
                       "cpu_variant": "tiliqua_rv32im_xip",
-                      "mainram_size": 0x8000,
+                      "mainram_size": 0x10000,
                   })
