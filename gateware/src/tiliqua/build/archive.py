@@ -128,6 +128,23 @@ class ArchiveBuilder:
 
         return self
 
+    def with_usb_load(self, filename: str, psram_dst: int, max_size: int) -> 'ArchiveBuilder':
+        """
+        Region loaded from a file on a USB drive by the bootloader.
+
+        `max_size` determines the end of the PSRAM window reserved at `psram_dst`. It copies the
+        file's actual length (rounded up to the next FAT cluster), failing boot if that exceeds `max_size`.
+        """
+        self._regions.append(MemoryRegion(
+            filename=filename,
+            region_type=RegionType.UsbLoad,
+            spiflash_src=None,  # Never in SPI flash.
+            psram_dst=psram_dst,
+            size=max_size,
+            crc=None
+        ))
+        return self
+
     def with_option_storage(self, filename: str = "<options>", size: int = 2*FLASH_PAGE_SZ) -> 'ArchiveBuilder':
         """Add option storage region and return self for chaining."""
         region = MemoryRegion(
