@@ -37,6 +37,10 @@ CPU_BASE = [
     '--lsu-l1-wishbone',
     '--fetch-l1',
     '--fetch-wishbone',
+    # cbo.inval/cbo.clean, only used by `guh-dma` for cache
+    # maintenance on USB DMA buffers at the moment, but this
+    # should be pretty cheap so we enable it everywhere.
+    '--with-rvZcbm',
 ]
 
 CPU_VARIANTS = {
