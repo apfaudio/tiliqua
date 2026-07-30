@@ -606,7 +606,7 @@ version = "0.1.0"
 requires_python = ">=3.11"
 git = "https://github.com/apfaudio/guh"
 ref = "main"
-revision = "be2b947e5aa9a5ddb396de3be6a831d01b13d0c8"
+revision = "fbd707755f1c666fc54f2e4ad9a7e624900aad4e"
 summary = "Experimental USB2 HS/FS host primitives for FPGAs."
 groups = ["default"]
 dependencies = [
