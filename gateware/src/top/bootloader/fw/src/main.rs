@@ -452,7 +452,7 @@ fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
         while !usb_msc.is_ready() {
             riscv::asm::delay(1_000_000);
             waited += 1;
-            if waited > 200 { // 3sec or so, some drives might need longer..
+            if waited > 350 { // 5sec or so, some drives might need longer?
                 warn!("USB MSC device did not enumerate");
                 return Err(BitstreamError::UsbNoDevice);
             }
