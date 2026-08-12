@@ -57,6 +57,7 @@ class RegionType(StrEnum):
     RamLoad = "RamLoad"            # Region that gets copied from SPI flash to RAM before use (firmware.bin to PSRAM)
     OptionStorage = "OptionStorage"  # Option storage region for persistent application settings
     Manifest = "Manifest"          # Manifest region containing metadata about the bitstream
+    UsbLoad = "UsbLoad"            # Copied from a file on a USB drive to PSRAM before use
 
 @dataclass_json
 @dataclass

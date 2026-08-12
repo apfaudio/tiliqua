@@ -62,6 +62,7 @@ vectorscope_no_soc = "src/top/vectorscope_no_soc/top.py"
 bootstub           = "src/top/bootstub/top.py"
 usb_audio          = "src/top/usb_audio/top.py"
 usb_host           = "src/top/usb_host/top.py"
+wavplay            = "src/top/wavplay/top.py"
 # Additional utilities
 test               = { cmd = "pytest -n auto tests/" }
 colors_vectorscope = { call = "top.vectorscope_no_soc.top:colors()" }

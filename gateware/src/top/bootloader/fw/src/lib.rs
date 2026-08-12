@@ -6,5 +6,9 @@ pub use tiliqua_hal as hal;
 
 hal::impl_tiliqua_soc_pac!();
 
+guh_usb_msc::impl_usb_msc! {
+    UsbMsc0: pac::USB_MSC,
+}
+
 pub mod handlers;
 pub mod options;
