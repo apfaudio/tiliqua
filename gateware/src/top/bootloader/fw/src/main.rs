@@ -851,6 +851,8 @@ fn main() -> ! {
         BLIT_MEM_BASE,
     );
 
+    timer.delay_ms(50);
+
     handler!(timer0 = || timer0_handler(&app));
 
     irq::scope(|s| {
