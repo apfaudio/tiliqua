@@ -46,6 +46,7 @@ pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
 // But we keep it this low for compatibility with low res modes.
 pub const PIXEL_CLK_MIN_KHZ: u32 = 24_000u32;
 pub const PIXEL_CLK_MAX_KHZ: u32 = CLOCK_DVI_HZ / 1000u32;
+pub const SPREAD_SPECTRUM_MAX: f32 = 0.0025;
 
 #[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
@@ -252,6 +253,14 @@ where
 fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device<I2c0>)
     -> Result<(), tiliqua_hal::si5351::Error> {
     pll.init_adafruit_module()?;
+    let spread = pll_config.spread_spectrum.map(|s| {
+        if s > SPREAD_SPECTRUM_MAX {
+            warn!("si5351/pll: spread_spectrum {} exceeds max {}, clamping", s, SPREAD_SPECTRUM_MAX);
+            SPREAD_SPECTRUM_MAX
+        } else {
+            s
+        }
+    });
     match pll_config.clk1_hz {
         Some(clk1_hz) => {
             info!("si5351/pll: configure for clk0={}Hz, clk1={}Hz", pll_config.clk0_hz, clk1_hz);
@@ -265,7 +274,7 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
                     pll_config.clk0_hz,
                     clk1_hz,
                 ],
-                pll_config.spread_spectrum)
+                spread)
         }
         _ => {
             info!("si5351/pll: configure for clk0={}Hz, clk1=disabled", pll_config.clk0_hz);
@@ -277,7 +286,7 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
                 &[
                     pll_config.clk0_hz,
                 ],
-                pll_config.spread_spectrum)
+                spread)
         }
     }
 }
@@ -776,7 +785,7 @@ fn main() -> ! {
             clk0_hz: CLOCK_AUDIO_HZ,
             clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
             clk1_inherit: false,
-            spread_spectrum: Some(0.01),
+            spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
         }, &mut si5351drv).unwrap();
         Some(si5351drv)
     } else {
@@ -842,6 +851,8 @@ fn main() -> ! {
         BLIT_MEM_BASE,
     );
 
+    timer.delay_ms(50);
+
     handler!(timer0 = || timer0_handler(&app));
 
     irq::scope(|s| {
@@ -906,7 +917,7 @@ fn main() -> ! {
                                 clk0_hz: CLOCK_AUDIO_HZ,
                                 clk1_hz: Some((new_modeline.pixel_clk_mhz*1e6) as u32),
                                 clk1_inherit: false,
-                                spread_spectrum: Some(0.01),
+                                spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
                             }, external_pll).unwrap();
                             reprogrammed_pll = true;
                         }
