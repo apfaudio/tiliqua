@@ -52,7 +52,7 @@ class OpenFPGALoaderCommandSequence:
         # Command to flash a file to a specific flash offset.
         # Add commands using a builder pattern:  o.with_flash_cmd(...).execute()
         cmd = _CMD_BASE + [
-            "-f", "-o", f"{hex(offset)}",
+            "-f", "-o", f"{hex(offset)}", "--skip-reset",
         ]
         if file_type != "auto":
             cmd.extend(["--file-type", file_type])
@@ -67,13 +67,7 @@ class OpenFPGALoaderCommandSequence:
 
     @property
     def commands(self):
-        commands = self._commands.copy()
-        # Add skip-reset flag to all but the last command
-        if len(commands) > 1:
-            for cmd in commands[:-1]:
-                if "--skip-reset" not in cmd:
-                    cmd.insert(-1, "--skip-reset")
-        return commands
+        return self._commands.copy()
 
     def execute(self, cwd=None):
         """
@@ -86,6 +80,11 @@ class OpenFPGALoaderCommandSequence:
         print("\nExecuting commands...")
         for cmd in self.commands:
             subprocess.check_call(cmd, cwd=cwd)
+
+def reset_fpga():
+    cmd = _CMD_BASE + ["-r"]
+    print(" ".join(cmd))
+    subprocess.call(cmd)
 
 def scan_for_tiliqua_hardware_version() -> Optional[int]:
     """
@@ -123,7 +122,7 @@ def scan_for_tiliqua_hardware_version() -> Optional[int]:
                     print("Found tiliqua-like device, product code is malformed (update RP2040?).")
     return None
 
-def dump_flash_region(offset: int, size: int, reset: bool = False) -> bytes:
+def dump_flash_region(offset: int, size: int) -> bytes:
     # Create a unique filename, for use by openFPGALoader
     with tempfile.NamedTemporaryFile(suffix='.bin', delete=True) as tmp_file:
         temp_file_name = tmp_file.name
@@ -131,12 +130,9 @@ def dump_flash_region(offset: int, size: int, reset: bool = False) -> bytes:
     # FIXME: dumping to stdout and capturing it does not work somehow.
     cmd = _CMD_BASE + [
         "--dump-flash", "-o", f"{hex(offset)}",
-        "--file-size", str(size),
+        "--file-size", str(size), "--skip-reset",
+        temp_file_name,
     ]
-    if not reset:
-        # Spamming the FPGA with resets is not nice for audio pops.
-        cmd.append("--skip-reset")
-    cmd.append(temp_file_name)
     print(" ".join(cmd)) # command we are running
     subprocess.check_call(cmd)
     # Finally, read out the contents and return them.

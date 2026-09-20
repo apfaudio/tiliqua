@@ -7,11 +7,12 @@ determine what is flashed where (i.e. ``pdm flash status``).
 """
 
 import json
+import re
 import subprocess
 from typing import Dict, List, Tuple, Optional
 
 from .spiflash_layout import SlotLayout, N_MANIFESTS, MANIFEST_SIZE
-from .openfpgaloader import dump_flash_region
+from .openfpgaloader import dump_flash_region, reset_fpga
 
 def is_empty_flash(data: bytes) -> bool:
     return all(b == 0xFF for b in data)
@@ -31,25 +32,45 @@ def parse_json_from_flash(data: bytes) -> Optional[Dict]:
     except json.JSONDecodeError:
         return None
 
-def flash_status():
-    """Dump the JSON manifest flashed to every user slot."""
+def read_bootloader_manifest() -> Optional[Dict]:
+    """Read and parse the bootloader manifest, or None if empty/unreadable."""
+    try:
+        data = dump_flash_region(SlotLayout(None).manifest_addr, MANIFEST_SIZE)
+    except subprocess.CalledProcessError:
+        return None
+    if is_empty_flash(data):
+        return None
+    return parse_json_from_flash(data)
 
+def parse_version_tag(tag: str) -> Optional[Tuple[int, int, int]]:
+    """Parse a 'vX.Y.Z' tag into a tuple, or None for untagged (dev) builds."""
+    m = re.match(r"^v(\d+)\.(\d+)\.(\d+)", tag or "")
+    if m is None:
+        return None
+    return tuple(int(x) for x in m.groups())
+
+def flash_status():
+    """Dump the JSON manifest flashed to the bootloader and every user slot."""
+
+    slots = [None] + list(range(N_MANIFESTS))
     manifest_data = []
-    for slot in range(N_MANIFESTS):
-        slot_layout = SlotLayout(slot)
-        offset = slot_layout.manifest_addr
-        is_last = (slot == N_MANIFESTS - 1)
-        print(f"\nReading Slot {slot} manifest at {hex(offset)}:")
-        try:
-            data = dump_flash_region(offset, MANIFEST_SIZE, reset=is_last)
-            manifest_data.append((slot, offset, data))
-        except subprocess.CalledProcessError as e:
-            print(f"  Error reading flash: {e}")
+    try:
+        for slot in slots:
+            name = "Bootloader" if slot is None else f"Slot {slot}"
+            offset = SlotLayout(slot).manifest_addr
+            print(f"\nReading {name} manifest at {hex(offset)}:")
+            try:
+                data = dump_flash_region(offset, MANIFEST_SIZE)
+                manifest_data.append((name, offset, data))
+            except subprocess.CalledProcessError as e:
+                print(f"  Error reading flash: {e}")
+    finally:
+        reset_fpga()
 
     print("\nMANIFESTS:")
     print("-" * 40)
-    for slot, offset, data in manifest_data:
-        print(f"\nSlot {slot} manifest at {hex(offset)}:")
+    for name, offset, data in manifest_data:
+        print(f"\n{name} manifest at {hex(offset)}:")
         try:
             if is_empty_flash(data):
                 print("  status: empty (all 0xFF)")
