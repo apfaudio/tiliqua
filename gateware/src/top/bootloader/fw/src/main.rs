@@ -38,7 +38,7 @@ use tiliqua_lib::color::HI8;
 use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;
 use hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState, AccessoryType};
-use guh_dma::{DmaBuf, CACHE_LINE_BYTES};
+use guh_dma::DmaBuf;
 use guh_usb_msc::fat_stream::{FatStream, StreamConfig};
 use guh_usb_msc::partition::find_first_fat32_lba;
 use guh_usb_msc::usb_msc::{UsbMsc, PartitionView, BLOCK_BYTES};

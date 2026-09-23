@@ -7,11 +7,11 @@ import os
 from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out, connect, flipped
-from amaranth_soc import csr
 
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
 from tiliqua.tiliqua_soc import TiliquaSoc
+from tiliqua.periph import vbus
 
 from guh.engines.msc import MAX_BLOCKS_PER_XFER
 from guh.periph import msc
@@ -19,32 +19,6 @@ from guh.periph import msc
 # PSRAM window reserved for the bootloader's USB MSC scratch buffers.
 # HACK/TODO: pretty ugly, swap these out for dynamic allocs?
 USB_SCRATCH_PSRAM_SIZE = 3 * MAX_BLOCKS_PER_XFER * 512
-
-class UsbVbusPeripheral(wiring.Component):
-
-    """Tiny periph for USB host port VBUS control."""
-
-    class Flags(csr.Register, access="w"):
-        en: csr.Field(csr.action.W, unsigned(1))
-
-    def __init__(self):
-        regs = csr.Builder(addr_width=2, data_width=8)
-        self._flags = regs.add("flags", self.Flags(), offset=0x0)
-        self._bridge = csr.Bridge(regs.as_memory_map())
-        super().__init__({
-            "en": Out(1),
-            "bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
-        })
-        self.bus.memory_map = self._bridge.bus.memory_map
-
-    def elaborate(self, platform):
-        m = Module()
-        m.submodules.bridge = self._bridge
-        connect(m, flipped(self.bus), self._bridge.bus)
-        with m.If(self._flags.f.en.w_stb):
-            m.d.sync += self.en.eq(self._flags.f.en.w_data)
-        return m
-
 
 class BootloaderSoc(TiliquaSoc):
 
@@ -63,7 +37,7 @@ class BootloaderSoc(TiliquaSoc):
         self.psram_periph.add_master(self.usb_msc.dma_bus)
 
         # VBUS control
-        self.usb_vbus = UsbVbusPeripheral()
+        self.usb_vbus = vbus.UsbVbusPeripheral()
         self.csr_decoder.add(self.usb_vbus.bus, addr=self.usb_vbus_base, name="usb_vbus")
 
         self.add_rust_constant(
