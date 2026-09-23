@@ -10,6 +10,7 @@ from amaranth.lib.wiring import In, Out, connect, flipped
 
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
+from tiliqua.build.types import BitstreamHelp
 from tiliqua.tiliqua_soc import TiliquaSoc
 from tiliqua.periph import vbus
 
@@ -21,6 +22,12 @@ from guh.periph import msc
 USB_SCRATCH_PSRAM_SIZE = 3 * MAX_BLOCKS_PER_XFER * 512
 
 class BootloaderSoc(TiliquaSoc):
+
+    bitstream_help = BitstreamHelp(
+        brief="Tiliqua Bootloader",
+        io_left=['', '', '', '', '(muted)', '(muted)', '(muted)', '(muted)'],
+        io_right=['navigate menu', 'USB host', 'video out', '', '', '']
+    )
 
     def __init__(self, **kwargs):
 
