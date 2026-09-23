@@ -91,7 +91,6 @@ pub enum MidiChannel {
 impl MidiChannel {
     pub fn to_filter(self) -> Option<u8> {
         match self {
-            /// HAL wants `None` => for listening on all channels.
             MidiChannel::All => None,
             _ => Some(self as u8),
         }
