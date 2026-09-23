@@ -216,6 +216,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
+name = "fatfs"
+version = "0.4.0"
+source = "git+https://github.com/vk2seb/rust-fatfs.git?branch=seb%2Fdma-geo#3e3f63360399e236a8d9562846a02cc99274975e"
+dependencies = [
+ "bitflags",
+ "log",
+]
+
+[[package]]
 name = "fixed"
 version = "1.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -247,6 +256,22 @@ name = "futures-sink"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e575fab7d1e0dcb8d0c7bcf9a63ee213816ab51902e6d244a95819acacf1d4f7"
+
+[[package]]
+name = "guh-dma"
+version = "0.0.0"
+source = "git+https://github.com/apfaudio/guh?rev=32e7f0d#32e7f0dcd4b7871a33bb8b38fd167ed630ba016e"
+
+[[package]]
+name = "guh-usb-msc"
+version = "0.0.0"
+source = "git+https://github.com/apfaudio/guh?rev=32e7f0d#32e7f0dcd4b7871a33bb8b38fd167ed630ba016e"
+dependencies = [
+ "critical-section",
+ "fatfs",
+ "guh-dma",
+ "log",
+]
 
 [[package]]
 name = "half"
@@ -595,6 +620,9 @@ dependencies = [
  "critical-section",
  "embedded-hal 1.0.0",
  "fastrand",
+ "fatfs",
+ "guh-dma",
+ "guh-usb-msc",
  "heapless",
  "irq",
  "log",

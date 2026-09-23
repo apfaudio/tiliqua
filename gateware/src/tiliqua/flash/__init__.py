@@ -28,11 +28,32 @@ import sys
 from colorama import Fore, Style
 from typing import Optional
 
-from ..build.types import N_MANIFESTS
+from ..build.types import N_MANIFESTS, RegionType
 from .archive_loader import ArchiveLoader
 from .spiflash_layout import compute_concrete_regions_to_flash
-from .spiflash_status import flash_status
+from .spiflash_status import flash_status, read_bootloader_manifest, parse_version_tag
 from .openfpgaloader import *
+
+USBLOAD_MIN_BOOTLOADER = (1, 3, 0)
+
+class BootloaderTooOld(Exception):
+    pass
+
+def check_bootloader_supports_archive(bl_manifest: Optional[dict], manifest):
+    needs_usbload = any(r.region_type == RegionType.UsbLoad for r in manifest.regions)
+    if not needs_usbload or bl_manifest is None:
+        return
+    tag = bl_manifest.get('tag')
+    version = parse_version_tag(tag)
+    if version is None:
+        print(f"{Fore.YELLOW}Warning: bootloader tag '{tag}' is not a release version, "
+              f"assuming it supports 'UsbLoad' regions.{Style.RESET_ALL}\n")
+        return
+    if version < USBLOAD_MIN_BOOTLOADER:
+        min_str = "v" + ".".join(map(str, USBLOAD_MIN_BOOTLOADER))
+        raise BootloaderTooOld(
+            f"this bitstream contains a 'UsbLoad' region, which requires "
+            f"bootloader >= {min_str} (device has {tag}).")
 
 def flash_archive(args, detected_hw_rev: int):
 
@@ -99,7 +120,23 @@ def flash_archive(args, detected_hw_rev: int):
             print("Aborting.")
             sys.exit(0)
 
-        sequence.execute(cwd=loader.tmpdir)
+        try:
+            try:
+                if not is_bootloader:
+                    bl = read_bootloader_manifest()
+                    if bl is not None:
+                        print(f"\nBootloader on device: {bl.get('name')} {bl.get('tag')} (hw=r{bl.get('hw_rev')})\n")
+                    else:
+                        print(f"\n{Fore.YELLOW}Warning: no valid bootloader manifest found on device.{Style.RESET_ALL}\n")
+                    check_bootloader_supports_archive(bl, manifest)
+
+                sequence.execute(cwd=loader.tmpdir)
+            finally:
+                reset_fpga()
+        except BootloaderTooOld as e:
+            print(f"\n{Fore.RED}Error: {e}{Style.RESET_ALL}")
+            print("Please update the bootloader first.")
+            sys.exit(1)
 
 def main():
 

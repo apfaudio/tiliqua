@@ -32,7 +32,8 @@ parallel --halt now,fail=1 --jobs 0 --ungroup "{} $@" ::: \
   "pdm vectorscope_no_soc build --fs-192khz --spectrogram --modeline 1280x720p60 --name=SPECTRO12" \
   "pdm bootstub build" \
   "pdm usb_audio build" \
-  "pdm usb_host build"
+  "pdm usb_host build" \
+  "pdm wavplay build"
 
 # build static modeline bitstreams again at 720x720p60
 # this is not done in parallel as it trips a strange bug during amaranth

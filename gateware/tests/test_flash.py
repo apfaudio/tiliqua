@@ -82,9 +82,6 @@ class TestFlashCommandGenerator(unittest.TestCase):
             self.assertIn("--skip-reset", commands[1])
             self.assertIn("firmware.bin", " ".join(commands[1]))
 
-            # Last command should not have --skip-reset
-            self.assertNotIn("--skip-reset", commands[2])
-
     def test_user_bitstream_without_firmware(self):
 
         archiver = ArchiveBuilder(
@@ -112,9 +109,6 @@ class TestFlashCommandGenerator(unittest.TestCase):
             self.assertIn("0x200000", commands[0])
             self.assertIn("--skip-reset", commands[0])
             self.assertIn("top.bit", " ".join(commands[0]))
-
-            # Last command should not have --skip-reset
-            self.assertNotIn("--skip-reset", commands[1])
 
     def test_user_bitstream_with_firmware(self):
 
@@ -151,9 +145,6 @@ class TestFlashCommandGenerator(unittest.TestCase):
             self.assertIn("0x390000", commands[1])
             self.assertIn("--skip-reset", commands[1])
             self.assertIn("firmware.bin", " ".join(commands[1]))
-
-            # Last command should not have --skip-reset
-            self.assertNotIn("--skip-reset", commands[2])
 
     def test_manifest_rust_compatibility(self):
         """Test that a Python-generated manifest can be read by Rust lib.rs."""

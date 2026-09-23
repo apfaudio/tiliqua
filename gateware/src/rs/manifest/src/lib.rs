@@ -45,6 +45,8 @@ pub enum RegionType {
     OptionStorage,
     /// Manifest region containing metadata about the bitstream
     Manifest,
+    /// Copied from a file on an attached USB drive to PSRAM
+    UsbLoad,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
