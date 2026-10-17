@@ -24,6 +24,8 @@ use channel::{Channel, ChannelView};
 use flash::DelaylineFlash;
 use hal::pca9635::Pca9635Driver;
 use tiliqua_fw::delay_line::DelayLine;
+use embassy_embedded_hal::flash::partition::BlockingPartition;
+use embassy_sync::blocking_mutex::{Mutex as FlashMutex, raw::NoopRawMutex};
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pmod::EurorackPmod;
 
@@ -198,16 +200,12 @@ fn main() -> ! {
     );
 
     let mut opts = Opts::default();
+    let flash = FlashMutex::<NoopRawMutex, _>::new(RefCell::new(spiflash));
     let mut flash_persist_opt = FlashOptionsPersistence::open(
-        spiflash, bootinfo.manifest.get_option_storage_window(), &mut opts);
-
-    // HACK: stolen spiflash instance!! be careful that delayln rd/wr is
-    // never happening at the same time as other spiflash ops.
-    let mut delayln_flash = DelaylineFlash::new(SPIFlash0::new(
-        unsafe { pac::Peripherals::steal() }.SPIFLASH_CTRL,
-        SPIFLASH_BASE,
-        SPIFLASH_SZ_BYTES,
-    ));
+        BlockingPartition::new(&flash, 0, SPIFLASH_SZ_BYTES as u32),
+        bootinfo.manifest.get_option_storage_window(), &mut opts);
+    let mut delayln_flash = DelaylineFlash::new(
+        BlockingPartition::new(&flash, 0, SPIFLASH_SZ_BYTES as u32));
 
     palette::ColorPalette::default().write_to_hardware(&mut display);
 
