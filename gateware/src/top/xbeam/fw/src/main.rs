@@ -87,22 +87,18 @@ fn build_cc_mapper(opts: &Opts) -> MidiCcMapper {
     m
 }
 
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>;
+
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: Ui,
     cc_mapper: MidiCcMapper,
 }
 
 impl App {
-    pub fn new(opts: Opts) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-        let cc_mapper = build_cc_mapper(&opts);
+    pub fn new(ui: Ui) -> Self {
+        let cc_mapper = build_cc_mapper(&ui.opts);
         Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
+            ui,
             cc_mapper,
         }
     }
@@ -196,7 +192,9 @@ fn main() -> ! {
     //
 
     let mut last_palette = opts.beam.palette.value;
-    let app = Mutex::new(RefCell::new(App::new(opts)));
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
+    let app = Mutex::new(RefCell::new(App::new(ui)));
 
     handler!(timer0 = || timer0_handler(&app));
 

@@ -98,26 +98,18 @@ pub type Channels = (
     Channel<GrainPlayer2>,
 );
 
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>;
+
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: Ui,
     channels: Channels,
     delayln: DelayLine0,
 }
 
 impl App {
-    pub fn new(
-        opts: Opts,
-        channels: Channels,
-        delayln: DelayLine0,
-    ) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    pub fn new(ui: Ui, channels: Channels, delayln: DelayLine0) -> Self {
         Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
+            ui,
             channels,
             delayln,
         }
@@ -227,7 +219,9 @@ fn main() -> ! {
         });
     }
 
-    let app = Mutex::new(RefCell::new(App::new(opts, channels, delayln)));
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
+    let app = Mutex::new(RefCell::new(App::new(ui, channels, delayln)));
 
     handler!(timer0 = || timer0_handler(&app));
 

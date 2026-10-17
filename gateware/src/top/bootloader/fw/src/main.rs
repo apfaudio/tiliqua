@@ -92,17 +92,11 @@ struct App {
 }
 
 impl App {
-    pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
+    pub fn new(ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
                pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline, autoboot_slot: Option<usize>, 
                eeprom_manager: EepromManager<I2c1>) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
         Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
+            ui,
             pll,
             eeprom_manager,
             reboot_n: None,
@@ -1003,7 +997,9 @@ fn main() -> ! {
     }
 
     let app = Mutex::new(RefCell::new(
-            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone(), autoboot_to, eeprom_manager)));
+            App::new(ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                             Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod),
+                     manifests.clone(), maybe_external_pll, modeline.clone(), autoboot_to, eeprom_manager)));
 
     // Until this point, the video gateware is held in reset. Now that we have a target modeline
     // and the external PLL is appropriately configured, we can bring it up.
@@ -1042,12 +1038,12 @@ fn main() -> ! {
             let h_active = display.size().width;
             let v_active = display.size().height;
 
-            // Always mute the CODEC to stop pops on flashing while in the bootloader.
-            pmod.mute(true);
-
             let (opts, reboot_n, error_n, final_modeline, autoboot_countdown_ms) = critical_section::with(|cs| {
 
                 let mut app = app.borrow_ref_mut(cs);
+
+                // Always mute the CODEC to stop pops on flashing while in the bootloader.
+                app.ui.pmod.mute(true);
 
                 //
                 // Dynamic modeline switching.

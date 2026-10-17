@@ -364,20 +364,6 @@ struct App {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
 
-impl App {
-    pub fn new(opts: Opts) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
-        }
-    }
-}
-
 fn push_to_opts(constants: &CalibrationConstants, options: &mut Opts, d: &DefaultCalibrationConstants) {
     let c = constants.to_tweakable(d);
     options.caladc.scale0.value = c.adc_scale[0];
@@ -419,7 +405,7 @@ fn main() -> ! {
 
     let mut i2cdev = I2c0::new(peripherals.I2C0);
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
-    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
 
     let mut startup_report = ReportString::new();
@@ -447,7 +433,10 @@ fn main() -> ! {
 
     info!("STARTUP REPORT: {startup_report}");
 
-    let app = Mutex::new(RefCell::new(App::new(opts)));
+    let mut last_jack = pmod.jack();
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2c0::new(unsafe { pac::I2C0::steal() })), pmod);
+    let app = Mutex::new(RefCell::new(App { ui }));
     let hue = 10;
 
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
@@ -462,8 +451,6 @@ fn main() -> ! {
 
     let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
     let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
-
-    let mut last_jack = pmod.jack();
 
     let gpio0 = peripherals.GPIO0;
     let gpio1 = peripherals.GPIO1;
@@ -488,18 +475,16 @@ fn main() -> ! {
                 last_hpd = dvi_hpd;
             }
 
-            if pmod.jack() != last_jack {
-                let _ = cy8.reset();
-            }
-            last_jack = pmod.jack();
-
-            let (opts, commit_to_eeprom) = critical_section::with(|cs| {
+            let (opts, commit_to_eeprom, jack, counts_per_v) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
                 let commit_to_eeprom = app.ui.opts.autocal.write.poll();
-                (app.ui.opts.clone(), commit_to_eeprom)
+                (app.ui.opts.clone(), commit_to_eeprom, app.ui.pmod.jack(), app.ui.pmod.counts_per_v())
             });
 
-            let counts_per_v = pmod.counts_per_v();
+            if jack != last_jack {
+                let _ = cy8.reset();
+            }
+            last_jack = jack;
             let stimulus_raw = counts_per_v * i32::from(opts.autocal.volts.value);
 
             draw::draw_options(&mut display, &opts, h_active/2-30, 70,
@@ -512,9 +497,9 @@ fn main() -> ! {
                 let report_str = match opts.report.page.value {
                     ReportPage::Startup => &startup_report,
                     ReportPage::Status  => {
-                        critical_section::with(|_| {
+                        critical_section::with(|cs| {
                             // Devices shared with timer callback, be careful!
-                            print_pmod_state(&mut status_report, &pmod);
+                            print_pmod_state(&mut status_report, &app.borrow_ref(cs).ui.pmod);
                             print_usb_state(&mut status_report, &mut i2cdev);
                         });
                         print_die_temperature(&mut status_report, &dtr);
@@ -541,10 +526,13 @@ fn main() -> ! {
             }
 
             if opts.tracker.page.value == Page::Autocal {
-                pmod.registers.sample_o0().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
-                pmod.registers.sample_o1().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
-                pmod.registers.sample_o2().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
-                pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                critical_section::with(|cs| {
+                    let pmod = &app.borrow_ref(cs).ui.pmod;
+                    pmod.registers.sample_o0().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                    pmod.registers.sample_o1().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                    pmod.registers.sample_o2().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                    pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                });
             }
 
             if opts.tracker.page.value == Page::Benchmark {
@@ -614,7 +602,11 @@ fn main() -> ! {
                 },
                 &cal_default
             );
-            constants.write_to_pmod(&mut pmod);
+            let (sample_i, f_bits) = critical_section::with(|cs| {
+                let mut app = app.borrow_ref_mut(cs);
+                constants.write_to_pmod(&mut app.ui.pmod);
+                (app.ui.pmod.sample_i(), app.ui.pmod.f_bits())
+            });
 
             if commit_to_eeprom {
                 critical_section::with(|_| {
@@ -625,11 +617,11 @@ fn main() -> ! {
             if opts.tracker.page.value != Page::Report && opts.tracker.page.value != Page::Benchmark {
                 draw::draw_cal(&mut display, h_active/2-128, v_active/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
-                               &pmod.sample_i(), counts_per_v).ok();
+                               &sample_i, counts_per_v).ok();
                 draw::draw_cal_constants(
                     &mut display, h_active/2-128, v_active/2+64, hue,
                     &constants.cal.adc_scale, &constants.cal.adc_zero, &constants.cal.dac_scale, &constants.cal.dac_zero,
-                    pmod.f_bits()).ok();
+                    f_bits).ok();
 
             }
 

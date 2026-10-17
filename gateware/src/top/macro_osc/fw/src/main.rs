@@ -30,15 +30,17 @@ const HEAP_SIZE: usize = 128*1024;
 
 static HEAP: Heap = Heap::empty();
 
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>;
+
 struct App<'a> {
     voice: Voice<'a>,
     patch: Patch,
     modulations: Modulations,
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: Ui,
 }
 
 impl App<'_> {
-    pub fn new(opts: Opts) -> Self {
+    pub fn new(ui: Ui) -> Self {
         let mut voice = Voice::new(&HEAP, BLOCK_SIZE);
         let patch = Patch {
             engine: 0,
@@ -51,18 +53,12 @@ impl App<'_> {
         };
         voice.init();
 
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
 
         Self {
             voice,
             patch,
             modulations: Modulations::default(),
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
+            ui,
         }
     }
 }
@@ -225,7 +221,9 @@ fn main() -> ! {
     //
 
     let mut last_palette = opts.beam.palette.value;
-    let app = App::new(opts);
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
+    let app = App::new(ui);
     let app = Mutex::new(RefCell::new(app));
 
     info!("heap usage {} KiB", HEAP.used()/1024);
