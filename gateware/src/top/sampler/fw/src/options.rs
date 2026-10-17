@@ -61,7 +61,7 @@ impl PlaybackMode {
     }
 }
 
-impl From<PlaybackMode> for tiliqua_hal::grain_player::PlaybackMode {
+impl From<PlaybackMode> for crate::grain_player::PlaybackMode {
     fn from(mode: PlaybackMode) -> Self {
         match mode {
             PlaybackMode::Gate => Self::Gate,

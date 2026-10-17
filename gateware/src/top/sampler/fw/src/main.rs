@@ -23,7 +23,7 @@ use opts::persistence::*;
 use channel::{Channel, ChannelView};
 use flash::DelaylineFlash;
 use hal::pca9635::Pca9635Driver;
-use tiliqua_hal::delay_line::DelayLine;
+use tiliqua_fw::delay_line::DelayLine;
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pmod::EurorackPmod;
 
@@ -204,9 +204,9 @@ fn main() -> ! {
 
     let delayln = DelayLine0::new(peripherals.DELAYLN_PERIPH0);
     let channels = (
-        Channel::new(GrainPlayer0::new(peripherals.GRAIN_PERIPH0)),
-        Channel::new(GrainPlayer1::new(peripherals.GRAIN_PERIPH1)),
-        Channel::new(GrainPlayer2::new(peripherals.GRAIN_PERIPH2)),
+        Channel::new(peripherals.GRAIN_PERIPH0),
+        Channel::new(peripherals.GRAIN_PERIPH1),
+        Channel::new(peripherals.GRAIN_PERIPH2),
     );
 
     let mut opts = Opts::default();

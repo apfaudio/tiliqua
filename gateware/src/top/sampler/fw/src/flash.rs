@@ -1,5 +1,5 @@
 use log::info;
-use tiliqua_hal::delay_line::DelayLine;
+use crate::delay_line::DelayLine;
 use tiliqua_hal::nor_flash::{NorFlash, ReadNorFlash};
 
 // XXX: hardcoded delayline offset in spiflash that is far

@@ -1,5 +1,5 @@
-use tiliqua_hal::delay_line::DelayLine;
-use tiliqua_hal::grain_player::GrainPlayer;
+use crate::delay_line::DelayLine;
+use crate::grain_player::GrainPlayer;
 use crate::options::{ChannelOpts, PlaybackMode};
 use micromath::F32Ext;
 
