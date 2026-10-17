@@ -400,7 +400,7 @@ fn push_to_opts(constants: &CalibrationConstants, options: &mut Opts, d: &Defaul
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
 
     // initialize logging
     let serial = Serial0::new(peripherals.UART0);
@@ -413,7 +413,7 @@ fn main() -> ! {
     info!("Hello from Tiliqua selftest!");
 
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.expect("invalid bootinfo");
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
 

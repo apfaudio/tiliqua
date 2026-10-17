@@ -642,7 +642,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     app.ui.opts.tracker.modify = false;
                     app.reboot_n = None;
                     app.time_since_reboot_requested = 0;
-                    app.error_n[n] = Some(String::from_str(bitstream_error.into()).unwrap());
+                    app.error_n[n] = Some(String::from_str(bitstream_error.into()).expect("bitstream error name too long"));
                     info!("Failed to load bitstream: {:?}", app.error_n[n]);
                     // Clear the autoboot flag, as it's possible an error occurred after
                     // the autoboot flag was set (during/after PLL reconfiguration).
@@ -847,7 +847,7 @@ fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
 
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
@@ -946,7 +946,7 @@ fn main() -> ! {
             clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
             clk1_inherit: false,
             spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
-        }, &mut si5351drv).unwrap();
+        }, &mut si5351drv).expect("failed to configure external PLL");
         Some(si5351drv)
     } else {
         None
@@ -1071,7 +1071,7 @@ fn main() -> ! {
                                 clk1_hz: Some((new_modeline.pixel_clk_mhz*1e6) as u32),
                                 clk1_inherit: false,
                                 spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
-                            }, external_pll).unwrap();
+                            }, external_pll).expect("failed to reconfigure external PLL");
                             reprogrammed_pll = true;
                         }
                     }

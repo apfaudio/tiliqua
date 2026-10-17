@@ -32,7 +32,7 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
         mut progress: impl FnMut(usize, usize),
     ) -> bool {
         let mut magic_buf = [0u8; 4];
-        self.flash.read(BASE, &mut magic_buf).unwrap();
+        self.flash.read(BASE, &mut magic_buf).expect("failed to read delay line magic");
         let magic = u32::from_le_bytes(magic_buf);
         if magic != MAGIC {
             info!("No saved delay line found in flash (magic=0x{magic:08x}).");
@@ -46,7 +46,7 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
         let mut loaded = 0usize;
         while loaded < size_bytes {
             let chunk = (size_bytes - loaded).min(CHUNK);
-            self.flash.read(flash_offset + loaded as u32, &mut data[loaded..loaded + chunk]).unwrap();
+            self.flash.read(flash_offset + loaded as u32, &mut data[loaded..loaded + chunk]).expect("failed to read delay line");
             loaded += chunk;
             progress(loaded / 1024, size_bytes / 1024);
         }
@@ -75,14 +75,14 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
         while erased < erase_total {
             let chunk = (erase_total - erased).min(CHUNK);
             let addr = BASE + erased as u32;
-            self.flash.erase(addr, addr + chunk as u32).unwrap();
+            self.flash.erase(addr, addr + chunk as u32).expect("failed to erase delay line");
             erased += chunk;
             progress("Erasing", erased / 1024, erase_total / 1024);
         }
 
         // Write the magic and then unrotated data (on load, wrpointer=0, data must
         // be correctly ordered)
-        self.flash.write(BASE, &MAGIC.to_le_bytes()).unwrap();
+        self.flash.write(BASE, &MAGIC.to_le_bytes()).expect("failed to write delay line magic");
         let parts: [&[u8]; 2] = [&data[wr_bytes..], &data[..wr_bytes]];
         let mut flash_written = 0usize;
         for part in parts {
@@ -90,7 +90,7 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
             while part_written < part.len() {
                 let chunk = (part.len() - part_written).min(CHUNK);
                 let addr = flash_offset + flash_written as u32;
-                self.flash.write(addr, &part[part_written..part_written + chunk]).unwrap();
+                self.flash.write(addr, &part[part_written..part_written + chunk]).expect("failed to write delay line");
                 part_written += chunk;
                 flash_written += chunk;
                 progress("Saving", flash_written / 1024, size_bytes / 1024);
@@ -100,6 +100,6 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
     }
 
     pub fn wipe_magic(&mut self) {
-        self.flash.erase(BASE, BASE + DATA_OFFSET).unwrap();
+        self.flash.erase(BASE, BASE + DATA_OFFSET).expect("failed to erase delay line magic");
     }
 }

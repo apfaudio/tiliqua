@@ -176,7 +176,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 #[entry]
 fn main() -> ! {
 
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
 
     // initialize logging
     let serial = Serial0::new(peripherals.UART0);
@@ -193,7 +193,7 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua MACRO-OSCILLATOR!");
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.expect("invalid bootinfo");
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
@@ -332,7 +332,7 @@ fn main() -> ! {
 
             if save_opts {
                 if let Some(ref mut flash_persist) = flash_persist_opt {
-                    flash_persist.save_options(&opts).unwrap();
+                    flash_persist.save_options(&opts).expect("failed to save options");
                 }
             }
 
@@ -341,7 +341,7 @@ fn main() -> ! {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = Opts::default();
                     if let Some(ref mut flash_persist) = flash_persist_opt {
-                        flash_persist.erase_all().unwrap();
+                        flash_persist.erase_all().expect("failed to erase options");
                     }
                 });
             }
