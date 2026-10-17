@@ -92,14 +92,16 @@ type Ui = ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>;
 struct App {
     ui: Ui,
     cc_mapper: MidiCcMapper,
+    xbeam: pac::XBEAM_PERIPH,
 }
 
 impl App {
-    pub fn new(ui: Ui) -> Self {
+    pub fn new(ui: Ui, xbeam: pac::XBEAM_PERIPH) -> Self {
         let cc_mapper = build_cc_mapper(&ui.opts);
         Self {
             ui,
             cc_mapper,
+            xbeam,
         }
     }
 }
@@ -110,8 +112,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         app.ui.update();
 
         // Check for TRS MIDI CC traffic
-        let xbeam = unsafe { pac::XBEAM_PERIPH::steal() };
-        let midi_word = xbeam.midi_read().read().bits();
+        let midi_word = app.xbeam.midi_read().read().bits();
         if midi_word != 0 {
             app.ui.midi_activity();
             let bytes = [
@@ -194,7 +195,7 @@ fn main() -> ! {
     let mut last_palette = opts.beam.palette.value;
     let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
                          Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
-    let app = Mutex::new(RefCell::new(App::new(ui)));
+    let app = Mutex::new(RefCell::new(App::new(ui, peripherals.XBEAM_PERIPH)));
 
     handler!(timer0 = || timer0_handler(&app));
 
@@ -209,7 +210,6 @@ fn main() -> ! {
 
         let mut vscope = Vector0::new(peripherals.VECTOR_PERIPH);
         let mut scope = Scope0::new(peripherals.SCOPE_PERIPH, 6);
-        let xbeam_mux = peripherals.XBEAM_PERIPH;
         let overlay_periph = peripherals.OVERLAY_PERIPH;
         let mut first = true;
 
@@ -335,11 +335,13 @@ fn main() -> ! {
                 }
             });
 
-            xbeam_mux.flags().write(
-                |w| { w.usb_en().bit(opts.misc.usb_mode.value == USBMode::Enable);
-                      w.show_outputs().bit(opts.misc.plot_src.value == PlotSrc::Outputs);
-                      w.usb_connect().bit(usb_cc_attached)
-                } );
+            critical_section::with(|cs| {
+                app.borrow_ref(cs).xbeam.flags().write(
+                    |w| { w.usb_en().bit(opts.misc.usb_mode.value == USBMode::Enable);
+                          w.show_outputs().bit(opts.misc.plot_src.value == PlotSrc::Outputs);
+                          w.usb_connect().bit(usb_cc_attached)
+                    } );
+            });
 
             // Update grid spacing. In scope mode use the scope's ppd_x for the
             // time axis. In portrait rotation the time/signal axes are swapped
@@ -377,14 +379,17 @@ fn main() -> ! {
                 w.grid_pixel().bits((opts.beam.grid_i.value << 4) | opts.beam.ui_hue.value)
             });
 
-            xbeam_mux.delay0().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[0].proc_u16(opts.delay.delay_x.value)) });
-            xbeam_mux.delay1().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[1].proc_u16(opts.delay.delay_y.value)) });
-            xbeam_mux.delay2().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[2].proc_u16(opts.delay.delay_i.value)) });
-            xbeam_mux.delay3().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[3].proc_u16(opts.delay.delay_c.value)) });
+            critical_section::with(|cs| {
+                let xbeam = &app.borrow_ref(cs).xbeam;
+                xbeam.delay0().write(|w| unsafe { w.value().bits(
+                        delay_smoothers[0].proc_u16(opts.delay.delay_x.value)) });
+                xbeam.delay1().write(|w| unsafe { w.value().bits(
+                        delay_smoothers[1].proc_u16(opts.delay.delay_y.value)) });
+                xbeam.delay2().write(|w| unsafe { w.value().bits(
+                        delay_smoothers[2].proc_u16(opts.delay.delay_i.value)) });
+                xbeam.delay3().write(|w| unsafe { w.value().bits(
+                        delay_smoothers[3].proc_u16(opts.delay.delay_c.value)) });
+            });
 
             display.rotate(&opts.misc.rotation.value);
 

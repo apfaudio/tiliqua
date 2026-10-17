@@ -104,24 +104,22 @@ struct App {
     ui: Ui,
     channels: Channels,
     delayln: DelayLine0,
+    sampler: pac::SAMPLER_PERIPH,
 }
 
 impl App {
-    pub fn new(ui: Ui, channels: Channels, delayln: DelayLine0) -> Self {
+    pub fn new(ui: Ui, channels: Channels, delayln: DelayLine0, sampler: pac::SAMPLER_PERIPH) -> Self {
         Self {
             ui,
             channels,
             delayln,
+            sampler,
         }
     }
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
     critical_section::with(|cs| {
-
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let pmod = peripherals.PMOD0_PERIPH;
-        let sampler = peripherals.SAMPLER_PERIPH;
 
         let mut app = app.borrow_ref_mut(cs);
 
@@ -144,12 +142,12 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             opts.len.value = zoomstep(opts_prev.len.value, opts.len.value, opts.zoom.value);
         }
 
-        sampler.flags().write(|w| {
+        app.sampler.flags().write(|w| {
             w.record().bit(app.ui.opts.record.record.value)
         });
 
         // ScrubFast/ScrubSlow selects different onepole cutoff on scrub pos
-        sampler.scrub_filter().write(|w| unsafe {
+        app.sampler.scrub_filter().write(|w| unsafe {
             w.ch0().bits(app.ui.opts.channel0.mode.value.scrub_filter_shift());
             w.ch1().bits(app.ui.opts.channel1.mode.value.scrub_filter_shift());
             w.ch2().bits(app.ui.opts.channel2.mode.value.scrub_filter_shift())
@@ -157,7 +155,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         app.ui.touch_led_mask(0b00001110);
         let touch = app.ui.pmod.touch();
-        let jack = pmod.jack().read().bits();
+        let jack = app.ui.pmod.registers.jack().read().bits();
         let cv = app.ui.pmod.sample_i();
         let opts = app.ui.opts.clone();
         app.channels.0.update(&opts.channel0, max_samples, 1, &touch, jack, cv[1]);
@@ -221,7 +219,7 @@ fn main() -> ! {
 
     let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
                          Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
-    let app = Mutex::new(RefCell::new(App::new(ui, channels, delayln)));
+    let app = Mutex::new(RefCell::new(App::new(ui, channels, delayln, peripherals.SAMPLER_PERIPH)));
 
     handler!(timer0 = || timer0_handler(&app));
 

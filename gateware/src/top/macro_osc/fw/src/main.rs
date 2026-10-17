@@ -37,10 +37,11 @@ struct App<'a> {
     patch: Patch,
     modulations: Modulations,
     ui: Ui,
+    audio_fifo: pac::AUDIO_FIFO,
 }
 
 impl App<'_> {
-    pub fn new(ui: Ui) -> Self {
+    pub fn new(ui: Ui, audio_fifo: pac::AUDIO_FIFO) -> Self {
         let mut voice = Voice::new(&HEAP, BLOCK_SIZE);
         let patch = Patch {
             engine: 0,
@@ -59,6 +60,7 @@ impl App<'_> {
             patch,
             modulations: Modulations::default(),
             ui,
+            audio_fifo,
         }
     }
 }
@@ -81,10 +83,6 @@ pub fn f32_to_i32(f: u32) -> i32 {
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
-
-    let peripherals = unsafe { pac::Peripherals::steal() };
-    let audio_fifo = peripherals.AUDIO_FIFO;
-    let pmod = peripherals.PMOD0_PERIPH;
 
     critical_section::with(|cs| {
 
@@ -124,6 +122,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         //
 
         let mut modulations = app.modulations.clone();
+        let pmod = &app.ui.pmod.registers;
         let jack = pmod.jack().read().bits();
 
         let note_patched = (jack & 0x1) != 0;
@@ -149,7 +148,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         let mut aux = [0.0f32; BLOCK_SIZE];
 
         let mut n_attempts = 0;
-        while (audio_fifo.fifo_len().read().bits() as usize) < AUDIO_FIFO_ELASTIC_SZ - BLOCK_SIZE {
+        while (app.audio_fifo.fifo_len().read().bits() as usize) < AUDIO_FIFO_ELASTIC_SZ - BLOCK_SIZE {
             n_attempts += 1;
             if n_attempts > 10 {
                 // TODO set underrun flag
@@ -223,7 +222,7 @@ fn main() -> ! {
     let mut last_palette = opts.beam.palette.value;
     let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
                          Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
-    let app = App::new(ui);
+    let app = App::new(ui, peripherals.AUDIO_FIFO);
     let app = Mutex::new(RefCell::new(app));
 
     info!("heap usage {} KiB", HEAP.used()/1024);
