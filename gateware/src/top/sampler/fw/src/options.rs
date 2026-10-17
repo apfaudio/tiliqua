@@ -3,7 +3,7 @@ use strum_macros::{EnumIter, IntoStaticStr};
 use serde_derive::{Serialize, Deserialize};
 use tiliqua_lib::palette::ColorPalette;
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     #[default]
@@ -17,15 +17,15 @@ pub enum Page {
 impl Page {
     pub fn channel_index(&self) -> Option<usize> {
         match self {
-            Page::Channel0 => Some(0),
-            Page::Channel1 => Some(1),
-            Page::Channel2 => Some(2),
+            Self::Channel0 => Some(0),
+            Self::Channel1 => Some(1),
+            Self::Channel2 => Some(2),
             _ => None,
         }
     }
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum WaveformView {
     #[default]
@@ -33,7 +33,7 @@ pub enum WaveformView {
     Lines,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum PlaybackMode {
     #[default]
@@ -49,13 +49,13 @@ pub enum PlaybackMode {
 
 impl PlaybackMode {
     pub fn gate_stuck(&self) -> bool {
-        matches!(self, PlaybackMode::LoopOn | PlaybackMode::BounceOn)
+        matches!(self, Self::LoopOn | Self::BounceOn)
     }
 
     pub fn scrub_filter_shift(&self) -> u8 {
         match self {
-            PlaybackMode::ScrubFast => 3,
-            PlaybackMode::ScrubSlow => 12,
+            Self::ScrubFast => 3,
+            Self::ScrubSlow => 12,
             _ => 0,
         }
     }

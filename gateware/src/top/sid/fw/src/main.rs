@@ -61,7 +61,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     let sid = peripherals.SID_PERIPH;
     let sid_poke = |_sid: &pac::SID_PERIPH, addr: u8, data: u8| {
         _sid.transaction_data().write(
-            |w| unsafe { w.transaction_data().bits(((data as u16) << 5) | (addr as u16)) } );
+            |w| unsafe { w.transaction_data().bits((u16::from(data) << 5) | u16::from(addr)) } );
     };
 
     let (mut opts, x) = critical_section::with(|cs| {
@@ -91,13 +91,13 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         let mut gate = voices[n_voice].gate.value;
 
         for (ch, m) in mods.iter().enumerate() {
-            if let Some(VoiceModulationType::Frequency) = m.modulates_voice(n_voice) {
+            if matches!(m.modulates_voice(n_voice), Some(VoiceModulationType::Frequency)) {
                 let volts: f32 = (x[ch] as f32) / 4096.0f32;
                 let freq_hz = volts_to_freq(volts);
                 freq = 16u16 * (0.05960464f32 * freq_hz) as u16; // assumes 1Mhz SID clk
                                                                  // http://www.sidmusic.org/sid/sidtech2.html
             }
-            if let Some(VoiceModulationType::Gate) = m.modulates_voice(n_voice) {
+            if matches!(m.modulates_voice(n_voice), Some(VoiceModulationType::Gate)) {
                 if x[ch] > 2000 {
                     gate = 1;
                 }
@@ -112,9 +112,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         voices[n_voice].freq.value = freq;
         voices[n_voice].gate.value = gate;
 
-        freq = (freq as f32 * (voices[n_voice].freq_os.value as f32 / 1000.0f32)) as u16;
+        freq = (f32::from(freq) * (f32::from(voices[n_voice].freq_os.value) / 1000.0f32)) as u16;
 
-        sid_poke(&sid, base+0, freq as u8);
+        sid_poke(&sid, base, freq as u8);
         sid_poke(&sid, base+1, (freq>>8) as u8);
 
         sid_poke(&sid, base+2, voices[n_voice].pw.value as u8);
@@ -147,17 +147,17 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     sid_poke(&sid, 0x15, (opts.filter.cutoff.value & 0x7) as u8);
     sid_poke(&sid, 0x16, (opts.filter.cutoff.value >> 3) as u8);
     sid_poke(&sid, 0x17,
-        (opts.filter.filt1.value |
+        opts.filter.filt1.value |
         (opts.filter.filt2.value << 1) |
         (opts.filter.filt3.value << 2) |
-        (opts.filter.reso.value  << 4)) as u8
+        (opts.filter.reso.value  << 4)
         );
     sid_poke(&sid, 0x18,
-        ((opts.filter.lp.value     << 4) |
+        (opts.filter.lp.value     << 4) |
          (opts.filter.bp.value     << 5) |
          (opts.filter.hp.value     << 6) |
          (opts.filter.v3off.value  << 7) |
-         (opts.filter.volume.value << 0)) as u8
+         opts.filter.volume.value
         );
 
     critical_section::with(|cs| {
@@ -312,32 +312,32 @@ fn main() -> ! {
 
                     Text::new(
                         "out3: combined, post-filter",
-                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                                   (opts.scope.ypos0.value + vc + 50) as i32),
+                        Point::new(i32::from(opts.scope.xpos.value + hc - 250),
+                                   i32::from(opts.scope.ypos0.value + vc + 50)),
                         font_small_white,
                     )
                     .draw(&mut display).ok();
 
                     Text::new(
                         "out0: voice 1, post-VCA",
-                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                                   (opts.scope.ypos1.value + vc + 50) as i32),
+                        Point::new(i32::from(opts.scope.xpos.value + hc - 250),
+                                   i32::from(opts.scope.ypos1.value + vc + 50)),
                         font_small_white,
                     )
                     .draw(&mut display).ok();
 
                     Text::new(
                         "out1: voice 2, post-VCA",
-                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                                   (opts.scope.ypos2.value + vc + 50) as i32),
+                        Point::new(i32::from(opts.scope.xpos.value + hc - 250),
+                                   i32::from(opts.scope.ypos2.value + vc + 50)),
                         font_small_white,
                     )
                     .draw(&mut display).ok();
 
                     Text::new(
                         "out2: voice 3, post-VCA",
-                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                                   (opts.scope.ypos3.value + vc + 50) as i32),
+                        Point::new(i32::from(opts.scope.xpos.value + hc - 250),
+                                   i32::from(opts.scope.ypos3.value + vc + 50)),
                         font_small_white,
                     )
                     .draw(&mut display).ok();

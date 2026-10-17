@@ -31,8 +31,8 @@ impl<G: GrainPlayer> Channel<G> {
             let volts = cv as f32 / 4000.0;
             (256.0 * (2.0f32).powf(volts - 3.0)).clamp(32.0, 1024.0) as u16
         } else if opts.mode.value.gate_stuck() {
-            let t = touch[touch_idx] as u32;
-            (opts.speed.value as u32 * (256 + t) / 256) as u16
+            let t = u32::from(touch[touch_idx]);
+            (u32::from(opts.speed.value) * (256 + t) / 256) as u16
         } else {
             opts.speed.value
         };

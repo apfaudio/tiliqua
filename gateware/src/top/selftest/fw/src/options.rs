@@ -2,7 +2,7 @@ use opts::*;
 use strum_macros::{EnumIter, IntoStaticStr};
 use serde_derive::{Serialize, Deserialize};
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     #[default]
@@ -13,7 +13,7 @@ pub enum Page {
     Benchmark,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum AutoZero {
     #[default]
@@ -23,7 +23,7 @@ pub enum AutoZero {
     DacScale,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ReportPage {
     Startup,
@@ -31,7 +31,7 @@ pub enum ReportPage {
     Status,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum StopRun {
     #[default]
@@ -44,7 +44,7 @@ int_params!(CalTweakerParams<i16>    { step: 1, min: -256, max: 256 });
 
 button_params!(OneShotButtonParams { mode: ButtonMode::OneShot });
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum BenchmarkType {
     #[default]

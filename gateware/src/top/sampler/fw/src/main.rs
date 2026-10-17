@@ -82,7 +82,7 @@ fn draw_flash_progress(
 ) {
     let Size { width: h, height: v } = display.size();
     let mut buf = heapless::String::<64>::new();
-    write!(buf, "{} ({} / {} KiB)", label, done_kb, total_kb).ok();
+    write!(buf, "{label} ({done_kb} / {total_kb} KiB)").ok();
     let font = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 0xf));
     Text::with_alignment(
         &buf,
@@ -144,12 +144,12 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             // Recalculate steps by zoom factor
             let opts = app.ui.opts.channel_opts_mut(ix);
             let zoomstep = |prev: u32, cur: u32, zoom: u8| -> u32 {
-                let scale = 1i32 << (4 - zoom as i32);
+                let scale = 1i32 << (4 - i32::from(zoom));
                 let delta = cur as i32 - prev as i32;
                 (prev as i32 + delta * scale).max(0).min(max_samples as i32) as u32
             };
-            opts.start.value = zoomstep(opts_prev.start.value, opts.start.value.clone(), opts.zoom.value.clone());
-            opts.len.value = zoomstep(opts_prev.len.value, opts.len.value.clone(), opts.zoom.value.clone());
+            opts.start.value = zoomstep(opts_prev.start.value, opts.start.value, opts.zoom.value);
+            opts.len.value = zoomstep(opts_prev.len.value, opts.len.value, opts.zoom.value);
         } else {
             app.ui.update();
         }
@@ -310,7 +310,7 @@ fn main() -> ! {
                 }
                 let (ptr, size_bytes, wr_bytes) = critical_section::with(|cs| {
                     let app = app.borrow_ref(cs);
-                    (app.delayln.data_ptr() as *const u8,
+                    (app.delayln.data_ptr().cast::<u8>(),
                      app.delayln.size_samples() * 2,
                      app.delayln.wrpointer() * 2)
                 });

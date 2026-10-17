@@ -35,14 +35,14 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
         self.flash.read(BASE, &mut magic_buf).unwrap();
         let magic = u32::from_le_bytes(magic_buf);
         if magic != MAGIC {
-            info!("No saved delay line found in flash (magic=0x{:08x}).", magic);
+            info!("No saved delay line found in flash (magic=0x{magic:08x}).");
             return false;
         }
 
         let flash_offset = BASE + DATA_OFFSET;
         let size_bytes = delayln.size_samples() * 2;
         let data = unsafe { core::slice::from_raw_parts_mut(delayln.data_ptr() as *mut u8, size_bytes) };
-        info!("Loading delay line from flash 0x{:x} ({} bytes)...", flash_offset, size_bytes);
+        info!("Loading delay line from flash 0x{flash_offset:x} ({size_bytes} bytes)...");
         let mut loaded = 0usize;
         while loaded < size_bytes {
             let chunk = (size_bytes - loaded).min(CHUNK);
@@ -63,7 +63,7 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
         mut progress: impl FnMut(&str, usize, usize),
     ) {
         let size_bytes = data.len();
-        info!("Saving delay line ({} bytes, wrptr={})...", size_bytes, wr_bytes);
+        info!("Saving delay line ({size_bytes} bytes, wrptr={wr_bytes})...");
 
         // Erase entire region first
         // it's annoying to do this inline with each write as we're simultaneously

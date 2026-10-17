@@ -56,7 +56,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         if opts_ro.autocal.autozero.value == StopRun::Run {
             let counts_per_v = app.ui.pmod.counts_per_v();
-            let stimulus_raw = counts_per_v * opts_ro.autocal.volts.value as i32;
+            let stimulus_raw = counts_per_v * i32::from(opts_ro.autocal.volts.value);
             let sample_i = app.ui.pmod.sample_i();
             let mut deltas = [0i16; 4];
             for ch in 0..4 {
@@ -120,7 +120,7 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
     unsafe {
         for i in memtest_start..memtest_end {
-            psram_ptr.offset(i as isize).write_volatile(i as u32);
+            psram_ptr.add(i).write_volatile(i as u32);
         }
     }
 
@@ -129,10 +129,10 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let mut psram_fl = false;
     unsafe {
         for i in memtest_start..memtest_end {
-            let value = psram_ptr.offset(i as isize).read_volatile();
+            let value = psram_ptr.add(i).read_volatile();
             if (i as u32) != value {
                 psram_fl = true;
-                error!("FAIL: PSRAM selftest @ {:#x} is {:#x}", i, value);
+                error!("FAIL: PSRAM selftest @ {i:#x} is {value:#x}");
             }
         }
     }
@@ -150,8 +150,8 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
         write!(s, "PASS: PSRAM memtest\r\n").ok();
     }
 
-    write!(s, "  write {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / write_ticks as u64).ok();
-    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (psram_sz_test/1024) as u64) / (read_ticks as u64)).ok();
+    write!(s, "  write {} KByte/sec\r\n", (u64::from(sysclk) * (psram_sz_test/1024) as u64) / u64::from(write_ticks)).ok();
+    write!(s, "  read {} KByte/sec\r\n", (u64::from(sysclk) * (psram_sz_test/1024) as u64) / u64::from(read_ticks)).ok();
 }
 
 fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
@@ -168,9 +168,9 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
     unsafe {
         for i in 0..spiflash_sz_test {
-            let value = spiflash_ptr.offset(i as isize).read_volatile();
+            let value = spiflash_ptr.add(i).read_volatile();
             if i < first_words.len() {
-                first_words[i] = value
+                first_words[i] = value;
             }
         }
     }
@@ -193,7 +193,7 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     } else {
         write!(s, "PASS: SPIFLASH memtest\r\n").ok();
     }
-    write!(s, "  read {} KByte/sec\r\n", ((sysclk as u64) * (spiflash_sz_test/1024) as u64) / (read_ticks as u64)).ok();
+    write!(s, "  read {} KByte/sec\r\n", (u64::from(sysclk) * (spiflash_sz_test/1024) as u64) / u64::from(read_ticks)).ok();
 }
 
 fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
@@ -201,13 +201,13 @@ fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
     let mut tusb322 = TUSB322Driver::new(i2cdev);
     match tusb322.read_device_id() {
         Ok(tusb322_id) => {
-            if tusb322_id != [0x32, 0x32, 0x33, 0x42, 0x53, 0x55, 0x54, 0x0] {
-                write!(s, "FAIL: tusb322_id ").ok();
-            } else {
+            if tusb322_id == [0x32, 0x32, 0x33, 0x42, 0x53, 0x55, 0x54, 0x0] {
                 write!(s, "PASS: tusb322_id ").ok();
+            } else {
+                write!(s, "FAIL: tusb322_id ").ok();
             }
             for byte in tusb322_id {
-                write!(s, "{:x} ", byte).ok();
+                write!(s, "{byte:x} ").ok();
             }
         },
         Err(_) => {
@@ -229,7 +229,7 @@ fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
                 write!(s, "FAIL: eeprom_id ").ok();
             }
             for byte in eeprom_id {
-                write!(s, "{:x} ", byte).ok();
+                write!(s, "{byte:x} ").ok();
             }
         },
         Err(_) => {
@@ -256,9 +256,9 @@ fn edid_test(s: &mut ReportString, i2cdev: &mut I2c0) {
                    header.product_code,
                    header.serial_number,
                    ).ok();
-            info!("EDID header: {:?}", header);
-            for descriptor in descriptors.iter() {
-                info!("EDID descriptor: {:?}", descriptor);
+            info!("EDID header: {header:?}");
+            for descriptor in &descriptors {
+                info!("EDID descriptor: {descriptor:?}");
                 if let edid::Descriptor::DetailedTiming(desc) = descriptor {
                     write!(s, "      detailed [sz_x={} sz_y={} clk={}kHz]\r\n",
                            desc.horizontal_active,
@@ -269,7 +269,7 @@ fn edid_test(s: &mut ReportString, i2cdev: &mut I2c0) {
             }
         }
         _ => {
-            write!(s, "{:?}\r\n", edid_parsed).ok();
+            write!(s, "{edid_parsed:?}\r\n").ok();
         }
     }
 }
@@ -444,7 +444,7 @@ fn main() -> ! {
         write!(startup_report, "FAIL: load calibration from EEPROM").ok();
     }
 
-    info!("STARTUP REPORT: {}", startup_report);
+    info!("STARTUP REPORT: {startup_report}");
 
     let app = Mutex::new(RefCell::new(App::new(opts)));
     let hue = 10;
@@ -484,7 +484,7 @@ fn main() -> ! {
         loop {
             let dvi_hpd = display.get_hpd();
             if last_hpd != dvi_hpd {
-                info!("dvi_hpd: display hotplug! new state: {}", dvi_hpd);
+                info!("dvi_hpd: display hotplug! new state: {dvi_hpd}");
                 last_hpd = dvi_hpd;
             }
 
@@ -500,7 +500,7 @@ fn main() -> ! {
             });
 
             let counts_per_v = pmod.counts_per_v();
-            let stimulus_raw = counts_per_v * opts.autocal.volts.value as i32;
+            let stimulus_raw = counts_per_v * i32::from(opts.autocal.volts.value);
 
             draw::draw_options(&mut display, &opts, h_active/2-30, 70,
                                hue).ok();
@@ -519,7 +519,7 @@ fn main() -> ! {
                         });
                         print_die_temperature(&mut status_report, &dtr);
                         print_psram_stats(&mut status_report, &psram);
-                        write!(&mut status_report, "dvi_hpd [active={}]\r\n", dvi_hpd).ok();
+                        write!(&mut status_report, "dvi_hpd [active={dvi_hpd}]\r\n").ok();
                         write!(&mut status_report, "ex0={:08b} ex1={:08b}\r\n",
                                gpio0.input().read().bits(),
                                gpio1.input().read().bits()).ok();
@@ -528,8 +528,8 @@ fn main() -> ! {
                 };
                 if let Some(ref help) = bootinfo.manifest.help {
                     draw::draw_tiliqua(&mut display, (h_active/2-80) as i32, (v_active/2-250) as i32, hue,
-                        help.io_left.each_ref().map(|s| s.as_str()),
-                        help.io_right.each_ref().map(|s| s.as_str())
+                        help.io_left.each_ref().map(heapless::string::StringInner::as_str),
+                        help.io_right.each_ref().map(heapless::string::StringInner::as_str)
                     ).ok();
                 }
                 Text::with_alignment(

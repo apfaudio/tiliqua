@@ -2,7 +2,7 @@ use opts::*;
 use strum_macros::{EnumIter, IntoStaticStr};
 use serde_derive::{Serialize, Deserialize};
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     #[default]

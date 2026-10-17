@@ -189,7 +189,7 @@ fn main() -> ! {
     //
 
     let mut opts = Opts::default();
-    opts.misc.rotation.value = modeline.rotate.clone();
+    opts.misc.rotation.value = modeline.rotate;
     let mut flash_persist_opt = FlashOptionsPersistence::open(
         spiflash, bootinfo.manifest.get_option_storage_window(), &mut opts);
 
@@ -220,8 +220,8 @@ fn main() -> ! {
         let mut usb_cc_attached = false;
 
         // Grid overlay operates in DVI pixel space (pre-rotation)
-        let dvi_w = modeline.h_active as u32;
-        let dvi_h = modeline.v_active as u32;
+        let dvi_w = u32::from(modeline.h_active);
+        let dvi_h = u32::from(modeline.v_active);
         overlay_periph.grid_offset().write(|w| unsafe {
             w.offset_x().bits((dvi_w / 2) as u16);
             w.offset_y().bits((dvi_h / 2) as u16)
@@ -281,7 +281,7 @@ fn main() -> ! {
                 critical_section::with(|cs| {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = Opts::default();
-                    app.ui.opts.misc.rotation.value = modeline.rotate.clone();
+                    app.ui.opts.misc.rotation.value = modeline.rotate;
                     if let Some(ref mut flash_persist) = flash_persist_opt {
                         flash_persist.erase_all().unwrap();
                     }
@@ -329,7 +329,7 @@ fn main() -> ! {
                     // Only update on valid reads to reduce risk of unintended toggling mid-stream
                     let new_state = status.attached_state == AttachedState::AttachedSnk;
                     if new_state != usb_cc_attached {
-                        info!("USB CC hotplug: {:?}", status);
+                        info!("USB CC hotplug: {status:?}");
                         usb_cc_attached = new_state;
                     }
                 }
@@ -374,7 +374,7 @@ fn main() -> ! {
             };
             overlay_periph.flags().write(|w| unsafe {
                 w.grid_style().bits(grid_style);
-                w.grid_pixel().bits(((opts.beam.grid_i.value as u8) << 4) | opts.beam.ui_hue.value)
+                w.grid_pixel().bits((opts.beam.grid_i.value << 4) | opts.beam.ui_hue.value)
             });
 
             xbeam_mux.delay0().write(|w| unsafe { w.value().bits(
@@ -392,14 +392,12 @@ fn main() -> ! {
             if opts.tracker.page.value == Page::Help {
                 scope.set_enabled(false, false);
                 vscope.set_enabled(false);
+            } else if opts.misc.plot_type.value == PlotType::Vector {
+                scope.set_enabled(false, false);
+                vscope.set_enabled(true);
             } else {
-                if opts.misc.plot_type.value == PlotType::Vector {
-                    scope.set_enabled(false, false);
-                    vscope.set_enabled(true);
-                } else {
-                    scope.set_enabled(true, opts.scope2.trig_mode.value == TriggerMode::Always);
-                    vscope.set_enabled(false);
-                }
+                scope.set_enabled(true, opts.scope2.trig_mode.value == TriggerMode::Always);
+                vscope.set_enabled(false);
             }
 
             first = false;

@@ -38,8 +38,8 @@ pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
 fn adsr_ui_to_rate(ui_value: u16) -> u16 {
     // 0..32768 -> 1ms..2000ms -> hardware rate
-    let ms_x32k = 32768u32 + ui_value as u32 * 1999;
-    let rate = (45_000_000u64 / ms_x32k as u64) as u32;
+    let ms_x32k = 32768u32 + u32::from(ui_value) * 1999;
+    let rate = (45_000_000u64 / u64::from(ms_x32k)) as u32;
     rate.min(65535) as u16
 }
 
@@ -106,14 +106,14 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         app.synth.set_drive(drive_smooth);
 
         // Map 0-1 UI range to 32768-8192 hardware range (inverted)
-        let reso_ui = opts.voice.reso.value as u32;
+        let reso_ui = u32::from(opts.voice.reso.value);
         let reso_hw = (32768 - reso_ui * 24576 / 32768) as u16;
         let reso_smooth = app.reso_smoother.proc_u16(reso_hw);
         app.synth.set_reso(reso_smooth);
 
         let diffuse_smooth = app.diffusion_smoother.proc_u16(opts.effect.diffuse.value);
-        let coeff_dry: i32 = (32768 - diffuse_smooth) as i32;
-        let coeff_wet: i32 = diffuse_smooth as i32;
+        let coeff_dry: i32 = i32::from(32768 - diffuse_smooth);
+        let coeff_wet: i32 = i32::from(diffuse_smooth);
 
         app.synth.set_matrix_coefficient(0, 0, coeff_dry);
         app.synth.set_matrix_coefficient(1, 1, coeff_dry);
@@ -130,7 +130,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         // ADSR params
         app.synth.set_attack_rate(adsr_ui_to_rate(opts.adsr.attack.value));
         app.synth.set_decay_rate(adsr_ui_to_rate(opts.adsr.decay.value));
-        app.synth.set_sustain_level((opts.adsr.sustain.value as u32 * 65535 / 32768) as u16);
+        app.synth.set_sustain_level((u32::from(opts.adsr.sustain.value) * 65535 / 32768) as u16);
         app.synth.set_release_rate(adsr_ui_to_rate(opts.adsr.release.value));
 
         // LFO -> phase modulation CSR
@@ -139,10 +139,10 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             let isr_rate = Fix32::from_num(1000u32 / TIMER0_ISR_PERIOD_MS);
             // lfo_rate option: 0..50 -> 0..5.0 Hz
             // Q16.16 from_bits: value * 65536 / 10 = value * 6554
-            let rate_hz = Fix32::from_bits(opts.voice.lfo_rate.value as i32 * 6554);
+            let rate_hz = Fix32::from_bits(i32::from(opts.voice.lfo_rate.value) * 6554);
             let phase_inc = rate_hz * CYCLE_LEN as i32 / isr_rate;
             // depth option: 0..32768 -> 0..1.0
-            let depth = Fix32::from_bits(opts.voice.lfo_depth.value as i32 * 2);
+            let depth = Fix32::from_bits(i32::from(opts.voice.lfo_depth.value) * 2);
             let lfo_val = wavetable::wt_lfo(&mut app.lfo_phase, phase_inc, depth,
                                            Waveform::Sine);
             app.synth.set_lfo(lfo_val);
@@ -177,9 +177,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     // even inside synth.midi_write.
                     let mut bytes = [0u8; 3];
                     msg.render_slice(&mut bytes);
-                    let v: u32 = (bytes[2] as u32) << 16 |
-                                 (bytes[1] as u32) << 8 |
-                                 (bytes[0] as u32) << 0;
+                    let v: u32 = (u32::from(bytes[2]) << 16) | (u32::from(bytes[1]) << 8) | u32::from(bytes[0]);
                     app.synth.midi_write(v);
                 }
             }
@@ -333,7 +331,7 @@ fn main() -> ! {
     // Create App instance
     //
 
-    let mut last_palette = opts.beam.palette.value.clone();
+    let mut last_palette = opts.beam.palette.value;
     let app = Mutex::new(RefCell::new(App::new(opts)));
 
     handler!(timer0 = || timer0_handler(&app));
@@ -402,7 +400,7 @@ fn main() -> ! {
                     if let Ok(conn) = tusb322.read_connection_status() {
                         // Only update on valid reads to reduce risk of unintended toggling mid-stream
                         if ctrl.attached_state != last_attached_state {
-                            info!("USB CC hotplug: {:?} | {:?}", ctrl, conn);
+                            info!("USB CC hotplug: {ctrl:?} | {conn:?}");
                             last_attached_state = ctrl.attached_state;
                         }
                         // Check how we are attached
@@ -419,8 +417,8 @@ fn main() -> ! {
                 //
 
                 (app.ui.opts.clone(),
-                 app.synth.voice_notes().clone(),
-                 app.synth.voice_cutoffs().clone(),
+                 app.synth.voice_notes(),
+                 app.synth.voice_cutoffs(),
                  app.ui.draw(),
                  save_opts,
                  wipe_opts)
