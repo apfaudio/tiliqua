@@ -471,11 +471,11 @@ fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
         // Turn the file to a FatStream, and do a pure-DMA copy into PSRAM
         let mut stream = {
             let bd = UsbMscBlockDevice::new(&mut view, stage)
-                .map_err(|_| BitstreamError::UsbMountError)?;
+                .map_err(|e| { warn!("usb: block device: {e:?}"); BitstreamError::UsbMountError })?;
             let fs = fatfs::FileSystem::new(bd, fatfs::FsOptions::new())
-                .map_err(|_| BitstreamError::UsbMountError)?;
+                .map_err(|e| { warn!("usb: mount: {e:?}"); BitstreamError::UsbMountError })?;
             let file = fs.root_dir().open_file(&region.filename)
-                .map_err(|_| BitstreamError::UsbFileError)?;
+                .map_err(|e| { warn!("usb: open '{}': {e:?}", region.filename); BitstreamError::UsbFileError })?;
             let size = file.size().ok_or(BitstreamError::UsbFileError)?;
             if size == 0 {
                 return Err(BitstreamError::UsbFileError);
@@ -499,11 +499,11 @@ fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
                 max_chunk_blocks: USB_MSC_MAX_BLOCKS_PER_READ,
                 ring: dst,
                 fat_cache,
-            }).map_err(|_| BitstreamError::UsbStreamError)?
+            }).map_err(|e| { warn!("usb: stream open: {e:?}"); BitstreamError::UsbStreamError })?
         };
 
         // one prefill is the whole copy. no ticks needed
-        stream.prefill(&mut view).map_err(|_| BitstreamError::UsbStreamError)?;
+        stream.prefill(&mut view).map_err(|e| { warn!("usb: stream prefill: {e:?}"); BitstreamError::UsbStreamError })?;
         info!("Copy completed ({} KiB)", stream.bytes_submitted() / 1024);
 
         // TODO: optional CRC? it will be super slow, but maybe we could write
