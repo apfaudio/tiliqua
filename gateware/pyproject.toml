@@ -65,6 +65,7 @@ usb_host           = "src/top/usb_host/top.py"
 wavplay            = "src/top/wavplay/top.py"
 # Additional utilities
 test               = { cmd = "pytest -n auto tests/" }
+clippy             = { cmd = "python scripts/clippy.py" }
 colors_vectorscope = { call = "top.vectorscope_no_soc.top:colors()" }
 # Documentation
 document.cmd = "sphinx-build docs/ docs/_build/ -W --keep-going"
