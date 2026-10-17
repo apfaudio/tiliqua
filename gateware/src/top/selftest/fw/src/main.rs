@@ -34,6 +34,7 @@ use tiliqua_hal::pca9635::Pca9635Driver;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 use tiliqua_hal::eeprom::EepromDriver;
 use tiliqua_hal::tusb322::TUSB322Driver;
+use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
 
 pub type ReportString = String<512>;
 
@@ -181,9 +182,9 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
 
     // TODO: verify there is actually a bitstream header in first N words?
     let mut spiflash_fl = true;
-    for i in 0..first_words.len() {
-        info!("spiflash_memtest: read @ {:#x} at {:#x}", first_words[i], i);
-        if first_words[i] != 0xff && first_words[i] != 0x00 {
+    for (i, w) in first_words.iter().enumerate() {
+        info!("spiflash_memtest: read @ {w:#x} at {i:#x}");
+        if *w != 0xff && *w != 0x00 {
             spiflash_fl = false;
         }
     }
@@ -459,7 +460,6 @@ fn main() -> ! {
 
     let mut benchmark_rng = Rng::with_seed(0);
 
-    use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
     let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
     let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
 
@@ -526,7 +526,7 @@ fn main() -> ! {
                         &status_report
                     }
                 };
-                if let Some(ref help) = bootinfo.manifest.help {
+                if let Some(help) = &bootinfo.manifest.help {
                     draw::draw_tiliqua(&mut display, (h_active/2-80) as i32, (v_active/2-250) as i32, hue,
                         help.io_left.each_ref().map(heapless::string::StringInner::as_str),
                         help.io_right.each_ref().map(heapless::string::StringInner::as_str)

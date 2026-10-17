@@ -40,14 +40,15 @@ struct App<'a> {
 impl App<'_> {
     pub fn new(opts: Opts) -> Self {
         let mut voice = Voice::new(&HEAP, BLOCK_SIZE);
-        let mut patch = Patch::default();
-
-        patch.engine = 0;
-        patch.harmonics = 0.5;
-        patch.timbre = 0.5;
-        patch.morph = 0.5;
-        patch.timbre_modulation_amount = 0.5;
-        patch.morph_modulation_amount  = 0.5;
+        let patch = Patch {
+            engine: 0,
+            harmonics: 0.5,
+            timbre: 0.5,
+            morph: 0.5,
+            timbre_modulation_amount: 0.5,
+            morph_modulation_amount: 0.5,
+            ..Patch::default()
+        };
         voice.init();
 
         let peripherals = unsafe { pac::Peripherals::steal() };
@@ -67,6 +68,7 @@ impl App<'_> {
 }
 
 // TODO: move this to hardware as it is quite expensive.
+#[expect(clippy::inline_always)]
 #[inline(always)]
 pub fn f32_to_i32(f: u32) -> i32 {
     let a = f & (!0 >> 1); // Remove sign bit.

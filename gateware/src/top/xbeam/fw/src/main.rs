@@ -123,15 +123,13 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                 ((midi_word >> 8) & 0xFF) as u8,
                 ((midi_word >> 16) & 0xFF) as u8,
             ];
-            if let Ok(msg) = MidiMessage::try_parse_slice(&bytes) {
-                if let MidiMessage::ControlChange(_, cc, val) = msg {
-                    if let Some(action) = app.cc_mapper.process(cc.into(), val.into()) {
-                        if app.ui.opts.misc.cc_highlight.value == CcHighlight::On {
-                            app.ui.opts.select_global(action.global_index);
-                            app.ui.external_modify();
-                        }
-                        apply_cc_action(&mut app.ui.opts, &action);
+            if let Ok(MidiMessage::ControlChange(_, cc, val)) = MidiMessage::try_parse_slice(&bytes) {
+                if let Some(action) = app.cc_mapper.process(cc.into(), val.into()) {
+                    if app.ui.opts.misc.cc_highlight.value == CcHighlight::On {
+                        app.ui.opts.select_global(action.global_index);
+                        app.ui.external_modify();
                     }
+                    apply_cc_action(&mut app.ui.opts, &action);
                 }
             }
         }

@@ -49,18 +49,18 @@ impl App {
 }
 
 fn volts_to_freq(volts: f32) -> f32 {
-    let a3_freq_hz: f32 = 440.0f32;
+    let a3_freq_hz = 440.0f32;
     (a3_freq_hz / 2.0f32) * (2.0f32).powf(volts + 2.0f32 - 3.0f32/4.0f32)
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
-    use tiliqua_fw::options::{VoiceOpts, ModulationTarget, VoiceModulationType};
+    use tiliqua_fw::options::{VoiceOpts, ModulationTarget, VoiceModulationType, Wave};
 
     let peripherals = unsafe { pac::Peripherals::steal() };
     let sid = peripherals.SID_PERIPH;
-    let sid_poke = |_sid: &pac::SID_PERIPH, addr: u8, data: u8| {
-        _sid.transaction_data().write(
+    let sid_poke = |regs: &pac::SID_PERIPH, addr: u8, data: u8| {
+        regs.transaction_data().write(
             |w| unsafe { w.transaction_data().bits((u16::from(data) << 5) | u16::from(addr)) } );
     };
 
@@ -70,7 +70,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         (app.ui.opts.clone(), app.ui.pmod.sample_i())
     });
 
-    let voices: [&mut VoiceOpts; 3] = [
+    let mut voices: [&mut VoiceOpts; 3] = [
         &mut opts.voice1,
         &mut opts.voice2,
         &mut opts.voice3,
@@ -83,12 +83,12 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         opts.modulate.in3.value,
     ];
 
-    for n_voice in 0usize..3usize {
+    for (n_voice, voice) in voices.iter_mut().enumerate() {
         let base = (7*n_voice) as u8;
 
         // MODULATION
-        let mut freq: u16 = voices[n_voice].freq.value;
-        let mut gate = voices[n_voice].gate.value;
+        let mut freq: u16 = voice.freq.value;
+        let mut gate = voice.gate.value;
 
         for (ch, m) in mods.iter().enumerate() {
             if matches!(m.modulates_voice(n_voice), Some(VoiceModulationType::Frequency)) {
@@ -109,20 +109,19 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         // Propagate modulation back to menu system
 
-        voices[n_voice].freq.value = freq;
-        voices[n_voice].gate.value = gate;
+        voice.freq.value = freq;
+        voice.gate.value = gate;
 
-        freq = (f32::from(freq) * (f32::from(voices[n_voice].freq_os.value) / 1000.0f32)) as u16;
+        freq = (f32::from(freq) * (f32::from(voice.freq_os.value) / 1000.0f32)) as u16;
 
         sid_poke(&sid, base, freq as u8);
         sid_poke(&sid, base+1, (freq>>8) as u8);
 
-        sid_poke(&sid, base+2, voices[n_voice].pw.value as u8);
-        sid_poke(&sid, base+3, (voices[n_voice].pw.value>>8) as u8);
+        sid_poke(&sid, base+2, voice.pw.value as u8);
+        sid_poke(&sid, base+3, (voice.pw.value>>8) as u8);
 
         let mut reg04 = 0u8;
-        use crate::options::Wave;
-        match voices[n_voice].wave.value {
+        match voice.wave.value {
             Wave::Triangle => { reg04 |= 0x10; }
             Wave::Saw      => { reg04 |= 0x20; }
             Wave::Pulse    => { reg04 |= 0x40; }
@@ -130,18 +129,18 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         }
 
         reg04 |= gate;
-        reg04 |= voices[n_voice].sync.value << 1;
-        reg04 |= voices[n_voice].ring.value << 2;
+        reg04 |= voice.sync.value << 1;
+        reg04 |= voice.ring.value << 2;
 
         sid_poke(&sid, base+4, reg04);
 
         sid_poke(&sid, base+5,
-            voices[n_voice].decay.value |
-            (voices[n_voice].attack.value << 4));
+            voice.decay.value |
+            (voice.attack.value << 4));
 
         sid_poke(&sid, base+6,
-            voices[n_voice].release.value |
-            (voices[n_voice].sustain.value << 4));
+            voice.release.value |
+            (voice.sustain.value << 4));
     }
 
     sid_poke(&sid, 0x15, (opts.filter.cutoff.value & 0x7) as u8);

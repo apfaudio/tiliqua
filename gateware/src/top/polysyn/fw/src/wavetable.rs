@@ -134,10 +134,10 @@ pub fn wt_preview(buf: &mut [i16], waveform: Waveform,
     let gain = gain_from_amt(proc_amt);
     let cl = CYCLE_LEN;
     let len = buf.len();
-    for i in 0..len {
+    for (i, b) in buf.iter_mut().enumerate() {
         let idx = i * cl / len;
         let sample = wt_sample(waveform, idx, cl);
-        buf[i] = to_asq(wt_apply_proc(sample, proc_mode, gain));
+        *b = to_asq(wt_apply_proc(sample, proc_mode, gain));
     }
 }
 

@@ -186,10 +186,10 @@ impl ChannelView {
         let stride = self.stride(opts, n_samples);
         self.delayln_read_samples(buf, start_delay, stride);
         // Zero out samples whose delay falls outside the buffer
-        for i in 0..n_samples {
+        for (i, b) in buf.iter_mut().enumerate().take(n_samples) {
             let delay = start_delay as isize - (i as isize * stride as isize);
             if delay < 0 || delay as usize > self.delayln_max_samples {
-                buf[i] = 0;
+                *b = 0;
             }
         }
     }

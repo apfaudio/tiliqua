@@ -58,6 +58,8 @@ pub const SPREAD_SPECTRUM_MAX: f32 = 0.0025;
 // firmware versions > beta5
 pub const RP2040_APFBUG_ADDR: u8 = 0x17;
 
+const LOGO_LINES_PER_LOOP: usize = 3;
+
 #[derive(Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum BitstreamError {
@@ -119,7 +121,7 @@ impl App {
         use tiliqua_hal::pca9635::Pca9635;
         let animation_end_ms = 500u32;
         if self.animation_elapsed_ms < animation_end_ms {
-            let tau = 6.2832f32;
+            let tau = core::f32::consts::TAU;
             let lerp1: f32 = self.animation_elapsed_ms as f32 / animation_end_ms as f32;
             for n in 0..8 {
                 let lerp2: f32 = n as f32 / 7.0f32;
@@ -178,8 +180,8 @@ where
 }
 
 fn draw_summary<D>(d: &mut D,
-                   bitstream_manifest: &Option<BitstreamManifest>,
-                   error: &Option<String<32>>,
+                   bitstream_manifest: Option<&BitstreamManifest>,
+                   error: Option<&String<32>>,
                    startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
@@ -189,7 +191,7 @@ where
     let v_active = d.size().height as i32;
     let norm = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
     if let Some(bitstream) = bitstream_manifest {
-        if let Some(ref help) = bitstream.help {
+        if let Some(help) = &bitstream.help {
             Text::with_alignment(
                 "brief:",
                 Point::new((h_active/2 - 10) + or, (v_active/2+20) + ot),
@@ -234,7 +236,7 @@ where
         )
         .draw(d).ok();
     }
-    if let Some(error_string) = &error {
+    if let Some(error_string) = error {
         Text::with_alignment(
             "error:",
             Point::new((h_active/2 - 10) + or, (v_active/2+80) + ot),
@@ -306,7 +308,7 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
 
 fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
     // Skip regions without spiflash_src (e.g. during simulation)
-    let spiflash_src = if let Some(addr) = region.spiflash_src { addr } else {
+    let Some(spiflash_src) = region.spiflash_src else {
         info!("Skip region '{}' (no spiflash_src)", region.filename);
         return Ok(());
     };
@@ -666,7 +668,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     }
                     // Older apfbug/rp2040: issue UART reconfig request
                     info!("Enter BITSTREAM{n}\n\r");
-                    loop {}
+                    loop { core::hint::spin_loop(); }
                 }
             }
         }
@@ -702,8 +704,8 @@ where
                           Operation::Read(&mut rx_bytes)]);
     if ret.is_err() || rx_bytes[0] != 0x37 {
         warn!("ak4619/codec: needs hard reset. transaction returned: {ret:?}.");
-        for n in 0usize..4usize {
-            warn!("ak4619: @{}:0x{:x}", n, rx_bytes[n]);
+        for (n, b) in rx_bytes.iter().enumerate() {
+            warn!("ak4619: @{n}:0x{b:x}");
         }
         warn!("ak4619/codec: issuing hard PDN reset ...");
         pmod.hard_reset();
@@ -732,7 +734,7 @@ where
             Ok(())
         } else {
             warn!("{prefix}CRC NOT OK, reprogramming ...");
-            if let Ok(()) = dev.reprogram_nvm_and_reset() {
+            if dev.reprogram_nvm_and_reset().is_ok() {
                 warn!("{prefix}reprogramming DONE ...");
                 Err(StartupWarning::TouchNvmReprogrammed)
             } else {
@@ -776,7 +778,7 @@ fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
     }
 }
 
-fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
+fn modeline_from_edid(edid: &edid::Edid) -> Option<DVIModeline> {
 
     // Read the EDID contents and see if we can use it to dynamically create a
     // sensible modeline. If we can't fine a reasonable descriptor, we return
@@ -795,11 +797,12 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
                 continue;
             }
             if let edid::SyncType::DigitalSeparate { vsync_positive, hsync_positive } = desc.features.sync_type {
-                let mut rotate = Rotate::Normal;
-                if edid.header.product_code == 0x3132 || edid.header.product_code == 0xAA61 {
+                let rotate = if edid.header.product_code == 0x3132 || edid.header.product_code == 0xAA61 {
                     info!("video/edid: detected tiliqua screen! rotate framebuffer 90 degrees.");
-                    rotate = Rotate::Left;
-                }
+                    Rotate::Left
+                } else {
+                    Rotate::Normal
+                };
                 let modeline = DVIModeline {
                     h_active      : desc.horizontal_active,
                     h_sync_start  : desc.horizontal_active +
@@ -826,7 +829,6 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
                 return Some(modeline)
             }
             warn!("video/edid: skip descriptor (unknown sync format)");
-            continue;
         }
     }
     None
@@ -835,10 +837,7 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
 fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
     if FIXED_MODELINE.is_none() {
         match read_edid(i2cdev) {
-            Ok(edid) => match modeline_from_edid(edid) {
-                Some(edid_modeline) => edid_modeline,
-                _ => DVIModeline::default()
-            }
+            Ok(edid) => modeline_from_edid(&edid).unwrap_or_default(),
             _ => DVIModeline::default()
         }
     } else {
@@ -868,7 +867,7 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua bootloader!");
 
-    let mut startup_report: String<256> = Default::default();
+    let mut startup_report: String<256> = String::new();
 
     // Check if we already started any bitstreams by checking if we already wrote
     // something to the PSRAM for client bitstreams. Warm/Cold boots have different
@@ -965,11 +964,11 @@ fn main() -> ! {
     // Load serialized JSON manifests from spiflash
 
     let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
-    for n in 0usize..N_MANIFESTS {
+    for (n, manifest) in manifests.iter_mut().enumerate().take(N_MANIFESTS) {
         let size: usize = MANIFEST_SIZE;
         let addr: usize = SPIFLASH_BASE + MANIFEST_OFFSET + (n+1)*SLOT_SIZE;
         info!("(entry {}) look for manifest from {:#x} to {:#x}", n, addr, addr+size);
-        manifests[n] = unsafe { BitstreamManifest::from_addr(addr, size) };
+        *manifest = unsafe { BitstreamManifest::from_addr(addr, size) };
     }
 
     let mut opts = Opts::default();
@@ -1105,9 +1104,9 @@ fn main() -> ! {
 
 
             if let Some(n) = opts.tracker.selected {
-                draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -110, 0);
-                if let Some(ref manifest) = manifests[n] {
-                    if let Some(ref help) = manifest.help {
+                draw_summary(&mut display, manifests[n].as_ref(), error_n[n].as_ref(), &startup_report, -20, -110, 0);
+                if let Some(manifest) = &manifests[n] {
+                    if let Some(help) = &manifest.help {
                         draw::draw_tiliqua(&mut display,
                             (h_active/2+30) as i32,
                             (v_active/2-40) as i32,
@@ -1123,8 +1122,7 @@ fn main() -> ! {
                           .draw(&mut display).ok();
             }
 
-            const LINES_PER_LOOP: usize = 3;
-            for _ in 0..LINES_PER_LOOP {
+            for _ in 0..LOGO_LINES_PER_LOOP {
                 let _ = draw::draw_boot_logo(&mut display,
                                              (h_active/2) as i32,
                                              130,

@@ -2,6 +2,7 @@
 #![no_main]
 
 use critical_section::Mutex;
+use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
 use log::info;
 use riscv_rt::entry;
 use irq::handler;
@@ -74,12 +75,10 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                 ((midi_word >> 8) & 0xFF) as u8,
                 ((midi_word >> 16) & 0xFF) as u8,
             ];
-            if let Ok(msg) = MidiMessage::try_parse_slice(&bytes) {
-                if let MidiMessage::ControlChange(_, cc, val) = msg {
-                    if let Some(action) = app.cc_mapper.process(cc.into(), val.into()) {
-                        last_cc_index = Some(action.global_index);
-                        apply_cc_action(&mut app.ui.opts, &action);
-                    }
+            if let Ok(MidiMessage::ControlChange(_, cc, val)) = MidiMessage::try_parse_slice(&bytes) {
+                if let Some(action) = app.cc_mapper.process(cc.into(), val.into()) {
+                    last_cc_index = Some(action.global_index);
+                    apply_cc_action(&mut app.ui.opts, &action);
                 }
             }
 
@@ -300,7 +299,6 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
     let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
     let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
 
