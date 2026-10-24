@@ -645,6 +645,8 @@ fn boot_slot(app: &mut App, n: usize, display: &mut DMAFramebuffer0) {
         // the autoboot flag was set (during/after PLL reconfiguration).
         let config = EepromConfig { last_boot_slot: None };
         app.eeprom_manager.write_config(&config).ok();
+        unsafe { bootinfo::BootInfo::clear_addr(BOOTINFO_BASE) };
+        riscv::asm::fence();
     } else {
         // Ask RP2040 to replay the JTAG command sequence to reconfigure the ECP5
         // to new bitstream. The number is corresponding to SPI flash addresses
