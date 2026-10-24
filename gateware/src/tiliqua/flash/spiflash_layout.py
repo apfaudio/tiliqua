@@ -146,6 +146,9 @@ def compute_concrete_regions_to_flash(
                 assert region.spiflash_src is not None, "XipFirmware region missing spiflash_src"
             case RegionType.OptionStorage:
                 region.spiflash_src = layout.options_base
+                if region.spiflash_src % FLASH_PAGE_SZ or region.size % FLASH_PAGE_SZ:
+                    raise ValueError(f"Region {region.filename} must be aligned to 0x{FLASH_PAGE_SZ:x}: "
+                                     f"starts at 0x{region.spiflash_src:x}, size 0x{region.size:x}")
             case RegionType.RamLoad:
                 assert region.spiflash_src is None, "RamLoad region already has spiflash_src set"
                 region.spiflash_src = ramload_base
