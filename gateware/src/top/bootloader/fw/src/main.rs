@@ -576,20 +576,7 @@ fn boot_slot(app: &mut App, n: usize, display: &mut DMAFramebuffer0) {
                 }
             }
 
-            // Save this bitstream as the last_boot_slot for future autoboot.
-            // NOTE: This should technically happen after any step that could
-            // cause a BitstreamError, however the PLL reconfiguration below
-            // can cause the CODEC to go into a state where it NAKs I2C transactions,
-            // causing I2C writes to fail.
-            let config = EepromConfig { last_boot_slot: Some(n as u8) };
-            app.eeprom_manager.write_config(&config).ok();
-
-
-            // If required, reconfigure the external PLL to what the bitstream wants.
-            // There may be dragons here, be VERY careful appropriate components are
-            // held in reset while the PLL is being reconfigured! (i.e framebuffer,
-            // audio gateware).
-            if let Some(mut pll_config) = manifest.external_pll_config.clone() {
+            let pll_config = if let Some(mut pll_config) = manifest.external_pll_config.clone() {
                 if pll_config.clk1_inherit {
                     info!("video/pll: inherit pixel clock from bootloader modeline.");
                     pll_config.clk1_hz = Some((bootinfo.modeline.pixel_clk_mhz*1e6f32) as u32);
@@ -603,6 +590,32 @@ fn boot_slot(app: &mut App, n: usize, display: &mut DMAFramebuffer0) {
                         Err(BitstreamError::BootloaderStaticModeline)?;
                     }
                 }
+                if app.pll.is_none() {
+                    // External PLL config is in manifest but this bootloader
+                    // didn't set up the PLL (likely hardware / gateware mismatch).
+                    Err(BitstreamError::PllBadConfigError)?;
+                }
+                Some(pll_config)
+            } else {
+                None
+            };
+
+            // Place BootInfo at the end of PSRAM
+            unsafe { bootinfo.to_addr(BOOTINFO_BASE) }.ok_or(BitstreamError::BootinfoSerializeError)?;
+
+            // Save this bitstream as the last_boot_slot for future autoboot.
+            // NOTE: This should technically happen after any step that could
+            // cause a BitstreamError, however the PLL reconfiguration below
+            // can cause the CODEC to go into a state where it NAKs I2C transactions,
+            // causing I2C writes to fail.
+            let config = EepromConfig { last_boot_slot: Some(n as u8) };
+            app.eeprom_manager.write_config(&config).ok();
+
+            // If required, reconfigure the external PLL to what the bitstream wants.
+            // There may be dragons here, be VERY careful appropriate components are
+            // held in reset while the PLL is being reconfigured! (i.e framebuffer,
+            // audio gateware).
+            if let Some(pll_config) = pll_config {
                 // Disable audio components
                 app.ui.pmod.set_aclk_unstable();
                 if let Some(ref mut pll) = app.pll {
@@ -611,14 +624,8 @@ fn boot_slot(app: &mut App, n: usize, display: &mut DMAFramebuffer0) {
                     riscv::asm::delay(10_000_000);
                     configure_external_pll(&pll_config, pll).or(
                         Err(BitstreamError::PllI2cError))?;
-                } else {
-                    // External PLL config is in manifest but this bootloader
-                    // didn't set up the PLL (likely hardware / gateware mismatch).
-                    Err(BitstreamError::PllBadConfigError)?;
                 }
             }
-            // Place BootInfo at the end of PSRAM
-            unsafe { bootinfo.to_addr(BOOTINFO_BASE) }.ok_or(BitstreamError::BootinfoSerializeError)?;
             riscv::asm::fence();
             riscv::asm::fence_i();
             Ok(())
