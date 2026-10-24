@@ -156,6 +156,9 @@ class SamplerSoc(TiliquaSoc):
             setattr(self, f'grain{n}', grain)
             self.csr_decoder.add(grain.csr_bus, addr=self.PERIPH_BASE+0x200+(n*0x100), name=f"grain_periph{n}")
 
+        self.add_rust_constant(
+            f"pub const DELAYLN_SIZE_SAMPLES: usize = 0x{self.DELAYLN_SIZE:x};\n")
+
         self.finalize_csr_bridge()
 
     def elaborate(self, platform):

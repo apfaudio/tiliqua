@@ -201,11 +201,10 @@ fn main() -> ! {
 
     let mut opts = Opts::default();
     let flash = FlashMutex::<NoopRawMutex, _>::new(RefCell::new(spiflash));
-    let mut flash_persist_opt = FlashOptionsPersistence::open(
-        BlockingPartition::new(&flash, 0, SPIFLASH_SZ_BYTES as u32),
-        bootinfo.manifest.get_option_storage_window(), &mut opts);
+    let mut flash_persist_opt = FlashOptionsPersistence::open_partition(
+        &flash, bootinfo.manifest.get_option_storage_window(), &mut opts);
     let mut delayln_flash = DelaylineFlash::new(
-        BlockingPartition::new(&flash, 0, SPIFLASH_SZ_BYTES as u32));
+        BlockingPartition::new(&flash, flash::BASE, flash::PARTITION_SIZE));
 
     palette::ColorPalette::default().write_to_hardware(&mut display);
 

@@ -1,5 +1,7 @@
 use log::{info, error};
 use crate::delay_line::DelayLine;
+use crate::pac::constants::DELAYLN_SIZE_SAMPLES;
+use crate::SPIFlash0;
 use tiliqua_hal::nor_flash::{NorFlash, ReadNorFlash};
 
 // XXX: hardcoded delayline offset in spiflash that is far
@@ -10,10 +12,15 @@ use tiliqua_hal::nor_flash::{NorFlash, ReadNorFlash};
 // Likely, the 'proper' solution will be to store sampler delaylines
 // on mass storage (thumbdrive) instead of on SPI flash, which is slow.
 //
-const BASE: u32 = 0x900000;
+pub const BASE: u32 = 0x900000;
 const MAGIC: u32 = 0x534D504C;   // "SMPL" <= sampler delayline identifier
 const DATA_OFFSET: u32 = 0x1000; // audio data starts DATA_OFFSET after BASE
 const CHUNK: usize = 0x4000;     // erase/write to spiflash in 16 KiB chunks
+
+const ERASE_SIZE: u32 = SPIFlash0::ERASE_SIZE as u32;
+pub const PARTITION_SIZE: u32 = DATA_OFFSET + (DELAYLN_SIZE_SAMPLES * 2) as u32;
+const _: () = assert!(BASE.is_multiple_of(ERASE_SIZE) && PARTITION_SIZE.is_multiple_of(ERASE_SIZE),
+                      "delay line flash partition must be erase-aligned");
 
 pub struct DelaylineFlash<F> {
     flash: F,
@@ -43,17 +50,17 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
         mut progress: impl FnMut(usize, usize),
     ) -> Result<bool, F::Error> {
         let mut magic_buf = [0u8; 4];
-        self.flash.read(BASE, &mut magic_buf)?;
+        self.flash.read(0, &mut magic_buf)?;
         let magic = u32::from_le_bytes(magic_buf);
         if magic != MAGIC {
             info!("No saved delay line found in flash (magic=0x{magic:08x}).");
             return Ok(false);
         }
 
-        let flash_offset = BASE + DATA_OFFSET;
+        let flash_offset = DATA_OFFSET;
         let size_bytes = delayln.size_samples() * 2;
         let data = unsafe { core::slice::from_raw_parts_mut(delayln.data_ptr() as *mut u8, size_bytes) };
-        info!("Loading delay line from flash 0x{flash_offset:x} ({size_bytes} bytes)...");
+        info!("Loading delay line from flash 0x{:x} ({size_bytes} bytes)...", BASE + flash_offset);
         let mut loaded = 0usize;
         while loaded < size_bytes {
             let chunk = (size_bytes - loaded).min(CHUNK);
@@ -90,13 +97,13 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
         // Erase entire region first
         // it's annoying to do this inline with each write as we're simultaneously
         // unrotating the circular buffer. easier to just erase the whole region first.
-        let flash_offset = BASE + DATA_OFFSET;
+        let flash_offset = DATA_OFFSET;
         let erase_end = flash_offset + size_bytes as u32;
-        let erase_total = (erase_end - BASE) as usize;
+        let erase_total = erase_end as usize;
         let mut erased = 0usize;
         while erased < erase_total {
             let chunk = (erase_total - erased).min(CHUNK);
-            let addr = BASE + erased as u32;
+            let addr = erased as u32;
             self.flash.erase(addr, addr + chunk as u32)?;
             erased += chunk;
             progress("Erasing", erased / 1024, erase_total / 1024);
@@ -117,13 +124,13 @@ impl<F: NorFlash + ReadNorFlash> DelaylineFlash<F> {
                 progress("Saving", flash_written / 1024, size_bytes / 1024);
             }
         }
-        self.flash.write(BASE, &MAGIC.to_le_bytes())?;
+        self.flash.write(0, &MAGIC.to_le_bytes())?;
         info!("Delay line saved.");
         Ok(())
     }
 
     pub fn wipe_magic(&mut self) {
-        if let Err(e) = self.flash.erase(BASE, BASE + DATA_OFFSET) {
+        if let Err(e) = self.flash.erase(0, DATA_OFFSET) {
             error!("Failed to wipe delay line magic: {e:?}");
         }
     }
