@@ -23,6 +23,7 @@ strum_macros = "0.28.0"
 strum = {version = "0.28.0", features = ["derive"], default-features=false}
 mi-plaits-dsp = { git = "https://github.com/schnommus/mi-plaits-dsp-rs", branch = "seb/tiliqua" }
 critical-section = "1.2.0"
+embassy-sync = "0.8.0"
 embedded-alloc = "0.7.0"
 amaranth-soc-isr = { path="../../../rs/isr", default-features = false }
 irq = "0.2.3"

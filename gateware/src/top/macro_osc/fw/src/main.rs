@@ -6,6 +6,7 @@
 use log::{info, error};
 use riscv_rt::entry;
 use core::cell::RefCell;
+use embassy_sync::blocking_mutex::{Mutex as FlashMutex, raw::NoopRawMutex};
 use critical_section::Mutex;
 use irq::handler;
 use embedded_alloc::LlffHeap as Heap;
@@ -212,8 +213,9 @@ fn main() -> ! {
     //
 
     let mut opts = Opts::default();
-    let mut flash_persist_opt = FlashOptionsPersistence::open(
-        spiflash, bootinfo.manifest.get_option_storage_window(), &mut opts);
+    let flash = FlashMutex::<NoopRawMutex, _>::new(RefCell::new(spiflash));
+    let mut flash_persist_opt = FlashOptionsPersistence::open_partition(
+        &flash, bootinfo.manifest.get_option_storage_window(), &mut opts);
 
     //
     // Create App instance

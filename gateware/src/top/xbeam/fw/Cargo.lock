@@ -729,6 +729,7 @@ dependencies = [
  "amaranth-soc-isr",
  "colorsys",
  "critical-section",
+ "embassy-sync",
  "embedded-hal 1.0.0",
  "fastrand",
  "heapless",

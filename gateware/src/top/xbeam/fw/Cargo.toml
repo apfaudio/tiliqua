@@ -25,6 +25,7 @@ strum_macros = "0.28.0"
 strum = {version = "0.28.0", features = ["derive"], default-features=false}
 colorsys = { version = "*", default-features = false }
 critical-section = "1.2.0"
+embassy-sync = "0.8.0"
 midi-types = "0.1.7"
 midi-convert = "0.2.0"
 amaranth-soc-isr = { path="../../../rs/isr", default-features = false }
