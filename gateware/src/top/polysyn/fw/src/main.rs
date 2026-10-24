@@ -3,7 +3,7 @@
 
 use critical_section::Mutex;
 use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
-use log::info;
+use log::{info, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -424,7 +424,9 @@ fn main() -> ! {
 
             if save_opts {
                 if let Some(ref mut flash_persist) = flash_persist_opt {
-                    flash_persist.save_options(&opts).expect("failed to save options");
+                    if let Err(e) = flash_persist.save_options(&opts) {
+                        error!("failed to save options: {e:?}");
+                    }
                 }
             }
 
@@ -433,7 +435,9 @@ fn main() -> ! {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = Opts::default();
                     if let Some(ref mut flash_persist) = flash_persist_opt {
-                        flash_persist.erase_all().expect("failed to erase options");
+                        if let Err(e) = flash_persist.erase_all() {
+                            error!("failed to erase options: {e:?}");
+                        }
                     }
                 });
             }
