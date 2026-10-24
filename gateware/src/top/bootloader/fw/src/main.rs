@@ -12,7 +12,6 @@ use strum_macros::{EnumIter, IntoStaticStr};
 use embedded_hal::delay::DelayNs;
 use embedded_hal::i2c::Operation;
 
-use core::str::FromStr;
 use core::fmt::Write;
 
 use tiliqua_lib::*;
@@ -83,7 +82,7 @@ struct App {
     pll: Option<Si5351Device<I2c0>>,
     eeprom_manager: EepromManager<I2c1>,
     reboot_n: Option<usize>,
-    error_n: [Option<String<32>>; N_MANIFESTS],
+    error_n: [Option<BitstreamError>; N_MANIFESTS],
     time_since_reboot_requested: u32,
     manifests: [Option<BitstreamManifest>; N_MANIFESTS],
     animation_elapsed_ms: u32,
@@ -182,7 +181,7 @@ where
 
 fn draw_summary<D>(d: &mut D,
                    bitstream_manifest: Option<&BitstreamManifest>,
-                   error: Option<&String<32>>,
+                   error: Option<BitstreamError>,
                    startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
@@ -237,7 +236,8 @@ where
         )
         .draw(d).ok();
     }
-    if let Some(error_string) = error {
+    if let Some(error) = error {
+        let error_string: &'static str = error.into();
         Text::with_alignment(
             "error:",
             Point::new((h_active/2 - 10) + or, (v_active/2+80) + ot),
@@ -643,8 +643,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     app.ui.opts.tracker.modify = false;
                     app.reboot_n = None;
                     app.time_since_reboot_requested = 0;
-                    app.error_n[n] = Some(String::from_str(bitstream_error.into()).expect("bitstream error name too long"));
-                    info!("Failed to load bitstream: {:?}", app.error_n[n]);
+                    app.error_n[n] = Some(bitstream_error);
+                    let error_string: &'static str = bitstream_error.into();
+                    info!("Failed to load bitstream: {error_string}");
                     // Clear the autoboot flag, as it's possible an error occurred after
                     // the autoboot flag was set (during/after PLL reconfiguration).
                     let config = EepromConfig { last_boot_slot: None };
@@ -1101,7 +1102,7 @@ fn main() -> ! {
 
                 (app.ui.opts.clone(),
                  app.reboot_n,
-                 app.error_n.clone(),
+                 app.error_n,
                  app.modeline.clone(),
                  app.autoboot_countdown_ms)
             });
@@ -1113,7 +1114,7 @@ fn main() -> ! {
 
 
             if let Some(n) = opts.tracker.selected {
-                draw_summary(&mut display, manifests[n].as_ref(), error_n[n].as_ref(), &startup_report, -20, -110, 0);
+                draw_summary(&mut display, manifests[n].as_ref(), error_n[n], &startup_report, -20, -110, 0);
                 if let Some(manifest) = &manifests[n] {
                     if let Some(help) = &manifest.help {
                         draw::draw_tiliqua(&mut display,
