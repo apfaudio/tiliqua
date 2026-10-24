@@ -25,6 +25,8 @@ use opts::cc_map::{MidiCcMapper, CcMapMode};
 use hal::pca9635::Pca9635Driver;
 use tiliqua_hal::dma_framebuffer::Rotate;
 use tiliqua_hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState};
+use tiliqua_hal::i2c::{I2cBus, I2cDevice};
+use static_cell::StaticCell;
 use tiliqua_hal::persist::Persist;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
@@ -87,7 +89,9 @@ fn build_cc_mapper(opts: &Opts) -> MidiCcMapper {
     m
 }
 
-type Ui = ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>;
+static I2C0_BUS: StaticCell<I2cBus<I2c0>> = StaticCell::new();
+
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2cDevice<'static, I2c0>, Opts>;
 
 struct App {
     ui: Ui,
@@ -174,8 +178,8 @@ fn main() -> ! {
     // Start up TUSB322 in UFP/Device mode
     //
 
-    let i2cdev_tusb = I2c0::new(unsafe { pac::I2C0::steal() } );
-    let mut tusb322 = TUSB322Driver::new(i2cdev_tusb);
+    let i2c0 = I2C0_BUS.init(tiliqua_hal::i2c::bus(I2c0::new(peripherals.I2C0)));
+    let mut tusb322 = TUSB322Driver::new(I2cDevice::new(i2c0));
     tusb322.soft_reset().ok();
     tusb322.set_mode(TUSB322Mode::Ufp).ok();
 
@@ -194,7 +198,7 @@ fn main() -> ! {
 
     let mut last_palette = opts.beam.palette.value;
     let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
-                         Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
+                         Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
     let app = Mutex::new(RefCell::new(App::new(ui, peripherals.XBEAM_PERIPH)));
 
     handler!(timer0 = || timer0_handler(&app));
@@ -324,16 +328,14 @@ fn main() -> ! {
 
             // Only connect USB PHY if the TUSB322 Type-C controller says we are attached.
             // This fixes enumeration issues on some machines when using typec <-> typec cables.
-            critical_section::with(|_| {
-                if let Ok(status) = tusb322.read_connection_status_control() {
-                    // Only update on valid reads to reduce risk of unintended toggling mid-stream
-                    let new_state = status.attached_state == AttachedState::AttachedSnk;
-                    if new_state != usb_cc_attached {
-                        info!("USB CC hotplug: {status:?}");
-                        usb_cc_attached = new_state;
-                    }
+            if let Ok(status) = tusb322.read_connection_status_control() {
+                // Only update on valid reads to reduce risk of unintended toggling mid-stream
+                let new_state = status.attached_state == AttachedState::AttachedSnk;
+                if new_state != usb_cc_attached {
+                    info!("USB CC hotplug: {status:?}");
+                    usb_cc_attached = new_state;
                 }
-            });
+            }
 
             critical_section::with(|cs| {
                 app.borrow_ref(cs).xbeam.flags().write(

@@ -32,6 +32,8 @@ use tiliqua_hal::embedded_graphics::prelude::*;
 use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
 use hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState, AccessoryType};
+use hal::i2c::{I2cBus, I2cDevice};
+use static_cell::StaticCell;
 
 use tiliqua_fw::wavetable;
 
@@ -225,7 +227,9 @@ fn build_cc_mapper(opts: &Opts) -> MidiCcMapper {
     m
 }
 
-type Ui = ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>;
+static I2C0_BUS: StaticCell<I2cBus<I2c0>> = StaticCell::new();
+
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2cDevice<'static, I2c0>, Opts>;
 
 struct App {
     ui: Ui,
@@ -294,8 +298,7 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
-    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
+    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev1, &TOUCH_SENSOR_ORDER);
 
     //
     // Create options and maybe load from persistent storage
@@ -315,8 +318,8 @@ fn main() -> ! {
     // TODO: draw error text if this fails?
     //
 
-    let i2cdev = I2c0::new(peripherals.I2C0);
-    let mut tusb322 = TUSB322Driver::new(i2cdev);
+    let i2c0 = I2C0_BUS.init(hal::i2c::bus(I2c0::new(peripherals.I2C0)));
+    let mut tusb322 = TUSB322Driver::new(I2cDevice::new(i2c0));
     tusb322.soft_reset().ok();
     tusb322.disable_term().ok();
 
@@ -327,7 +330,7 @@ fn main() -> ! {
     let mut last_palette = opts.beam.palette.value;
     let mut last_jack = pmod.jack();
     let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
-                         Pca9635Driver::new(I2c0::new(unsafe { pac::I2C0::steal() })), pmod);
+                         Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
     let app = Mutex::new(RefCell::new(App::new(ui, Polysynth0::new(peripherals.SYNTH_PERIPH))));
 
     handler!(timer0 = || timer0_handler(&app));

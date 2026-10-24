@@ -19,6 +19,8 @@ bench = false
 [dependencies]
 embedded-hal = "=1.0.0"
 embedded-hal-nb = "=1.0.0"
+embedded-hal-bus = "0.3.0"
+critical-section = "1.2.0"
 log = { version = "0.4.*", optional = true }
 nb = "=1.1.0"
 riscv = { version = "=0.16.1", features = ["critical-section-single-hart"] }

@@ -34,6 +34,8 @@ use tiliqua_hal::pca9635::Pca9635Driver;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 use tiliqua_hal::eeprom::EepromDriver;
 use tiliqua_hal::tusb322::TUSB322Driver;
+use tiliqua_hal::i2c::{I2cBus, I2cDevice};
+use static_cell::StaticCell;
 use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
 
 pub type ReportString = String<512>;
@@ -197,7 +199,7 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     write!(s, "  read {} KByte/sec\r\n", (u64::from(sysclk) * (spiflash_sz_test/1024) as u64) / u64::from(read_ticks)).ok();
 }
 
-fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
+fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut impl I2c) {
     // Read TUSB322 device ID
     let mut tusb322 = TUSB322Driver::new(i2cdev);
     match tusb322.read_device_id() {
@@ -218,7 +220,7 @@ fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
     write!(s, "\r\n").ok();
 }
 
-fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
+fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut impl I2c) -> bool {
     let mut ok = false;
     let mut eeprom = EepromDriver::new(i2cdev);
     match eeprom.read_id() {
@@ -241,7 +243,7 @@ fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
     ok
 }
 
-fn edid_test(s: &mut ReportString, i2cdev: &mut I2c0) {
+fn edid_test(s: &mut ReportString, i2cdev: &mut impl I2c) {
     const EDID_ADDR: u8 = 0x50;
     write!(s, "EDID: ").ok();
     let mut edid: [u8; 128] = [0; 128];
@@ -284,7 +286,7 @@ fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
     }
 }
 
-fn print_usb_state(s: &mut ReportString, i2cdev: &mut I2c0)
+fn print_usb_state(s: &mut ReportString, i2cdev: &mut impl I2c)
 {
     // Read TUSB322 connection status register
     // We don't fully use this yet. But it's useful for checking for usb circuitry assembly problems.
@@ -360,8 +362,11 @@ fn print_psram_stats(s: &mut ReportString, psram: &pac::PSRAM_CSR)
            sysclk / (cycles_elapsed+1)).ok();
 }
 
+static I2C0_BUS: StaticCell<I2cBus<I2c0>> = StaticCell::new();
+static I2C1_BUS: StaticCell<I2cBus<I2c1>> = StaticCell::new();
+
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2cDevice<'static, I2c0>, Opts>,
 }
 
 fn push_to_opts(constants: &CalibrationConstants, options: &mut Opts, d: &DefaultCalibrationConstants) {
@@ -403,8 +408,10 @@ fn main() -> ! {
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
 
-    let mut i2cdev = I2c0::new(peripherals.I2C0);
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let i2c0 = I2C0_BUS.init(tiliqua_hal::i2c::bus(I2c0::new(peripherals.I2C0)));
+    let i2c1 = I2C1_BUS.init(tiliqua_hal::i2c::bus(I2c1::new(peripherals.I2C1)));
+    let mut i2cdev = I2cDevice::new(i2c0);
+    let mut i2cdev1 = I2cDevice::new(i2c1);
     let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
 
@@ -435,7 +442,7 @@ fn main() -> ! {
 
     let mut last_jack = pmod.jack();
     let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
-                         Pca9635Driver::new(I2c0::new(unsafe { pac::I2C0::steal() })), pmod);
+                         Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
     let app = Mutex::new(RefCell::new(App { ui }));
     let hue = 10;
 
@@ -449,8 +456,7 @@ fn main() -> ! {
 
     let mut benchmark_rng = Rng::with_seed(0);
 
-    let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
-    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
+    let mut cy8 = Cy8cmbr3108Driver::new(I2cDevice::new(i2c1), &TOUCH_SENSOR_ORDER);
 
     let gpio0 = peripherals.GPIO0;
     let gpio1 = peripherals.GPIO1;
@@ -609,9 +615,7 @@ fn main() -> ! {
             });
 
             if commit_to_eeprom {
-                critical_section::with(|_| {
-                    constants.write_to_eeprom(&mut i2cdev1);
-                });
+                constants.write_to_eeprom(&mut i2cdev1);
             }
 
             if opts.tracker.page.value != Page::Report && opts.tracker.page.value != Page::Benchmark {

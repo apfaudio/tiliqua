@@ -14,6 +14,8 @@ opts = { path = "../../../rs/opts" }
 guh-dma = { git = "https://github.com/apfaudio/guh", rev = "9aa0fd3" }
 guh-usb-msc = { git = "https://github.com/apfaudio/guh", rev = "9aa0fd3", default-features = false, features = ["fatfs"] }
 fatfs = { git = "https://github.com/vk2seb/rust-fatfs.git", branch = "seb/dma-geo", default-features = false }
+static_cell = "2.1.1"
+portable-atomic = { version = "1.15.0", default-features = false, features = ["critical-section"] }
 
 log = "0.4.17"
 embedded-hal = "=1.0.0"
