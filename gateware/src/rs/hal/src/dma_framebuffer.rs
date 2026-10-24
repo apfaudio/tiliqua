@@ -115,6 +115,7 @@ macro_rules! impl_dma_framebuffer {
             }
 
             impl $DMA_FRAMEBUFFERX {
+                #[expect(clippy::too_many_arguments)]
                 pub fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, registers_blitter: $PACBLITTERX,
                        registers_pixel_plot: $PACPIXEL_PLOTX, registers_line: $PACLINEX, fb_base: usize, mode: DVIModeline, blitter_mem_base: usize) -> Self {
                     registers_fb.flags().write(|w| unsafe {
