@@ -1086,15 +1086,15 @@ fn main() -> ! {
                             // the audio clock. This might be important to separate if we decide
                             // to support dynamic hotplug timings in user bitstreams where
                             // we want the audio streams to not be interrupted.
-                            if let Err(e) = configure_external_pll(&ExternalPLLConfig{
+                            match configure_external_pll(&ExternalPLLConfig{
                                 clk0_hz: CLOCK_AUDIO_HZ,
                                 clk1_hz: Some((new_modeline.pixel_clk_mhz*1e6) as u32),
                                 clk1_inherit: false,
                                 spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
                             }, external_pll) {
-                                error!("failed to reconfigure external PLL: {e:?}");
+                                Ok(()) => reprogrammed_pll = true,
+                                Err(e) => error!("failed to reconfigure external PLL: {e:?}"),
                             }
-                            reprogrammed_pll = true;
                         }
                     }
 
