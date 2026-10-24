@@ -28,13 +28,6 @@ macro_rules! impl_i2c {
                 pub fn free(self) -> $PACI2CX {
                     self.registers
                 }
-
-                /// Obtain a static `I2c` instance for use in e.g. interrupt handlers
-                pub unsafe fn summon() -> Self {
-                    Self {
-                        registers: <$PACI2CX>::steal(),
-                    }
-                }
             }
 
             impl From<$PACI2CX> for $I2CX {

@@ -23,17 +23,6 @@ macro_rules! impl_serial {
                 pub fn free(self) -> $PACUARTX {
                     self.registers
                 }
-
-                /// Obtain a static `Serial` instance for use in e.g. interrupt handlers
-                ///
-                /// # Safety
-                ///
-                /// 'Tis thine responsibility, that which thou doth summon.
-                pub unsafe fn summon() -> Self {
-                    Self {
-                        registers: <$PACUARTX>::steal(),
-                    }
-                }
             }
 
             // trait: From
