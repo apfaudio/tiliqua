@@ -42,6 +42,7 @@ macro_rules! impl_timer {
                 /// # Safety
                 ///
                 /// 'Tis thine responsibility, that which thou doth summon.
+                #[expect(clippy::disallowed_methods)]
                 pub unsafe fn steal_irq() -> $TIMERIRQX {
                     $TIMERIRQX { registers: <$PACTIMERX>::steal() }
                 }
