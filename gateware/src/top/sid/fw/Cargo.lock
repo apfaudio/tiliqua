@@ -370,6 +370,7 @@ version = "0.1.0"
 dependencies = [
  "embassy-embedded-hal",
  "embassy-futures",
+ "embassy-sync",
  "embedded-storage",
  "embedded-storage-async",
  "fixed",
