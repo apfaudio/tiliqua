@@ -2,7 +2,7 @@
 #![no_main]
 
 use critical_section::Mutex;
-use log::{info, warn};
+use log::{info, warn, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -75,6 +75,7 @@ pub enum BitstreamError {
     UsbFileError,
     UsbTooLarge,
     UsbStreamError,
+    BootinfoSerializeError,
 }
 
 struct App {
@@ -629,7 +630,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             }
                         }
                         // Place BootInfo at the end of PSRAM
-                        unsafe { bootinfo.to_addr(BOOTINFO_BASE).expect("Failed to serialize BootInfo") };
+                        unsafe { bootinfo.to_addr(BOOTINFO_BASE) }.ok_or(BitstreamError::BootinfoSerializeError)?;
                         riscv::asm::fence();
                         riscv::asm::fence_i();
                         Ok(())
@@ -941,13 +942,19 @@ fn main() -> ! {
     let maybe_external_pll = if USE_EXTERNAL_PLL {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
-        configure_external_pll(&ExternalPLLConfig{
+        match configure_external_pll(&ExternalPLLConfig{
             clk0_hz: CLOCK_AUDIO_HZ,
             clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
             clk1_inherit: false,
             spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
-        }, &mut si5351drv).expect("failed to configure external PLL");
-        Some(si5351drv)
+        }, &mut si5351drv) {
+            Ok(()) => Some(si5351drv),
+            Err(e) => {
+                error!("failed to configure external PLL: {e:?}");
+                write!(startup_report, "EXTERNAL-PLL-INIT-ERROR\r\n").ok();
+                None
+            }
+        }
     } else {
         None
     };
@@ -1066,12 +1073,14 @@ fn main() -> ! {
                             // the audio clock. This might be important to separate if we decide
                             // to support dynamic hotplug timings in user bitstreams where
                             // we want the audio streams to not be interrupted.
-                            configure_external_pll(&ExternalPLLConfig{
+                            if let Err(e) = configure_external_pll(&ExternalPLLConfig{
                                 clk0_hz: CLOCK_AUDIO_HZ,
                                 clk1_hz: Some((new_modeline.pixel_clk_mhz*1e6) as u32),
                                 clk1_inherit: false,
                                 spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
-                            }, external_pll).expect("failed to reconfigure external PLL");
+                            }, external_pll) {
+                                error!("failed to reconfigure external PLL: {e:?}");
+                            }
                             reprogrammed_pll = true;
                         }
                     }
