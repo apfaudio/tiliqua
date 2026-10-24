@@ -1072,9 +1072,7 @@ fn main() -> ! {
                         info!("video/hpd: display inferred different modeline to previous. switching timings...");
                         if let Some(ref mut external_pll) = app.pll {
                             // Hold DVI PHY in reset before touching the video PLL
-                            unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
-                                w.enable().bit(false)
-                            );
+                            display.disable();
                             // Configure new pixel clock. Technically we don't need to touch
                             // the audio clock. This might be important to separate if we decide
                             // to support dynamic hotplug timings in user bitstreams where
@@ -1093,8 +1091,7 @@ fn main() -> ! {
 
                     if reprogrammed_pll {
                         // Finally, reinitialize the display.
-                        let peripherals = unsafe { pac::Peripherals::steal() };
-                        display = hal::new_framebuffer!(peripherals, new_modeline.clone());
+                        display.set_mode(new_modeline.clone());
                         app.modeline = new_modeline;
                     }
                 }

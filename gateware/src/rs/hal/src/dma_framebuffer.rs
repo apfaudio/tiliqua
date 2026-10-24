@@ -118,39 +118,7 @@ macro_rules! impl_dma_framebuffer {
                 #[expect(clippy::too_many_arguments)]
                 pub fn new(registers_fb: $PACFRAMEBUFFERX, registers_palette: $PACPALETTEX, registers_blitter: $PACBLITTERX,
                        registers_pixel_plot: $PACPIXEL_PLOTX, registers_line: $PACLINEX, fb_base: usize, mode: DVIModeline, blitter_mem_base: usize) -> Self {
-                    registers_fb.flags().write(|w| unsafe {
-                        w.enable().bit(false)
-                    });
-                    registers_fb.fb_base().write(|w| unsafe {
-                        w.fb_base().bits(fb_base as u32)
-                    });
-                    registers_fb.h_timing().write(|w| unsafe {
-                        w.h_active().bits(mode.h_active);
-                        w.h_sync_start().bits(mode.h_sync_start)
-                    } );
-                    registers_fb.h_timing2().write(|w| unsafe {
-                        w.h_sync_end().bits(mode.h_sync_end);
-                        w.h_total().bits(mode.h_total)
-                    } );
-                    registers_fb.v_timing().write(|w| unsafe {
-                        w.v_active().bits(mode.v_active);
-                        w.v_sync_start().bits(mode.v_sync_start)
-                    } );
-                    registers_fb.v_timing2().write(|w| unsafe {
-                        w.v_sync_end().bits(mode.v_sync_end);
-                        w.v_total().bits(mode.v_total)
-                    } );
-                    registers_fb.hv_timing().write(|w| unsafe {
-                        w.h_sync_invert().bit(mode.h_sync_invert);
-                        w.v_sync_invert().bit(mode.v_sync_invert);
-                        w.active_pixels().bits(
-                            mode.h_active as u32 * mode.v_active as u32)
-                    } );
-                    registers_fb.flags().write(|w| unsafe {
-                        w.enable().bit(true);
-                        w.rotation().bits(mode.rotate.clone() as u8)
-                    });
-                    Self {
+                    let fb = Self {
                         registers_fb,
                         registers_palette,
                         registers_blitter,
@@ -160,7 +128,57 @@ macro_rules! impl_dma_framebuffer {
                         framebuffer_base: fb_base as *mut u32,
                         blitter_mem_base: blitter_mem_base as *mut u32,
                         current_spritesheet_key: 0, // No spritesheet loaded initially
-                    }
+                    };
+                    fb.program_mode();
+                    fb
+                }
+
+                fn program_mode(&self) {
+                    let mode = &self.mode;
+                    self.registers_fb.flags().write(|w| unsafe {
+                        w.enable().bit(false)
+                    });
+                    self.registers_fb.fb_base().write(|w| unsafe {
+                        w.fb_base().bits(self.framebuffer_base as u32)
+                    });
+                    self.registers_fb.h_timing().write(|w| unsafe {
+                        w.h_active().bits(mode.h_active);
+                        w.h_sync_start().bits(mode.h_sync_start)
+                    } );
+                    self.registers_fb.h_timing2().write(|w| unsafe {
+                        w.h_sync_end().bits(mode.h_sync_end);
+                        w.h_total().bits(mode.h_total)
+                    } );
+                    self.registers_fb.v_timing().write(|w| unsafe {
+                        w.v_active().bits(mode.v_active);
+                        w.v_sync_start().bits(mode.v_sync_start)
+                    } );
+                    self.registers_fb.v_timing2().write(|w| unsafe {
+                        w.v_sync_end().bits(mode.v_sync_end);
+                        w.v_total().bits(mode.v_total)
+                    } );
+                    self.registers_fb.hv_timing().write(|w| unsafe {
+                        w.h_sync_invert().bit(mode.h_sync_invert);
+                        w.v_sync_invert().bit(mode.v_sync_invert);
+                        w.active_pixels().bits(
+                            mode.h_active as u32 * mode.v_active as u32)
+                    } );
+                    self.registers_fb.flags().write(|w| unsafe {
+                        w.enable().bit(true);
+                        w.rotation().bits(mode.rotate.clone() as u8)
+                    });
+                }
+
+                pub fn set_mode(&mut self, mode: DVIModeline) {
+                    self.mode = mode;
+                    self.current_spritesheet_key = 0;
+                    self.program_mode();
+                }
+
+                pub fn disable(&mut self) {
+                    self.registers_fb.flags().write(|w| unsafe {
+                        w.enable().bit(false)
+                    });
                 }
 
                 pub fn rotate(&mut self, rotation: &Rotate) {
