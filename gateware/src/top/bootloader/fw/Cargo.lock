@@ -301,12 +301,12 @@ checksum = "1944426bf7d03f1d14f708785e4b33efd750b36d48a157b836b3efc15ede8e1d"
 [[package]]
 name = "guh-dma"
 version = "0.0.0"
-source = "git+https://github.com/apfaudio/guh?rev=9aa0fd3#9aa0fd3511490674bdd038760abc8729f9e0b023"
+source = "git+https://github.com/apfaudio/guh?rev=400e812#400e812f26ff498be2d96bf614c19a404d28e87f"
 
 [[package]]
 name = "guh-usb-msc"
 version = "0.0.0"
-source = "git+https://github.com/apfaudio/guh?rev=9aa0fd3#9aa0fd3511490674bdd038760abc8729f9e0b023"
+source = "git+https://github.com/apfaudio/guh?rev=400e812#400e812f26ff498be2d96bf614c19a404d28e87f"
 dependencies = [
  "critical-section",
  "fatfs",
