@@ -11,5 +11,6 @@ guh_usb_msc::impl_usb_msc! {
 }
 
 tiliqua_lib::impl_handlers!(Serial0, Timer0);
+tiliqua_lib::impl_tick!(Clint);
 
 pub mod options;

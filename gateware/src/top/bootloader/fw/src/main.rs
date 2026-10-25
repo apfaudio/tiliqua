@@ -46,7 +46,7 @@ use guh_usb_msc::usb_msc::{UsbMsc, PartitionView, BLOCK_BYTES};
 use guh_usb_msc::usb_msc_fatfs::UsbMscBlockDevice;
 use hal::dma_framebuffer::{Rotate, DVIModeline};
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
+pub const TICK_PERIOD_MS: u32 = 10;
 // Technically this lower bound is out of the ECP5 PLL spec,
 // see the notes in `tiliqua_pll.py:create_dynamic_dvi_pll`.
 // But we keep it this low for compatibility with low res modes.
@@ -119,7 +119,7 @@ impl App {
                         f32::sin(tau*lerp1*0.5f32)) as u8;
             }
             self.ui.pca9635.push().ok();
-            self.animation_elapsed_ms += TIMER0_ISR_PERIOD_MS;
+            self.animation_elapsed_ms += TICK_PERIOD_MS;
             return true;
         }
         false
@@ -510,7 +510,7 @@ fn load_usb_region(region: &MemoryRegion, usb: &mut UsbHost) -> Result<(), Bitst
     result
 }
 
-fn timer0_handler(app: &Mutex<RefCell<App>>) {
+fn tick_handler(app: &Mutex<RefCell<App>>) {
 
     critical_section::with(|cs| {
 
@@ -526,13 +526,13 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         // Handle autoboot countdown
         if let Some(slot) = app.autoboot_slot {
-            if app.ui.encoder_recently_touched(TIMER0_ISR_PERIOD_MS*2) {
+            if app.ui.encoder_recently_touched(TICK_PERIOD_MS*2) {
                 // Encoder was touched during countdown, cancel autoboot, clear flag for next boot.
                 app.autoboot_slot = None;
                 app.autoboot_countdown_ms = 0;
             } else if app.autoboot_countdown_ms > 0 {
                 // Autoboot is configured, continue countdown
-                app.autoboot_countdown_ms = app.autoboot_countdown_ms.saturating_sub(TIMER0_ISR_PERIOD_MS);
+                app.autoboot_countdown_ms = app.autoboot_countdown_ms.saturating_sub(TICK_PERIOD_MS);
             } else {
                 // Countdown finished, trigger autoboot into selected bitstream
                 app.reboot_n = Some(slot);
@@ -546,7 +546,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         }
 
         if app.reboot_n.is_some() {
-            app.time_since_reboot_requested += TIMER0_ISR_PERIOD_MS;
+            app.time_since_reboot_requested += TICK_PERIOD_MS;
         }
     });
 }
@@ -843,9 +843,8 @@ fn modeline_or_fallback(i2cdev: &mut impl I2c) -> DVIModeline {
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
 
-    let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
-    let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
+    let mut delay = Clint::delay();
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let i2c0 = I2C0_BUS.init(hal::i2c::bus(I2c0::new(peripherals.I2C0)));
@@ -903,7 +902,7 @@ fn main() -> ! {
             // Rev5+, resetting CODEC is always allowed without popping.
             // So let's just do it to bring the CODEC into a consistent state.
             if cold_boot {
-                timer.delay_ms(200); // Wait for POR on eurorack-pmod
+                delay.delay_ms(200); // Wait for POR on eurorack-pmod
             }
             pmod.hard_reset();
         }
@@ -928,7 +927,7 @@ fn main() -> ! {
 
     // Fetch initial modeline (may be used for external PLL setup)
 
-    timer.delay_ms(10);
+    delay.delay_ms(10);
     let mut i2cdev_edid = I2cDevice::new(i2c0);
     let mut modeline = modeline_or_fallback(&mut i2cdev_edid);
 
@@ -996,7 +995,7 @@ fn main() -> ! {
         opts.tracker.selected = Some(n);
     }
 
-    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+    let ui = ui::UI::new(opts, TICK_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
                          Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
     let usb = UsbHost {
         vbus: peripherals.USB_VBUS,
@@ -1024,9 +1023,9 @@ fn main() -> ! {
 
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
 
-    timer.delay_ms(50);
+    delay.delay_ms(50);
 
-    handler!(timer0 = || timer0_handler(&app));
+    handler!(tick_isr = || tick_handler(&app));
 
     irq::scope(|s| {
 
@@ -1044,9 +1043,8 @@ fn main() -> ! {
 
         log::info!("{startup_report}");
 
-        s.register(handlers::Interrupt::TIMER0, timer0);
-        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
-                              pac::Interrupt::TIMER0);
+        s.register(tick::Interrupt::TICK, tick_isr);
+        tick::enable(TICK_PERIOD_MS);
 
 
         let mut last_hpd = display.get_hpd();
