@@ -410,8 +410,9 @@ fn main() -> ! {
 
     let i2c0 = I2C0_BUS.init(tiliqua_hal::i2c::bus(I2c0::new(peripherals.I2C0)));
     let i2c1 = I2C1_BUS.init(tiliqua_hal::i2c::bus(I2c1::new(peripherals.I2C1)));
-    let mut i2cdev = I2cDevice::new(i2c0);
-    let mut i2cdev1 = I2cDevice::new(i2c1);
+    let mut i2cdev_tusb = I2cDevice::new(i2c0);
+    let mut i2cdev_edid = I2cDevice::new(i2c0);
+    let mut i2cdev_eeprom = I2cDevice::new(i2c1);
     let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
 
@@ -419,10 +420,10 @@ fn main() -> ! {
 
     psram_memtest(&mut startup_report, &mut timer);
     spiflash_memtest(&mut startup_report, &mut timer);
-    tusb322_id_test(&mut startup_report, &mut i2cdev);
+    tusb322_id_test(&mut startup_report, &mut i2cdev_tusb);
     print_touch_err(&mut startup_report, &pmod);
-    eeprom_id_test(&mut startup_report, &mut i2cdev1);
-    edid_test(&mut startup_report, &mut i2cdev);
+    eeprom_id_test(&mut startup_report, &mut i2cdev_eeprom);
+    edid_test(&mut startup_report, &mut i2cdev_edid);
 
     timer.disable();
     timer.delay_ns(0);
@@ -431,7 +432,7 @@ fn main() -> ! {
     let mut opts = Opts::default();
     let cal_default = DefaultCalibrationConstants::from_array(
         &PMOD_DEFAULT_CAL, pmod.f_bits());
-    if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
+    if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev_eeprom) {
         push_to_opts(&cal_constants, &mut opts, &cal_default);
         write!(startup_report, "PASS: load calibration from EEPROM").ok();
     } else {
@@ -506,7 +507,7 @@ fn main() -> ! {
                         critical_section::with(|cs| {
                             // Devices shared with timer callback, be careful!
                             print_pmod_state(&mut status_report, &app.borrow_ref(cs).ui.pmod);
-                            print_usb_state(&mut status_report, &mut i2cdev);
+                            print_usb_state(&mut status_report, &mut i2cdev_tusb);
                         });
                         print_die_temperature(&mut status_report, &dtr);
                         print_psram_stats(&mut status_report, &psram);
@@ -615,7 +616,7 @@ fn main() -> ! {
             });
 
             if commit_to_eeprom {
-                constants.write_to_eeprom(&mut i2cdev1);
+                constants.write_to_eeprom(&mut i2cdev_eeprom);
             }
 
             if opts.tracker.page.value != Page::Report && opts.tracker.page.value != Page::Benchmark {

@@ -171,9 +171,9 @@ fn main() -> ! {
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
 
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut i2c1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+    CalibrationConstants::load_or_default(&mut i2c1, &mut pmod);
 
     //
     // Start up TUSB322 in UFP/Device mode

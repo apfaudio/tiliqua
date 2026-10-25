@@ -659,8 +659,8 @@ fn boot_slot(app: &mut App, n: usize, display: &mut DMAFramebuffer0) {
         // RP2040 apfbug versions > beta5 accept reconfiguration requests over I2C,
         // which should be more robust. We trigger both I2C and UART
         // reconfigurations to retain backwards compatibility with old RP2040 firmware.
-        let mut i2cdev0 = I2cDevice::new(app.i2c0);
-        let i2c_reconfig_result = i2cdev0.transaction(
+        let mut i2cdev_rp2040 = I2cDevice::new(app.i2c0);
+        let i2c_reconfig_result = i2cdev_rp2040.transaction(
             RP2040_APFBUG_ADDR, &mut [Operation::Write(&[0u8, 0x5A, n as u8])]);
         if i2c_reconfig_result.is_err() {
             warn!("apfbug/rp2040: i2c reconfig request NAK (apfbug <= beta5?)");
@@ -958,12 +958,12 @@ fn main() -> ! {
 
     // Setup CODEC and load audio calibration.
 
-    let mut i2cdev1 = I2cDevice::new(i2c1);
-    if let Err(e) = maybe_restart_codec(&mut i2cdev1, &mut pmod) {
+    let mut i2cdev_codec = I2cDevice::new(i2c1);
+    if let Err(e) = maybe_restart_codec(&mut i2cdev_codec, &mut pmod) {
         let s: &'static str = e.into();
         write!(startup_report, "{s}\r\n").ok();
     }
-    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+    calibration::CalibrationConstants::load_or_default(I2cDevice::new(i2c1), &mut pmod);
 
     // Load serialized JSON manifests from spiflash
 
