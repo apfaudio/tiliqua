@@ -14,7 +14,6 @@ pub mod pca9635;
 pub mod pmod;
 pub mod serial;
 pub mod si5351;
-pub mod timer;
 pub mod tusb322;
 pub mod persist;
 pub mod clint;
@@ -45,10 +44,6 @@ macro_rules! impl_tiliqua_soc_pac {
 
         tiliqua_hal::impl_serial! {
             Serial0: tiliqua_pac::UART0,
-        }
-
-        tiliqua_hal::impl_timer! {
-            Timer0, Timer0Irq: tiliqua_pac::TIMER0,
         }
 
         tiliqua_hal::impl_i2c! {

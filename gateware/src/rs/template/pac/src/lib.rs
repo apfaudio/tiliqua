@@ -10,7 +10,6 @@ compile_error!(r#"Only one of the "minerva" or "vexriscv" features can be select
 mod macros;
 
 pub mod cpu;
-pub mod csr;
 pub mod register {
     #[cfg(feature = "minerva")]
     pub use crate::cpu::minerva::register::*;

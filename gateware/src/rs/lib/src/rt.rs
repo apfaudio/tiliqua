@@ -60,17 +60,9 @@ macro_rules! impl_tick {
 
 #[macro_export]
 macro_rules! impl_handlers {
-    ($serial:ty, $timer:ty) => {
+    ($serial:ty) => {
         pub mod handlers {
             use super::*;
-
-            $crate::rt::irq::scoped_interrupts! {
-                #[allow(non_camel_case_types)]
-                pub enum Interrupt {
-                    TIMER0,
-                }
-                use #[$crate::rt::amaranth_soc_isr::return_as_is];
-            }
 
             static LOGGER: $crate::logger::WriteLogger<$serial> = $crate::logger::WriteLogger {
                 writer: ::core::cell::RefCell::new(None),
@@ -114,11 +106,8 @@ macro_rules! impl_handlers {
 
             #[export_name = "DefaultHandler"]
             fn default_isr_handler() {
-                let timer = unsafe { <$timer>::steal_irq() };
-                if timer.is_pending() {
-                    unsafe { TIMER0(); }
-                    timer.clear_pending();
-                }
+                $crate::rt::log::error!("default_isr_handler(): unhandled interrupt");
+                loop {}
             }
         }
     };

@@ -43,7 +43,7 @@ from amaranth.lib import cdc, wiring
 from amaranth.lib.wiring import Component
 from amaranth_soc import csr, wishbone
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
-from luna_soc.gateware.core import blockram, spiflash, timer, uart
+from luna_soc.gateware.core import blockram, spiflash, uart
 from luna_soc.gateware.cpu import InterruptController
 from luna_soc.gateware.provider.cynthion import UARTProvider
 from luna_soc.generate import introspect, rust, svd
@@ -94,8 +94,7 @@ class TiliquaSoc(Component):
         # Offsets from `self.csr_base` of peripheral CSRs
         self.spiflash_ctrl_base   = 0x00000100
         self.uart0_base           = 0x00000200
-        self.timer0_base          = 0x00000300
-        self.timer0_irq           = 0
+        # 0x00000300: RIP timer0
         self.i2c0_base            = 0x00000400
         self.i2c1_base            = 0x00000500
         self.encoder0_base        = 0x00000600
@@ -175,11 +174,6 @@ class TiliquaSoc(Component):
         divisor = int(self.clock_settings.frequencies.sync // uart_baud_rate)
         self.uart0 = uart.Peripheral(divisor=divisor)
         self.csr_decoder.add(self.uart0.bus, addr=self.uart0_base, name="uart0")
-
-        # timer0
-        self.timer0 = timer.Peripheral(width=32)
-        self.csr_decoder.add(self.timer0.bus, addr=self.timer0_base, name="timer0")
-        self.interrupt_controller.add(self.timer0, number=self.timer0_irq, name="timer0")
 
         # spiflash peripheral
         self.spi0_phy        = spiflash.SPIPHYController(domain="sync", divisor=0)
@@ -320,9 +314,6 @@ class TiliquaSoc(Component):
             uart0_provider = UARTProvider()
             m.submodules.uart0_provider = uart0_provider
             wiring.connect(m, self.uart0.pins, uart0_provider.pins)
-
-        # timer0
-        m.submodules.timer0 = self.timer0
 
         # i2c0
         m.submodules.i2c0 = self.i2c0
