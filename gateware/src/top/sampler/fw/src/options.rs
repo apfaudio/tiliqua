@@ -14,17 +14,6 @@ pub enum Page {
     Channel2,
 }
 
-impl Page {
-    pub fn channel_index(&self) -> Option<usize> {
-        match self {
-            Self::Channel0 => Some(0),
-            Self::Channel1 => Some(1),
-            Self::Channel2 => Some(2),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum WaveformView {
@@ -136,21 +125,21 @@ pub struct Opts {
 }
 
 impl Opts {
-    pub fn channel_opts(&self, index: usize) -> &ChannelOpts {
-        match index {
-            0 => &self.channel0,
-            1 => &self.channel1,
-            2 => &self.channel2,
-            _ => panic!("invalid channel index"),
+    pub fn channel_opts(&self, page: Page) -> Option<&ChannelOpts> {
+        match page {
+            Page::Channel0 => Some(&self.channel0),
+            Page::Channel1 => Some(&self.channel1),
+            Page::Channel2 => Some(&self.channel2),
+            _ => None,
         }
     }
 
-    pub fn channel_opts_mut(&mut self, index: usize) -> &mut ChannelOpts {
-        match index {
-            0 => &mut self.channel0,
-            1 => &mut self.channel1,
-            2 => &mut self.channel2,
-            _ => panic!("invalid channel index"),
+    pub fn channel_opts_mut(&mut self, page: Page) -> Option<&mut ChannelOpts> {
+        match page {
+            Page::Channel0 => Some(&mut self.channel0),
+            Page::Channel1 => Some(&mut self.channel1),
+            Page::Channel2 => Some(&mut self.channel2),
+            _ => None,
         }
     }
 }

@@ -135,14 +135,14 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         let max_samples = app.delayln.size_samples() as u32;
 
-        if let Some(ix) = app.ui.opts.tracker.page.value.channel_index() {
-            // HACK: dynamic option steps based on zoom level (move up into options lib at some
-            // point?).
-            // Snapshot options before encoder update, so we can scale step by zoom factor.
-            let opts_prev = app.ui.opts.channel_opts(ix).clone();
-            app.ui.update();
-            // Recalculate steps by zoom factor
-            let opts = app.ui.opts.channel_opts_mut(ix);
+        // HACK: dynamic option steps based on zoom level (move up into options lib at some
+        // point?).
+        // Snapshot options before encoder update, so we can scale step by zoom factor.
+        let page = app.ui.opts.tracker.page.value;
+        let opts_prev = app.ui.opts.channel_opts(page).cloned();
+        app.ui.update();
+        // Recalculate steps by zoom factor
+        if let (Some(opts_prev), Some(opts)) = (opts_prev, app.ui.opts.channel_opts_mut(page)) {
             let zoomstep = |prev: u32, cur: u32, zoom: u8| -> u32 {
                 let scale = 1i32 << (4 - i32::from(zoom));
                 let delta = cur as i32 - prev as i32;
@@ -150,8 +150,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             };
             opts.start.value = zoomstep(opts_prev.start.value, opts.start.value, opts.zoom.value);
             opts.len.value = zoomstep(opts_prev.len.value, opts.len.value, opts.zoom.value);
-        } else {
-            app.ui.update();
         }
 
         sampler.flags().write(|w| {
