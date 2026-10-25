@@ -2,7 +2,7 @@
 #![no_main]
 
 use critical_section::Mutex;
-use log::info;
+use log::{info, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -23,7 +23,7 @@ use opts::persistence::*;
 use channel::{Channel, ChannelView};
 use flash::DelaylineFlash;
 use hal::pca9635::Pca9635Driver;
-use tiliqua_hal::delay_line::DelayLine;
+use tiliqua_fw::delay_line::DelayLine;
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pmod::EurorackPmod;
 
@@ -82,7 +82,7 @@ fn draw_flash_progress(
 ) {
     let Size { width: h, height: v } = display.size();
     let mut buf = heapless::String::<64>::new();
-    write!(buf, "{} ({} / {} KiB)", label, done_kb, total_kb).ok();
+    write!(buf, "{label} ({done_kb} / {total_kb} KiB)").ok();
     let font = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 0xf));
     Text::with_alignment(
         &buf,
@@ -135,23 +135,21 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         let max_samples = app.delayln.size_samples() as u32;
 
-        if let Some(ix) = app.ui.opts.tracker.page.value.channel_index() {
-            // HACK: dynamic option steps based on zoom level (move up into options lib at some
-            // point?).
-            // Snapshot options before encoder update, so we can scale step by zoom factor.
-            let opts_prev = app.ui.opts.channel_opts(ix).clone();
-            app.ui.update();
-            // Recalculate steps by zoom factor
-            let opts = app.ui.opts.channel_opts_mut(ix);
+        // HACK: dynamic option steps based on zoom level (move up into options lib at some
+        // point?).
+        // Snapshot options before encoder update, so we can scale step by zoom factor.
+        let page = app.ui.opts.tracker.page.value;
+        let opts_prev = app.ui.opts.channel_opts(page).cloned();
+        app.ui.update();
+        // Recalculate steps by zoom factor
+        if let (Some(opts_prev), Some(opts)) = (opts_prev, app.ui.opts.channel_opts_mut(page)) {
             let zoomstep = |prev: u32, cur: u32, zoom: u8| -> u32 {
-                let scale = 1i32 << (4 - zoom as i32);
+                let scale = 1i32 << (4 - i32::from(zoom));
                 let delta = cur as i32 - prev as i32;
                 (prev as i32 + delta * scale).max(0).min(max_samples as i32) as u32
             };
-            opts.start.value = zoomstep(opts_prev.start.value, opts.start.value.clone(), opts.zoom.value.clone());
-            opts.len.value = zoomstep(opts_prev.len.value, opts.len.value.clone(), opts.zoom.value.clone());
-        } else {
-            app.ui.update();
+            opts.start.value = zoomstep(opts_prev.start.value, opts.start.value, opts.zoom.value);
+            opts.len.value = zoomstep(opts_prev.len.value, opts.len.value, opts.zoom.value);
         }
 
         sampler.flags().write(|w| {
@@ -178,7 +176,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
@@ -193,7 +191,7 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua SAMPLER!");
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.expect("invalid bootinfo");
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
@@ -204,9 +202,9 @@ fn main() -> ! {
 
     let delayln = DelayLine0::new(peripherals.DELAYLN_PERIPH0);
     let channels = (
-        Channel::new(GrainPlayer0::new(peripherals.GRAIN_PERIPH0)),
-        Channel::new(GrainPlayer1::new(peripherals.GRAIN_PERIPH1)),
-        Channel::new(GrainPlayer2::new(peripherals.GRAIN_PERIPH2)),
+        Channel::new(peripherals.GRAIN_PERIPH0),
+        Channel::new(peripherals.GRAIN_PERIPH1),
+        Channel::new(peripherals.GRAIN_PERIPH2),
     );
 
     let mut opts = Opts::default();
@@ -306,11 +304,13 @@ fn main() -> ! {
             if save_all {
                 // persist all options and then the audio delay line (slow)
                 if let Some(ref mut flash_persist) = flash_persist_opt {
-                    flash_persist.save_options(&opts).unwrap();
+                    if let Err(e) = flash_persist.save_options(&opts) {
+                        error!("failed to save options: {e:?}");
+                    }
                 }
                 let (ptr, size_bytes, wr_bytes) = critical_section::with(|cs| {
                     let app = app.borrow_ref(cs);
-                    (app.delayln.data_ptr() as *const u8,
+                    (app.delayln.data_ptr().cast::<u8>(),
                      app.delayln.size_samples() * 2,
                      app.delayln.wrpointer() * 2)
                 });
@@ -331,7 +331,9 @@ fn main() -> ! {
                     };
                     data.fill(0);
                     if let Some(ref mut flash_persist) = flash_persist_opt {
-                        flash_persist.erase_all().unwrap();
+                        if let Err(e) = flash_persist.erase_all() {
+                            error!("failed to erase options: {e:?}");
+                        }
                     }
                 });
                 delayln_flash.wipe_magic();

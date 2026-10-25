@@ -2,7 +2,7 @@
 #![no_main]
 
 use critical_section::Mutex;
-use log::info;
+use log::{info, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -123,15 +123,13 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                 ((midi_word >> 8) & 0xFF) as u8,
                 ((midi_word >> 16) & 0xFF) as u8,
             ];
-            if let Ok(msg) = MidiMessage::try_parse_slice(&bytes) {
-                if let MidiMessage::ControlChange(_, cc, val) = msg {
-                    if let Some(action) = app.cc_mapper.process(cc.into(), val.into()) {
-                        if app.ui.opts.misc.cc_highlight.value == CcHighlight::On {
-                            app.ui.opts.select_global(action.global_index);
-                            app.ui.external_modify();
-                        }
-                        apply_cc_action(&mut app.ui.opts, &action);
+            if let Ok(MidiMessage::ControlChange(_, cc, val)) = MidiMessage::try_parse_slice(&bytes) {
+                if let Some(action) = app.cc_mapper.process(cc.into(), val.into()) {
+                    if app.ui.opts.misc.cc_highlight.value == CcHighlight::On {
+                        app.ui.opts.select_global(action.global_index);
+                        app.ui.external_modify();
                     }
+                    apply_cc_action(&mut app.ui.opts, &action);
                 }
             }
         }
@@ -151,7 +149,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
@@ -166,7 +164,7 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua XBEAM!");
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.expect("invalid bootinfo");
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
@@ -189,7 +187,7 @@ fn main() -> ! {
     //
 
     let mut opts = Opts::default();
-    opts.misc.rotation.value = modeline.rotate.clone();
+    opts.misc.rotation.value = modeline.rotate;
     let mut flash_persist_opt = FlashOptionsPersistence::open(
         spiflash, bootinfo.manifest.get_option_storage_window(), &mut opts);
 
@@ -220,8 +218,8 @@ fn main() -> ! {
         let mut usb_cc_attached = false;
 
         // Grid overlay operates in DVI pixel space (pre-rotation)
-        let dvi_w = modeline.h_active as u32;
-        let dvi_h = modeline.v_active as u32;
+        let dvi_w = u32::from(modeline.h_active);
+        let dvi_h = u32::from(modeline.v_active);
         overlay_periph.grid_offset().write(|w| unsafe {
             w.offset_x().bits((dvi_w / 2) as u16);
             w.offset_y().bits((dvi_h / 2) as u16)
@@ -273,7 +271,9 @@ fn main() -> ! {
 
             if save_opts {
                 if let Some(ref mut flash_persist) = flash_persist_opt {
-                    flash_persist.save_options(&opts).unwrap();
+                    if let Err(e) = flash_persist.save_options(&opts) {
+                        error!("failed to save options: {e:?}");
+                    }
                 }
             }
 
@@ -281,9 +281,11 @@ fn main() -> ! {
                 critical_section::with(|cs| {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = Opts::default();
-                    app.ui.opts.misc.rotation.value = modeline.rotate.clone();
+                    app.ui.opts.misc.rotation.value = modeline.rotate;
                     if let Some(ref mut flash_persist) = flash_persist_opt {
-                        flash_persist.erase_all().unwrap();
+                        if let Err(e) = flash_persist.erase_all() {
+                            error!("failed to erase options: {e:?}");
+                        }
                     }
                 });
             }
@@ -329,7 +331,7 @@ fn main() -> ! {
                     // Only update on valid reads to reduce risk of unintended toggling mid-stream
                     let new_state = status.attached_state == AttachedState::AttachedSnk;
                     if new_state != usb_cc_attached {
-                        info!("USB CC hotplug: {:?}", status);
+                        info!("USB CC hotplug: {status:?}");
                         usb_cc_attached = new_state;
                     }
                 }
@@ -374,7 +376,7 @@ fn main() -> ! {
             };
             overlay_periph.flags().write(|w| unsafe {
                 w.grid_style().bits(grid_style);
-                w.grid_pixel().bits(((opts.beam.grid_i.value as u8) << 4) | opts.beam.ui_hue.value)
+                w.grid_pixel().bits((opts.beam.grid_i.value << 4) | opts.beam.ui_hue.value)
             });
 
             xbeam_mux.delay0().write(|w| unsafe { w.value().bits(
@@ -392,14 +394,12 @@ fn main() -> ! {
             if opts.tracker.page.value == Page::Help {
                 scope.set_enabled(false, false);
                 vscope.set_enabled(false);
+            } else if opts.misc.plot_type.value == PlotType::Vector {
+                scope.set_enabled(false, false);
+                vscope.set_enabled(true);
             } else {
-                if opts.misc.plot_type.value == PlotType::Vector {
-                    scope.set_enabled(false, false);
-                    vscope.set_enabled(true);
-                } else {
-                    scope.set_enabled(true, opts.scope2.trig_mode.value == TriggerMode::Always);
-                    vscope.set_enabled(false);
-                }
+                scope.set_enabled(true, opts.scope2.trig_mode.value == TriggerMode::Always);
+                vscope.set_enabled(false);
             }
 
             first = false;

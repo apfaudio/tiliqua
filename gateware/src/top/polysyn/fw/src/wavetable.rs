@@ -122,7 +122,7 @@ pub fn wt_apply_proc(sample: Fix32, mode: ProcMode, proc_amt: Fix32) -> Fix32 {
 
 
 fn to_asq(v: Fix32) -> i16 {
-    (v.to_bits() >> 1).clamp(i16::MIN as i32, i16::MAX as i32) as i16
+    (v.to_bits() >> 1).clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16
 }
 
 fn gain_from_amt(proc_amt: u16) -> Fix32 {
@@ -134,17 +134,17 @@ pub fn wt_preview(buf: &mut [i16], waveform: Waveform,
     let gain = gain_from_amt(proc_amt);
     let cl = CYCLE_LEN;
     let len = buf.len();
-    for i in 0..len {
+    for (i, b) in buf.iter_mut().enumerate() {
         let idx = i * cl / len;
         let sample = wt_sample(waveform, idx, cl);
-        buf[i] = to_asq(wt_apply_proc(sample, proc_mode, gain));
+        *b = to_asq(wt_apply_proc(sample, proc_mode, gain));
     }
 }
 
 pub fn wt_lfo(phase: &mut Fix32, phase_inc: Fix32, depth: Fix32, waveform: Waveform) -> i16 {
     let idx = phase.to_num::<usize>() % CYCLE_LEN;
     let sample = wt_sample(waveform, idx, CYCLE_LEN) * depth;
-    *phase = *phase + phase_inc;
+    *phase += phase_inc;
     let cycle_len = Fix32::from_num(CYCLE_LEN);
     if *phase >= cycle_len {
         *phase -= cycle_len;

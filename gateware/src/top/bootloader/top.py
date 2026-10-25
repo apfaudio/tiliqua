@@ -10,7 +10,7 @@ from amaranth.lib.wiring import In, Out, connect, flipped
 
 from tiliqua.build import sim
 from tiliqua.build.cli import top_level_cli
-from tiliqua.build.types import BitstreamHelp
+from tiliqua.build.types import BitstreamHelp, FirmwareLocation
 from tiliqua.tiliqua_soc import TiliquaSoc
 from tiliqua.periph import vbus
 
@@ -75,6 +75,7 @@ if __name__ == "__main__":
     this_path = os.path.dirname(os.path.realpath(__file__))
     # FIXME: more RAM needed for this bitstream because `serde` has quite huge code size.
     top_level_cli(BootloaderSoc, path=this_path,
+                  argparse_callback=lambda parser: parser.set_defaults(fw_location=FirmwareLocation.SPIFlash),
                   argparse_fragment=lambda _: {
                       "cpu_variant": "tiliqua_rv32im_xip",
                       "mainram_size": 0x10000,

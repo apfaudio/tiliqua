@@ -2,7 +2,8 @@
 #![no_main]
 
 use critical_section::Mutex;
-use log::info;
+use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
+use log::{info, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -38,8 +39,8 @@ pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
 fn adsr_ui_to_rate(ui_value: u16) -> u16 {
     // 0..32768 -> 1ms..2000ms -> hardware rate
-    let ms_x32k = 32768u32 + ui_value as u32 * 1999;
-    let rate = (45_000_000u64 / ms_x32k as u64) as u32;
+    let ms_x32k = 32768u32 + u32::from(ui_value) * 1999;
+    let rate = (45_000_000u64 / u64::from(ms_x32k)) as u32;
     rate.min(65535) as u16
 }
 
@@ -74,12 +75,10 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                 ((midi_word >> 8) & 0xFF) as u8,
                 ((midi_word >> 16) & 0xFF) as u8,
             ];
-            if let Ok(msg) = MidiMessage::try_parse_slice(&bytes) {
-                if let MidiMessage::ControlChange(_, cc, val) = msg {
-                    if let Some(action) = app.cc_mapper.process(cc.into(), val.into()) {
-                        last_cc_index = Some(action.global_index);
-                        apply_cc_action(&mut app.ui.opts, &action);
-                    }
+            if let Ok(MidiMessage::ControlChange(_, cc, val)) = MidiMessage::try_parse_slice(&bytes) {
+                if let Some(action) = app.cc_mapper.process(cc.into(), val.into()) {
+                    last_cc_index = Some(action.global_index);
+                    apply_cc_action(&mut app.ui.opts, &action);
                 }
             }
 
@@ -106,14 +105,14 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         app.synth.set_drive(drive_smooth);
 
         // Map 0-1 UI range to 32768-8192 hardware range (inverted)
-        let reso_ui = opts.voice.reso.value as u32;
+        let reso_ui = u32::from(opts.voice.reso.value);
         let reso_hw = (32768 - reso_ui * 24576 / 32768) as u16;
         let reso_smooth = app.reso_smoother.proc_u16(reso_hw);
         app.synth.set_reso(reso_smooth);
 
         let diffuse_smooth = app.diffusion_smoother.proc_u16(opts.effect.diffuse.value);
-        let coeff_dry: i32 = (32768 - diffuse_smooth) as i32;
-        let coeff_wet: i32 = diffuse_smooth as i32;
+        let coeff_dry: i32 = i32::from(32768 - diffuse_smooth);
+        let coeff_wet: i32 = i32::from(diffuse_smooth);
 
         app.synth.set_matrix_coefficient(0, 0, coeff_dry);
         app.synth.set_matrix_coefficient(1, 1, coeff_dry);
@@ -130,7 +129,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         // ADSR params
         app.synth.set_attack_rate(adsr_ui_to_rate(opts.adsr.attack.value));
         app.synth.set_decay_rate(adsr_ui_to_rate(opts.adsr.decay.value));
-        app.synth.set_sustain_level((opts.adsr.sustain.value as u32 * 65535 / 32768) as u16);
+        app.synth.set_sustain_level((u32::from(opts.adsr.sustain.value) * 65535 / 32768) as u16);
         app.synth.set_release_rate(adsr_ui_to_rate(opts.adsr.release.value));
 
         // LFO -> phase modulation CSR
@@ -139,10 +138,10 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             let isr_rate = Fix32::from_num(1000u32 / TIMER0_ISR_PERIOD_MS);
             // lfo_rate option: 0..50 -> 0..5.0 Hz
             // Q16.16 from_bits: value * 65536 / 10 = value * 6554
-            let rate_hz = Fix32::from_bits(opts.voice.lfo_rate.value as i32 * 6554);
+            let rate_hz = Fix32::from_bits(i32::from(opts.voice.lfo_rate.value) * 6554);
             let phase_inc = rate_hz * CYCLE_LEN as i32 / isr_rate;
             // depth option: 0..32768 -> 0..1.0
-            let depth = Fix32::from_bits(opts.voice.lfo_depth.value as i32 * 2);
+            let depth = Fix32::from_bits(i32::from(opts.voice.lfo_depth.value) * 2);
             let lfo_val = wavetable::wt_lfo(&mut app.lfo_phase, phase_inc, depth,
                                            Waveform::Sine);
             app.synth.set_lfo(lfo_val);
@@ -177,9 +176,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     // even inside synth.midi_write.
                     let mut bytes = [0u8; 3];
                     msg.render_slice(&mut bytes);
-                    let v: u32 = (bytes[2] as u32) << 16 |
-                                 (bytes[1] as u32) << 8 |
-                                 (bytes[0] as u32) << 0;
+                    let v: u32 = (u32::from(bytes[2]) << 16) | (u32::from(bytes[1]) << 8) | u32::from(bytes[0]);
                     app.synth.midi_write(v);
                 }
             }
@@ -279,7 +276,7 @@ impl App {
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
@@ -293,7 +290,7 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua POLYSYN!");
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.expect("invalid bootinfo");
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
@@ -302,7 +299,6 @@ fn main() -> ! {
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
-    use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
     let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
     let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
 
@@ -333,7 +329,7 @@ fn main() -> ! {
     // Create App instance
     //
 
-    let mut last_palette = opts.beam.palette.value.clone();
+    let mut last_palette = opts.beam.palette.value;
     let app = Mutex::new(RefCell::new(App::new(opts)));
 
     handler!(timer0 = || timer0_handler(&app));
@@ -402,7 +398,7 @@ fn main() -> ! {
                     if let Ok(conn) = tusb322.read_connection_status() {
                         // Only update on valid reads to reduce risk of unintended toggling mid-stream
                         if ctrl.attached_state != last_attached_state {
-                            info!("USB CC hotplug: {:?} | {:?}", ctrl, conn);
+                            info!("USB CC hotplug: {ctrl:?} | {conn:?}");
                             last_attached_state = ctrl.attached_state;
                         }
                         // Check how we are attached
@@ -419,8 +415,8 @@ fn main() -> ! {
                 //
 
                 (app.ui.opts.clone(),
-                 app.synth.voice_notes().clone(),
-                 app.synth.voice_cutoffs().clone(),
+                 app.synth.voice_notes(),
+                 app.synth.voice_cutoffs(),
                  app.ui.draw(),
                  save_opts,
                  wipe_opts)
@@ -428,7 +424,9 @@ fn main() -> ! {
 
             if save_opts {
                 if let Some(ref mut flash_persist) = flash_persist_opt {
-                    flash_persist.save_options(&opts).unwrap();
+                    if let Err(e) = flash_persist.save_options(&opts) {
+                        error!("failed to save options: {e:?}");
+                    }
                 }
             }
 
@@ -437,7 +435,9 @@ fn main() -> ! {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = Opts::default();
                     if let Some(ref mut flash_persist) = flash_persist_opt {
-                        flash_persist.erase_all().unwrap();
+                        if let Err(e) = flash_persist.erase_all() {
+                            error!("failed to erase options: {e:?}");
+                        }
                     }
                 });
             }

@@ -5,7 +5,7 @@ use serde_derive::{Serialize, Deserialize};
 use tiliqua_lib::palette::ColorPalette;
 use tiliqua_lib::scope::VScale;
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     #[default]
@@ -17,7 +17,7 @@ pub enum Page {
     Misc,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TouchControl {
     Off,
@@ -25,7 +25,7 @@ pub enum TouchControl {
     On,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Waveform {
     #[default]
@@ -41,7 +41,7 @@ pub enum Waveform {
     Strng,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ProcMode {
     #[default]
@@ -52,7 +52,7 @@ pub enum ProcMode {
     Crush,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum UsbHost {
     #[default]
@@ -60,7 +60,7 @@ pub enum UsbHost {
     On,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum UsbMidiSerialDebug {
     #[default]
@@ -68,7 +68,7 @@ pub enum UsbMidiSerialDebug {
     On,
 }
 
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum CcHighlight {
     Off,
@@ -77,7 +77,7 @@ pub enum CcHighlight {
 }
 
 #[repr(u8)]
-#[derive(Default, Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum MidiChannel {
     #[default]
@@ -91,7 +91,7 @@ pub enum MidiChannel {
 impl MidiChannel {
     pub fn to_filter(self) -> Option<u8> {
         match self {
-            MidiChannel::All => None,
+            Self::All => None,
             _ => Some(self as u8),
         }
     }

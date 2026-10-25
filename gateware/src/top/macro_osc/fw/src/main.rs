@@ -3,7 +3,7 @@
 #![no_std]
 #![no_main]
 
-use log::info;
+use log::{info, error};
 use riscv_rt::entry;
 use core::cell::RefCell;
 use critical_section::Mutex;
@@ -37,17 +37,18 @@ struct App<'a> {
     ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
 }
 
-impl<'a> App<'a> {
+impl App<'_> {
     pub fn new(opts: Opts) -> Self {
         let mut voice = Voice::new(&HEAP, BLOCK_SIZE);
-        let mut patch = Patch::default();
-
-        patch.engine = 0;
-        patch.harmonics = 0.5;
-        patch.timbre = 0.5;
-        patch.morph = 0.5;
-        patch.timbre_modulation_amount = 0.5;
-        patch.morph_modulation_amount  = 0.5;
+        let patch = Patch {
+            engine: 0,
+            harmonics: 0.5,
+            timbre: 0.5,
+            morph: 0.5,
+            timbre_modulation_amount: 0.5,
+            morph_modulation_amount: 0.5,
+            ..Patch::default()
+        };
         voice.init();
 
         let peripherals = unsafe { pac::Peripherals::steal() };
@@ -67,13 +68,14 @@ impl<'a> App<'a> {
 }
 
 // TODO: move this to hardware as it is quite expensive.
+#[expect(clippy::inline_always)]
 #[inline(always)]
 pub fn f32_to_i32(f: u32) -> i32 {
-    let a = f & !0 >> 1; // Remove sign bit.
+    let a = f & (!0 >> 1); // Remove sign bit.
     if a < 127 << 23 { // >= 0, < 1
         0
     } else if a < 158 << 23 { // >= 1, < max
-        let m = 1 << 31 | a << 8; // Mantissa and the implicit 1-bit.
+        let m = (1 << 31) | (a << 8); // Mantissa and the implicit 1-bit.
         let s = 158 - (a >> 23); // Shift based on the exponent and bias.
         let u = (m >> s) as i32; // Unsigned result.
         if (f as i32) < 0 { -u } else { u }
@@ -116,10 +118,10 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         let mut patch = app.patch.clone();
 
         patch.engine    = opts.osc.engine.value as usize;
-        patch.note      = opts.osc.note.value as f32;
-        patch.harmonics = (opts.osc.harmonics.value as f32) / 256.0f32;
-        patch.timbre    = (opts.osc.timbre.value as f32) / 256.0f32;
-        patch.morph     = (opts.osc.morph.value as f32) / 256.0f32;
+        patch.note      = f32::from(opts.osc.note.value);
+        patch.harmonics = f32::from(opts.osc.harmonics.value) / 256.0f32;
+        patch.timbre    = f32::from(opts.osc.timbre.value) / 256.0f32;
+        patch.morph     = f32::from(opts.osc.morph.value) / 256.0f32;
 
         //
         // Modulation sources from jacks
@@ -135,13 +137,13 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         if note_patched {
             // 1V/oct
-            let v_oct = ((pmod.sample_i0().read().bits() as i16) as f32) / 4000.0f32;
+            let v_oct = f32::from(pmod.sample_i0().read().bits() as i16) / 4000.0f32;
             modulations.note = v_oct * 12.0f32;
         }
 
-        modulations.trigger = ((pmod.sample_i1().read().bits() as i16) as f32) / 16384.0f32;
-        modulations.timbre = ((pmod.sample_i2().read().bits() as i16) as f32) / 16384.0f32;
-        modulations.morph = ((pmod.sample_i3().read().bits() as i16) as f32) / 16384.0f32;
+        modulations.trigger = f32::from(pmod.sample_i1().read().bits() as i16) / 16384.0f32;
+        modulations.timbre = f32::from(pmod.sample_i2().read().bits() as i16) / 16384.0f32;
+        modulations.morph = f32::from(pmod.sample_i3().read().bits() as i16) / 16384.0f32;
 
         //
         // Render audio
@@ -174,7 +176,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 #[entry]
 fn main() -> ! {
 
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
 
     // initialize logging
     let serial = Serial0::new(peripherals.UART0);
@@ -191,7 +193,7 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua MACRO-OSCILLATOR!");
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.expect("invalid bootinfo");
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
@@ -330,7 +332,9 @@ fn main() -> ! {
 
             if save_opts {
                 if let Some(ref mut flash_persist) = flash_persist_opt {
-                    flash_persist.save_options(&opts).unwrap();
+                    if let Err(e) = flash_persist.save_options(&opts) {
+                        error!("failed to save options: {e:?}");
+                    }
                 }
             }
 
@@ -339,7 +343,9 @@ fn main() -> ! {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = Opts::default();
                     if let Some(ref mut flash_persist) = flash_persist_opt {
-                        flash_persist.erase_all().unwrap();
+                        if let Err(e) = flash_persist.erase_all() {
+                            error!("failed to erase options: {e:?}");
+                        }
                     }
                 });
             }
@@ -369,14 +375,12 @@ fn main() -> ! {
             if opts.tracker.page.value == Page::Help {
                 scope.set_enabled(false, false);
                 vscope.set_enabled(false);
+            } else if opts.misc.plot_type.value == PlotType::Vector {
+                scope.set_enabled(false, false);
+                vscope.set_enabled(true);
             } else {
-                if opts.misc.plot_type.value == PlotType::Vector {
-                    scope.set_enabled(false, false);
-                    vscope.set_enabled(true);
-                } else {
-                    scope.set_enabled(true, opts.scope.trig_mode.value == TriggerMode::Always);
-                    vscope.set_enabled(false);
-                }
+                scope.set_enabled(true, opts.scope.trig_mode.value == TriggerMode::Always);
+                vscope.set_enabled(false);
             }
 
             first = false;

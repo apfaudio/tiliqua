@@ -1,5 +1,5 @@
-use tiliqua_hal::delay_line::DelayLine;
-use tiliqua_hal::grain_player::GrainPlayer;
+use crate::delay_line::DelayLine;
+use crate::grain_player::GrainPlayer;
 use crate::options::{ChannelOpts, PlaybackMode};
 use micromath::F32Ext;
 
@@ -31,8 +31,8 @@ impl<G: GrainPlayer> Channel<G> {
             let volts = cv as f32 / 4000.0;
             (256.0 * (2.0f32).powf(volts - 3.0)).clamp(32.0, 1024.0) as u16
         } else if opts.mode.value.gate_stuck() {
-            let t = touch[touch_idx] as u32;
-            (opts.speed.value as u32 * (256 + t) / 256) as u16
+            let t = u32::from(touch[touch_idx]);
+            (u32::from(opts.speed.value) * (256 + t) / 256) as u16
         } else {
             opts.speed.value
         };
@@ -186,10 +186,10 @@ impl ChannelView {
         let stride = self.stride(opts, n_samples);
         self.delayln_read_samples(buf, start_delay, stride);
         // Zero out samples whose delay falls outside the buffer
-        for i in 0..n_samples {
+        for (i, b) in buf.iter_mut().enumerate().take(n_samples) {
             let delay = start_delay as isize - (i as isize * stride as isize);
             if delay < 0 || delay as usize > self.delayln_max_samples {
-                buf[i] = 0;
+                *b = 0;
             }
         }
     }

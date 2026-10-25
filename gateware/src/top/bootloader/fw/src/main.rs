@@ -2,7 +2,7 @@
 #![no_main]
 
 use critical_section::Mutex;
-use log::{info, warn};
+use log::{info, warn, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -12,7 +12,6 @@ use strum_macros::{EnumIter, IntoStaticStr};
 use embedded_hal::delay::DelayNs;
 use embedded_hal::i2c::Operation;
 
-use core::str::FromStr;
 use core::fmt::Write;
 
 use tiliqua_lib::*;
@@ -58,7 +57,9 @@ pub const SPREAD_SPECTRUM_MAX: f32 = 0.0025;
 // firmware versions > beta5
 pub const RP2040_APFBUG_ADDR: u8 = 0x17;
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+const LOGO_LINES_PER_LOOP: usize = 3;
+
+#[derive(Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum BitstreamError {
     InvalidManifest,
@@ -73,6 +74,7 @@ pub enum BitstreamError {
     UsbFileError,
     UsbTooLarge,
     UsbStreamError,
+    BootinfoSerializeError,
 }
 
 struct App {
@@ -80,7 +82,7 @@ struct App {
     pll: Option<Si5351Device<I2c0>>,
     eeprom_manager: EepromManager<I2c1>,
     reboot_n: Option<usize>,
-    error_n: [Option<String<32>>; N_MANIFESTS],
+    error_n: [Option<BitstreamError>; N_MANIFESTS],
     time_since_reboot_requested: u32,
     manifests: [Option<BitstreamManifest>; N_MANIFESTS],
     animation_elapsed_ms: u32,
@@ -119,7 +121,7 @@ impl App {
         use tiliqua_hal::pca9635::Pca9635;
         let animation_end_ms = 500u32;
         if self.animation_elapsed_ms < animation_end_ms {
-            let tau = 6.2832f32;
+            let tau = core::f32::consts::TAU;
             let lerp1: f32 = self.animation_elapsed_ms as f32 / animation_end_ms as f32;
             for n in 0..8 {
                 let lerp2: f32 = n as f32 / 7.0f32;
@@ -137,7 +139,7 @@ impl App {
             self.animation_elapsed_ms += TIMER0_ISR_PERIOD_MS;
             return true;
         }
-        return false;
+        false
     }
 }
 
@@ -165,9 +167,9 @@ where
     let h_active = d.size().width as i32;
     let v_active = d.size().height as i32;
 
-    let countdown_sec = (countdown_ms + 999) / 1000; // Round up
+    let countdown_sec = countdown_ms.div_ceil(1000); // Round up
     let mut countdown_text: String<64> = String::new();
-    write!(countdown_text, "Autoboot {} (slot {}) in {}sec", target, slot, countdown_sec).ok();
+    write!(countdown_text, "Autoboot {target} (slot {slot}) in {countdown_sec}sec").ok();
     Text::with_alignment(
         &countdown_text,
         Point::new(h_active/2, v_active/2 - 135),
@@ -178,8 +180,8 @@ where
 }
 
 fn draw_summary<D>(d: &mut D,
-                   bitstream_manifest: &Option<BitstreamManifest>,
-                   error: &Option<String<32>>,
+                   bitstream_manifest: Option<&BitstreamManifest>,
+                   error: Option<BitstreamError>,
                    startup_report: &String<256>,
                    or: i32, ot: i32, hue: u8)
 where
@@ -189,77 +191,78 @@ where
     let v_active = d.size().height as i32;
     let norm = MonoTextStyle::new(&FONT_9X15, HI8::new(hue, 10));
     if let Some(bitstream) = bitstream_manifest {
-        if let Some(ref help) = bitstream.help {
+        if let Some(help) = &bitstream.help {
             Text::with_alignment(
-                "brief:".into(),
-                Point::new((h_active/2 - 10) as i32 + or, (v_active/2+20) as i32 + ot),
+                "brief:",
+                Point::new((h_active/2 - 10) + or, (v_active/2+20) + ot),
                 norm,
                 Alignment::Right,
             )
             .draw(d).ok();
             Text::with_alignment(
                 &help.brief,
-                Point::new((h_active/2) as i32 + or, (v_active/2+20) as i32 + ot),
+                Point::new((h_active/2) + or, (v_active/2+20) + ot),
                 norm,
                 Alignment::Left,
             )
             .draw(d).ok();
             Text::with_alignment(
-                "video:".into(),
-                Point::new((h_active/2 - 10) as i32 + or, (v_active/2+40) as i32 + ot),
+                "video:",
+                Point::new((h_active/2 - 10) + or, (v_active/2+40) + ot),
                 norm,
                 Alignment::Right,
             )
             .draw(d).ok();
             Text::with_alignment(
                 &help.video,
-                Point::new((h_active/2) as i32 + or, (v_active/2+40) as i32 + ot),
+                Point::new((h_active/2) + or, (v_active/2+40) + ot),
                 norm,
                 Alignment::Left,
             )
             .draw(d).ok();
         }
         Text::with_alignment(
-            "tag:".into(),
-            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+60) as i32 + ot),
+            "tag:",
+            Point::new((h_active/2 - 10) + or, (v_active/2+60) + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
             &bitstream.tag,
-            Point::new((h_active/2) as i32 + or, (v_active/2+60) as i32 + ot),
+            Point::new((h_active/2) + or, (v_active/2+60) + ot),
             norm,
             Alignment::Left,
         )
         .draw(d).ok();
     }
-    if let Some(error_string) = &error {
+    if let Some(error) = error {
+        let error_string: &'static str = error.into();
         Text::with_alignment(
-            "error:".into(),
-            Point::new((h_active/2 - 10) as i32 + or, (v_active/2+80) as i32 + ot),
+            "error:",
+            Point::new((h_active/2 - 10) + or, (v_active/2+80) + ot),
             norm,
             Alignment::Right,
         )
         .draw(d).ok();
         Text::with_alignment(
-            &error_string,
-            Point::new((h_active/2) as i32 + or, (v_active/2+80) as i32 + ot),
+            error_string,
+            Point::new((h_active/2) + or, (v_active/2+80) + ot),
             norm,
             Alignment::Left,
         )
         .draw(d).ok();
     }
     Text::with_alignment(
-        &startup_report,
-        Point::new((h_active/2) as i32, (v_active/2-20) as i32 + ot),
+        startup_report,
+        Point::new(h_active/2, (v_active/2-20) + ot),
         norm,
         Alignment::Center,
     )
     .draw(d).ok();
     Text::with_alignment(
         "Select a bitstream. To return here, hold encoder down for 3sec.",
-        Point::new((h_active/2) as i32, (v_active-180) as i32),
+        Point::new(h_active/2, v_active-180),
         norm,
         Alignment::Center,
     )
@@ -271,50 +274,44 @@ fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device
     pll.init_adafruit_module()?;
     let spread = pll_config.spread_spectrum.map(|s| {
         if s > SPREAD_SPECTRUM_MAX {
-            warn!("si5351/pll: spread_spectrum {} exceeds max {}, clamping", s, SPREAD_SPECTRUM_MAX);
+            warn!("si5351/pll: spread_spectrum {s} exceeds max {SPREAD_SPECTRUM_MAX}, clamping");
             SPREAD_SPECTRUM_MAX
         } else {
             s
         }
     });
-    match pll_config.clk1_hz {
-        Some(clk1_hz) => {
-            info!("si5351/pll: configure for clk0={}Hz, clk1={}Hz", pll_config.clk0_hz, clk1_hz);
-            pll.set_frequencies(
-                PLL::A,
-                &[
-                    ClockOutput::Clk0,
-                    ClockOutput::Clk1,
-                ],
-                &[
-                    pll_config.clk0_hz,
-                    clk1_hz,
-                ],
-                spread)
-        }
-        _ => {
-            info!("si5351/pll: configure for clk0={}Hz, clk1=disabled", pll_config.clk0_hz);
-            pll.set_frequencies(
-                PLL::A,
-                &[
-                    ClockOutput::Clk0,
-                ],
-                &[
-                    pll_config.clk0_hz,
-                ],
-                spread)
-        }
+    if let Some(clk1_hz) = pll_config.clk1_hz {
+        info!("si5351/pll: configure for clk0={}Hz, clk1={}Hz", pll_config.clk0_hz, clk1_hz);
+        pll.set_frequencies(
+            PLL::A,
+            &[
+                ClockOutput::Clk0,
+                ClockOutput::Clk1,
+            ],
+            &[
+                pll_config.clk0_hz,
+                clk1_hz,
+            ],
+            spread)
+    } else {
+        info!("si5351/pll: configure for clk0={}Hz, clk1=disabled", pll_config.clk0_hz);
+        pll.set_frequencies(
+            PLL::A,
+            &[
+                ClockOutput::Clk0,
+            ],
+            &[
+                pll_config.clk0_hz,
+            ],
+            spread)
     }
 }
 
 fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
     // Skip regions without spiflash_src (e.g. during simulation)
-    let spiflash_src = match region.spiflash_src {
-        Some(addr) => addr,
-        None => {
-            info!("Skip region '{}' (no spiflash_src)", region.filename);
-            return Ok(());
-        }
+    let Some(spiflash_src) = region.spiflash_src else {
+        info!("Skip region '{}' (no spiflash_src)", region.filename);
+        return Ok(());
     };
 
     let spiflash_ptr = SPIFLASH_BASE as *mut u32;
@@ -340,15 +337,15 @@ fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), Bitstr
         for i in 0..size_words {
             unsafe {
                 let d = spiflash_ptr.offset(spiflash_offset_words + i).read_volatile();
-                if i != (size_words - 1) {
-                    digest.update(&d.to_le_bytes());
-                } else {
+                if i == (size_words - 1) {
                     digest.update(&d.to_le_bytes()[0..(region.size as usize)%4usize]);
+                } else {
+                    digest.update(&d.to_le_bytes());
                 }
             }
         }
         let crc_result = digest.finalize();
-        info!("got SPI flash crc: {:#x}, manifest wants: {:#x}", crc_result, crc_target);
+        info!("got SPI flash crc: {crc_result:#x}, manifest wants: {crc_target:#x}");
         if crc_result != crc_target {
             return Err(BitstreamError::SpiflashCrcError);
         }
@@ -435,7 +432,7 @@ fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
                 if ctrl.attached_state == AttachedState::AttachedSrc ||
                    (ctrl.attached_state == AttachedState::AttachedAccessory &&
                     conn.accessory == AccessoryType::DebugDfp) {
-                    info!("USB CC attached: {:?} | {:?}", ctrl, conn);
+                    info!("USB CC attached: {ctrl:?} | {conn:?}");
                     break;
                 }
             }
@@ -469,17 +466,17 @@ fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
         info!("USB ready: {} blocks", usb_msc.capacity());
 
         let part_lba = find_first_fat32_lba(&mut usb_msc, stage[0]);
-        info!("FAT32 partition at LBA {}", part_lba);
+        info!("FAT32 partition at LBA {part_lba}");
         let mut view = PartitionView::new(usb_msc, part_lba);
 
         // Turn the file to a FatStream, and do a pure-DMA copy into PSRAM
         let mut stream = {
             let bd = UsbMscBlockDevice::new(&mut view, stage)
-                .map_err(|_| BitstreamError::UsbMountError)?;
+                .map_err(|e| { warn!("usb: block device: {e:?}"); BitstreamError::UsbMountError })?;
             let fs = fatfs::FileSystem::new(bd, fatfs::FsOptions::new())
-                .map_err(|_| BitstreamError::UsbMountError)?;
+                .map_err(|e| { warn!("usb: mount: {e:?}"); BitstreamError::UsbMountError })?;
             let file = fs.root_dir().open_file(&region.filename)
-                .map_err(|_| BitstreamError::UsbFileError)?;
+                .map_err(|e| { warn!("usb: open '{}': {e:?}", region.filename); BitstreamError::UsbFileError })?;
             let size = file.size().ok_or(BitstreamError::UsbFileError)?;
             if size == 0 {
                 return Err(BitstreamError::UsbFileError);
@@ -503,11 +500,11 @@ fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
                 max_chunk_blocks: USB_MSC_MAX_BLOCKS_PER_READ,
                 ring: dst,
                 fat_cache,
-            }).map_err(|_| BitstreamError::UsbStreamError)?
+            }).map_err(|e| { warn!("usb: stream open: {e:?}"); BitstreamError::UsbStreamError })?
         };
 
         // one prefill is the whole copy. no ticks needed
-        stream.prefill(&mut view).map_err(|_| BitstreamError::UsbStreamError)?;
+        stream.prefill(&mut view).map_err(|e| { warn!("usb: stream prefill: {e:?}"); BitstreamError::UsbStreamError })?;
         info!("Copy completed ({} KiB)", stream.bytes_submitted() / 1024);
 
         // TODO: optional CRC? it will be super slow, but maybe we could write
@@ -559,7 +556,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         if app.ui.opts.tracker.modify {
             if let Some(n) = app.ui.opts.tracker.selected {
-                app.reboot_n = Some(n)
+                app.reboot_n = Some(n);
             }
         }
 
@@ -633,7 +630,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                             }
                         }
                         // Place BootInfo at the end of PSRAM
-                        unsafe { bootinfo.to_addr(BOOTINFO_BASE).expect("Failed to serialize BootInfo") };
+                        unsafe { bootinfo.to_addr(BOOTINFO_BASE) }.ok_or(BitstreamError::BootinfoSerializeError)?;
                         riscv::asm::fence();
                         riscv::asm::fence_i();
                         Ok(())
@@ -646,8 +643,9 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                     app.ui.opts.tracker.modify = false;
                     app.reboot_n = None;
                     app.time_since_reboot_requested = 0;
-                    app.error_n[n] = Some(String::from_str(bitstream_error.into()).unwrap());
-                    info!("Failed to load bitstream: {:?}", app.error_n[n]);
+                    app.error_n[n] = Some(bitstream_error);
+                    let error_string: &'static str = bitstream_error.into();
+                    info!("Failed to load bitstream: {error_string}");
                     // Clear the autoboot flag, as it's possible an error occurred after
                     // the autoboot flag was set (during/after PLL reconfiguration).
                     let config = EepromConfig { last_boot_slot: None };
@@ -671,15 +669,15 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                         warn!("apfbug/rp2040: i2c reconfig request NAK (apfbug <= beta5?)");
                     }
                     // Older apfbug/rp2040: issue UART reconfig request
-                    info!("Enter BITSTREAM{}\n\r", n);
-                    loop {}
+                    info!("Enter BITSTREAM{n}\n\r");
+                    loop { core::hint::spin_loop(); }
                 }
             }
         }
     });
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr)]
+#[derive(Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum StartupWarning {
     #[strum(to_string = "ak4619/codec: issued hard reset (to avoid: remove display when unpowered)")]
@@ -707,9 +705,9 @@ where
         CODEC_ADDR, &mut [Operation::Write(&[0u8]),
                           Operation::Read(&mut rx_bytes)]);
     if ret.is_err() || rx_bytes[0] != 0x37 {
-        warn!("ak4619/codec: needs hard reset. transaction returned: {:?}.", ret);
-        for n in 0usize..4usize {
-            warn!("ak4619: @{}:0x{:x}", n, rx_bytes[n]);
+        warn!("ak4619/codec: needs hard reset. transaction returned: {ret:?}.");
+        for (n, b) in rx_bytes.iter().enumerate() {
+            warn!("ak4619: @{n}:0x{b:x}");
         }
         warn!("ak4619/codec: issuing hard PDN reset ...");
         pmod.hard_reset();
@@ -730,31 +728,25 @@ where
     let prefix = "cy8cmbr3xxx/touch: ";
     info!("{}n_working_sensors={:?}", prefix, dev.read_n_working_sensors());
     let stored = dev.get_stored_crc();
-    match stored {
-        Ok(stored) => {
-            let desired = dev.calculate_crc();
-            info!("{}CRC stored={:#x} (desired={:#x})", prefix, stored, desired);
-            if stored == desired {
-                info!("{}CRC OK", prefix);
-                return Ok(());
+    if let Ok(stored) = stored {
+        let desired = dev.calculate_crc();
+        info!("{prefix}CRC stored={stored:#x} (desired={desired:#x})");
+        if stored == desired {
+            info!("{prefix}CRC OK");
+            Ok(())
+        } else {
+            warn!("{prefix}CRC NOT OK, reprogramming ...");
+            if dev.reprogram_nvm_and_reset().is_ok() {
+                warn!("{prefix}reprogramming DONE ...");
+                Err(StartupWarning::TouchNvmReprogrammed)
             } else {
-                warn!("{}CRC NOT OK, reprogramming ...", prefix);
-                match dev.reprogram_nvm_and_reset() {
-                    Ok(_) => {
-                        warn!("{}reprogramming DONE ...", prefix);
-                        Err(StartupWarning::TouchNvmReprogrammed)
-                    },
-                    _ => {
-                        warn!("{}reprogramming FAILED ...", prefix);
-                        Err(StartupWarning::TouchNvmReprogramFailed)
-                    }
-                }
+                warn!("{prefix}reprogramming FAILED ...");
+                Err(StartupWarning::TouchNvmReprogramFailed)
             }
-        },
-        _ => {
-            warn!("{}NAK error (jack2 connected?) ignoring ...", prefix);
-            Err(StartupWarning::TouchNak)
         }
+    } else {
+        warn!("{prefix}NAK error (jack2 connected?) ignoring ...");
+        Err(StartupWarning::TouchNak)
     }
 }
 
@@ -765,7 +757,7 @@ fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
     const EDID_READ_ATTEMPTS: usize = 3;
     let mut read_attempts = 0;
     loop {
-        info!("video/edid: read_edid from i2c0 address 0x{:x}", EDID_ADDR);
+        info!("video/edid: read_edid from i2c0 address 0x{EDID_ADDR:x}");
         let mut edid: [u8; 128] = [0; 128];
         for i in 0..16 {
             // WARN: be careful these transactions are not interrupted, because
@@ -774,7 +766,7 @@ fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
                                                 Operation::Read(&mut edid[i*8..i*8+8])]).ok();
         }
         let edid = edid::Edid::parse(&edid);
-        info!("video/edid: (attempt {}) read_edid got {:?}", read_attempts, edid);
+        info!("video/edid: (attempt {read_attempts}) read_edid got {edid:?}");
         match edid {
             Ok(edid_parsed) => return Ok(edid_parsed),
             Err(error) => {
@@ -788,16 +780,16 @@ fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
     }
 }
 
-fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
+fn modeline_from_edid(edid: &edid::Edid) -> Option<DVIModeline> {
 
     // Read the EDID contents and see if we can use it to dynamically create a
     // sensible modeline. If we can't fine a reasonable descriptor, we return
     // None and assumably the caller falls back to some default modeline.
 
     info!("video/edid: valid edid. scanning detailed timing descriptors...");
-    for descriptor in edid.descriptors.iter() {
+    for descriptor in &edid.descriptors {
         if let edid::Descriptor::DetailedTiming(desc) = descriptor {
-            info!("video/edid: checking detailed timing descriptor, contents: {:?}", descriptor);
+            info!("video/edid: checking detailed timing descriptor, contents: {descriptor:?}");
             if desc.pixel_clock_khz < PIXEL_CLK_MIN_KHZ || desc.pixel_clock_khz > PIXEL_CLK_MAX_KHZ {
                 warn!("video/edid: skip descriptor (out-of-range pixel clock)");
                 continue;
@@ -807,11 +799,12 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
                 continue;
             }
             if let edid::SyncType::DigitalSeparate { vsync_positive, hsync_positive } = desc.features.sync_type {
-                let mut rotate = Rotate::Normal;
-                if edid.header.product_code == 0x3132 || edid.header.product_code == 0xAA61 {
+                let rotate = if edid.header.product_code == 0x3132 || edid.header.product_code == 0xAA61 {
                     info!("video/edid: detected tiliqua screen! rotate framebuffer 90 degrees.");
-                    rotate = Rotate::Left;
-                }
+                    Rotate::Left
+                } else {
+                    Rotate::Normal
+                };
                 let modeline = DVIModeline {
                     h_active      : desc.horizontal_active,
                     h_sync_start  : desc.horizontal_active +
@@ -834,12 +827,10 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
                     pixel_clk_mhz : (desc.pixel_clock_khz as f32) / 1e3f32,
                     rotate
                 };
-                info!("video/edid: found useable modeline, returning: {:?}", modeline);
+                info!("video/edid: found useable modeline, returning: {modeline:?}");
                 return Some(modeline)
-            } else {
-                warn!("video/edid: skip descriptor (unknown sync format)");
-                continue;
             }
+            warn!("video/edid: skip descriptor (unknown sync format)");
         }
     }
     None
@@ -848,10 +839,7 @@ fn modeline_from_edid(edid: edid::Edid) -> Option<DVIModeline> {
 fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
     if FIXED_MODELINE.is_none() {
         match read_edid(i2cdev) {
-            Ok(edid) => match modeline_from_edid(edid) {
-                Some(edid_modeline) => edid_modeline,
-                _ => DVIModeline::default()
-            }
+            Ok(edid) => modeline_from_edid(&edid).unwrap_or_default(),
             _ => DVIModeline::default()
         }
     } else {
@@ -861,7 +849,7 @@ fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
 
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
@@ -881,37 +869,37 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua bootloader!");
 
-    let mut startup_report: String<256> = Default::default();
+    let mut startup_report: String<256> = String::new();
 
     // Check if we already started any bitstreams by checking if we already wrote
     // something to the PSRAM for client bitstreams. Warm/Cold boots have different
     // autoboot behavior, this is used to distinguish between them.
 
     let cold_boot = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.is_none();
-    info!("cold_boot: {}", cold_boot);
+    info!("cold_boot: {cold_boot}");
 
     // Read autoboot flag and maybe configure us to start an autoboot countdown by
     // setting 'autoboot_to'.
 
     let mut autoboot_to: Option<usize> = None;
     let mut eeprom_manager = EepromManager::new(unsafe{I2c1::summon()});
-    if !cold_boot {
-        // Warm boot: Clear the autoboot flag.
-        let config = EepromConfig { last_boot_slot: None };
-        eeprom_manager.write_config(&config).ok();
-    } else {
+    if cold_boot {
         // Cold boot: Check the autoboot flag and boot
         match eeprom_manager.read_config() {
             Ok(config) => {
-                log::info!("EepromConfig.read_config() wants: {:?}", config);
+                log::info!("EepromConfig.read_config() wants: {config:?}");
                 if let Some(slot) = config.last_boot_slot {
                     autoboot_to = Some(slot as usize);
                 }
             },
             Err(e) => {
-                log::warn!("EepromConfig.read_config() failed: {:?}", e);
+                log::warn!("EepromConfig.read_config() failed: {e:?}");
             }
         }
+    } else {
+        // Warm boot: Clear the autoboot flag.
+        let config = EepromConfig { last_boot_slot: None };
+        eeprom_manager.write_config(&config).ok();
     }
 
     // Verify/reprogram touch sensing NVM
@@ -928,7 +916,7 @@ fn main() -> ! {
         let mut cy8 = Cy8cmbr3108Driver::new(unsafe{I2c1::summon()}, &TOUCH_SENSOR_ORDER);
         if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
             let s: &'static str = e.into();
-            write!(startup_report, "{}\r\n", s).ok();
+            write!(startup_report, "{s}\r\n").ok();
         }
     }
 
@@ -955,13 +943,19 @@ fn main() -> ! {
     let maybe_external_pll = if USE_EXTERNAL_PLL {
         let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
-        configure_external_pll(&ExternalPLLConfig{
+        match configure_external_pll(&ExternalPLLConfig{
             clk0_hz: CLOCK_AUDIO_HZ,
             clk1_hz: Some((modeline.pixel_clk_mhz*1e6) as u32),
             clk1_inherit: false,
             spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
-        }, &mut si5351drv).unwrap();
-        Some(si5351drv)
+        }, &mut si5351drv) {
+            Ok(()) => Some(si5351drv),
+            Err(e) => {
+                error!("failed to configure external PLL: {e:?}");
+                write!(startup_report, "EXTERNAL-PLL-INIT-ERROR\r\n").ok();
+                None
+            }
+        }
     } else {
         None
     };
@@ -971,18 +965,18 @@ fn main() -> ! {
     let mut i2cdev1 = I2c1::new(peripherals.I2C1);
     if let Err(e) = maybe_restart_codec(&mut i2cdev1, &mut pmod) {
         let s: &'static str = e.into();
-        write!(startup_report, "{}\r\n", s).ok();
+        write!(startup_report, "{s}\r\n").ok();
     }
     calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
 
     // Load serialized JSON manifests from spiflash
 
     let mut manifests: [Option<BitstreamManifest>; 8] = [const { None }; 8];
-    for n in 0usize..N_MANIFESTS {
+    for (n, manifest) in manifests.iter_mut().enumerate().take(N_MANIFESTS) {
         let size: usize = MANIFEST_SIZE;
         let addr: usize = SPIFLASH_BASE + MANIFEST_OFFSET + (n+1)*SLOT_SIZE;
         info!("(entry {}) look for manifest from {:#x} to {:#x}", n, addr, addr+size);
-        manifests[n] = unsafe { BitstreamManifest::from_addr(addr, size) };
+        *manifest = unsafe { BitstreamManifest::from_addr(addr, size) };
     }
 
     let mut opts = Opts::default();
@@ -1034,7 +1028,7 @@ fn main() -> ! {
 
         palette::ColorPalette::default().write_to_hardware(&mut display);
 
-        log::info!("{}", startup_report);
+        log::info!("{startup_report}");
 
         s.register(handlers::Interrupt::TIMER0, timer0);
         timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
@@ -1064,10 +1058,12 @@ fn main() -> ! {
                     // Rising edge of DVI HPD
                     info!("video/hpd: display reconnected!");
                     let new_modeline = modeline_or_fallback(&mut i2cdev_edid);
-                    info!("video/hpd: modeline was {:?}", modeline);
-                    info!("video/hpd: modeline infer {:?}", new_modeline);
+                    info!("video/hpd: modeline was {modeline:?}");
+                    info!("video/hpd: modeline infer {new_modeline:?}");
                     let mut reprogrammed_pll = false;
-                    if new_modeline != modeline {
+                    if new_modeline == modeline {
+                        info!("video/hpd: display inferred same modeline as previous. do nothing");
+                    } else {
                         info!("video/hpd: display inferred different modeline to previous. switching timings...");
                         if let Some(ref mut external_pll) = app.pll {
                             // Hold DVI PHY in reset before touching the video PLL
@@ -1078,16 +1074,16 @@ fn main() -> ! {
                             // the audio clock. This might be important to separate if we decide
                             // to support dynamic hotplug timings in user bitstreams where
                             // we want the audio streams to not be interrupted.
-                            configure_external_pll(&ExternalPLLConfig{
+                            if let Err(e) = configure_external_pll(&ExternalPLLConfig{
                                 clk0_hz: CLOCK_AUDIO_HZ,
                                 clk1_hz: Some((new_modeline.pixel_clk_mhz*1e6) as u32),
                                 clk1_inherit: false,
                                 spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
-                            }, external_pll).unwrap();
+                            }, external_pll) {
+                                error!("failed to reconfigure external PLL: {e:?}");
+                            }
                             reprogrammed_pll = true;
                         }
-                    } else {
-                        info!("video/hpd: display inferred same modeline as previous. do nothing");
                     }
 
                     if reprogrammed_pll {
@@ -1105,8 +1101,8 @@ fn main() -> ! {
                 //
 
                 (app.ui.opts.clone(),
-                 app.reboot_n.clone(),
-                 app.error_n.clone(),
+                 app.reboot_n,
+                 app.error_n,
                  app.modeline.clone(),
                  app.autoboot_countdown_ms)
             });
@@ -1118,15 +1114,15 @@ fn main() -> ! {
 
 
             if let Some(n) = opts.tracker.selected {
-                draw_summary(&mut display, &manifests[n], &error_n[n], &startup_report, -20, -110, 0);
-                if let Some(ref manifest) = manifests[n] {
-                    if let Some(ref help) = manifest.help {
+                draw_summary(&mut display, manifests[n].as_ref(), error_n[n], &startup_report, -20, -110, 0);
+                if let Some(manifest) = &manifests[n] {
+                    if let Some(help) = &manifest.help {
                         draw::draw_tiliqua(&mut display,
                             (h_active/2+30) as i32,
                             (v_active/2-40) as i32,
                             0,
-                            help.io_left.each_ref().map(|s| s.as_str()),
-                            help.io_right.each_ref().map(|s| s.as_str())
+                            help.io_left.each_ref().map(heapless::string::StringInner::as_str),
+                            help.io_right.each_ref().map(heapless::string::StringInner::as_str)
                         ).ok();
                     }
                 }
@@ -1136,16 +1132,15 @@ fn main() -> ! {
                           .draw(&mut display).ok();
             }
 
-            const LINES_PER_LOOP: usize = 3;
-            for _ in 0..LINES_PER_LOOP {
+            for _ in 0..LOGO_LINES_PER_LOOP {
                 let _ = draw::draw_boot_logo(&mut display,
                                              (h_active/2) as i32,
-                                             130 as i32,
+                                             130,
                                              logo_coord_ix);
                 logo_coord_ix += 1;
             }
 
-            if let Some(_) = reboot_n {
+            if reboot_n.is_some() {
                 print_rebooting(&mut display, &mut rng);
             }
 

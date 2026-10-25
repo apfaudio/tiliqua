@@ -3,7 +3,7 @@ use strum_macros::{EnumIter, IntoStaticStr};
 use serde_derive::{Serialize, Deserialize};
 pub use tiliqua_lib::scope::{Timebase, VScale};
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "SCREAMING-KEBAB-CASE")]
 pub enum Page {
     #[default]
@@ -17,7 +17,7 @@ pub enum Page {
     Misc,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum TriggerMode {
     Always,
@@ -25,7 +25,7 @@ pub enum TriggerMode {
     Rising,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Wave {
     #[default]
@@ -35,7 +35,7 @@ pub enum Wave {
     Noise,
 }
 
-#[derive(Clone, Copy, PartialEq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr, Default, Serialize, Deserialize)]
 #[strum(serialize_all = "kebab-case")]
 pub enum ModulationTarget {
     #[default]
@@ -57,8 +57,8 @@ pub enum VoiceModulationType {
 
 impl ModulationTarget {
     pub fn modulates_voice(&self, n: usize) -> Option<VoiceModulationType> {
-        use ModulationTarget::*;
-        use VoiceModulationType::*;
+        use ModulationTarget::{Freq1, Freq2, Freq3, Freq12, Gate1, Gate2, Gate3, Gate12};
+        use VoiceModulationType::{Frequency, Gate};
         match (n, *self) {
             (0, Freq1)  => Some(Frequency),
             (1, Freq2)  => Some(Frequency),

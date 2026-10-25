@@ -214,7 +214,7 @@ macro_rules! impl_spiflash {
                             self.registers
                                 .data()
                                 .write(|w| unsafe { w.tx().bits(*byte as u32) });
-                            bytes_in_fifo = bytes_in_fifo + 1;
+                            bytes_in_fifo += 1;
                         }
                         if bytes_in_fifo >= SPIFLASH_FIFO_LEN {
                             for n in 0..bytes_in_fifo {

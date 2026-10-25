@@ -2,7 +2,7 @@
 #![no_main]
 
 use critical_section::Mutex;
-use log::info;
+use log::{info, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
@@ -49,19 +49,19 @@ impl App {
 }
 
 fn volts_to_freq(volts: f32) -> f32 {
-    let a3_freq_hz: f32 = 440.0f32;
+    let a3_freq_hz = 440.0f32;
     (a3_freq_hz / 2.0f32) * (2.0f32).powf(volts + 2.0f32 - 3.0f32/4.0f32)
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
-    use tiliqua_fw::options::{VoiceOpts, ModulationTarget, VoiceModulationType};
+    use tiliqua_fw::options::{VoiceOpts, ModulationTarget, VoiceModulationType, Wave};
 
     let peripherals = unsafe { pac::Peripherals::steal() };
     let sid = peripherals.SID_PERIPH;
-    let sid_poke = |_sid: &pac::SID_PERIPH, addr: u8, data: u8| {
-        _sid.transaction_data().write(
-            |w| unsafe { w.transaction_data().bits(((data as u16) << 5) | (addr as u16)) } );
+    let sid_poke = |regs: &pac::SID_PERIPH, addr: u8, data: u8| {
+        regs.transaction_data().write(
+            |w| unsafe { w.transaction_data().bits((u16::from(data) << 5) | u16::from(addr)) } );
     };
 
     let (mut opts, x) = critical_section::with(|cs| {
@@ -70,7 +70,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         (app.ui.opts.clone(), app.ui.pmod.sample_i())
     });
 
-    let voices: [&mut VoiceOpts; 3] = [
+    let mut voices: [&mut VoiceOpts; 3] = [
         &mut opts.voice1,
         &mut opts.voice2,
         &mut opts.voice3,
@@ -83,21 +83,21 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         opts.modulate.in3.value,
     ];
 
-    for n_voice in 0usize..3usize {
+    for (n_voice, voice) in voices.iter_mut().enumerate() {
         let base = (7*n_voice) as u8;
 
         // MODULATION
-        let mut freq: u16 = voices[n_voice].freq.value;
-        let mut gate = voices[n_voice].gate.value;
+        let mut freq: u16 = voice.freq.value;
+        let mut gate = voice.gate.value;
 
         for (ch, m) in mods.iter().enumerate() {
-            if let Some(VoiceModulationType::Frequency) = m.modulates_voice(n_voice) {
+            if matches!(m.modulates_voice(n_voice), Some(VoiceModulationType::Frequency)) {
                 let volts: f32 = (x[ch] as f32) / 4096.0f32;
                 let freq_hz = volts_to_freq(volts);
                 freq = 16u16 * (0.05960464f32 * freq_hz) as u16; // assumes 1Mhz SID clk
                                                                  // http://www.sidmusic.org/sid/sidtech2.html
             }
-            if let Some(VoiceModulationType::Gate) = m.modulates_voice(n_voice) {
+            if matches!(m.modulates_voice(n_voice), Some(VoiceModulationType::Gate)) {
                 if x[ch] > 2000 {
                     gate = 1;
                 }
@@ -109,20 +109,19 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         // Propagate modulation back to menu system
 
-        voices[n_voice].freq.value = freq;
-        voices[n_voice].gate.value = gate;
+        voice.freq.value = freq;
+        voice.gate.value = gate;
 
-        freq = (freq as f32 * (voices[n_voice].freq_os.value as f32 / 1000.0f32)) as u16;
+        freq = (f32::from(freq) * (f32::from(voice.freq_os.value) / 1000.0f32)) as u16;
 
-        sid_poke(&sid, base+0, freq as u8);
+        sid_poke(&sid, base, freq as u8);
         sid_poke(&sid, base+1, (freq>>8) as u8);
 
-        sid_poke(&sid, base+2, voices[n_voice].pw.value as u8);
-        sid_poke(&sid, base+3, (voices[n_voice].pw.value>>8) as u8);
+        sid_poke(&sid, base+2, voice.pw.value as u8);
+        sid_poke(&sid, base+3, (voice.pw.value>>8) as u8);
 
         let mut reg04 = 0u8;
-        use crate::options::Wave;
-        match voices[n_voice].wave.value {
+        match voice.wave.value {
             Wave::Triangle => { reg04 |= 0x10; }
             Wave::Saw      => { reg04 |= 0x20; }
             Wave::Pulse    => { reg04 |= 0x40; }
@@ -130,34 +129,34 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         }
 
         reg04 |= gate;
-        reg04 |= voices[n_voice].sync.value << 1;
-        reg04 |= voices[n_voice].ring.value << 2;
+        reg04 |= voice.sync.value << 1;
+        reg04 |= voice.ring.value << 2;
 
         sid_poke(&sid, base+4, reg04);
 
         sid_poke(&sid, base+5,
-            voices[n_voice].decay.value |
-            (voices[n_voice].attack.value << 4));
+            voice.decay.value |
+            (voice.attack.value << 4));
 
         sid_poke(&sid, base+6,
-            voices[n_voice].release.value |
-            (voices[n_voice].sustain.value << 4));
+            voice.release.value |
+            (voice.sustain.value << 4));
     }
 
     sid_poke(&sid, 0x15, (opts.filter.cutoff.value & 0x7) as u8);
     sid_poke(&sid, 0x16, (opts.filter.cutoff.value >> 3) as u8);
     sid_poke(&sid, 0x17,
-        (opts.filter.filt1.value |
+        opts.filter.filt1.value |
         (opts.filter.filt2.value << 1) |
         (opts.filter.filt3.value << 2) |
-        (opts.filter.reso.value  << 4)) as u8
+        (opts.filter.reso.value  << 4)
         );
     sid_poke(&sid, 0x18,
-        ((opts.filter.lp.value     << 4) |
+        (opts.filter.lp.value     << 4) |
          (opts.filter.bp.value     << 5) |
          (opts.filter.hp.value     << 6) |
          (opts.filter.v3off.value  << 7) |
-         (opts.filter.volume.value << 0)) as u8
+         opts.filter.volume.value
         );
 
     critical_section::with(|cs| {
@@ -173,7 +172,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
 #[entry]
 fn main() -> ! {
-    let peripherals = pac::Peripherals::take().unwrap();
+    let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
 
     let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
@@ -189,7 +188,7 @@ fn main() -> ! {
 
     info!("Hello from Tiliqua SID!");
 
-    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.unwrap();
+    let bootinfo = unsafe { bootinfo::BootInfo::from_addr(BOOTINFO_BASE) }.expect("invalid bootinfo");
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
@@ -239,7 +238,9 @@ fn main() -> ! {
 
             if save_opts {
                 if let Some(ref mut flash_persist) = flash_persist_opt {
-                    flash_persist.save_options(&opts).unwrap();
+                    if let Err(e) = flash_persist.save_options(&opts) {
+                        error!("failed to save options: {e:?}");
+                    }
                 }
             }
 
@@ -248,7 +249,9 @@ fn main() -> ! {
                     let mut app = app.borrow_ref_mut(cs);
                     app.ui.opts = options::Opts::default();
                     if let Some(ref mut flash_persist) = flash_persist_opt {
-                        flash_persist.erase_all().unwrap();
+                        if let Err(e) = flash_persist.erase_all() {
+                            error!("failed to erase options: {e:?}");
+                        }
                     }
                 });
             }
@@ -312,32 +315,32 @@ fn main() -> ! {
 
                     Text::new(
                         "out3: combined, post-filter",
-                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                                   (opts.scope.ypos0.value + vc + 50) as i32),
+                        Point::new(i32::from(opts.scope.xpos.value + hc - 250),
+                                   i32::from(opts.scope.ypos0.value + vc + 50)),
                         font_small_white,
                     )
                     .draw(&mut display).ok();
 
                     Text::new(
                         "out0: voice 1, post-VCA",
-                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                                   (opts.scope.ypos1.value + vc + 50) as i32),
+                        Point::new(i32::from(opts.scope.xpos.value + hc - 250),
+                                   i32::from(opts.scope.ypos1.value + vc + 50)),
                         font_small_white,
                     )
                     .draw(&mut display).ok();
 
                     Text::new(
                         "out1: voice 2, post-VCA",
-                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                                   (opts.scope.ypos2.value + vc + 50) as i32),
+                        Point::new(i32::from(opts.scope.xpos.value + hc - 250),
+                                   i32::from(opts.scope.ypos2.value + vc + 50)),
                         font_small_white,
                     )
                     .draw(&mut display).ok();
 
                     Text::new(
                         "out2: voice 3, post-VCA",
-                        Point::new((opts.scope.xpos.value + hc - 250) as i32,
-                                   (opts.scope.ypos3.value + vc + 50) as i32),
+                        Point::new(i32::from(opts.scope.xpos.value + hc - 250),
+                                   i32::from(opts.scope.ypos3.value + vc + 50)),
                         font_small_white,
                     )
                     .draw(&mut display).ok();
