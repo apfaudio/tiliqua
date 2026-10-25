@@ -15,5 +15,6 @@ hal::impl_vector! {
 }
 
 tiliqua_lib::impl_handlers!(Serial0, Timer0);
+tiliqua_lib::impl_tick!(Clint);
 
 pub mod options;
