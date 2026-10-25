@@ -530,8 +530,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                 // Encoder was touched during countdown, cancel autoboot, clear flag for next boot.
                 app.autoboot_slot = None;
                 app.autoboot_countdown_ms = 0;
-                let config = EepromConfig { last_boot_slot: None };
-                app.eeprom_manager.write_config(&config).ok();
             } else if app.autoboot_countdown_ms > 0 {
                 // Autoboot is configured, continue countdown
                 app.autoboot_countdown_ms = app.autoboot_countdown_ms.saturating_sub(TIMER0_ISR_PERIOD_MS);
@@ -1108,6 +1106,12 @@ fn main() -> ! {
                 }
 
                 last_hpd = display.get_hpd();
+
+                if autoboot_to.is_some() && app.autoboot_slot.is_none() {
+                    autoboot_to = None;
+                    let config = EepromConfig { last_boot_slot: None };
+                    app.eeprom_manager.write_config(&config).ok();
+                }
 
                 if let Some(n) = app.reboot_n {
                     // Give codec time to mute and display time to draw 'REBOOTING'
