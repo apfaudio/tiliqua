@@ -61,7 +61,7 @@ macro_rules! impl_handlers {
 
             #[export_name = "DefaultHandler"]
             fn default_isr_handler() {
-                let timer = unsafe { <$timer>::summon() };
+                let timer = unsafe { <$timer>::steal_irq() };
                 if timer.is_pending() {
                     unsafe { TIMER0(); }
                     timer.clear_pending();

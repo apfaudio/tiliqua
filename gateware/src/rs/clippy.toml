@@ -1,1 +1,5 @@
 allow-unwrap-in-tests = true
+disallowed-methods = [
+    { path = "tiliqua_pac::Peripherals::steal", reason = "take peripherals once in main and pass them in", allow-invalid = true },
+    { path = "tiliqua_pac::Periph::steal", reason = "take peripherals once in main and pass them in", allow-invalid = true },
+]

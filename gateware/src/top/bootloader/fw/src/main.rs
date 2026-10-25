@@ -37,6 +37,8 @@ use tiliqua_lib::color::HI8;
 use tiliqua_fw::options::*;
 use hal::pca9635::Pca9635Driver;
 use hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState, AccessoryType};
+use hal::i2c::{I2cBus, I2cDevice};
+use static_cell::StaticCell;
 use guh_dma::DmaBuf;
 use guh_usb_msc::fat_stream::{FatStream, StreamConfig};
 use guh_usb_msc::partition::find_first_fat32_lba;
@@ -77,10 +79,15 @@ pub enum BitstreamError {
     BootinfoSerializeError,
 }
 
+static I2C0_BUS: StaticCell<I2cBus<I2c0>> = StaticCell::new();
+static I2C1_BUS: StaticCell<I2cBus<I2c1>> = StaticCell::new();
+
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
-    pll: Option<Si5351Device<I2c0>>,
-    eeprom_manager: EepromManager<I2c1>,
+    ui: ui::UI<Encoder0, EurorackPmod0, I2cDevice<'static, I2c0>, Opts>,
+    pll: Option<Si5351Device<I2cDevice<'static, I2c0>>>,
+    eeprom_manager: EepromManager<I2cDevice<'static, I2c1>>,
+    i2c0: &'static I2cBus<I2c0>,
+    usb: UsbHost,
     reboot_n: Option<usize>,
     error_n: [Option<BitstreamError>; N_MANIFESTS],
     time_since_reboot_requested: u32,
@@ -92,30 +99,6 @@ struct App {
 }
 
 impl App {
-    pub fn new(opts: Opts, manifests: [Option<BitstreamManifest>; N_MANIFESTS],
-               pll: Option<Si5351Device<I2c0>>, modeline: DVIModeline, autoboot_slot: Option<usize>, 
-               eeprom_manager: EepromManager<I2c1>) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-        Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
-            pll,
-            eeprom_manager,
-            reboot_n: None,
-            error_n: [const { None }; N_MANIFESTS],
-            time_since_reboot_requested: 0u32,
-            manifests,
-            animation_elapsed_ms: 0u32,
-            modeline,
-            autoboot_slot,
-            autoboot_countdown_ms: if autoboot_slot.is_some() { 5000 } else { 0 },
-        }
-    }
-
     // Return 'true' while startup LED animation is in progress.
     pub fn startup_animation(&mut self) -> bool {
         use tiliqua_hal::pca9635::Pca9635;
@@ -269,7 +252,7 @@ where
     .draw(d).ok();
 }
 
-fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device<I2c0>)
+fn configure_external_pll(pll_config: &ExternalPLLConfig, pll: &mut Si5351Device<impl I2c>)
     -> Result<(), tiliqua_hal::si5351::Error> {
     pll.init_adafruit_module()?;
     let spread = pll_config.spread_spectrum.map(|s| {
@@ -379,6 +362,12 @@ fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), Bitstr
 }
 
 
+struct UsbHost {
+    vbus: pac::USB_VBUS,
+    tusb322: TUSB322Driver<I2cDevice<'static, I2c0>>,
+    msc: UsbMsc0,
+}
+
 /// Copy `region.filename` off a USB drive to `region.psram_dst`.
 ///
 /// However fragmented the file might be on disk, it gets flattened out and
@@ -394,8 +383,9 @@ fn validate_and_copy_spiflash_region(region: &MemoryRegion) -> Result<(), Bitstr
 /// no device is present and show an error on the screen, so some diagnosis
 /// is still possible without looking at the detailed serial logs...
 ///
-fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
+fn load_usb_region(region: &MemoryRegion, usb: &mut UsbHost) -> Result<(), BitstreamError> {
     const CHUNK_BYTES: u32 = USB_MSC_MAX_BLOCKS_PER_READ * BLOCK_BYTES as u32;
+    let UsbHost { vbus, tusb322, msc: usb_msc } = usb;
 
     let psram_dst = region.psram_dst.ok_or(BitstreamError::InvalidManifest)?;
     if psram_dst % BLOCK_BYTES as u32 != 0 {
@@ -416,8 +406,6 @@ fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
         DmaBuf::from_raw_parts(scratch.add(2*CHUNK_BYTES as usize), CHUNK_BYTES as usize) };
 
     // Put CC control chip in host mode
-    let vbus = unsafe { pac::USB_VBUS::steal() };
-    let mut tusb322 = TUSB322Driver::new(I2c0::new(unsafe { pac::I2C0::steal() }));
     tusb322.soft_reset().ok();
     tusb322.set_mode(TUSB322Mode::Dfp).ok();
 
@@ -449,7 +437,6 @@ fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
         vbus.flags().write(|w| w.en().bit(true));
 
         // Wait for it to enumerate
-        let mut usb_msc = unsafe { UsbMsc0::new(pac::USB_MSC::steal(), PSRAM_BASE as u32) };
         let mut waited = 0u32;
         while !usb_msc.is_ready() {
             riscv::asm::delay(1_000_000);
@@ -465,9 +452,9 @@ fn load_usb_region(region: &MemoryRegion) -> Result<(), BitstreamError> {
         }
         info!("USB ready: {} blocks", usb_msc.capacity());
 
-        let part_lba = find_first_fat32_lba(&mut usb_msc, stage[0]);
+        let part_lba = find_first_fat32_lba(usb_msc, stage[0]);
         info!("FAT32 partition at LBA {part_lba}");
-        let mut view = PartitionView::new(usb_msc, part_lba);
+        let mut view = PartitionView::new(&mut *usb_msc, part_lba);
 
         // Turn the file to a FatStream, and do a pure-DMA copy into PSRAM
         let mut stream = {
@@ -543,8 +530,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
                 // Encoder was touched during countdown, cancel autoboot, clear flag for next boot.
                 app.autoboot_slot = None;
                 app.autoboot_countdown_ms = 0;
-                let config = EepromConfig { last_boot_slot: None };
-                app.eeprom_manager.write_config(&config).ok();
             } else if app.autoboot_countdown_ms > 0 {
                 // Autoboot is configured, continue countdown
                 app.autoboot_countdown_ms = app.autoboot_countdown_ms.saturating_sub(TIMER0_ISR_PERIOD_MS);
@@ -560,121 +545,128 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             }
         }
 
-        if let Some(n) = app.reboot_n {
+        if app.reboot_n.is_some() {
             app.time_since_reboot_requested += TIMER0_ISR_PERIOD_MS;
-            // Give codec time to mute and display time to draw 'REBOOTING'
-            if app.time_since_reboot_requested > 250 {
-                // Is there a firmware image to copy to PSRAM before we switch bitstreams?
-                let error = if let Some(manifest) = &app.manifests[n].clone() {
-                    || -> Result<(), BitstreamError> {
-                        if manifest.magic != MANIFEST_MAGIC {
-                            Err(BitstreamError::InvalidManifest)?;
-                        }
-                        if manifest.hw_rev != HW_REV_MAJOR {
-                            Err(BitstreamError::HwVersionMismatch)?;
-                        }
-                        // BootInfo structure placed at the end of PSRAM
-                        let mut bootinfo = bootinfo::BootInfo {
-                            manifest: manifest.clone(),
-                            modeline: app.modeline.clone(),
-                        };
-                        for region in &manifest.regions {
-                            if region.region_type == RegionType::UsbLoad {
-                                load_usb_region(region)?;
-                            } else {
-                                validate_and_copy_spiflash_region(region)?;
-                            }
-                        }
-
-                        // Save this bitstream as the last_boot_slot for future autoboot.
-                        // NOTE: This should technically happen after any step that could
-                        // cause a BitstreamError, however the PLL reconfiguration below
-                        // can cause the CODEC to go into a state where it NAKs I2C transactions,
-                        // causing I2C writes to fail.
-                        let config = EepromConfig { last_boot_slot: Some(n as u8) };
-                        app.eeprom_manager.write_config(&config).ok();
-
-
-                        // If required, reconfigure the external PLL to what the bitstream wants.
-                        // There may be dragons here, be VERY careful appropriate components are
-                        // held in reset while the PLL is being reconfigured! (i.e framebuffer,
-                        // audio gateware).
-                        if let Some(mut pll_config) = manifest.external_pll_config.clone() {
-                            if pll_config.clk1_inherit {
-                                info!("video/pll: inherit pixel clock from bootloader modeline.");
-                                pll_config.clk1_hz = Some((bootinfo.modeline.pixel_clk_mhz*1e6f32) as u32);
-                                bootinfo.manifest.external_pll_config = Some(pll_config.clone());
-                                if FIXED_MODELINE.is_some() {
-                                    // Can't boot a dynamic modeline bitstream if the bootloader
-                                    // itself only supports static modelines, as we haven't read
-                                    // the EDID and so can't forward it. Fix is to only flash other
-                                    // bitstreams with static modelines, or reflash the bootloader
-                                    // with support for dynamic modelines.
-                                    Err(BitstreamError::BootloaderStaticModeline)?;
-                                }
-                            }
-                            // Disable audio components
-                            app.ui.pmod.set_aclk_unstable();
-                            if let Some(ref mut pll) = app.pll {
-                                // Disable DVI PHY before playing with external PLL.
-                                unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
-                                    w.enable().bit(false)
-                                );
-                                riscv::asm::delay(10_000_000);
-                                configure_external_pll(&pll_config, pll).or(
-                                    Err(BitstreamError::PllI2cError))?;
-                            } else {
-                                // External PLL config is in manifest but this bootloader
-                                // didn't set up the PLL (likely hardware / gateware mismatch).
-                                Err(BitstreamError::PllBadConfigError)?;
-                            }
-                        }
-                        // Place BootInfo at the end of PSRAM
-                        unsafe { bootinfo.to_addr(BOOTINFO_BASE) }.ok_or(BitstreamError::BootinfoSerializeError)?;
-                        riscv::asm::fence();
-                        riscv::asm::fence_i();
-                        Ok(())
-                    }()
-                } else {
-                    Err(BitstreamError::InvalidManifest)
-                };
-                if let Err(bitstream_error) = error {
-                    // Failure. cancel reboot, draw an error in this slot.
-                    app.ui.opts.tracker.modify = false;
-                    app.reboot_n = None;
-                    app.time_since_reboot_requested = 0;
-                    app.error_n[n] = Some(bitstream_error);
-                    let error_string: &'static str = bitstream_error.into();
-                    info!("Failed to load bitstream: {error_string}");
-                    // Clear the autoboot flag, as it's possible an error occurred after
-                    // the autoboot flag was set (during/after PLL reconfiguration).
-                    let config = EepromConfig { last_boot_slot: None };
-                    app.eeprom_manager.write_config(&config).ok();
-                } else {
-                    // Ask RP2040 to replay the JTAG command sequence to reconfigure the ECP5
-                    // to new bitstream. The number is corresponding to SPI flash addresses
-                    // in the ECP5's configuration flash, i.e BITSTREAM3 loads the bitstream from
-                    // 0x100000*(n+1) = 0x400000. In the future I'd like to be able to configure
-                    // from arbitrary addresses, but this requires reverse engineering the
-                    // bitstream structure a bit more than I have time for at the moment.
-                    //
-                    //
-                    // RP2040 apfbug versions > beta5 accept reconfiguration requests over I2C,
-                    // which should be more robust. We trigger both I2C and UART
-                    // reconfigurations to retain backwards compatibility with old RP2040 firmware.
-                    let mut i2cdev0 = unsafe { I2c0::summon() };
-                    let i2c_reconfig_result = i2cdev0.transaction(
-                        RP2040_APFBUG_ADDR, &mut [Operation::Write(&[0u8, 0x5A, n as u8])]);
-                    if i2c_reconfig_result.is_err() {
-                        warn!("apfbug/rp2040: i2c reconfig request NAK (apfbug <= beta5?)");
-                    }
-                    // Older apfbug/rp2040: issue UART reconfig request
-                    info!("Enter BITSTREAM{n}\n\r");
-                    loop { core::hint::spin_loop(); }
-                }
-            }
         }
     });
+}
+
+fn boot_slot(app: &mut App, n: usize, display: &mut DMAFramebuffer0) {
+    // Is there a firmware image to copy to PSRAM before we switch bitstreams?
+    let error = if let Some(manifest) = &app.manifests[n].clone() {
+        || -> Result<(), BitstreamError> {
+            if manifest.magic != MANIFEST_MAGIC {
+                Err(BitstreamError::InvalidManifest)?;
+            }
+            if manifest.hw_rev != HW_REV_MAJOR {
+                Err(BitstreamError::HwVersionMismatch)?;
+            }
+            // BootInfo structure placed at the end of PSRAM
+            let mut bootinfo = bootinfo::BootInfo {
+                manifest: manifest.clone(),
+                modeline: app.modeline.clone(),
+            };
+            for region in &manifest.regions {
+                if region.region_type == RegionType::UsbLoad {
+                    load_usb_region(region, &mut app.usb)?;
+                } else {
+                    validate_and_copy_spiflash_region(region)?;
+                }
+            }
+
+            let pll_config = if let Some(mut pll_config) = manifest.external_pll_config.clone() {
+                if pll_config.clk1_inherit {
+                    info!("video/pll: inherit pixel clock from bootloader modeline.");
+                    pll_config.clk1_hz = Some((bootinfo.modeline.pixel_clk_mhz*1e6f32) as u32);
+                    bootinfo.manifest.external_pll_config = Some(pll_config.clone());
+                    if FIXED_MODELINE.is_some() {
+                        // Can't boot a dynamic modeline bitstream if the bootloader
+                        // itself only supports static modelines, as we haven't read
+                        // the EDID and so can't forward it. Fix is to only flash other
+                        // bitstreams with static modelines, or reflash the bootloader
+                        // with support for dynamic modelines.
+                        Err(BitstreamError::BootloaderStaticModeline)?;
+                    }
+                }
+                if app.pll.is_none() {
+                    // External PLL config is in manifest but this bootloader
+                    // didn't set up the PLL (likely hardware / gateware mismatch).
+                    Err(BitstreamError::PllBadConfigError)?;
+                }
+                Some(pll_config)
+            } else {
+                None
+            };
+
+            // Place BootInfo at the end of PSRAM
+            unsafe { bootinfo.to_addr(BOOTINFO_BASE) }.ok_or(BitstreamError::BootinfoSerializeError)?;
+
+            // Save this bitstream as the last_boot_slot for future autoboot.
+            // NOTE: This should technically happen after any step that could
+            // cause a BitstreamError, however the PLL reconfiguration below
+            // can cause the CODEC to go into a state where it NAKs I2C transactions,
+            // causing I2C writes to fail.
+            let config = EepromConfig { last_boot_slot: Some(n as u8) };
+            app.eeprom_manager.write_config(&config).ok();
+
+            // If required, reconfigure the external PLL to what the bitstream wants.
+            // There may be dragons here, be VERY careful appropriate components are
+            // held in reset while the PLL is being reconfigured! (i.e framebuffer,
+            // audio gateware).
+            if let Some(pll_config) = pll_config {
+                // Disable audio components
+                app.ui.pmod.set_aclk_unstable();
+                if let Some(ref mut pll) = app.pll {
+                    // Disable DVI PHY before playing with external PLL.
+                    display.disable();
+                    riscv::asm::delay(10_000_000);
+                    configure_external_pll(&pll_config, pll).or(
+                        Err(BitstreamError::PllI2cError))?;
+                }
+            }
+            riscv::asm::fence();
+            riscv::asm::fence_i();
+            Ok(())
+        }()
+    } else {
+        Err(BitstreamError::InvalidManifest)
+    };
+    if let Err(bitstream_error) = error {
+        // Failure. cancel reboot, draw an error in this slot.
+        app.ui.opts.tracker.modify = false;
+        app.reboot_n = None;
+        app.time_since_reboot_requested = 0;
+        app.error_n[n] = Some(bitstream_error);
+        let error_string: &'static str = bitstream_error.into();
+        info!("Failed to load bitstream: {error_string}");
+        // Clear the autoboot flag, as it's possible an error occurred after
+        // the autoboot flag was set (during/after PLL reconfiguration).
+        let config = EepromConfig { last_boot_slot: None };
+        app.eeprom_manager.write_config(&config).ok();
+        unsafe { bootinfo::BootInfo::clear_addr(BOOTINFO_BASE) };
+        riscv::asm::fence();
+    } else {
+        // Ask RP2040 to replay the JTAG command sequence to reconfigure the ECP5
+        // to new bitstream. The number is corresponding to SPI flash addresses
+        // in the ECP5's configuration flash, i.e BITSTREAM3 loads the bitstream from
+        // 0x100000*(n+1) = 0x400000. In the future I'd like to be able to configure
+        // from arbitrary addresses, but this requires reverse engineering the
+        // bitstream structure a bit more than I have time for at the moment.
+        //
+        //
+        // RP2040 apfbug versions > beta5 accept reconfiguration requests over I2C,
+        // which should be more robust. We trigger both I2C and UART
+        // reconfigurations to retain backwards compatibility with old RP2040 firmware.
+        let mut i2cdev_rp2040 = I2cDevice::new(app.i2c0);
+        let i2c_reconfig_result = i2cdev_rp2040.transaction(
+            RP2040_APFBUG_ADDR, &mut [Operation::Write(&[0u8, 0x5A, n as u8])]);
+        if i2c_reconfig_result.is_err() {
+            warn!("apfbug/rp2040: i2c reconfig request NAK (apfbug <= beta5?)");
+        }
+        // Older apfbug/rp2040: issue UART reconfig request
+        info!("Enter BITSTREAM{n}\n\r");
+        loop { core::hint::spin_loop(); }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, EnumIter, IntoStaticStr)]
@@ -750,7 +742,7 @@ where
     }
 }
 
-fn read_edid(i2cdev: &mut I2c0) -> Result<edid::Edid, edid::EdidError> {
+fn read_edid(i2cdev: &mut impl I2c) -> Result<edid::Edid, edid::EdidError> {
     const EDID_ADDR: u8 = 0x50;
     // Some screens fail on the first read and require a delay and re-attempted
     // read for the valid EDID to actually become available.
@@ -836,7 +828,7 @@ fn modeline_from_edid(edid: &edid::Edid) -> Option<DVIModeline> {
     None
 }
 
-fn modeline_or_fallback(i2cdev: &mut I2c0) -> DVIModeline {
+fn modeline_or_fallback(i2cdev: &mut impl I2c) -> DVIModeline {
     if FIXED_MODELINE.is_none() {
         match read_edid(i2cdev) {
             Ok(edid) => modeline_from_edid(&edid).unwrap_or_default(),
@@ -856,11 +848,13 @@ fn main() -> ! {
     let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    let i2c0 = I2C0_BUS.init(hal::i2c::bus(I2c0::new(peripherals.I2C0)));
+    let i2c1 = I2C1_BUS.init(hal::i2c::bus(I2c1::new(peripherals.I2C1)));
 
     if USE_EXTERNAL_PLL {
         // Disable all external PLL outputs as early as possible, in case
         // they are in some unknown state.
-        let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
+        let i2cdev_mobo_pll = I2cDevice::new(i2c0);
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         si5351drv.flush_output_enabled().ok();
     }
@@ -882,7 +876,7 @@ fn main() -> ! {
     // setting 'autoboot_to'.
 
     let mut autoboot_to: Option<usize> = None;
-    let mut eeprom_manager = EepromManager::new(unsafe{I2c1::summon()});
+    let mut eeprom_manager = EepromManager::new(I2cDevice::new(i2c1));
     if cold_boot {
         // Cold boot: Check the autoboot flag and boot
         match eeprom_manager.read_config() {
@@ -913,7 +907,7 @@ fn main() -> ! {
             }
             pmod.hard_reset();
         }
-        let mut cy8 = Cy8cmbr3108Driver::new(unsafe{I2c1::summon()}, &TOUCH_SENSOR_ORDER);
+        let mut cy8 = Cy8cmbr3108Driver::new(I2cDevice::new(i2c1), &TOUCH_SENSOR_ORDER);
         if let Err(e) = maybe_reprogram_cy8cmbr3xxx(&mut cy8) {
             let s: &'static str = e.into();
             write!(startup_report, "{s}\r\n").ok();
@@ -927,7 +921,7 @@ fn main() -> ! {
     // TODO: maybe we should even disable the terminations and be 'disconnected'?
     //
 
-    let i2cdev_tusb = I2c0::new(unsafe { pac::I2C0::steal()});
+    let i2cdev_tusb = I2cDevice::new(i2c0);
     let mut tusb322 = TUSB322Driver::new(i2cdev_tusb);
     tusb322.soft_reset().ok();
     tusb322.set_mode(TUSB322Mode::Ufp).ok();
@@ -935,13 +929,13 @@ fn main() -> ! {
     // Fetch initial modeline (may be used for external PLL setup)
 
     timer.delay_ms(10);
-    let mut i2cdev_edid = I2c0::new(unsafe { pac::I2C0::steal() } );
+    let mut i2cdev_edid = I2cDevice::new(i2c0);
     let mut modeline = modeline_or_fallback(&mut i2cdev_edid);
 
     // Setup audio clocks on external PLL
 
     let maybe_external_pll = if USE_EXTERNAL_PLL {
-        let i2cdev_mobo_pll = I2c0::new(unsafe { pac::I2C0::steal() } );
+        let i2cdev_mobo_pll = I2cDevice::new(i2c0);
         let mut si5351drv = Si5351Device::new_adafruit_module(i2cdev_mobo_pll);
         match configure_external_pll(&ExternalPLLConfig{
             clk0_hz: CLOCK_AUDIO_HZ,
@@ -962,12 +956,12 @@ fn main() -> ! {
 
     // Setup CODEC and load audio calibration.
 
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
-    if let Err(e) = maybe_restart_codec(&mut i2cdev1, &mut pmod) {
+    let mut i2cdev_codec = I2cDevice::new(i2c1);
+    if let Err(e) = maybe_restart_codec(&mut i2cdev_codec, &mut pmod) {
         let s: &'static str = e.into();
         write!(startup_report, "{s}\r\n").ok();
     }
-    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+    calibration::CalibrationConstants::load_or_default(I2cDevice::new(i2c1), &mut pmod);
 
     // Load serialized JSON manifests from spiflash
 
@@ -1002,8 +996,28 @@ fn main() -> ! {
         opts.tracker.selected = Some(n);
     }
 
-    let app = Mutex::new(RefCell::new(
-            App::new(opts, manifests.clone(), maybe_external_pll, modeline.clone(), autoboot_to, eeprom_manager)));
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
+    let usb = UsbHost {
+        vbus: peripherals.USB_VBUS,
+        tusb322,
+        msc: UsbMsc0::new(peripherals.USB_MSC, PSRAM_BASE as u32),
+    };
+    let app = Mutex::new(RefCell::new(App {
+        ui,
+        pll: maybe_external_pll,
+        eeprom_manager,
+        i2c0,
+        usb,
+        reboot_n: None,
+        error_n: [const { None }; N_MANIFESTS],
+        time_since_reboot_requested: 0u32,
+        manifests: manifests.clone(),
+        animation_elapsed_ms: 0u32,
+        modeline: modeline.clone(),
+        autoboot_slot: autoboot_to,
+        autoboot_countdown_ms: if autoboot_to.is_some() { 5000 } else { 0 },
+    }));
 
     // Until this point, the video gateware is held in reset. Now that we have a target modeline
     // and the external PLL is appropriately configured, we can bring it up.
@@ -1042,12 +1056,12 @@ fn main() -> ! {
             let h_active = display.size().width;
             let v_active = display.size().height;
 
-            // Always mute the CODEC to stop pops on flashing while in the bootloader.
-            pmod.mute(true);
-
             let (opts, reboot_n, error_n, final_modeline, autoboot_countdown_ms) = critical_section::with(|cs| {
 
                 let mut app = app.borrow_ref_mut(cs);
+
+                // Always mute the CODEC to stop pops on flashing while in the bootloader.
+                app.ui.pmod.mute(true);
 
                 //
                 // Dynamic modeline switching.
@@ -1067,34 +1081,44 @@ fn main() -> ! {
                         info!("video/hpd: display inferred different modeline to previous. switching timings...");
                         if let Some(ref mut external_pll) = app.pll {
                             // Hold DVI PHY in reset before touching the video PLL
-                            unsafe { pac::FRAMEBUFFER_PERIPH::steal() }.flags().write(|w|
-                                w.enable().bit(false)
-                            );
+                            display.disable();
                             // Configure new pixel clock. Technically we don't need to touch
                             // the audio clock. This might be important to separate if we decide
                             // to support dynamic hotplug timings in user bitstreams where
                             // we want the audio streams to not be interrupted.
-                            if let Err(e) = configure_external_pll(&ExternalPLLConfig{
+                            match configure_external_pll(&ExternalPLLConfig{
                                 clk0_hz: CLOCK_AUDIO_HZ,
                                 clk1_hz: Some((new_modeline.pixel_clk_mhz*1e6) as u32),
                                 clk1_inherit: false,
                                 spread_spectrum: Some(SPREAD_SPECTRUM_MAX),
                             }, external_pll) {
-                                error!("failed to reconfigure external PLL: {e:?}");
+                                Ok(()) => reprogrammed_pll = true,
+                                Err(e) => error!("failed to reconfigure external PLL: {e:?}"),
                             }
-                            reprogrammed_pll = true;
                         }
                     }
 
                     if reprogrammed_pll {
                         // Finally, reinitialize the display.
-                        let peripherals = unsafe { pac::Peripherals::steal() };
-                        display = hal::new_framebuffer!(peripherals, new_modeline.clone());
+                        display.set_mode(new_modeline.clone());
                         app.modeline = new_modeline;
                     }
                 }
 
                 last_hpd = display.get_hpd();
+
+                if autoboot_to.is_some() && app.autoboot_slot.is_none() {
+                    autoboot_to = None;
+                    let config = EepromConfig { last_boot_slot: None };
+                    app.eeprom_manager.write_config(&config).ok();
+                }
+
+                if let Some(n) = app.reboot_n {
+                    // Give codec time to mute and display time to draw 'REBOOTING'
+                    if app.time_since_reboot_requested > 250 {
+                        boot_slot(&mut app, n, &mut display);
+                    }
+                }
 
                 //
                 // Copy out mutable application state

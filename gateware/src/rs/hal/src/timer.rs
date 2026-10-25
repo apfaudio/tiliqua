@@ -14,7 +14,7 @@ pub enum Mode {
 #[macro_export]
 macro_rules! impl_timer {
     ($(
-        $TIMERX:ident: $PACTIMERX:ty,
+        $TIMERX:ident, $TIMERIRQX:ident: $PACTIMERX:ty,
     )+) => {
         $(
             /// Timer peripheral
@@ -37,16 +37,30 @@ macro_rules! impl_timer {
                     self.registers
                 }
 
-                /// Obtain a static `Timer` instance for use in e.g. interrupt handlers
+                /// Obtain a static `TimerIrq` instance for use in e.g. interrupt handlers
                 ///
                 /// # Safety
                 ///
                 /// 'Tis thine responsibility, that which thou doth summon.
-                pub unsafe fn summon() -> Self {
-                    Self {
-                        registers: <$PACTIMERX>::steal(),
-                        clk: 0,
-                    }
+                #[expect(clippy::disallowed_methods)]
+                pub unsafe fn steal_irq() -> $TIMERIRQX {
+                    $TIMERIRQX { registers: <$PACTIMERX>::steal() }
+                }
+            }
+
+            pub struct $TIMERIRQX {
+                registers: $PACTIMERX,
+            }
+
+            impl $TIMERIRQX {
+                /// Check if the interrupt flag is pending
+                pub fn is_pending(&self) -> bool {
+                    self.registers.ev_pending().read().mask().bit()
+                }
+
+                /// Clear the interrupt flag
+                pub fn clear_pending(&self) {
+                    self.registers.ev_pending().modify(|r, w| unsafe { w.mask().bit(r.mask().bit()) });
                 }
             }
 
@@ -123,16 +137,6 @@ macro_rules! impl_timer {
                             self.registers.ev_enable().write(|w| unsafe { w.mask().bit(false) });
                         }
                     }
-                }
-
-                /// Check if the interrupt flag is pending
-                pub fn is_pending(&self) -> bool {
-                    self.registers.ev_pending().read().mask().bit()
-                }
-
-                /// Clear the interrupt flag
-                pub fn clear_pending(&self) {
-                    self.registers.ev_pending().modify(|r, w| unsafe { w.mask().bit(r.mask().bit()) });
                 }
 
                 pub fn enable_tick_isr(&mut self, period_ms: u32, isr: pac::Interrupt) {

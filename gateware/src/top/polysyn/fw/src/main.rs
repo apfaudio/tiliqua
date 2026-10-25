@@ -7,6 +7,7 @@ use log::{info, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
+use embassy_sync::blocking_mutex::{Mutex as FlashMutex, raw::NoopRawMutex};
 
 use micromath::F32Ext;
 use midi_types::*;
@@ -32,6 +33,8 @@ use tiliqua_hal::embedded_graphics::prelude::*;
 use opts::persistence::*;
 use hal::pca9635::Pca9635Driver;
 use hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState, AccessoryType};
+use hal::i2c::{I2cBus, I2cDevice};
+use static_cell::StaticCell;
 
 use tiliqua_fw::wavetable;
 
@@ -225,8 +228,12 @@ fn build_cc_mapper(opts: &Opts) -> MidiCcMapper {
     m
 }
 
+static I2C0_BUS: StaticCell<I2cBus<I2c0>> = StaticCell::new();
+
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2cDevice<'static, I2c0>, Opts>;
+
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: Ui,
     synth: Polysynth0,
     drive_smoother: OnePoleSmoother,
     reso_smoother: OnePoleSmoother,
@@ -243,23 +250,16 @@ struct App {
 }
 
 impl App {
-    pub fn new(opts: Opts) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
+    pub fn new(ui: Ui, mut synth: Polysynth0) -> Self {
         let drive_smoother = OnePoleSmoother::new(0.05f32);
         let reso_smoother = OnePoleSmoother::new(0.05f32);
         let diffusion_smoother = OnePoleSmoother::new(0.05f32);
         let touch_controller = MidiTouchController::new();
-        let cc_mapper = build_cc_mapper(&opts);
-        let mut synth = Polysynth0::new(peripherals.SYNTH_PERIPH);
+        let cc_mapper = build_cc_mapper(&ui.opts);
         synth.usb_host_midi(1, 1);
         synth.usb_host_vbus(false); // default, but set anyway...
         Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
+            ui,
             synth,
             drive_smoother,
             reso_smoother,
@@ -295,20 +295,20 @@ fn main() -> ! {
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
 
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut i2c1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+    calibration::CalibrationConstants::load_or_default(&mut i2c1, &mut pmod);
 
-    let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
-    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
+    let mut cy8 = Cy8cmbr3108Driver::new(i2c1, &TOUCH_SENSOR_ORDER);
 
     //
     // Create options and maybe load from persistent storage
     //
 
     let mut opts = Opts::default();
-    let mut flash_persist_opt = FlashOptionsPersistence::open(
-        spiflash, bootinfo.manifest.get_option_storage_window(), &mut opts);
+    let flash = FlashMutex::<NoopRawMutex, _>::new(RefCell::new(spiflash));
+    let mut flash_persist_opt = FlashOptionsPersistence::open_partition(
+        &flash, bootinfo.manifest.get_option_storage_window(), &mut opts);
 
     //
     // Configure TUSB322 (CC controller) in DFP/Host mode
@@ -320,8 +320,8 @@ fn main() -> ! {
     // TODO: draw error text if this fails?
     //
 
-    let i2cdev = I2c0::new(peripherals.I2C0);
-    let mut tusb322 = TUSB322Driver::new(i2cdev);
+    let i2c0 = I2C0_BUS.init(hal::i2c::bus(I2c0::new(peripherals.I2C0)));
+    let mut tusb322 = TUSB322Driver::new(I2cDevice::new(i2c0));
     tusb322.soft_reset().ok();
     tusb322.disable_term().ok();
 
@@ -330,7 +330,10 @@ fn main() -> ! {
     //
 
     let mut last_palette = opts.beam.palette.value;
-    let app = Mutex::new(RefCell::new(App::new(opts)));
+    let mut last_jack = pmod.jack();
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
+    let app = Mutex::new(RefCell::new(App::new(ui, Polysynth0::new(peripherals.SYNTH_PERIPH))));
 
     handler!(timer0 = || timer0_handler(&app));
 
@@ -347,8 +350,6 @@ fn main() -> ! {
         let h_active = display.size().width;
         let v_active = display.size().height;
 
-        let mut last_jack = pmod.jack();
-
         let mut last_attached_state = AttachedState::NotAttached;
         let mut last_opt_host_enabled = false;
 
@@ -356,11 +357,11 @@ fn main() -> ! {
 
             let (opts, notes, cutoffs, draw_options, save_opts, wipe_opts) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
-                if pmod.jack() != last_jack {
+                if app.ui.pmod.jack() != last_jack {
                     // Re-calibrate touch sensing on jack swaps.
                     let _ = cy8.reset();
                 }
-                last_jack = pmod.jack();
+                last_jack = app.ui.pmod.jack();
                 let save_opts = app.ui.opts.misc.save_opts.poll();
                 let wipe_opts = app.ui.opts.misc.wipe_opts.poll();
 

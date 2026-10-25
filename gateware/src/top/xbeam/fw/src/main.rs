@@ -6,6 +6,7 @@ use log::{info, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
+use embassy_sync::blocking_mutex::{Mutex as FlashMutex, raw::NoopRawMutex};
 
 use midi_types::*;
 use midi_convert::parse::MidiTryParseSlice;
@@ -25,6 +26,8 @@ use opts::cc_map::{MidiCcMapper, CcMapMode};
 use hal::pca9635::Pca9635Driver;
 use tiliqua_hal::dma_framebuffer::Rotate;
 use tiliqua_hal::tusb322::{TUSB322Driver, TUSB322Mode, AttachedState};
+use tiliqua_hal::i2c::{I2cBus, I2cDevice};
+use static_cell::StaticCell;
 use tiliqua_hal::persist::Persist;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
@@ -87,23 +90,23 @@ fn build_cc_mapper(opts: &Opts) -> MidiCcMapper {
     m
 }
 
+static I2C0_BUS: StaticCell<I2cBus<I2c0>> = StaticCell::new();
+
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2cDevice<'static, I2c0>, Opts>;
+
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: Ui,
     cc_mapper: MidiCcMapper,
+    xbeam: pac::XBEAM_PERIPH,
 }
 
 impl App {
-    pub fn new(opts: Opts) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-        let cc_mapper = build_cc_mapper(&opts);
+    pub fn new(ui: Ui, xbeam: pac::XBEAM_PERIPH) -> Self {
+        let cc_mapper = build_cc_mapper(&ui.opts);
         Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
+            ui,
             cc_mapper,
+            xbeam,
         }
     }
 }
@@ -114,8 +117,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         app.ui.update();
 
         // Check for TRS MIDI CC traffic
-        let xbeam = unsafe { pac::XBEAM_PERIPH::steal() };
-        let midi_word = xbeam.midi_read().read().bits();
+        let midi_word = app.xbeam.midi_read().read().bits();
         if midi_word != 0 {
             app.ui.midi_activity();
             let bytes = [
@@ -169,16 +171,16 @@ fn main() -> ! {
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
 
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut i2c1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+    CalibrationConstants::load_or_default(&mut i2c1, &mut pmod);
 
     //
     // Start up TUSB322 in UFP/Device mode
     //
 
-    let i2cdev_tusb = I2c0::new(unsafe { pac::I2C0::steal() } );
-    let mut tusb322 = TUSB322Driver::new(i2cdev_tusb);
+    let i2c0 = I2C0_BUS.init(tiliqua_hal::i2c::bus(I2c0::new(peripherals.I2C0)));
+    let mut tusb322 = TUSB322Driver::new(I2cDevice::new(i2c0));
     tusb322.soft_reset().ok();
     tusb322.set_mode(TUSB322Mode::Ufp).ok();
 
@@ -188,15 +190,18 @@ fn main() -> ! {
 
     let mut opts = Opts::default();
     opts.misc.rotation.value = modeline.rotate;
-    let mut flash_persist_opt = FlashOptionsPersistence::open(
-        spiflash, bootinfo.manifest.get_option_storage_window(), &mut opts);
+    let flash = FlashMutex::<NoopRawMutex, _>::new(RefCell::new(spiflash));
+    let mut flash_persist_opt = FlashOptionsPersistence::open_partition(
+        &flash, bootinfo.manifest.get_option_storage_window(), &mut opts);
 
     //
     // Create App instance
     //
 
     let mut last_palette = opts.beam.palette.value;
-    let app = Mutex::new(RefCell::new(App::new(opts)));
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
+    let app = Mutex::new(RefCell::new(App::new(ui, peripherals.XBEAM_PERIPH)));
 
     handler!(timer0 = || timer0_handler(&app));
 
@@ -211,7 +216,6 @@ fn main() -> ! {
 
         let mut vscope = Vector0::new(peripherals.VECTOR_PERIPH);
         let mut scope = Scope0::new(peripherals.SCOPE_PERIPH, 6);
-        let xbeam_mux = peripherals.XBEAM_PERIPH;
         let overlay_periph = peripherals.OVERLAY_PERIPH;
         let mut first = true;
 
@@ -326,22 +330,22 @@ fn main() -> ! {
 
             // Only connect USB PHY if the TUSB322 Type-C controller says we are attached.
             // This fixes enumeration issues on some machines when using typec <-> typec cables.
-            critical_section::with(|_| {
-                if let Ok(status) = tusb322.read_connection_status_control() {
-                    // Only update on valid reads to reduce risk of unintended toggling mid-stream
-                    let new_state = status.attached_state == AttachedState::AttachedSnk;
-                    if new_state != usb_cc_attached {
-                        info!("USB CC hotplug: {status:?}");
-                        usb_cc_attached = new_state;
-                    }
+            if let Ok(status) = tusb322.read_connection_status_control() {
+                // Only update on valid reads to reduce risk of unintended toggling mid-stream
+                let new_state = status.attached_state == AttachedState::AttachedSnk;
+                if new_state != usb_cc_attached {
+                    info!("USB CC hotplug: {status:?}");
+                    usb_cc_attached = new_state;
                 }
-            });
+            }
 
-            xbeam_mux.flags().write(
-                |w| { w.usb_en().bit(opts.misc.usb_mode.value == USBMode::Enable);
-                      w.show_outputs().bit(opts.misc.plot_src.value == PlotSrc::Outputs);
-                      w.usb_connect().bit(usb_cc_attached)
-                } );
+            critical_section::with(|cs| {
+                app.borrow_ref(cs).xbeam.flags().write(
+                    |w| { w.usb_en().bit(opts.misc.usb_mode.value == USBMode::Enable);
+                          w.show_outputs().bit(opts.misc.plot_src.value == PlotSrc::Outputs);
+                          w.usb_connect().bit(usb_cc_attached)
+                    } );
+            });
 
             // Update grid spacing. In scope mode use the scope's ppd_x for the
             // time axis. In portrait rotation the time/signal axes are swapped
@@ -379,14 +383,17 @@ fn main() -> ! {
                 w.grid_pixel().bits((opts.beam.grid_i.value << 4) | opts.beam.ui_hue.value)
             });
 
-            xbeam_mux.delay0().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[0].proc_u16(opts.delay.delay_x.value)) });
-            xbeam_mux.delay1().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[1].proc_u16(opts.delay.delay_y.value)) });
-            xbeam_mux.delay2().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[2].proc_u16(opts.delay.delay_i.value)) });
-            xbeam_mux.delay3().write(|w| unsafe { w.value().bits(
-                    delay_smoothers[3].proc_u16(opts.delay.delay_c.value)) });
+            critical_section::with(|cs| {
+                let xbeam = &app.borrow_ref(cs).xbeam;
+                xbeam.delay0().write(|w| unsafe { w.value().bits(
+                        delay_smoothers[0].proc_u16(opts.delay.delay_x.value)) });
+                xbeam.delay1().write(|w| unsafe { w.value().bits(
+                        delay_smoothers[1].proc_u16(opts.delay.delay_y.value)) });
+                xbeam.delay2().write(|w| unsafe { w.value().bits(
+                        delay_smoothers[2].proc_u16(opts.delay.delay_i.value)) });
+                xbeam.delay3().write(|w| unsafe { w.value().bits(
+                        delay_smoothers[3].proc_u16(opts.delay.delay_c.value)) });
+            });
 
             display.rotate(&opts.misc.rotation.value);
 

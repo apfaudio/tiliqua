@@ -2,7 +2,11 @@ use sequential_storage::map::{MapConfig, MapStorage};
 use sequential_storage::cache::{Cache, Uncached};
 use embassy_futures::block_on;
 use embassy_embedded_hal::adapter::BlockingAsync;
+use embassy_embedded_hal::flash::partition::BlockingPartition;
+use embassy_sync::blocking_mutex::Mutex;
+use embassy_sync::blocking_mutex::raw::RawMutex;
 use embedded_storage::nor_flash::{MultiwriteNorFlash, NorFlash};
+use core::cell::RefCell;
 
 use crate::traits::Options;
 
@@ -60,6 +64,22 @@ impl<F: NorFlash + MultiwriteNorFlash> FlashOptionsPersistence<F> {
             log::error!("Failed to load persisted options: {e:?}");
         }
         Some(persist)
+    }
+}
+
+impl<'a, M: RawMutex, F: NorFlash + MultiwriteNorFlash> FlashOptionsPersistence<BlockingPartition<'a, M, F>> {
+    pub fn open_partition<O: Options>(flash: &'a Mutex<M, RefCell<F>>, window: Option<core::ops::Range<u32>>, opts: &mut O) -> Option<Self> {
+        let Some(window) = window else {
+            log::warn!("No option storage region: disable persistent storage");
+            return None;
+        };
+        let erase_size = F::ERASE_SIZE as u32;
+        if !window.start.is_multiple_of(erase_size) || !window.end.is_multiple_of(erase_size) {
+            log::warn!("Option storage window {window:x?} is not erase-aligned: disable persistent storage");
+            return None;
+        }
+        let size = window.end - window.start;
+        Self::open(BlockingPartition::new(flash, window.start, size), Some(0..size), opts)
     }
 }
 

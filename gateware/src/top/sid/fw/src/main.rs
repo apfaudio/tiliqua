@@ -6,6 +6,7 @@ use log::{info, error};
 use riscv_rt::entry;
 use irq::handler;
 use core::cell::RefCell;
+use embassy_sync::blocking_mutex::{Mutex as FlashMutex, raw::NoopRawMutex};
 
 use tiliqua_pac as pac;
 use tiliqua_hal as hal;
@@ -30,20 +31,18 @@ use micromath::F32Ext;
 
 pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
 
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>;
+
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: Ui,
+    sid: pac::SID_PERIPH,
 }
 
 impl App {
-    pub fn new(opts: Opts) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    pub fn new(ui: Ui, sid: pac::SID_PERIPH) -> Self {
         Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
+            ui,
+            sid,
         }
     }
 }
@@ -57,8 +56,6 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
     use tiliqua_fw::options::{VoiceOpts, ModulationTarget, VoiceModulationType, Wave};
 
-    let peripherals = unsafe { pac::Peripherals::steal() };
-    let sid = peripherals.SID_PERIPH;
     let sid_poke = |regs: &pac::SID_PERIPH, addr: u8, data: u8| {
         regs.transaction_data().write(
             |w| unsafe { w.transaction_data().bits((u16::from(data) << 5) | u16::from(addr)) } );
@@ -83,81 +80,86 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         opts.modulate.in3.value,
     ];
 
-    for (n_voice, voice) in voices.iter_mut().enumerate() {
-        let base = (7*n_voice) as u8;
+    critical_section::with(|cs| {
+        let app = app.borrow_ref(cs);
+        let sid = &app.sid;
 
-        // MODULATION
-        let mut freq: u16 = voice.freq.value;
-        let mut gate = voice.gate.value;
+        for (n_voice, voice) in voices.iter_mut().enumerate() {
+            let base = (7*n_voice) as u8;
 
-        for (ch, m) in mods.iter().enumerate() {
-            if matches!(m.modulates_voice(n_voice), Some(VoiceModulationType::Frequency)) {
-                let volts: f32 = (x[ch] as f32) / 4096.0f32;
-                let freq_hz = volts_to_freq(volts);
-                freq = 16u16 * (0.05960464f32 * freq_hz) as u16; // assumes 1Mhz SID clk
-                                                                 // http://www.sidmusic.org/sid/sidtech2.html
-            }
-            if matches!(m.modulates_voice(n_voice), Some(VoiceModulationType::Gate)) {
-                if x[ch] > 2000 {
-                    gate = 1;
+            // MODULATION
+            let mut freq: u16 = voice.freq.value;
+            let mut gate = voice.gate.value;
+
+            for (ch, m) in mods.iter().enumerate() {
+                if matches!(m.modulates_voice(n_voice), Some(VoiceModulationType::Frequency)) {
+                    let volts: f32 = (x[ch] as f32) / 4096.0f32;
+                    let freq_hz = volts_to_freq(volts);
+                    freq = 16u16 * (0.05960464f32 * freq_hz) as u16; // assumes 1Mhz SID clk
+                                                                     // http://www.sidmusic.org/sid/sidtech2.html
                 }
-                if x[ch] < 1000 {
-                    gate = 0;
+                if matches!(m.modulates_voice(n_voice), Some(VoiceModulationType::Gate)) {
+                    if x[ch] > 2000 {
+                        gate = 1;
+                    }
+                    if x[ch] < 1000 {
+                        gate = 0;
+                    }
                 }
             }
+
+            // Propagate modulation back to menu system
+
+            voice.freq.value = freq;
+            voice.gate.value = gate;
+
+            freq = (f32::from(freq) * (f32::from(voice.freq_os.value) / 1000.0f32)) as u16;
+
+            sid_poke(sid, base, freq as u8);
+            sid_poke(sid, base+1, (freq>>8) as u8);
+
+            sid_poke(sid, base+2, voice.pw.value as u8);
+            sid_poke(sid, base+3, (voice.pw.value>>8) as u8);
+
+            let mut reg04 = 0u8;
+            match voice.wave.value {
+                Wave::Triangle => { reg04 |= 0x10; }
+                Wave::Saw      => { reg04 |= 0x20; }
+                Wave::Pulse    => { reg04 |= 0x40; }
+                Wave::Noise    => { reg04 |= 0x80; }
+            }
+
+            reg04 |= gate;
+            reg04 |= voice.sync.value << 1;
+            reg04 |= voice.ring.value << 2;
+
+            sid_poke(sid, base+4, reg04);
+
+            sid_poke(sid, base+5,
+                voice.decay.value |
+                (voice.attack.value << 4));
+
+            sid_poke(sid, base+6,
+                voice.release.value |
+                (voice.sustain.value << 4));
         }
 
-        // Propagate modulation back to menu system
-
-        voice.freq.value = freq;
-        voice.gate.value = gate;
-
-        freq = (f32::from(freq) * (f32::from(voice.freq_os.value) / 1000.0f32)) as u16;
-
-        sid_poke(&sid, base, freq as u8);
-        sid_poke(&sid, base+1, (freq>>8) as u8);
-
-        sid_poke(&sid, base+2, voice.pw.value as u8);
-        sid_poke(&sid, base+3, (voice.pw.value>>8) as u8);
-
-        let mut reg04 = 0u8;
-        match voice.wave.value {
-            Wave::Triangle => { reg04 |= 0x10; }
-            Wave::Saw      => { reg04 |= 0x20; }
-            Wave::Pulse    => { reg04 |= 0x40; }
-            Wave::Noise    => { reg04 |= 0x80; }
-        }
-
-        reg04 |= gate;
-        reg04 |= voice.sync.value << 1;
-        reg04 |= voice.ring.value << 2;
-
-        sid_poke(&sid, base+4, reg04);
-
-        sid_poke(&sid, base+5,
-            voice.decay.value |
-            (voice.attack.value << 4));
-
-        sid_poke(&sid, base+6,
-            voice.release.value |
-            (voice.sustain.value << 4));
-    }
-
-    sid_poke(&sid, 0x15, (opts.filter.cutoff.value & 0x7) as u8);
-    sid_poke(&sid, 0x16, (opts.filter.cutoff.value >> 3) as u8);
-    sid_poke(&sid, 0x17,
-        opts.filter.filt1.value |
-        (opts.filter.filt2.value << 1) |
-        (opts.filter.filt3.value << 2) |
-        (opts.filter.reso.value  << 4)
-        );
-    sid_poke(&sid, 0x18,
-        (opts.filter.lp.value     << 4) |
-         (opts.filter.bp.value     << 5) |
-         (opts.filter.hp.value     << 6) |
-         (opts.filter.v3off.value  << 7) |
-         opts.filter.volume.value
-        );
+        sid_poke(sid, 0x15, (opts.filter.cutoff.value & 0x7) as u8);
+        sid_poke(sid, 0x16, (opts.filter.cutoff.value >> 3) as u8);
+        sid_poke(sid, 0x17,
+            opts.filter.filt1.value |
+            (opts.filter.filt2.value << 1) |
+            (opts.filter.filt3.value << 2) |
+            (opts.filter.reso.value  << 4)
+            );
+        sid_poke(sid, 0x18,
+            (opts.filter.lp.value     << 4) |
+             (opts.filter.bp.value     << 5) |
+             (opts.filter.hp.value     << 6) |
+             (opts.filter.v3off.value  << 7) |
+             opts.filter.volume.value
+            );
+    });
 
     critical_section::with(|cs| {
         let mut app = app.borrow_ref_mut(cs);
@@ -193,23 +195,26 @@ fn main() -> ! {
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
 
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut i2c1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+    calibration::CalibrationConstants::load_or_default(&mut i2c1, &mut pmod);
 
     //
     // Create options and maybe load from persistent storage
     //
 
     let mut opts = options::Opts::default();
-    let mut flash_persist_opt = FlashOptionsPersistence::open(
-        spiflash, bootinfo.manifest.get_option_storage_window(), &mut opts);
+    let flash = FlashMutex::<NoopRawMutex, _>::new(RefCell::new(spiflash));
+    let mut flash_persist_opt = FlashOptionsPersistence::open_partition(
+        &flash, bootinfo.manifest.get_option_storage_window(), &mut opts);
 
     //
     // Create App instance
     //
 
-    let app = Mutex::new(RefCell::new(App::new(opts)));
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
+    let app = Mutex::new(RefCell::new(App::new(ui, peripherals.SID_PERIPH)));
     let hue = 5u8;
 
     palette::ColorPalette::default().write_to_hardware(&mut display);

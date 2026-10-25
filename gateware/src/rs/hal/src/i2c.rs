@@ -1,3 +1,10 @@
+pub type I2cBus<T> = critical_section::Mutex<core::cell::RefCell<T>>;
+pub type I2cDevice<'a, T> = embedded_hal_bus::i2c::CriticalSectionDevice<'a, T>;
+
+pub const fn bus<T>(i2c: T) -> I2cBus<T> {
+    critical_section::Mutex::new(core::cell::RefCell::new(i2c))
+}
+
 #[macro_export]
 macro_rules! impl_i2c {
     ($(
@@ -20,13 +27,6 @@ macro_rules! impl_i2c {
                 /// Release the [`I2C`](crate::pac::I2C) peripheral and consume self.
                 pub fn free(self) -> $PACI2CX {
                     self.registers
-                }
-
-                /// Obtain a static `I2c` instance for use in e.g. interrupt handlers
-                pub unsafe fn summon() -> Self {
-                    Self {
-                        registers: <$PACI2CX>::steal(),
-                    }
                 }
             }
 

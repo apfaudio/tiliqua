@@ -6,6 +6,7 @@
 use log::{info, error};
 use riscv_rt::entry;
 use core::cell::RefCell;
+use embassy_sync::blocking_mutex::{Mutex as FlashMutex, raw::NoopRawMutex};
 use critical_section::Mutex;
 use irq::handler;
 use embedded_alloc::LlffHeap as Heap;
@@ -30,15 +31,18 @@ const HEAP_SIZE: usize = 128*1024;
 
 static HEAP: Heap = Heap::empty();
 
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>;
+
 struct App<'a> {
     voice: Voice<'a>,
     patch: Patch,
     modulations: Modulations,
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: Ui,
+    audio_fifo: pac::AUDIO_FIFO,
 }
 
 impl App<'_> {
-    pub fn new(opts: Opts) -> Self {
+    pub fn new(ui: Ui, audio_fifo: pac::AUDIO_FIFO) -> Self {
         let mut voice = Voice::new(&HEAP, BLOCK_SIZE);
         let patch = Patch {
             engine: 0,
@@ -51,18 +55,13 @@ impl App<'_> {
         };
         voice.init();
 
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
 
         Self {
             voice,
             patch,
             modulations: Modulations::default(),
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
+            ui,
+            audio_fifo,
         }
     }
 }
@@ -85,10 +84,6 @@ pub fn f32_to_i32(f: u32) -> i32 {
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
-
-    let peripherals = unsafe { pac::Peripherals::steal() };
-    let audio_fifo = peripherals.AUDIO_FIFO;
-    let pmod = peripherals.PMOD0_PERIPH;
 
     critical_section::with(|cs| {
 
@@ -128,6 +123,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         //
 
         let mut modulations = app.modulations.clone();
+        let pmod = &app.ui.pmod.registers;
         let jack = pmod.jack().read().bits();
 
         let note_patched = (jack & 0x1) != 0;
@@ -153,7 +149,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         let mut aux = [0.0f32; BLOCK_SIZE];
 
         let mut n_attempts = 0;
-        while (audio_fifo.fifo_len().read().bits() as usize) < AUDIO_FIFO_ELASTIC_SZ - BLOCK_SIZE {
+        while (app.audio_fifo.fifo_len().read().bits() as usize) < AUDIO_FIFO_ELASTIC_SZ - BLOCK_SIZE {
             n_attempts += 1;
             if n_attempts > 10 {
                 // TODO set underrun flag
@@ -198,9 +194,9 @@ fn main() -> ! {
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
 
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut i2c1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    calibration::CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+    calibration::CalibrationConstants::load_or_default(&mut i2c1, &mut pmod);
 
     let mut vscope = Vector0::new(peripherals.VECTOR_PERIPH);
     let mut scope = Scope0::new(peripherals.SCOPE_PERIPH, 6);
@@ -217,15 +213,18 @@ fn main() -> ! {
     //
 
     let mut opts = Opts::default();
-    let mut flash_persist_opt = FlashOptionsPersistence::open(
-        spiflash, bootinfo.manifest.get_option_storage_window(), &mut opts);
+    let flash = FlashMutex::<NoopRawMutex, _>::new(RefCell::new(spiflash));
+    let mut flash_persist_opt = FlashOptionsPersistence::open_partition(
+        &flash, bootinfo.manifest.get_option_storage_window(), &mut opts);
 
     //
     // Create App instance
     //
 
     let mut last_palette = opts.beam.palette.value;
-    let app = App::new(opts);
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
+    let app = App::new(ui, peripherals.AUDIO_FIFO);
     let app = Mutex::new(RefCell::new(app));
 
     info!("heap usage {} KiB", HEAP.used()/1024);

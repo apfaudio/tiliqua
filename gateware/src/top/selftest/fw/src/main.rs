@@ -34,6 +34,8 @@ use tiliqua_hal::pca9635::Pca9635Driver;
 use tiliqua_hal::dma_framebuffer::DMAFramebuffer;
 use tiliqua_hal::eeprom::EepromDriver;
 use tiliqua_hal::tusb322::TUSB322Driver;
+use tiliqua_hal::i2c::{I2cBus, I2cDevice};
+use static_cell::StaticCell;
 use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
 
 pub type ReportString = String<512>;
@@ -197,7 +199,7 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     write!(s, "  read {} KByte/sec\r\n", (u64::from(sysclk) * (spiflash_sz_test/1024) as u64) / u64::from(read_ticks)).ok();
 }
 
-fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
+fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut impl I2c) {
     // Read TUSB322 device ID
     let mut tusb322 = TUSB322Driver::new(i2cdev);
     match tusb322.read_device_id() {
@@ -218,7 +220,7 @@ fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut I2c0) {
     write!(s, "\r\n").ok();
 }
 
-fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
+fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut impl I2c) -> bool {
     let mut ok = false;
     let mut eeprom = EepromDriver::new(i2cdev);
     match eeprom.read_id() {
@@ -241,7 +243,7 @@ fn eeprom_id_test(s: &mut ReportString, i2cdev: &mut I2c1) -> bool {
     ok
 }
 
-fn edid_test(s: &mut ReportString, i2cdev: &mut I2c0) {
+fn edid_test(s: &mut ReportString, i2cdev: &mut impl I2c) {
     const EDID_ADDR: u8 = 0x50;
     write!(s, "EDID: ").ok();
     let mut edid: [u8; 128] = [0; 128];
@@ -284,7 +286,7 @@ fn print_touch_err(s: &mut ReportString, pmod: &EurorackPmod0)
     }
 }
 
-fn print_usb_state(s: &mut ReportString, i2cdev: &mut I2c0)
+fn print_usb_state(s: &mut ReportString, i2cdev: &mut impl I2c)
 {
     // Read TUSB322 connection status register
     // We don't fully use this yet. But it's useful for checking for usb circuitry assembly problems.
@@ -360,22 +362,11 @@ fn print_psram_stats(s: &mut ReportString, psram: &pac::PSRAM_CSR)
            sysclk / (cycles_elapsed+1)).ok();
 }
 
-struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
-}
+static I2C0_BUS: StaticCell<I2cBus<I2c0>> = StaticCell::new();
+static I2C1_BUS: StaticCell<I2cBus<I2c1>> = StaticCell::new();
 
-impl App {
-    pub fn new(opts: Opts) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
-        }
-    }
+struct App {
+    ui: ui::UI<Encoder0, EurorackPmod0, I2cDevice<'static, I2c0>, Opts>,
 }
 
 fn push_to_opts(constants: &CalibrationConstants, options: &mut Opts, d: &DefaultCalibrationConstants) {
@@ -417,19 +408,22 @@ fn main() -> ! {
     let modeline = bootinfo.modeline.maybe_override_fixed(
         FIXED_MODELINE, CLOCK_DVI_HZ);
 
-    let mut i2cdev = I2c0::new(peripherals.I2C0);
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
-    let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    let i2c0 = I2C0_BUS.init(tiliqua_hal::i2c::bus(I2c0::new(peripherals.I2C0)));
+    let i2c1 = I2C1_BUS.init(tiliqua_hal::i2c::bus(I2c1::new(peripherals.I2C1)));
+    let mut i2cdev_tusb = I2cDevice::new(i2c0);
+    let mut i2cdev_edid = I2cDevice::new(i2c0);
+    let mut i2cdev_eeprom = I2cDevice::new(i2c1);
+    let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
     let dtr = peripherals.DTR0;
 
     let mut startup_report = ReportString::new();
 
     psram_memtest(&mut startup_report, &mut timer);
     spiflash_memtest(&mut startup_report, &mut timer);
-    tusb322_id_test(&mut startup_report, &mut i2cdev);
+    tusb322_id_test(&mut startup_report, &mut i2cdev_tusb);
     print_touch_err(&mut startup_report, &pmod);
-    eeprom_id_test(&mut startup_report, &mut i2cdev1);
-    edid_test(&mut startup_report, &mut i2cdev);
+    eeprom_id_test(&mut startup_report, &mut i2cdev_eeprom);
+    edid_test(&mut startup_report, &mut i2cdev_edid);
 
     timer.disable();
     timer.delay_ns(0);
@@ -438,7 +432,7 @@ fn main() -> ! {
     let mut opts = Opts::default();
     let cal_default = DefaultCalibrationConstants::from_array(
         &PMOD_DEFAULT_CAL, pmod.f_bits());
-    if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev1) {
+    if let Some(cal_constants) = CalibrationConstants::from_eeprom(&mut i2cdev_eeprom) {
         push_to_opts(&cal_constants, &mut opts, &cal_default);
         write!(startup_report, "PASS: load calibration from EEPROM").ok();
     } else {
@@ -447,7 +441,10 @@ fn main() -> ! {
 
     info!("STARTUP REPORT: {startup_report}");
 
-    let app = Mutex::new(RefCell::new(App::new(opts)));
+    let mut last_jack = pmod.jack();
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
+    let app = Mutex::new(RefCell::new(App { ui }));
     let hue = 10;
 
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
@@ -460,10 +457,7 @@ fn main() -> ! {
 
     let mut benchmark_rng = Rng::with_seed(0);
 
-    let i2cdev_cy8 = I2c1::new(unsafe { pac::I2C1::steal() } );
-    let mut cy8 = Cy8cmbr3108Driver::new(i2cdev_cy8, &TOUCH_SENSOR_ORDER);
-
-    let mut last_jack = pmod.jack();
+    let mut cy8 = Cy8cmbr3108Driver::new(I2cDevice::new(i2c1), &TOUCH_SENSOR_ORDER);
 
     let gpio0 = peripherals.GPIO0;
     let gpio1 = peripherals.GPIO1;
@@ -488,18 +482,16 @@ fn main() -> ! {
                 last_hpd = dvi_hpd;
             }
 
-            if pmod.jack() != last_jack {
-                let _ = cy8.reset();
-            }
-            last_jack = pmod.jack();
-
-            let (opts, commit_to_eeprom) = critical_section::with(|cs| {
+            let (opts, commit_to_eeprom, jack, counts_per_v) = critical_section::with(|cs| {
                 let mut app = app.borrow_ref_mut(cs);
                 let commit_to_eeprom = app.ui.opts.autocal.write.poll();
-                (app.ui.opts.clone(), commit_to_eeprom)
+                (app.ui.opts.clone(), commit_to_eeprom, app.ui.pmod.jack(), app.ui.pmod.counts_per_v())
             });
 
-            let counts_per_v = pmod.counts_per_v();
+            if jack != last_jack {
+                let _ = cy8.reset();
+            }
+            last_jack = jack;
             let stimulus_raw = counts_per_v * i32::from(opts.autocal.volts.value);
 
             draw::draw_options(&mut display, &opts, h_active/2-30, 70,
@@ -512,10 +504,10 @@ fn main() -> ! {
                 let report_str = match opts.report.page.value {
                     ReportPage::Startup => &startup_report,
                     ReportPage::Status  => {
-                        critical_section::with(|_| {
+                        critical_section::with(|cs| {
                             // Devices shared with timer callback, be careful!
-                            print_pmod_state(&mut status_report, &pmod);
-                            print_usb_state(&mut status_report, &mut i2cdev);
+                            print_pmod_state(&mut status_report, &app.borrow_ref(cs).ui.pmod);
+                            print_usb_state(&mut status_report, &mut i2cdev_tusb);
                         });
                         print_die_temperature(&mut status_report, &dtr);
                         print_psram_stats(&mut status_report, &psram);
@@ -541,10 +533,13 @@ fn main() -> ! {
             }
 
             if opts.tracker.page.value == Page::Autocal {
-                pmod.registers.sample_o0().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
-                pmod.registers.sample_o1().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
-                pmod.registers.sample_o2().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
-                pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                critical_section::with(|cs| {
+                    let pmod = &app.borrow_ref(cs).ui.pmod;
+                    pmod.registers.sample_o0().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                    pmod.registers.sample_o1().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                    pmod.registers.sample_o2().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                    pmod.registers.sample_o3().write(|w| unsafe { w.sample().bits(stimulus_raw as u32) } );
+                });
             }
 
             if opts.tracker.page.value == Page::Benchmark {
@@ -614,22 +609,24 @@ fn main() -> ! {
                 },
                 &cal_default
             );
-            constants.write_to_pmod(&mut pmod);
+            let (sample_i, f_bits) = critical_section::with(|cs| {
+                let mut app = app.borrow_ref_mut(cs);
+                constants.write_to_pmod(&mut app.ui.pmod);
+                (app.ui.pmod.sample_i(), app.ui.pmod.f_bits())
+            });
 
             if commit_to_eeprom {
-                critical_section::with(|_| {
-                    constants.write_to_eeprom(&mut i2cdev1);
-                });
+                constants.write_to_eeprom(&mut i2cdev_eeprom);
             }
 
             if opts.tracker.page.value != Page::Report && opts.tracker.page.value != Page::Benchmark {
                 draw::draw_cal(&mut display, h_active/2-128, v_active/2-128, hue,
                                &[stimulus_raw, stimulus_raw, stimulus_raw, stimulus_raw],
-                               &pmod.sample_i(), counts_per_v).ok();
+                               &sample_i, counts_per_v).ok();
                 draw::draw_cal_constants(
                     &mut display, h_active/2-128, v_active/2+64, hue,
                     &constants.cal.adc_scale, &constants.cal.adc_zero, &constants.cal.dac_scale, &constants.cal.dac_zero,
-                    pmod.f_bits()).ok();
+                    f_bits).ok();
 
             }
 

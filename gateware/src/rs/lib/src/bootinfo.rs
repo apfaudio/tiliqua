@@ -39,4 +39,11 @@ impl BootInfo {
         let buffer = core::slice::from_raw_parts(addr as *const u8, BOOTINFO_MAX_SIZE);
         postcard::from_bytes_crc32(buffer, digest).ok()
     }
+
+    /// # Safety
+    ///
+    /// `addr` must point to `BOOTINFO_MAX_SIZE` writable bytes.
+    pub unsafe fn clear_addr(addr: usize) {
+        core::ptr::write_bytes(addr as *mut u8, 0, BOOTINFO_MAX_SIZE);
+    }
 }

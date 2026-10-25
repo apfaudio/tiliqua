@@ -11,6 +11,8 @@ tiliqua-hal = { path="../../../rs/hal", default-features = false }
 tiliqua-lib = { path = "../../../rs/lib" }
 tiliqua-pac = { path="../pac", default-features = false, features = ["critical-section", "vexriscv"] }
 opts = { path = "../../../rs/opts" }
+static_cell = "2.1.1"
+portable-atomic = { version = "1.15.0", default-features = false, features = ["critical-section"] }
 
 log = "0.4.17"
 embedded-hal = "=1.0.0"
@@ -26,6 +28,7 @@ trig-const = "0.4.0"
 midi-types = "0.1.7"
 midi-convert = "0.2.0"
 critical-section = "1.2.0"
+embassy-sync = "0.8.0"
 amaranth-soc-isr = { path="../../../rs/isr", default-features = false }
 irq = "0.2.3"
 serde = { version="1.0.219", default-features=false }

@@ -42,7 +42,7 @@ macro_rules! impl_tiliqua_soc_pac {
         }
 
         tiliqua_hal::impl_timer! {
-            Timer0: tiliqua_pac::TIMER0,
+            Timer0, Timer0Irq: tiliqua_pac::TIMER0,
         }
 
         tiliqua_hal::impl_i2c! {

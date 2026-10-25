@@ -24,6 +24,8 @@ use channel::{Channel, ChannelView};
 use flash::DelaylineFlash;
 use hal::pca9635::Pca9635Driver;
 use tiliqua_fw::delay_line::DelayLine;
+use embassy_embedded_hal::flash::partition::BlockingPartition;
+use embassy_sync::blocking_mutex::{Mutex as FlashMutex, raw::NoopRawMutex};
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pmod::EurorackPmod;
 
@@ -98,38 +100,28 @@ pub type Channels = (
     Channel<GrainPlayer2>,
 );
 
+type Ui = ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>;
+
 struct App {
-    ui: ui::UI<Encoder0, EurorackPmod0, I2c0, Opts>,
+    ui: Ui,
     channels: Channels,
     delayln: DelayLine0,
+    sampler: pac::SAMPLER_PERIPH,
 }
 
 impl App {
-    pub fn new(
-        opts: Opts,
-        channels: Channels,
-        delayln: DelayLine0,
-    ) -> Self {
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let encoder = Encoder0::new(peripherals.ENCODER0);
-        let i2cdev = I2c0::new(peripherals.I2C0);
-        let pca9635 = Pca9635Driver::new(i2cdev);
-        let pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
+    pub fn new(ui: Ui, channels: Channels, delayln: DelayLine0, sampler: pac::SAMPLER_PERIPH) -> Self {
         Self {
-            ui: ui::UI::new(opts, TIMER0_ISR_PERIOD_MS,
-                            encoder, pca9635, pmod),
+            ui,
             channels,
             delayln,
+            sampler,
         }
     }
 }
 
 fn timer0_handler(app: &Mutex<RefCell<App>>) {
     critical_section::with(|cs| {
-
-        let peripherals = unsafe { pac::Peripherals::steal() };
-        let pmod = peripherals.PMOD0_PERIPH;
-        let sampler = peripherals.SAMPLER_PERIPH;
 
         let mut app = app.borrow_ref_mut(cs);
 
@@ -152,12 +144,12 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
             opts.len.value = zoomstep(opts_prev.len.value, opts.len.value, opts.zoom.value);
         }
 
-        sampler.flags().write(|w| {
+        app.sampler.flags().write(|w| {
             w.record().bit(app.ui.opts.record.record.value)
         });
 
         // ScrubFast/ScrubSlow selects different onepole cutoff on scrub pos
-        sampler.scrub_filter().write(|w| unsafe {
+        app.sampler.scrub_filter().write(|w| unsafe {
             w.ch0().bits(app.ui.opts.channel0.mode.value.scrub_filter_shift());
             w.ch1().bits(app.ui.opts.channel1.mode.value.scrub_filter_shift());
             w.ch2().bits(app.ui.opts.channel2.mode.value.scrub_filter_shift())
@@ -165,7 +157,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 
         app.ui.touch_led_mask(0b00001110);
         let touch = app.ui.pmod.touch();
-        let jack = pmod.jack().read().bits();
+        let jack = app.ui.pmod.registers.jack().read().bits();
         let cv = app.ui.pmod.sample_i();
         let opts = app.ui.opts.clone();
         app.channels.0.update(&opts.channel0, max_samples, 1, &touch, jack, cv[1]);
@@ -196,9 +188,9 @@ fn main() -> ! {
         FIXED_MODELINE, CLOCK_DVI_HZ);
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
 
-    let mut i2cdev1 = I2c1::new(peripherals.I2C1);
+    let mut i2c1 = I2c1::new(peripherals.I2C1);
     let mut pmod = EurorackPmod0::new(peripherals.PMOD0_PERIPH);
-    CalibrationConstants::load_or_default(&mut i2cdev1, &mut pmod);
+    CalibrationConstants::load_or_default(&mut i2c1, &mut pmod);
 
     let delayln = DelayLine0::new(peripherals.DELAYLN_PERIPH0);
     let channels = (
@@ -208,16 +200,11 @@ fn main() -> ! {
     );
 
     let mut opts = Opts::default();
-    let mut flash_persist_opt = FlashOptionsPersistence::open(
-        spiflash, bootinfo.manifest.get_option_storage_window(), &mut opts);
-
-    // HACK: stolen spiflash instance!! be careful that delayln rd/wr is
-    // never happening at the same time as other spiflash ops.
-    let mut delayln_flash = DelaylineFlash::new(SPIFlash0::new(
-        unsafe { pac::Peripherals::steal() }.SPIFLASH_CTRL,
-        SPIFLASH_BASE,
-        SPIFLASH_SZ_BYTES,
-    ));
+    let flash = FlashMutex::<NoopRawMutex, _>::new(RefCell::new(spiflash));
+    let mut flash_persist_opt = FlashOptionsPersistence::open_partition(
+        &flash, bootinfo.manifest.get_option_storage_window(), &mut opts);
+    let mut delayln_flash = DelaylineFlash::new(
+        BlockingPartition::new(&flash, flash::BASE, flash::PARTITION_SIZE));
 
     palette::ColorPalette::default().write_to_hardware(&mut display);
 
@@ -227,7 +214,9 @@ fn main() -> ! {
         });
     }
 
-    let app = Mutex::new(RefCell::new(App::new(opts, channels, delayln)));
+    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+                         Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
+    let app = Mutex::new(RefCell::new(App::new(ui, channels, delayln, peripherals.SAMPLER_PERIPH)));
 
     handler!(timer0 = || timer0_handler(&app));
 

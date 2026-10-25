@@ -38,10 +38,6 @@ macro_rules! impl_encoder {
                            pending_press: false,
                     }
                 }
-
-                pub unsafe fn summon() -> Self {
-                    Self::new(<$PACENCODERX>::steal())
-                }
             }
 
             impl hal::encoder::Encoder for $ENCODERX {
