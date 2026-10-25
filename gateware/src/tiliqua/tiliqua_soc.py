@@ -54,7 +54,7 @@ from vendor.vexiiriscv import VexiiRiscv
 from . import pll
 from .build import sim
 from .build.types import FirmwareLocation
-from .periph import dtr, encoder, eurorack_pmod, i2c, psram
+from .periph import clint, dtr, encoder, eurorack_pmod, i2c, psram
 from .platform import *
 from .raster import blit, line, persist, plot
 from .video import framebuffer, palette
@@ -89,6 +89,7 @@ class TiliquaSoc(Component):
         self.bootinfo_base        = self.psram_base + self.psram_size - 4096
         self.csr_base             = 0xf0000000
         self.blit_mem_base        = 0xc0000000
+        self.clint_base           = 0x02000000
 
         # Offsets from `self.csr_base` of peripheral CSRs
         self.spiflash_ctrl_base   = 0x00000100
@@ -135,6 +136,7 @@ class TiliquaSoc(Component):
                 VexiiRiscv.MemoryRegion(base=self.psram_base, size=self.psram_size, cacheable=True, executable=True),
                 VexiiRiscv.MemoryRegion(base=self.csr_base, size=0x10000, cacheable=False, executable=False),
                 VexiiRiscv.MemoryRegion(base=self.blit_mem_base, size=0x2000, cacheable=False, executable=False),
+                VexiiRiscv.MemoryRegion(base=self.clint_base, size=clint.Peripheral.REGION_BYTES, cacheable=False, executable=False),
             ] + extra_cpu_regions,
             variant=cpu_variant,
             reset_addr=self.reset_addr,
@@ -161,6 +163,9 @@ class TiliquaSoc(Component):
         # mainram
         self.mainram = blockram.Peripheral(size=self.mainram_size)
         self.wb_decoder.add(self.mainram.bus, addr=self.mainram_base, name="blockram")
+
+        self.clint = clint.Peripheral(sync_clk_hz=self.clock_settings.frequencies.sync)
+        self.wb_decoder.add(self.clint.bus, addr=self.clint_base, name="clint")
 
         # csr decoder
         self.csr_decoder = csr.Decoder(addr_width=28, data_width=8)
@@ -296,6 +301,12 @@ class TiliquaSoc(Component):
         m.submodules.interrupt_controller = self.interrupt_controller
         # TODO wiring.connect(m, self.cpu.irq_external, self.irqs.pending)
         m.d.comb += self.cpu.irq_external.eq(self.interrupt_controller.pending)
+
+        m.submodules.clint = self.clint
+        m.d.comb += [
+            self.cpu.irq_timer.eq(self.clint.timer_irq),
+            self.cpu.irq_software.eq(self.clint.soft_irq),
+        ]
 
         # mainram
         m.submodules.mainram = self.mainram
@@ -475,6 +486,8 @@ class TiliquaSoc(Component):
             f.write(f"pub const TOUCH_SENSOR_ORDER: [u8; 8] = {pmod_rev.touch_order()};\n")
             f.write(f"pub const PMOD_DEFAULT_CAL: [f32; 4] = {pmod_rev.default_calibration_rs()};\n")
             f.write(f"pub const BLIT_MEM_BASE: usize = 0x{self.blit_mem_base:x};\n")
+            f.write(f"pub const CLINT_BASE: usize        = 0x{self.clint_base:x};\n")
+            f.write(f"pub const CLINT_MTIME_HZ: usize    = {self.clint.timebase_hz};\n")
             f.write(f"pub const AUDIO_FS: u32            = {self.clock_settings.audio_clock.fs()};\n")
 
             f.write("// Extra constants specified by an SoC subclass:\n")
