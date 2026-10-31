@@ -38,7 +38,7 @@ use static_cell::StaticCell;
 
 use tiliqua_fw::wavetable;
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
+pub const TICK_PERIOD_MS: u32 = 5;
 
 fn adsr_ui_to_rate(ui_value: u16) -> u16 {
     // 0..32768 -> 1ms..2000ms -> hardware rate
@@ -47,7 +47,7 @@ fn adsr_ui_to_rate(ui_value: u16) -> u16 {
     rate.min(65535) as u16
 }
 
-fn timer0_handler(app: &Mutex<RefCell<App>>) {
+fn tick_handler(app: &Mutex<RefCell<App>>) {
 
     critical_section::with(|cs| {
 
@@ -138,7 +138,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
         // LFO -> phase modulation CSR
         {
             use wavetable::{Fix32, CYCLE_LEN};
-            let isr_rate = Fix32::from_num(1000u32 / TIMER0_ISR_PERIOD_MS);
+            let isr_rate = Fix32::from_num(1000u32 / TICK_PERIOD_MS);
             // lfo_rate option: 0..50 -> 0..5.0 Hz
             // Q16.16 from_bits: value * 65536 / 10 = value * 6554
             let rate_hz = Fix32::from_bits(i32::from(opts.voice.lfo_rate.value) * 6554);
@@ -277,9 +277,7 @@ impl App {
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
-    let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
-    let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
     let spiflash = SPIFlash0::new(
         peripherals.SPIFLASH_CTRL,
@@ -331,18 +329,17 @@ fn main() -> ! {
 
     let mut last_palette = opts.beam.palette.value;
     let mut last_jack = pmod.jack();
-    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+    let ui = ui::UI::new(opts, TICK_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
                          Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
     let app = Mutex::new(RefCell::new(App::new(ui, Polysynth0::new(peripherals.SYNTH_PERIPH))));
 
-    handler!(timer0 = || timer0_handler(&app));
+    handler!(tick_isr = || tick_handler(&app));
 
     irq::scope(|s| {
 
-        s.register(handlers::Interrupt::TIMER0, timer0);
+        s.register(tick::Interrupt::TICK, tick_isr);
 
-        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
-                              pac::Interrupt::TIMER0);
+        tick::enable(TICK_PERIOD_MS);
 
         let mut vscope = Vector0::new(peripherals.VECTOR_PERIPH);
         let mut first = true;

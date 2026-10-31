@@ -10,7 +10,6 @@ use core::cell::RefCell;
 use core::fmt::Write;
 
 use embedded_hal::i2c::{I2c, Operation};
-use embedded_hal::delay::DelayNs;
 use tiliqua_hal::embedded_graphics::{
     mono_font::{ascii::FONT_9X15, MonoTextStyle},
     text::{Alignment, Text},
@@ -40,10 +39,10 @@ use tiliqua_hal::cy8cmbr3xxx::Cy8cmbr3108Driver;
 
 pub type ReportString = String<512>;
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 10;
+pub const TICK_PERIOD_MS: u32 = 10;
 
 
-fn timer0_handler(app: &Mutex<RefCell<App>>) {
+fn tick_handler(app: &Mutex<RefCell<App>>) {
 
     critical_section::with(|cs| {
 
@@ -103,7 +102,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
     });
 }
 
-fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
+fn psram_memtest(s: &mut ReportString) {
 
     // WARN: be careful about memtesting near:
     // - framebuffer at the start of PSRAM.
@@ -116,10 +115,7 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
     let memtest_start = (PSRAM_SZ_WORDS/2) - psram_sz_test;
     let memtest_end = PSRAM_SZ_WORDS/2;
 
-    timer.set_timeout_ticks(0xFFFFFFFF);
-    timer.enable();
-
-    let start = timer.counter();
+    let start = Clint::mtime();
 
     unsafe {
         for i in memtest_start..memtest_end {
@@ -127,7 +123,7 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
         }
     }
 
-    let endwrite = timer.counter();
+    let endwrite = Clint::mtime();
 
     let mut psram_fl = false;
     unsafe {
@@ -140,12 +136,11 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
         }
     }
 
-    let endread = timer.counter();
+    let endread = Clint::mtime();
 
-    let write_ticks = start-endwrite;
-    let read_ticks = endwrite-endread;
+    let write_ticks = endwrite-start;
+    let read_ticks = endread-endwrite;
 
-    let sysclk = pac::clock::sysclk();
     if psram_fl {
         write!(s, "FAIL: PSRAM memtest\r\n").ok();
 
@@ -153,19 +148,16 @@ fn psram_memtest(s: &mut ReportString, timer: &mut Timer0) {
         write!(s, "PASS: PSRAM memtest\r\n").ok();
     }
 
-    write!(s, "  write {} KByte/sec\r\n", (u64::from(sysclk) * (psram_sz_test/1024) as u64) / u64::from(write_ticks)).ok();
-    write!(s, "  read {} KByte/sec\r\n", (u64::from(sysclk) * (psram_sz_test/1024) as u64) / u64::from(read_ticks)).ok();
+    write!(s, "  write {} KByte/sec\r\n", (CLINT_MTIME_HZ as u64 * (psram_sz_test/1024) as u64) / write_ticks).ok();
+    write!(s, "  read {} KByte/sec\r\n", (CLINT_MTIME_HZ as u64 * (psram_sz_test/1024) as u64) / read_ticks).ok();
 }
 
-fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
+fn spiflash_memtest(s: &mut ReportString) {
 
     let spiflash_ptr = SPIFLASH_BASE as *mut u32;
     let spiflash_sz_test = 1024;
 
-    timer.enable();
-    timer.set_timeout_ticks(0xFFFFFFFF);
-
-    let start = timer.counter();
+    let start = Clint::mtime();
 
     let mut first_words: [u32; 8] = [0u32; 8];
 
@@ -178,9 +170,7 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
         }
     }
 
-    let read_ticks = start-timer.counter();
-
-    let sysclk = pac::clock::sysclk();
+    let read_ticks = Clint::mtime() - start;
 
     // TODO: verify there is actually a bitstream header in first N words?
     let mut spiflash_fl = true;
@@ -196,7 +186,7 @@ fn spiflash_memtest(s: &mut ReportString, timer: &mut Timer0) {
     } else {
         write!(s, "PASS: SPIFLASH memtest\r\n").ok();
     }
-    write!(s, "  read {} KByte/sec\r\n", (u64::from(sysclk) * (spiflash_sz_test/1024) as u64) / u64::from(read_ticks)).ok();
+    write!(s, "  read {} KByte/sec\r\n", (CLINT_MTIME_HZ as u64 * (spiflash_sz_test/1024) as u64) / read_ticks).ok();
 }
 
 fn tusb322_id_test(s: &mut ReportString, i2cdev: &mut impl I2c) {
@@ -398,7 +388,6 @@ fn main() -> ! {
     tiliqua_fw::handlers::logger_init(serial);
 
     let sysclk = pac::clock::sysclk();
-    let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
 
     info!("Hello from Tiliqua selftest!");
@@ -418,15 +407,12 @@ fn main() -> ! {
 
     let mut startup_report = ReportString::new();
 
-    psram_memtest(&mut startup_report, &mut timer);
-    spiflash_memtest(&mut startup_report, &mut timer);
+    psram_memtest(&mut startup_report);
+    spiflash_memtest(&mut startup_report);
     tusb322_id_test(&mut startup_report, &mut i2cdev_tusb);
     print_touch_err(&mut startup_report, &pmod);
     eeprom_id_test(&mut startup_report, &mut i2cdev_eeprom);
     edid_test(&mut startup_report, &mut i2cdev_edid);
-
-    timer.disable();
-    timer.delay_ns(0);
 
 
     let mut opts = Opts::default();
@@ -442,14 +428,14 @@ fn main() -> ! {
     info!("STARTUP REPORT: {startup_report}");
 
     let mut last_jack = pmod.jack();
-    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+    let ui = ui::UI::new(opts, TICK_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
                          Pca9635Driver::new(I2cDevice::new(i2c0)), pmod);
     let app = Mutex::new(RefCell::new(App { ui }));
     let hue = 10;
 
     let mut display = hal::new_framebuffer!(peripherals, modeline.clone());
 
-    handler!(timer0 = || timer0_handler(&app));
+    handler!(tick_isr = || tick_handler(&app));
 
     let psram = peripherals.PSRAM_CSR;
 
@@ -467,10 +453,9 @@ fn main() -> ! {
         palette::ColorPalette::default().write_to_hardware(&mut display);
         persist.set_persistence(20);
 
-        s.register(handlers::Interrupt::TIMER0, timer0);
+        s.register(tick::Interrupt::TICK, tick_isr);
 
-        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
-                              pac::Interrupt::TIMER0);
+        tick::enable(TICK_PERIOD_MS);
 
         let h_active = display.size().width;
         let v_active = display.size().height;

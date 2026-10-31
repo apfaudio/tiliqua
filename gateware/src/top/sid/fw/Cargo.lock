@@ -457,6 +457,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "riscv-peripheral"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abaeb1973471ded96f54cdbc580e17a9b2f73aee7c6708daca2414b20b98c9ac"
+dependencies = [
+ "embedded-hal 1.0.0",
+ "pastey",
+ "riscv",
+]
+
+[[package]]
 name = "riscv-rt"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -644,6 +655,7 @@ dependencies = [
  "embedded-storage",
  "nb 1.1.0",
  "riscv",
+ "riscv-peripheral",
  "serde",
  "serde_derive",
  "strum",

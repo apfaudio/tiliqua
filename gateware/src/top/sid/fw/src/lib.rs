@@ -10,6 +10,7 @@ hal::impl_scope! {
     Scope0: pac::SCOPE_PERIPH,
 }
 
-tiliqua_lib::impl_handlers!(Serial0, Timer0);
+tiliqua_lib::impl_handlers!(Serial0);
+tiliqua_lib::impl_tick!(Clint);
 
 pub mod options;

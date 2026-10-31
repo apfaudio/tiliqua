@@ -29,7 +29,7 @@ use embassy_sync::blocking_mutex::{Mutex as FlashMutex, raw::NoopRawMutex};
 use tiliqua_hal::persist::Persist;
 use tiliqua_hal::pmod::EurorackPmod;
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
+pub const TICK_PERIOD_MS: u32 = 5;
 
 // samples to draw in waveform peak/line displays
 pub const WAVEFORM_SAMPLES: usize = 240;
@@ -120,7 +120,7 @@ impl App {
     }
 }
 
-fn timer0_handler(app: &Mutex<RefCell<App>>) {
+fn tick_handler(app: &Mutex<RefCell<App>>) {
     critical_section::with(|cs| {
 
         let mut app = app.borrow_ref_mut(cs);
@@ -169,9 +169,7 @@ fn timer0_handler(app: &Mutex<RefCell<App>>) {
 #[entry]
 fn main() -> ! {
     let peripherals = pac::Peripherals::take().expect("unable to take peripherals");
-    let sysclk = pac::clock::sysclk();
     let serial = Serial0::new(peripherals.UART0);
-    let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
     let spiflash = SPIFlash0::new(
         peripherals.SPIFLASH_CTRL,
@@ -214,18 +212,17 @@ fn main() -> ! {
         });
     }
 
-    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+    let ui = ui::UI::new(opts, TICK_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
                          Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
     let app = Mutex::new(RefCell::new(App::new(ui, channels, delayln, peripherals.SAMPLER_PERIPH)));
 
-    handler!(timer0 = || timer0_handler(&app));
+    handler!(tick_isr = || tick_handler(&app));
 
     irq::scope(|s| {
 
-        s.register(handlers::Interrupt::TIMER0, timer0);
+        s.register(tick::Interrupt::TICK, tick_isr);
 
-        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
-                              pac::Interrupt::TIMER0);
+        tick::enable(TICK_PERIOD_MS);
 
         let hue = 10;
         let mut last_palette = palette::ColorPalette::default();

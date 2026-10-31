@@ -23,7 +23,7 @@ use options::*;
 use opts::persistence::*;
 use hal::pca9635::*;
 
-pub const TIMER0_ISR_PERIOD_MS: u32 = 5;
+pub const TICK_PERIOD_MS: u32 = 5;
 const BLOCK_SIZE: usize = 128;
 // PSRAM heap for big audio buffers.
 const HEAP_START: usize = PSRAM_BASE + (PSRAM_SZ_BYTES / 2);
@@ -83,7 +83,7 @@ pub fn f32_to_i32(f: u32) -> i32 {
     }
 }
 
-fn timer0_handler(app: &Mutex<RefCell<App>>) {
+fn tick_handler(app: &Mutex<RefCell<App>>) {
 
     critical_section::with(|cs| {
 
@@ -178,8 +178,6 @@ fn main() -> ! {
     let serial = Serial0::new(peripherals.UART0);
     tiliqua_fw::handlers::logger_init(serial);
 
-    let sysclk = pac::clock::sysclk();
-    let mut timer = Timer0::new(peripherals.TIMER0, sysclk);
     let mut persist = Persist0::new(peripherals.PERSIST_PERIPH);
     let spiflash = SPIFlash0::new(
         peripherals.SPIFLASH_CTRL,
@@ -222,7 +220,7 @@ fn main() -> ! {
     //
 
     let mut last_palette = opts.beam.palette.value;
-    let ui = ui::UI::new(opts, TIMER0_ISR_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
+    let ui = ui::UI::new(opts, TICK_PERIOD_MS, Encoder0::new(peripherals.ENCODER0),
                          Pca9635Driver::new(I2c0::new(peripherals.I2C0)), pmod);
     let app = App::new(ui, peripherals.AUDIO_FIFO);
     let app = Mutex::new(RefCell::new(app));
@@ -239,12 +237,9 @@ fn main() -> ! {
         let mut patch = app.patch.clone();
         let modulations = app.modulations.clone();
 
-        timer.set_timeout_ticks(0xFFFFFFFF);
-        timer.enable();
-
         for engine in 0..24 {
 
-            let start = timer.counter();
+            let start = Clint::mtime();
 
             patch.engine = engine;
 
@@ -253,27 +248,21 @@ fn main() -> ! {
                     .render(&patch, &modulations, &mut out, &mut aux);
                 }
 
-            let read_ticks = start-timer.counter();
+            let read_ticks = Clint::mtime() - start;
 
-            let sysclk = pac::clock::sysclk();
-            info!("engine {} speed {} samples/sec", engine, ((sysclk as u64) * ((BLOCK_SIZE * 8) as u64) / (read_ticks as u64)));
+            info!("engine {} speed {} samples/sec", engine, ((CLINT_MTIME_HZ as u64) * ((BLOCK_SIZE * 8) as u64) / read_ticks));
         }
-
-        timer.disable();
-        use embedded_hal::delay::DelayNs;
-        timer.delay_ns(0);
     });
     */
 
 
-    handler!(timer0 = || timer0_handler(&app));
+    handler!(tick_isr = || tick_handler(&app));
 
     irq::scope(|s| {
 
-        s.register(handlers::Interrupt::TIMER0, timer0);
+        s.register(tick::Interrupt::TICK, tick_isr);
 
-        timer.enable_tick_isr(TIMER0_ISR_PERIOD_MS,
-                              pac::Interrupt::TIMER0);
+        tick::enable(TICK_PERIOD_MS);
 
 
         let mut first = true;

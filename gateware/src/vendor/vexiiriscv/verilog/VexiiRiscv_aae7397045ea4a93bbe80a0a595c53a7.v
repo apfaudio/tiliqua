@@ -6788,7 +6788,7 @@ module VexiiRiscv (
   assign _zz_LsuPlugin_pmaBuilder_l1_onTransfers_0_addressHit = (|_zz_LsuPlugin_logic_onPma_cached_rsp_io);
   assign _zz_LsuPlugin_logic_onPma_cached_rsp_io_1 = (|_zz_LsuPlugin_logic_onPma_cached_rsp_io);
   assign _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit = (|((LsuPlugin_pmaBuilder_io_addressBits & 32'h0) == 32'h0));
-  assign _zz_LsuPlugin_logic_onPma_io_rsp_io = (|((LsuPlugin_pmaBuilder_io_addressBits & 32'h80000000) == 32'h0));
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_io = (|((LsuPlugin_pmaBuilder_io_addressBits & 32'h82000000) == 32'h0));
   assign _zz_early0_BranchPlugin_logic_jumpLogic_history_shifter_1 = {early0_BranchPlugin_logic_jumpLogic_history_shifter,execute_ctrl2_down_Prediction_ALIGNED_SLICES_TAKEN_lane0[0]};
   assign _zz_early0_BranchPlugin_logic_jumpLogic_history_shifter_2 = {early0_BranchPlugin_logic_jumpLogic_history_shifter_1,execute_ctrl2_down_early0_BranchPlugin_logic_jumpLogic_COND_lane0};
   assign _zz_late0_BranchPlugin_logic_jumpLogic_history_shifter_1 = {late0_BranchPlugin_logic_jumpLogic_history_shifter,execute_ctrl3_down_Prediction_ALIGNED_SLICES_TAKEN_lane0[0]};
@@ -7318,9 +7318,9 @@ module VexiiRiscv (
   assign _zz__zz_FpuPackerPlugin_logic_pip_node_0_s0_FLAGS_NX_11 = FpuSqrtPlugin_logic_packPort_cmd_flags_NX;
   assign _zz__zz_FpuPackerPlugin_logic_pip_node_0_s0_FLAGS_NX_14 = FpuDivPlugin_logic_packPort_cmd_flags_UF;
   assign _zz__zz_FpuPackerPlugin_logic_pip_node_0_s0_FLAGS_NX_15 = FpuDivPlugin_logic_packPort_cmd_flags_NX;
-  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault = 32'hffff0000;
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault = 32'hfdff0000;
   assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_1 = (LsuPlugin_pmaBuilder_io_addressBits & 32'hffff0000);
-  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_2 = 32'h0;
+  assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_2 = 32'hf0000000;
   assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_3 = ((LsuPlugin_pmaBuilder_io_addressBits & 32'hffffe000) == 32'hc0000000);
   assign _zz_LsuPlugin_logic_onPma_io_rsp_fault_4 = ((LsuPlugin_pmaBuilder_io_addressBits & 32'hfffffff8) == 32'ha0000000);
   assign _zz_execute_lane0_api_hartsInflight = (! execute_ctrl8_down_COMPLETED_lane0);
@@ -13700,7 +13700,7 @@ module VexiiRiscv (
   assign LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit = _zz_LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit[0];
   assign LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit = (|((LsuPlugin_pmaBuilder_io_argsBits & 3'b000) == 3'b000));
   assign LsuPlugin_pmaBuilder_io_onTransfers_0_hit = (LsuPlugin_pmaBuilder_io_onTransfers_0_argsHit && LsuPlugin_pmaBuilder_io_onTransfers_0_addressHit);
-  assign LsuPlugin_logic_onPma_io_rsp_fault = (! ((|{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h10000000),{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h20000000),{((LsuPlugin_pmaBuilder_io_addressBits & _zz_LsuPlugin_logic_onPma_io_rsp_fault) == 32'hf0000000),{(_zz_LsuPlugin_logic_onPma_io_rsp_fault_1 == _zz_LsuPlugin_logic_onPma_io_rsp_fault_2),{_zz_LsuPlugin_logic_onPma_io_rsp_fault_3,_zz_LsuPlugin_logic_onPma_io_rsp_fault_4}}}}}) && (|LsuPlugin_pmaBuilder_io_onTransfers_0_hit)));
+  assign LsuPlugin_logic_onPma_io_rsp_fault = (! ((|{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h10000000),{((LsuPlugin_pmaBuilder_io_addressBits & 32'hff000000) == 32'h20000000),{((LsuPlugin_pmaBuilder_io_addressBits & _zz_LsuPlugin_logic_onPma_io_rsp_fault) == 32'h0),{(_zz_LsuPlugin_logic_onPma_io_rsp_fault_1 == _zz_LsuPlugin_logic_onPma_io_rsp_fault_2),{_zz_LsuPlugin_logic_onPma_io_rsp_fault_3,_zz_LsuPlugin_logic_onPma_io_rsp_fault_4}}}}}) && (|LsuPlugin_pmaBuilder_io_onTransfers_0_hit)));
   assign LsuPlugin_logic_onPma_io_rsp_io = (! _zz_LsuPlugin_logic_onPma_io_rsp_io[0]);
   assign execute_ctrl1_down_early0_BranchPlugin_logic_alu_EQ_lane0 = ($signed(execute_ctrl1_down_early0_SrcPlugin_SRC1_lane0) == $signed(execute_ctrl1_down_early0_SrcPlugin_SRC2_lane0));
   assign execute_ctrl1_down_early0_BranchPlugin_logic_alu_btb_BAD_TARGET_lane0 = (execute_ctrl1_down_Prediction_ALIGNED_JUMPED_PC_lane0 != execute_ctrl1_down_early0_BranchPlugin_pcCalc_PC_TRUE_lane0);

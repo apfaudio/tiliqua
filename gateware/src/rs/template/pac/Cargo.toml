@@ -2,7 +2,6 @@
 name = "tiliqua-pac"
 version = "0.0.1"
 edition = "2021"
-rust-version = "1.68"
 include = ["src/**/*", "README.md", "device.x", "build.rs"]
 
 [package.metadata.docs.rs]
