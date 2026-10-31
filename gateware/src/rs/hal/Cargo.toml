@@ -3,7 +3,6 @@ name = "tiliqua-hal"
 version = "0.0.0"
 categories = ["embedded", "hardware-support", "no-std"]
 edition = "2021"
-rust-version = "1.68"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
