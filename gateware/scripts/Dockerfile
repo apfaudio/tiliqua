@@ -36,7 +36,7 @@ RUN curl -sSL https://pdm-project.org/install-pdm.py | python3 -
 ENV PATH="/root/.local/bin:${PATH}"
 
 # Install OSS CAD Suite
-RUN curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2025-11-02/oss-cad-suite-linux-x64-20251102.tgz | \
+RUN curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-10-25/oss-cad-suite-linux-x64-20261025.tgz | \
     tar -xz -C /opt
 ENV PATH="/opt/oss-cad-suite/bin:${PATH}"
 
