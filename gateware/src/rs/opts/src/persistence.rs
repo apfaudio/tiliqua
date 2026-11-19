@@ -131,7 +131,7 @@ impl<F: NorFlash + MultiwriteNorFlash> OptionsPersistence for FlashOptionsPersis
         }
         let mut buf: [u8; DATA_BUFFER_SZ] = [0u8; DATA_BUFFER_SZ];
         if let Some(encoded_len) = opts.page().encode(&mut buf) {
-            self.save_key(DEFAULT_PAGE_KEY, &buf[..encoded_len])?;
+            self.save_key_retries(DEFAULT_PAGE_KEY, &buf[..encoded_len], 2)?;
         }
         Ok(())
     }
