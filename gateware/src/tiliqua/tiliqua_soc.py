@@ -61,6 +61,9 @@ from .video import framebuffer, palette
 
 
 class TiliquaSoc(Component):
+
+    ON_DELAY_CYCLES = 0xFFFFF
+
     def __init__(self, *, firmware_bin_path, ui_name, ui_tag, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, poke_outputs=False, mainram_size=0x4000,
                  fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
@@ -422,8 +425,8 @@ class TiliquaSoc(Component):
         m.submodules.wb_to_csr = self.wb_to_csr
 
         # Memory controller hangs if we start making requests to it straight away.
-        on_delay = Signal(32)
-        with m.If(on_delay < 0xFFFFF):
+        on_delay = Signal(range(self.ON_DELAY_CYCLES + 1))
+        with m.If(on_delay < self.ON_DELAY_CYCLES):
             m.d.comb += self.cpu.ext_reset.eq(1)
             m.d.sync += on_delay.eq(on_delay+1)
 

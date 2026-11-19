@@ -450,6 +450,8 @@ class I2CMaster(wiring.Component):
     N_LEDS    = N_JACKS * 2
     N_SENSORS = 8
 
+    STARTUP_DELAY_CYCLES = 2**22 # ~70ms
+
     AK4619VN_CFG_48KHZ = [
         0x00, # Register address to start at.
         0x36, # 0x00 Power Management (RSTN asserted!)
@@ -666,7 +668,7 @@ class I2CMaster(wiring.Component):
         with m.Else():
             m.d.comb += codec_reg00.eq(self.ak4619vn_cfg[1] | 0b00000001)
 
-        startup_delay = Signal(32)
+        startup_delay = Signal(range(self.STARTUP_DELAY_CYCLES + 1))
 
         with m.FSM(init='STARTUP-DELAY') as fsm:
 
@@ -683,7 +685,7 @@ class I2CMaster(wiring.Component):
 
             with m.State('STARTUP-DELAY'):
                 if platform is not None:
-                    with m.If(startup_delay == 2**22): # ~70ms
+                    with m.If(startup_delay == self.STARTUP_DELAY_CYCLES):
                         m.next = init
                     with m.Else():
                         m.d.sync += startup_delay.eq(startup_delay+1)

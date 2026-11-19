@@ -15,6 +15,9 @@ class Peripheral(wiring.Component):
     class TemperatureReg(csr.Register, access="r"):
         temperature: csr.Field(csr.action.R, unsigned(8))
 
+    READ_PERIOD_CYCLES = 60000000
+    START_PULSE_CYCLES = 10000
+
     def __init__(self, **kwargs):
         regs = csr.Builder(addr_width=5, data_width=8)
 
@@ -33,7 +36,7 @@ class Peripheral(wiring.Component):
 
         connect(m, flipped(self.bus), self._bridge.bus)
 
-        read_cnt = Signal(32)
+        read_cnt = Signal(range(self.READ_PERIOD_CYCLES + 1))
         start_pulse = Signal()
         dtr_valid = Signal()
         dtr_code = Signal(6)
@@ -50,11 +53,11 @@ class Peripheral(wiring.Component):
         )
 
         m.d.sync += read_cnt.eq(read_cnt + 1)
-        with m.If(read_cnt == 60000000):
+        with m.If(read_cnt == self.READ_PERIOD_CYCLES):
             m.d.sync += read_cnt.eq(0)
 
         m.d.comb += start_pulse.eq(0)
-        with m.If(read_cnt < 10000):
+        with m.If(read_cnt < self.START_PULSE_CYCLES):
             m.d.comb += start_pulse.eq(1)
 
         valid_code = Signal(6)

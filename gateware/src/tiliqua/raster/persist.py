@@ -74,7 +74,7 @@ class Persistance(wiring.Component):
         # Latched version of skip probability control input
         skip_latch = Signal.like(self.skip)
         # Track delay between read/write bursts
-        holdoff_count = Signal(32)
+        holdoff_count = Signal(range(2**len(self.holdoff) + 1))
         # Incoming pixel array (read from FIFO)
         pixels_r = Signal(data.ArrayLayout(Pixel, 4))
 
