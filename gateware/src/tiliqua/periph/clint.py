@@ -26,7 +26,7 @@ class Peripheral(wiring.Component):
 
     REGION_BYTES = 0x10000
 
-    def __init__(self, *, sync_clk_hz, timebase_hz=1_000_000, name="clint"):
+    def __init__(self, *, sync_clk_hz, timebase_hz=1_000_000, mtime_writable=False, name="clint"):
         if sync_clk_hz % timebase_hz != 0:
             raise ValueError(
                 f"CLINT: sync clock {sync_clk_hz} Hz must be an integer multiple "
@@ -34,6 +34,7 @@ class Peripheral(wiring.Component):
         self.name        = name
         self.timebase_hz = timebase_hz
         self._tick_div   = sync_clk_hz // timebase_hz
+        self._mtime_writable = mtime_writable
 
         data_width  = 32
         granularity = 8
@@ -114,9 +115,10 @@ class Peripheral(wiring.Component):
                     write_lanes(mtimecmp[:32])
                 with m.Case(W_MTIMECMP_HI):
                     write_lanes(mtimecmp[32:])
-                with m.Case(W_MTIME_LO):
-                    write_lanes(mtime[:32])
-                with m.Case(W_MTIME_HI):
-                    write_lanes(mtime[32:])
+                if self._mtime_writable:
+                    with m.Case(W_MTIME_LO):
+                        write_lanes(mtime[:32])
+                    with m.Case(W_MTIME_HI):
+                        write_lanes(mtime[32:])
 
         return m
