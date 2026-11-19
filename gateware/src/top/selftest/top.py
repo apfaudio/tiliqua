@@ -33,7 +33,7 @@ class SelftestSoc(TiliquaSoc):
     def __init__(self, **kwargs):
 
         # don't finalize the CSR bridge in TiliquaSoc, we're adding more peripherals.
-        super().__init__(finalize_csr_bridge=False, **kwargs)
+        super().__init__(finalize_csr_bridge=False, psram_stats=True, **kwargs)
 
         self.gpio0_base = 0x00001000
         self.gpio1_base = 0x00001100

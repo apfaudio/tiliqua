@@ -67,7 +67,7 @@ class Peripheral(wiring.Component):
         # data (4 bytes) to the PSRAM controller.
         cycles_ack_w:   csr.Field(csr.action.R, unsigned(32))
 
-    def __init__(self, *, size, data_width=32, granularity=8, name="psram"):
+    def __init__(self, *, size, data_width=32, granularity=8, name="psram", with_stats=False):
         if not isinstance(size, int) or size <= 0 or size & size-1:
             raise ValueError("Size must be an integer power of two, not {!r}"
                              .format(size))
@@ -80,23 +80,27 @@ class Peripheral(wiring.Component):
         self.granularity = granularity
         self.name        = name
         self.mem_depth   = (size * granularity) // data_width
+        self.with_stats  = with_stats
 
         # memory map
         memory_map = MemoryMap(addr_width=exact_log2(size), data_width=granularity)
         memory_map.add_resource(name=("memory", self.name,), size=size, resource=self)
 
         # csrs
-        regs = csr.Builder(addr_width=5, data_width=8)
-        self._ctrl   = regs.add("ctrl",   self.PsramStatsCtrl(), offset=0x0)
-        self._stats0 = regs.add("stats0", self.PsramStatsReg0(), offset=0x4)
-        self._stats1 = regs.add("stats1", self.PsramStatsReg1(), offset=0x8)
-        self._stats2 = regs.add("stats2", self.PsramStatsReg2(), offset=0xC)
-        self._stats3 = regs.add("stats3", self.PsramStatsReg3(), offset=0x10)
-        self._bridge = csr.Bridge(regs.as_memory_map())
+        members = {}
+        if with_stats:
+            regs = csr.Builder(addr_width=5, data_width=8)
+            self._ctrl   = regs.add("ctrl",   self.PsramStatsCtrl(), offset=0x0)
+            self._stats0 = regs.add("stats0", self.PsramStatsReg0(), offset=0x4)
+            self._stats1 = regs.add("stats1", self.PsramStatsReg1(), offset=0x8)
+            self._stats2 = regs.add("stats2", self.PsramStatsReg2(), offset=0xC)
+            self._stats3 = regs.add("stats3", self.PsramStatsReg3(), offset=0x10)
+            self._bridge = csr.Bridge(regs.as_memory_map())
+            members["csr_bus"] = In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width))
 
         # bus
         super().__init__({
-            "csr_bus": In(csr.Signature(addr_width=regs.addr_width, data_width=regs.data_width)),
+            **members,
             "bus": In(wishbone.Signature(addr_width=exact_log2(self.mem_depth),
                                          data_width=data_width,
                                          granularity=granularity,
@@ -105,7 +109,8 @@ class Peripheral(wiring.Component):
             # should be optimized out in non-sim builds.
             "simif": In(sim.FakePSRAMSimulationInterface())
         })
-        self.csr_bus.memory_map = self._bridge.bus.memory_map
+        if with_stats:
+            self.csr_bus.memory_map = self._bridge.bus.memory_map
         self.bus.memory_map = memory_map
 
         # hram arbiter
@@ -123,8 +128,9 @@ class Peripheral(wiring.Component):
         m = Module()
 
         # csr bus
-        m.submodules.bridge = self._bridge
-        wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
+        if self.with_stats:
+            m.submodules.bridge = self._bridge
+            wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
         # arbiter
         m.submodules.arbiter = self._hram_arbiter
@@ -252,29 +258,29 @@ class Peripheral(wiring.Component):
                 with m.If(psram.idle):
                     m.next = 'IDLE'
 
-        # Logic for tracking PSRAM bandwidth consumption.
+        if self.with_stats:
+            # Logic for tracking PSRAM bandwidth consumption.
 
-        stats_collect = Signal()
+            stats_collect = Signal()
 
-        with m.If(stats_collect):
-            m.d.sync += self._stats0.f.cycles_elapsed.r_data.eq(self._stats0.f.cycles_elapsed.r_data+1)
-            with m.If(psram.idle):
-                m.d.sync += self._stats1.f.cycles_idle.r_data.eq(self._stats1.f.cycles_idle.r_data+1)
-            with m.If(psram.read_ready):
-                m.d.sync += self._stats2.f.cycles_ack_r.r_data.eq(self._stats2.f.cycles_ack_r.r_data+1)
-            with m.If(psram.write_ready):
-                m.d.sync += self._stats3.f.cycles_ack_w.r_data.eq(self._stats3.f.cycles_ack_w.r_data+1)
+            with m.If(stats_collect):
+                m.d.sync += self._stats0.f.cycles_elapsed.r_data.eq(self._stats0.f.cycles_elapsed.r_data+1)
+                with m.If(psram.idle):
+                    m.d.sync += self._stats1.f.cycles_idle.r_data.eq(self._stats1.f.cycles_idle.r_data+1)
+                with m.If(psram.read_ready):
+                    m.d.sync += self._stats2.f.cycles_ack_r.r_data.eq(self._stats2.f.cycles_ack_r.r_data+1)
+                with m.If(psram.write_ready):
+                    m.d.sync += self._stats3.f.cycles_ack_w.r_data.eq(self._stats3.f.cycles_ack_w.r_data+1)
 
-        with m.If(self._ctrl.f.collect.w_stb):
-            m.d.sync += stats_collect.eq(self._ctrl.f.collect.w_data)
-            # Reset stats whenever collect is strobed with 1
-            with m.If(self._ctrl.f.collect.w_data):
-                m.d.sync += [
-                    self._stats0.f.cycles_elapsed.r_data.eq(0),
-                    self._stats1.f.cycles_idle.r_data.eq(0),
-                    self._stats2.f.cycles_ack_r.r_data.eq(0),
-                    self._stats3.f.cycles_ack_w.r_data.eq(0),
-                ]
-
+            with m.If(self._ctrl.f.collect.w_stb):
+                m.d.sync += stats_collect.eq(self._ctrl.f.collect.w_data)
+                # Reset stats whenever collect is strobed with 1
+                with m.If(self._ctrl.f.collect.w_data):
+                    m.d.sync += [
+                        self._stats0.f.cycles_elapsed.r_data.eq(0),
+                        self._stats1.f.cycles_idle.r_data.eq(0),
+                        self._stats2.f.cycles_ack_r.r_data.eq(0),
+                        self._stats3.f.cycles_ack_w.r_data.eq(0),
+                    ]
 
         return m

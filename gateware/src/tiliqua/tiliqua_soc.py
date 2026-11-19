@@ -64,7 +64,7 @@ class TiliquaSoc(Component):
     def __init__(self, *, firmware_bin_path, ui_name, ui_tag, platform_class, clock_settings,
                  touch=False, finalize_csr_bridge=True, poke_outputs=False, mainram_size=0x4000,
                  fw_location=None, fw_offset=None, cpu_variant="tiliqua_rv32im",
-                 extra_cpu_regions=[], fb_overlay=None):
+                 extra_cpu_regions=[], fb_overlay=None, psram_stats=False):
 
         super().__init__({})
 
@@ -183,10 +183,11 @@ class TiliquaSoc(Component):
         self.csr_decoder.add(self.spiflash_periph.csr, addr=self.spiflash_ctrl_base, name="spiflash_ctrl")
 
         # psram peripheral
-        self.psram_periph = psram.Peripheral(size=self.psram_size)
+        self.psram_periph = psram.Peripheral(size=self.psram_size, with_stats=psram_stats)
         self.wb_decoder.add(self.psram_periph.bus, addr=self.psram_base,
                             name="psram")
-        self.csr_decoder.add(self.psram_periph.csr_bus, addr=self.psram_csr_base, name="psram_csr")
+        if psram_stats:
+            self.csr_decoder.add(self.psram_periph.csr_bus, addr=self.psram_csr_base, name="psram_csr")
 
         # mobo i2c
         self.i2c0 = i2c.Peripheral()
