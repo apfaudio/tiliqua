@@ -41,6 +41,8 @@ CPU_BASE = [
     # maintenance on USB DMA buffers at the moment, but this
     # should be pretty cheap so we enable it everywhere.
     '--with-rvZcbm',
+    # improve dpram inference on ecp5 (from my fork)
+    '--lsu-l1-banks-single-ram',
 ]
 
 CPU_VARIANTS = {
